@@ -1,0 +1,22 @@
+[submodule "tools/timeloop"]
+	path = tools/timeloop
+	url = https://github.com/NVlabs/timeloop.git
+[submodule "tools/accelergy"]
+	path = tools/accelergy
+	url = https://github.com/Accelergy-Project/accelergy.git
+[submodule "tools/accelergy-aladdin-plug-in"]
+	path = tools/accelergy-aladdin-plug-in
+	url = https://github.com/Accelergy-Project/accelergy-aladdin-plug-in.git
+	ignore = dirty
+[submodule "tools/accelergy-cacti-plug-in"]
+	path = tools/accelergy-cacti-plug-in
+	url = https://github.com/Accelergy-Project/accelergy-cacti-plug-in.git
+	ignore = dirty
+[submodule "tools/accelergy-table-based-plug-ins"]
+	path = tools/accelergy-table-based-plug-ins
+	url = https://github.com/Accelergy-Project/accelergy-table-based-plug-ins.git
+	ignore = dirty
+[submodule "tools/cacti"]
+	path = tools/cacti
+	url = https://github.com/HewlettPackard/cacti.git
+	ignore = dirty
