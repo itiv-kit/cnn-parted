@@ -49,6 +49,7 @@ class Timeloop:
         self.freq = tl_config['frequency']
         self.mapper_cfg = {} if not tl_config.get('mapper') else tl_config['mapper']
         self.type_cfg = '.yaml'
+        self.runroot = tl_config['run_root']
 
     def run(self,
             layer : LayerInfo,
@@ -57,9 +58,8 @@ class Timeloop:
         if os.path.isfile(os.path.join(self.configs_dir, 'archs', (self.accname + '.cfg'))):
             self.type_cfg = '.cfg'
 
-
         runname = layer.class_name + str(layer.depth) + str(layer.depth_index) + self.accname
-        dirname = os.path.join(ROOT_DIR, 'run', runname)
+        dirname = os.path.join(ROOT_DIR, self.runroot, runname)
         subprocess.check_call(['mkdir', '-p', dirname])
         os.chdir(dirname)
 
@@ -68,7 +68,7 @@ class Timeloop:
         nmap_fname = os.path.join(dirname, ('mapper'+self.type_cfg))
         prob_fname = os.path.join(self.configs_dir, 'probs', prob_name+self.type_cfg)
         nprob_fname = os.path.join(dirname, prob_name+self.type_cfg)
-        configfile_path  = os.path.join(dirname, ('run'+self.type_cfg))
+        configfile_path  = os.path.join(dirname, (self.runroot+self.type_cfg))
         logfile_path = os.path.join(dirname, logfile)
 
         if self.mapper_cfg:

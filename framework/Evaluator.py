@@ -8,22 +8,22 @@ from .DNNAnalyzer import DNNAnalyzer
 class Evaluator():
     def __init__(self, dnn : DNNAnalyzer, sensorStats : dict, linkStats : dict, edgeStats : dict) -> None:
         self.dnn = dnn
-        self.sensorStats = self._get_median(sensorStats)
-        self.linkStats = self._get_median(linkStats)
-        self.edgeStats = self._get_median(edgeStats)
+        self.sensorStats = self._calc_stats(sensorStats)
+        self.linkStats = self._calc_stats(linkStats)
+        self.edgeStats = self._calc_stats(edgeStats)
         self._evaluate()
 
     def print_sim_time(self) -> None:
         print()
         print("Median Simulation Time")
         print("===========================================")
-        print("DNN Analyzer:", self.dnn.stats['sim_time'], "s")
-        print("Sensor Node: ", self.sensorStats['sim_time'], "s")
-        print("Link:        ", self.linkStats['sim_time'],   "s")
-        print("Edge Node:   ", self.edgeStats['sim_time'],   "s")
+        print("DNN Analyzer:", self.dnn.stats['sim_time'],      "s (stdev: ", self.dnn.stats['sim_time'],      "s)")
+        print("Sensor Node: ", self.sensorStats['sim_time'][0], "s (stdev: ", self.sensorStats['sim_time'][1], "s)")
+        print("Link:        ", self.linkStats['sim_time'][0],   "s (stdev: ", self.linkStats['sim_time'][1],   "s)")
+        print("Edge Node:   ", self.edgeStats['sim_time'][0],   "s (stdev: ", self.edgeStats['sim_time'][1],   "s)")
         print()
 
-    def _get_median(self, stat : dict) -> None:
+    def _calc_stats(self, stat : dict) -> None:
         avg_stats = {}
         for j in stat[0].keys():
             if isinstance(stat[0][j], dict):
@@ -33,13 +33,16 @@ class Evaluator():
                         avg_stats[j][k] = {}
                         for m in stat[0][j][k].keys():
                             mdn = statistics.median([stat[n][j][k][m] for n in stat.keys()])
-                            avg_stats[j][k][m] = mdn
+                            std = statistics.stdev([stat[n][j][k][m] for n in stat.keys()])
+                            avg_stats[j][k][m] = [mdn, std]
                     else:
                         mdn = statistics.median([stat[n][j][k] for n in stat.keys()])
-                        avg_stats[j][k] = mdn
+                        std = statistics.stdev([stat[n][j][k] for n in stat.keys()])
+                        avg_stats[j][k] = [mdn, std]
             else:
                 mdn = statistics.median([stat[n][j] for n in stat.keys()])
-                avg_stats[j] = mdn
+                std = statistics.stdev([stat[n][j] for n in stat.keys()])
+                avg_stats[j] = [mdn, std]
 
         return avg_stats
 
@@ -53,24 +56,28 @@ class Evaluator():
             self.res[id]['output_size'] = layer.output_size
 
             if id in self.sensorStats.keys():
-                self.res[id]['sensor_latency'] = self.sensorStats[id]['latency']
-                self.res[id]['sensor_energy'] = self.sensorStats[id]['energy']
+                self.res[id]['sensor_latency'] = self.sensorStats[id]['latency'][0]
+                self.res[id]['sensor_latency_iqr'] = self.sensorStats[id]['latency_iqr'][0]
+                self.res[id]['sensor_energy'] = self.sensorStats[id]['energy'][0]
             else:
                 self.res[id]['sensor_latency'] = 0
+                self.res[id]['sensor_latency_iqr'] = 0
                 self.res[id]['sensor_energy'] = 0
 
             if id in self.linkStats.keys():
-                self.res[id]['link_latency'] = self.linkStats[id]['latency']
-                self.res[id]['link_energy'] = self.linkStats[id]['energy']
+                self.res[id]['link_latency'] = self.linkStats[id]['latency'][0]
+                self.res[id]['link_energy'] = self.linkStats[id]['energy'][0]
             else:
                 self.res[id]['link_latency'] = 0
                 self.res[id]['link_energy'] = 0
 
             if id in self.edgeStats.keys():
-                self.res[id]['edge_latency'] = self.edgeStats[id]['latency']
-                self.res[id]['edge_energy'] = self.edgeStats[id]['energy']
+                self.res[id]['edge_latency'] = self.edgeStats[id]['latency'][0]
+                self.res[id]['edge_latency_iqr'] = self.edgeStats[id]['latency_iqr'][0]
+                self.res[id]['edge_energy'] = self.edgeStats[id]['energy'][0]
             else:
                 self.res[id]['edge_latency'] = 0
+                self.res[id]['edge_latency_iqr'] = 0
                 self.res[id]['edge_energy'] = 0
 
             self.res[id]['latency'] = self.res[id]['sensor_latency'] + self.res[id]['link_latency'] + self.res[id]['edge_latency']
@@ -100,10 +107,12 @@ class Evaluator():
                 "Latency [ms]",
                 "Energy [mJ]",
                 "Sensor Latency",
+                "Sensor Latency IQR",
                 "Sensor Energy",
                 "Link Latency",
                 "Link Energy",
                 "Edge Latency",
+                "Edge Latency IQR",
                 "Edge Energy"
             ]
             writer.writerow(header)
@@ -115,10 +124,12 @@ class Evaluator():
                     str(data[layer]['latency']),
                     str(data[layer]['energy']),
                     str(data[layer]['sensor_latency']),
+                    str(data[layer]['sensor_latency_iqr']),
                     str(data[layer]['sensor_energy']),
                     str(data[layer]['link_latency']),
                     str(data[layer]['link_energy']),
                     str(data[layer]['edge_latency']),
+                    str(data[layer]['edge_latency_iqr']),
                     str(data[layer]['edge_energy'])
                 ]
                 writer.writerow(row)

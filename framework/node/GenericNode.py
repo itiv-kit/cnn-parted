@@ -29,6 +29,7 @@ class GenericNode:
             meas = tim.timeit(self.num_runs)
             output = {
                 'latency_ms' : meas.median * 1e3,
+                'latency_iqr' : meas.iqr * 1e3,
                 'energy_mJ' : 0
             }
         except RuntimeError as rte:

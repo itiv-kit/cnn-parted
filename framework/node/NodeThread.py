@@ -32,6 +32,7 @@ class NodeThread(ModuleThreadInterface):
         else: # Set stats to zero for Identity
             self.stats[layer_name] = {}
             self.stats[layer_name]['latency'] = 0
+            self.stats[layer_name]['latency_iqr'] = 0
             self.stats[layer_name]['energy'] = 0
 
         # only iterate through filtered list to save time
@@ -49,6 +50,7 @@ class NodeThread(ModuleThreadInterface):
             output = gn.run(layers, input_size)
             self.stats[layer_name] = {}
             self.stats[layer_name]['latency'] = output['latency_ms']
+            self.stats[layer_name]['latency_iqr'] = output['latency_iqr']
             self.stats[layer_name]['energy'] = output['energy_mJ']
 
             if self.show_progress:
@@ -65,6 +67,9 @@ class NodeThread(ModuleThreadInterface):
         if self.reverse:
             conv_layers = conv_layers[::-1]
 
+        runroot = 'run' + self.name
+        config['run_root'] = runroot
+
         tl = Timeloop(config)
 
         for layer in conv_layers:
@@ -79,11 +84,13 @@ class NodeThread(ModuleThreadInterface):
                 self.stats[partpoint_name] = {}
 
             self.stats[partpoint_name]['latency'] = overall_latency
+            self.stats[partpoint_name]['latency_iqr'] = 0
             self.stats[partpoint_name]['energy'] = overall_energy
 
             # save single layer stats
             self.stats[partpoint_name][layer_name] = {}
             self.stats[partpoint_name][layer_name]['latency'] = output['latency_ms']
+            self.stats[partpoint_name][layer_name]['latency_iqr'] = 0
             self.stats[partpoint_name][layer_name]['energy'] = output['energy_mJ']
 
             if self.show_progress:
@@ -106,6 +113,7 @@ class NodeThread(ModuleThreadInterface):
             else:
                 self.stats[l_name] = {}
                 self.stats[l_name]['latency'] = prev_latency
+                self.stats[l_name]['latency_iqr'] = 0
                 self.stats[l_name]['energy'] = prev_energy
 
         self._write_timeloop_csv(self.runname + "_" + self.name + "_tl_layers.csv")
