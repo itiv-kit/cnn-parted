@@ -17,7 +17,7 @@ class Evaluator():
         print()
         print("Median Simulation Time")
         print("===========================================")
-        print("DNN Analyzer:", self.dnn.stats['sim_time'],      "s (stdev: ", self.dnn.stats['sim_time'],      "s)")
+        print("DNN Analyzer:", self.dnn.stats['sim_time'],      "s")
         print("Sensor Node: ", self.sensorStats['sim_time'][0], "s (stdev: ", self.sensorStats['sim_time'][1], "s)")
         print("Link:        ", self.linkStats['sim_time'][0],   "s (stdev: ", self.linkStats['sim_time'][1],   "s)")
         print("Edge Node:   ", self.edgeStats['sim_time'][0],   "s (stdev: ", self.edgeStats['sim_time'][1],   "s)")
@@ -33,15 +33,27 @@ class Evaluator():
                         avg_stats[j][k] = {}
                         for m in stat[0][j][k].keys():
                             mdn = statistics.median([stat[n][j][k][m] for n in stat.keys()])
-                            std = statistics.stdev([stat[n][j][k][m] for n in stat.keys()])
+                            if len(stat) > 1:
+                                std = statistics.stdev([stat[n][j][k][m] for n in stat.keys()])
+                            else:
+                                std = 0
+
                             avg_stats[j][k][m] = [mdn, std]
                     else:
                         mdn = statistics.median([stat[n][j][k] for n in stat.keys()])
-                        std = statistics.stdev([stat[n][j][k] for n in stat.keys()])
+                        if len(stat) > 1:
+                            std = statistics.stdev([stat[n][j][k] for n in stat.keys()])
+                        else:
+                            std = 0
+
                         avg_stats[j][k] = [mdn, std]
             else:
                 mdn = statistics.median([stat[n][j] for n in stat.keys()])
-                std = statistics.stdev([stat[n][j] for n in stat.keys()])
+                if len(stat) > 1:
+                    std = statistics.stdev([stat[n][j] for n in stat.keys()])
+                else:
+                    std = 0
+
                 avg_stats[j] = [mdn, std]
 
         return avg_stats
