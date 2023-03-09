@@ -4,7 +4,7 @@
 *.json
 
 #run outputs
-run/
+run*
 *.csv
 timeloop-mapper.*
 !examples/results/*
