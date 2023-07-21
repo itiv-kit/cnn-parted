@@ -2,7 +2,7 @@ import csv
 import statistics
 from collections import OrderedDict
 from typing import Optional
-
+import numpy as np
 from .DNNAnalyzer import DNNAnalyzer
 
 class Evaluator():
@@ -97,6 +97,7 @@ class Evaluator():
 
         # remove non-beneficial partitioning points based on bandwidth constraint
         filtered_pp = [layer.get_layer_name(False, True) for layer in self.dnn.partpoints_filtered]
+        #print(filtered_pp)
         self.pp_res = {key:self.res[key] for key in self.res if key in filtered_pp}
 
     def export_csv(self, name) -> None:
@@ -145,3 +146,31 @@ class Evaluator():
                     str(data[layer]['edge_energy'])
                 ]
                 writer.writerow(row)
+
+
+    def get_all_layer_stats(self) -> OrderedDict:
+        output= OrderedDict()
+        #print(self.pp_res.keys())
+
+        for i,layer in enumerate(self.pp_res.keys()):
+            if i==0:
+                continue
+
+            output[i] = {}
+            output[i]['layer'] = layer
+            output[i]['energy'] = self.pp_res[layer]['energy']
+            output[i]['latency'] = self.pp_res[layer]['latency']
+
+            output[i]['sensor_latency'] = self.pp_res[layer]['sensor_latency']
+            output[i]['sensor_energy'] = self.pp_res[layer]['sensor_energy']
+            
+            output[i]['link_latency'] = self.pp_res[layer]['link_latency']
+            output[i]['link_energy'] = self.pp_res[layer]['link_energy']
+
+            output[i]['edge_latency'] = self.pp_res[layer]['edge_latency']
+            output[i]['edge_energy'] = self.pp_res[layer]['edge_energy']     
+
+            output[i]['throughput'] = np.prod(self.pp_res[layer]['output_size'])/((float(self.pp_res[layer]['sensor_latency'])+float(self.pp_res[layer]['link_latency'])))
+            
+        return output
+        

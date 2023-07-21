@@ -3,6 +3,8 @@ from torch import nn, Tensor
 from torch.nn import functional
 from torchinfo import summary
 from torchinfo.layer_info import LayerInfo
+from framework.Memory_Estimator.Estimator import Estimator
+import time
 
 import numpy as np
 import time
@@ -107,11 +109,13 @@ class DNNAnalyzer:
         self.partpoints_filtered.insert(0, input_data)
 
 
-    def __init__(self, model : nn.Module, input_size : tuple, max_size : int) -> None:
+    def __init__(self, model : nn.Module, input_size : tuple, constraints : dict) -> None:
         self.partition_points : list[LayerInfo] = []
         modsum = summary(model, input_size, depth=100, verbose=0)
         self.layers = [layer for layer in modsum.summary_list if layer.class_name != "Dropout" ]
         self.input_size = input_size
+        self.mem_estimator = Estimator()
+        self.constraints = constraints
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -130,6 +134,9 @@ class DNNAnalyzer:
 
         self._scan(self._layerTree, self._topLayer)
 
+        #self.max_conv2d_layer = self.get_max_conv2d_layer()
+
+        max_size = self.constraints["max_out_size"]
         if max_size != 0:
             self.partpoints_filtered = [layer for layer in self.partition_points if np.prod(layer.output_size) < max_size]
         else:
@@ -141,10 +148,40 @@ class DNNAnalyzer:
 
         print("Found", len(self.partpoints_filtered), "partition points.")
 
-
     def get_conv2d_layers(self) -> List[LayerInfo]:
         return [layer for layer in self.layers if isinstance(layer.module, nn.Conv2d)]
+    
+    #Mahdi:
+    def get_linear_layers(self) -> List[LayerInfo]:
+        for layer in self.layers:
+            print(layer.module)
 
+    def get_max_conv2d_layer(self):
+
+        max_mem_allowed = self.constraints["max_memory_size"]
+        width_bytes =self.constraints["word_width"]/8
+        weights=0
+
+        layers = self.get_conv2d_layers()
+
+        # return all layers when max_mem_allowed not defined
+        if max_mem_allowed == 0 :
+            return layers
+        
+        output= []
+        for layer in layers:
+            start_time = time.time()
+            memory_paramers_count,weights_local = self.mem_estimator.compute(layer) 
+            end_time = time.time()
+            print("time in sec : ", end_time - start_time) 
+            print("memory ",(memory_paramers_count + weights)*width_bytes)  
+            if (memory_paramers_count + weights)*width_bytes >= max_mem_allowed: # weights from old layers must be included in memory??
+                break
+            
+            weights += weights_local
+            output.append(layer)
+        
+        return output
 
     def search_partition_point(self, layer : LayerInfo) -> LayerInfo:
         for pp in self.partition_points:
