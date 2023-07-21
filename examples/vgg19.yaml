@@ -10,11 +10,11 @@ link:
   fps: 25
 neural-network:
   input-size: [1, 3, 224, 224]
-  name: fcn_resnet50
+  name: vgg19
 sensor:
   timeloop:
-    accelerator: simba_like
-    frequency: 500000000
+    accelerator: simple_output_stationary
+    frequency: 200000000
     layer: conv2d
     mapper:
       algorithm: linear-pruned
