@@ -50,11 +50,11 @@ class ConfigHelper:
     
     def get_optimization_objectives(self):
         try:
-            device = self.config['optimization_objectives']['device']
+            device = self.config['optimization-objectives']['device']
         except KeyError:
             device = 'sensor'
         try:
-            metric =self.config['optimization_objectives']['metric']
+            metric = self.config['optimization-objectives']['metric']
         except KeyError:
             metric = 'energy'
         

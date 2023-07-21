@@ -1,7 +1,5 @@
 constraints: {max_out_size: 200000}
-optimization-objective: 
-  device: senosr
-  metric: energy
+optimization-objectives: {device: edge, metric: latency}
 edge: {device: cpu, max_threads: 10, num_runs: 500}
 link:
   data_bit_width: 16
