@@ -40,6 +40,8 @@ pip3 install setuptools
 pip3 install libconf
 pip3 install numpy
 pip3 install pyyaml
+pip3 install -U pymoo
+
 
 # PyTorch
 pip3 install torchvision    # installs typing-extensions, dataclasses, torch, pillow at once
