@@ -64,7 +64,7 @@ if [[ $SKIP_TIMELOOP == false ]]; then
         ln -s ../pat-public/src/pat .
     fi
     cd ..
-    scons-3.6 -j4 --accelergy
+    scons -j4 --accelergy
     cd ..
 
     # Accelergy
