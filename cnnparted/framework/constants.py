@@ -2,7 +2,7 @@ import os
 import inspect
 
 this_file_path = os.path.abspath(inspect.getfile(inspect.currentframe()))
-ROOT_DIR = os.path.join(os.path.dirname(this_file_path), '..')
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(this_file_path), '..', '..'))
 
 
 import torchvision.models as tvmodels
