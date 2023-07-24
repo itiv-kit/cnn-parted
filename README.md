@@ -32,7 +32,7 @@ The framework currently includes a custom Ethernet model as well as hardware acc
 
 4. Run the given python script:
     ```sh
-    python3 cnnparted.py examples/squeezenet1_1.yaml RunName
+    python3 cnnparted/cnnparted.py examples/squeezenet1_1.yaml RunName
     ```
 
 ## Known issues
