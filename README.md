@@ -6,20 +6,42 @@ CNNParted is a framework for hardware-aware design space exploration of CNN infe
 The framework currently includes a custom Ethernet model as well as hardware accelerators models taken from Timeloop example repository (Simba, Eyeriss and Simple OS Array).
 
 ## Instructions
-1. Run setupTools script in tools
+0. If you have no permission to install python packages on your system, create a virtual environment
     ```sh
-    ./tools/setupTools.sh
+    python3 -m venv pythonEnv
+    source pythonEnv/bin/activate
+    pip3 install --upgrade pip
     ```
 
-2. Setup the environment using the script provided in env:
+1. Download submodules
+    ```sh
+    git submodule update --init --recursive
+    ```
+
+2. Run installation
+    ```sh
+    git submodule foreach --recursive 'if [ -f setup.py ]; then pip3 install .; fi'
+    python3 setup.py install
+    pip3 install -r requirements.txt
+    ```
+
+3. Setup the environment using the script provided in env:
     ```sh
     source env/setupEnv.sh
     ```
 
-3. Run the given python script:
+4. Run the given python script:
     ```sh
     python3 cnnparted.py examples/squeezenet1_1.yaml RunName
     ```
+
+## Known issues
+
+If accelergy does not run correctly, add the main directory to `PATH` and execute `accelergyTables`:
+```
+export PATH=$PATH:<path/to/cnn-parted>
+accelergyTables
+```
 
 ## Citing this work
 
