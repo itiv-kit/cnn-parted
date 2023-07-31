@@ -6,26 +6,61 @@ CNNParted is a framework for hardware-aware design space exploration of CNN infe
 The framework currently includes a custom Ethernet model as well as hardware accelerators models taken from Timeloop example repository (Simba, Eyeriss and Simple OS Array).
 
 ## Instructions
-1. Run setupTools script in tools
+0. If you have no permission to install python packages on your system, create a virtual environment
     ```sh
-    ./tools/setupTools.sh
+    python3 -m venv pythonEnv
+    source pythonEnv/bin/activate
+    pip3 install --upgrade pip
     ```
 
-2. Setup the environment using the script provided in env:
+1. Download submodules
+    ```sh
+    git submodule update --init --recursive
+    ```
+
+2. Run installation
+    ```sh
+    git submodule foreach --recursive 'if [ -f setup.py ]; then pip3 install .; fi'
+    python3 setup.py install
+    pip3 install -r requirements.txt
+    ```
+
+3. Setup the environment using the script provided in env:
     ```sh
     source env/setupEnv.sh
     ```
 
-3. Run the given python script:
+4. Run the given python script:
     ```sh
-    python3 cnnparted.py examples/squeezenet1_1.yaml RunName
+    python3 cnnparted/cnnparted.py examples/squeezenet1_1.yaml RunName
     ```
+
+## Known issues
+
+If accelergy does not run correctly, add the main directory to `PATH` and execute `accelergyTables`:
+```
+export PATH=$PATH:<path/to/cnn-parted>
+accelergyTables
+```
 
 ## Citing this work
 
-If you found this tool useful, please use the following bibtex to cite us
+If you found this tool useful, please use the following BibTeX to cite us
 
 ```
+@article{kress2023cnnparted,
+    title = {{CNNParted}: An open source framework for efficient Convolutional Neural Network inference partitioning in embedded systems},
+    author = {Fabian Kreß and Vladimir Sidorenko and Patrick Schmidt and Julian Hoefer and Tim Hotfilter and Iris Walter and Tanja Harbaum and Jürgen Becker},
+    journal = {Computer Networks},
+    volume = {229},
+    pages = {109759},
+    year = {2023},
+    issn = {1389-1286},
+    doi = {https://doi.org/10.1016/j.comnet.2023.109759},
+    url = {https://www.sciencedirect.com/science/article/pii/S1389128623002049}
+}
+
+
 @inproceedings{kress2022hwpart,
     title={Hardware-aware Partitioning of Convolutional Neural Network Inference for Embedded AI Applications},
     author={Kreß, Fabian and Hoefer, Julian and Hotfilter, Tim and Walter, Iris and Sidorenko, Vladimir and Harbaum, Tanja and Becker, Jürgen},
