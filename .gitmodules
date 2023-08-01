@@ -20,3 +20,6 @@
 	path = tools/cacti
 	url = https://github.com/HewlettPackard/cacti.git
 	ignore = dirty
+[submodule "tools/dnn-model-exploration"]
+	path = tools/dnn-model-exploration
+	url = https://github.com/itiv-kit/dnn-model-exploration.git
