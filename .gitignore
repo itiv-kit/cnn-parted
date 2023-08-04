@@ -8,6 +8,7 @@ run*
 *.csv
 timeloop-mapper.*
 !examples/results/*
+calibrations*
 
 #visualization outputs
 _visualizations/

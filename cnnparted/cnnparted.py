@@ -2,13 +2,26 @@
 
 import yaml
 import argparse
+import importlib
 
-from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator
-from framework.constants import DNN_DICT
+from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator, QuantizationEvaluator
+
+MODEL_FOLDER = "workloads"
 
 def load_config(fname : str) -> dict:
     with open(fname) as f:
         return yaml.load(f, Loader = yaml.SafeLoader)
+
+def setup_workload(model_settings: dict) -> tuple:
+    model = importlib.import_module(
+        f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
+    ).model
+
+    accuracy_function = importlib.import_module(
+        f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
+    ).accuracy_function
+
+    return model, accuracy_function
 
 def main():
     parser = argparse.ArgumentParser(description='Explore partition point metrics for DNNs')
@@ -23,12 +36,10 @@ def main():
     config = load_config(args.conf_file_path)
 
     try:
-        model = DNN_DICT[config['neural-network']['name']]()
+        model, accuracy_function = setup_workload(config['neural-network'])
     except KeyError:
         print()
-        print('\033[1m' + 'DNN not available - please use on of the supported networks:' + '\033[0m')
-        for nn in [k for k in DNN_DICT.keys() if type(DNN_DICT[k]) == type(main)]: # only print functions
-            print(nn)
+        print('\033[1m' + 'Workload not available' + '\033[0m')
         print()
         quit(1)
 
@@ -40,6 +51,11 @@ def main():
     dnn = DNNAnalyzer(model, (tuple(config['neural-network']['input-size'])), max_size)
     if len(dnn.partpoints_filtered) == 0:
         quit(1)
+
+    accStats = {}
+    if 'accuracy' in config.keys():
+        accEval = QuantizationEvaluator(model, dnn, config.get('accuracy'), accuracy_function)
+        accStats = accEval.get_stats()
 
     sensorStats = {}
     linkStats   = {}
@@ -60,7 +76,7 @@ def main():
         linkStats[i]   = threads[1].getStats()
         edgeStats[i]   = threads[2].getStats()
 
-    e = Evaluator(dnn, sensorStats, linkStats, edgeStats)
+    e = Evaluator(dnn, sensorStats, linkStats, edgeStats, accStats)
     e.print_sim_time()
     e.export_csv(args.run_name)
 
