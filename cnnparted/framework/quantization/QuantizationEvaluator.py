@@ -1,14 +1,18 @@
+import os
+import time
+
 import torch
 from torchvision import transforms, datasets
 from model_explorer.models.quantized_model import QuantizedModel
 from model_explorer.utils.data_loader_generator import DataLoaderGenerator
 
 from ..DNNAnalyzer import DNNAnalyzer, buildSequential
+from .generate_calibration import generate_calibration
 
 from torchinfo import summary
 from torchinfo.layer_info import LayerInfo
 from copy import deepcopy
-import time
+
 
 class QuantizationEvaluator():
     def __init__(self, model : torch.nn.Module, dnn : DNNAnalyzer, config : dict, accfunc : callable) -> None:
@@ -28,8 +32,8 @@ class QuantizationEvaluator():
 
         t0 = time.time()
 
-        self._create_quantized_model(self.fmodel, self.bits[0], config['calibration'].get('file'))
-        self._eval(config['calibration']['datasets'].get('path'))
+        self._create_quantized_model(self.fmodel, self.bits[0], config.get('calibration'))
+        self._eval(config['calibration']['datasets']['calibrate'].get('path'))
 
         t1 = time.time()
         self.stats['sim_time'] = t1 - t0
@@ -46,11 +50,16 @@ class QuantizationEvaluator():
             else:
                 return False
 
-    def _create_quantized_model(self, m : torch.nn.Module, bit : int, param_path : str) -> QuantizedModel:
+    def _create_quantized_model(self, m : torch.nn.Module, bit : int, calib_conf : dict) -> QuantizedModel:
         model = deepcopy(m)
 
         gpu_device = torch.device(self.device)
         qmodel = QuantizedModel(model, gpu_device)
+
+        param_path = calib_conf.get('file')
+        if not os.path.exists(param_path):
+            generate_calibration(deepcopy(m), calib_conf, True, param_path)
+
         qmodel.load_parameters(param_path)
 
         bits = [bit] * qmodel.get_explorable_parameter_count()

@@ -9,12 +9,13 @@ accuracy:
     samples: null # null sets samples to all
     file: './calibrations/squeezenet1_1_quant_calib.pkl'
     datasets:
-      type: imagenet
-      kind: 'imagefolder'
-      path: '/tools/datasets/imagenet/val_images'
-      sample_limit: null # number of validation dataset samples to test for each individual
-      batch_size: 64
-      randomize: True
+      calibrate:
+        type: imagenet
+        kind: 'imagefolder'
+        path: '/tools/datasets/imagenet/val_images'
+        sample_limit: null # number of validation dataset samples to test for each individual
+        batch_size: 64
+        randomize: True
 
 sensor:
   timeloop:
