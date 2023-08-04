@@ -88,7 +88,7 @@ class QuantizationEvaluator():
 
         transf = transforms.Compose([
             transforms.Resize(256),
-            transforms.CenterCrop(224),
+            transforms.CenterCrop(input_size[-1]),
             transforms.ToTensor(), normalize
         ])
 
