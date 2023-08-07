@@ -9,6 +9,7 @@ import time
 from collections import OrderedDict
 
 from typing import List, Dict
+from copy import deepcopy
 
 
 class _DictToTensorModel(nn.Module):
@@ -28,13 +29,14 @@ def buildSequential(layers : List[LayerInfo], input_size : list, device : str) -
         if len(layer.input_size) != len(output_size):
             modules[str(layer.layer_id)] = nn.Flatten(1)
 
-        modules[layer.var_name] = layer.module
+        modules[layer.get_layer_name(False, True)] = layer.module
 
         output_size = layer.output_size
 
         rand_tensor = torch.randn(layer.input_size, device=device)
-        layer.module.to(device)
-        out = layer.module(rand_tensor)
+        m = deepcopy(layer.module)
+        m.to(device)
+        out = m(rand_tensor)
         if isinstance(out, dict):
             modules[str(layer.layer_id)] = _DictToTensorModel(out)
 
