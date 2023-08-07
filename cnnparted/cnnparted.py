@@ -55,7 +55,7 @@ def main():
 
     accStats = {}
     if 'accuracy' in config.keys():
-        accEval = QuantizationEvaluator(model, dnn, config.get('accuracy'), accuracy_function)
+        accEval = QuantizationEvaluator(model, dnn, config.get('accuracy'), accuracy_function, args.show_progress)
         accStats = accEval.get_stats()
 
     sensorStats = {}

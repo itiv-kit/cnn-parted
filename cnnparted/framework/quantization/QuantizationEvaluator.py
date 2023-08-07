@@ -15,7 +15,7 @@ from copy import deepcopy
 
 
 class QuantizationEvaluator():
-    def __init__(self, model : torch.nn.Module, dnn : DNNAnalyzer, config : dict, accfunc : callable) -> None:
+    def __init__(self, model : torch.nn.Module, dnn : DNNAnalyzer, config : dict, accfunc : callable, showProgress : bool) -> None:
         self.fmodel = model
         self.dnn = dnn
         self.accfunc = accfunc
@@ -33,7 +33,7 @@ class QuantizationEvaluator():
         t0 = time.time()
 
         self._create_quantized_model(self.fmodel, self.bits[0], config.get('calibration'))
-        self._eval(config['calibration']['datasets']['calibrate'].get('path'))
+        self._eval(config['calibration']['datasets']['calibrate'].get('path'), showProgress)
 
         t1 = time.time()
         self.stats['sim_time'] = t1 - t0
@@ -77,7 +77,7 @@ class QuantizationEvaluator():
 
         self.qmodel = qmodel
 
-    def _eval(self, dir_path : str) -> None:
+    def _eval(self, dir_path : str, showProgress : bool) -> None:
         part_points = self.dnn.partition_points
         input_size = self.dnn.input_size
 
@@ -117,7 +117,7 @@ class QuantizationEvaluator():
             # summary(seqMod, input_size, depth=100)
 
             # inference loop
-            acc = self.accfunc(seqMod, dataloadergen, progress=True, title=f"Infere {layer_name}")
+            acc = self.accfunc(seqMod, dataloadergen, progress=showProgress, title=f"Infere {layer_name}")
 
             ## DEBUGGING
             # print(f"{layer_name}:{acc.cpu().detach().numpy()}")
