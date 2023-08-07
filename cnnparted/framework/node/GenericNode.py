@@ -18,6 +18,7 @@ class GenericNode:
     def run(self, layers : list, input_size : List[int]) -> float:
         model = buildSequential(layers, input_size, self.device)
         rand_tensor = torch.randn(input_size, device=self.device)
+        model.to(self.device)
 
         tim = benchmark.Timer(
             stmt='run_model(m, x)',
