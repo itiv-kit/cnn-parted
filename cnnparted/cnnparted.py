@@ -49,7 +49,8 @@ def main():
         max_size = 0
 
     dnn = DNNAnalyzer(model, (tuple(config['neural-network']['input-size'])), max_size)
-    if len(dnn.partpoints_filtered) == 0:
+    if len(dnn.partpoints_filtered) <= 1:
+        print("ERROR: No partitioning points found.")
         quit(1)
 
     accStats = {}
