@@ -6,6 +6,7 @@ from torchinfo.layer_info import LayerInfo
 
 import numpy as np
 import time
+from collections import OrderedDict
 
 from typing import List, Dict
 
@@ -21,22 +22,23 @@ class _DictToTensorModel(nn.Module):
 
 
 def buildSequential(layers : List[LayerInfo], input_size : list, device : str) -> nn.Sequential:
-    modules = []
+    modules = OrderedDict()
     output_size = list(input_size)
     for layer in layers:
         if len(layer.input_size) != len(output_size):
-            modules.append(nn.Flatten(1))
+            modules[str(layer.layer_id)] = nn.Flatten(1)
+
+        modules[layer.var_name] = layer.module
 
         output_size = layer.output_size
-        modules.append(layer.module)
 
         rand_tensor = torch.randn(layer.input_size, device=device)
         layer.module.to(device)
         out = layer.module(rand_tensor)
         if isinstance(out, dict):
-            modules.append(_DictToTensorModel(out))
+            modules[str(layer.layer_id)] = _DictToTensorModel(out)
 
-    return nn.Sequential(*modules)
+    return nn.Sequential(modules)
 
 
 class DNNAnalyzer:
