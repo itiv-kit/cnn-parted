@@ -4,7 +4,7 @@ neural-network:
 
 accuracy:
   device : "cuda"
-  bits: [8, 16]
+  bits: [16, 8]
   calibration:
     samples: null # null sets samples to all
     file: './calibrations/vgg16_quant_calib.pkl'

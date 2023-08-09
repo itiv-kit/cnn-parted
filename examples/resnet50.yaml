@@ -4,7 +4,7 @@ neural-network:
 
 accuracy:
   device : "cuda"
-  bits: [8, 16]
+  bits: [8, 32]
   calibration:
     samples: null # null sets samples to all
     file: './calibrations/resnet50_quant_calib.pkl'

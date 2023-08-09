@@ -27,9 +27,9 @@ def buildSequential(layers : List[LayerInfo], input_size : list, device : str) -
     output_size = list(input_size)
     for layer in layers:
         if len(layer.input_size) != len(output_size):
-            modules[str(layer.layer_id)] = nn.Flatten(1)
+            modules[str(layer.layer_id) + 'f'] = nn.Flatten(1)
 
-        modules[layer.get_layer_name(True, True)] = layer.module
+        modules[str(layer.layer_id)] = layer.module
 
         output_size = layer.output_size
 
