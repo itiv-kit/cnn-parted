@@ -9,6 +9,23 @@ link:
 neural-network:
   input-size: [1, 3, 227, 227]
   name: squeezenet1_1
+  input-size: [ 1, 3, 227, 227 ]
+
+accuracy:
+  device : "cuda"
+  bits: [8, 32]
+  calibration:
+    samples: null # null sets samples to all
+    file: './calibrations/squeezenet1_1_quant_calib.pkl'
+    datasets:
+      calibrate:
+        type: imagenet
+        kind: 'imagefolder'
+        path: '/tools/datasets/imagenet/val_images'
+        sample_limit: null # number of validation dataset samples to test for each individual
+        batch_size: 64
+        randomize: True
+
 sensor:
   timeloop:
     accelerator: simba_like

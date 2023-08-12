@@ -5,7 +5,24 @@ from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
 from framework.node.Dramsim import Dramsim
+import yaml
 
+import importlib
+
+from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator, QuantizationEvaluator
+
+MODEL_FOLDER = "workloads"
+
+def setup_workload(model_settings: dict) -> tuple:
+    model = importlib.import_module(
+        f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
+    ).model
+
+    accuracy_function = importlib.import_module(
+        f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
+    ).accuracy_function
+
+    return model, accuracy_function
 
 def main():
     parser = argparse.ArgumentParser(
@@ -35,13 +52,27 @@ def main():
     #####Test######################### 
     drsim= Dramsim()
     drsim.run("configs/DDR4_8Gb_x8_3200.ini",10000,"tests/example.trace")
-
     ####Test end##############################
+
+    try:
+        model, accuracy_function = setup_workload(config['neural-network'])
+    except KeyError:
+        print()
+        print('\033[1m' + 'Workload not available' + '\033[0m')
+        print()
+        quit(1)
+
+
 
     dnn = DNNAnalyzer(model, (tuple(config['neural-network']['input-size'])),
                       constraints)
     if len(dnn.partpoints_filtered) == 0:
         quit(1)
+
+    accStats = {}
+    if 'accuracy' in config.keys():
+        accEval = QuantizationEvaluator(model, dnn, config.get('accuracy'), accuracy_function, args.show_progress)
+        accStats = accEval.get_stats()
 
     sensorStats = {}
     linkStats = {}
@@ -65,7 +96,7 @@ def main():
         linkStats[i] = threads[1].getStats()
         edgeStats[i] = threads[2].getStats()
 
-    e = Evaluator(dnn, sensorStats, linkStats, edgeStats)
+    e = Evaluator(dnn, sensorStats, linkStats, edgeStats, accStats)
     e.print_sim_time()
     e.export_csv(args.run_name)
     #de = Dif_Evaluator(dnn, sensorStats)

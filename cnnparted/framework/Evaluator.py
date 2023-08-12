@@ -6,21 +6,26 @@ import numpy as np
 from .DNNAnalyzer import DNNAnalyzer
 
 class Evaluator():
-    def __init__(self, dnn : DNNAnalyzer, sensorStats : dict, linkStats : dict, edgeStats : dict) -> None:
+    def __init__(self, dnn : DNNAnalyzer, sensorStats : dict, linkStats : dict, edgeStats : dict, accStats : dict) -> None:
         self.dnn = dnn
         self.sensorStats = self._calc_stats(sensorStats)
         self.linkStats = self._calc_stats(linkStats)
         self.edgeStats = self._calc_stats(edgeStats)
+        self.accStats = accStats
         self._evaluate()
 
     def print_sim_time(self) -> None:
         print()
         print("Median Simulation Time")
         print("===========================================")
-        print("DNN Analyzer:", self.dnn.stats['sim_time'],      "s")
-        print("Sensor Node: ", self.sensorStats['sim_time'][0], "s (stdev: ", self.sensorStats['sim_time'][1], "s)")
-        print("Link:        ", self.linkStats['sim_time'][0],   "s (stdev: ", self.linkStats['sim_time'][1],   "s)")
-        print("Edge Node:   ", self.edgeStats['sim_time'][0],   "s (stdev: ", self.edgeStats['sim_time'][1],   "s)")
+        print("DNN Analyzer: ", self.dnn.stats['sim_time'],      "s")
+
+        if 'sim_time' in self.accStats.keys():
+            print("Accuracy Eval:", self.accStats['sim_time'],       "s")
+
+        print("Sensor Node:  ", self.sensorStats['sim_time'][0], "s (stdev: ", self.sensorStats['sim_time'][1], "s)")
+        print("Link:         ", self.linkStats['sim_time'][0],   "s (stdev: ", self.linkStats['sim_time'][1],   "s)")
+        print("Edge Node:    ", self.edgeStats['sim_time'][0],   "s (stdev: ", self.edgeStats['sim_time'][1],   "s)")
         print()
 
     def _calc_stats(self, stat : dict) -> None:
@@ -92,6 +97,11 @@ class Evaluator():
                 self.res[id]['edge_latency_iqr'] = 0
                 self.res[id]['edge_energy'] = 0
 
+            if id in self.accStats.keys():
+                self.res[id]['accuracy'] = self.accStats[id]
+            else:
+                self.res[id]['accuracy'] = 0
+
             self.res[id]['latency'] = self.res[id]['sensor_latency'] + self.res[id]['link_latency'] + self.res[id]['edge_latency']
             self.res[id]['energy'] = self.res[id]['sensor_energy'] + self.res[id]['link_energy'] + self.res[id]['edge_energy']
 
@@ -117,6 +127,7 @@ class Evaluator():
                 "No.",
                 "Layer",
                 "Output Size",
+                "Accuracy",
                 "Latency [ms]",
                 "Energy [mJ]",
                 "Sensor Latency",
@@ -134,6 +145,7 @@ class Evaluator():
                     (i + 1),
                     layer,
                     str(data[layer]['output_size']),
+                    str(data[layer]['accuracy']),
                     str(data[layer]['latency']),
                     str(data[layer]['energy']),
                     str(data[layer]['sensor_latency']),

@@ -7,8 +7,25 @@ link:
     eth_mode: BASE1000-T}
   fps: 25
 neural-network:
-  input-size: [1, 3, 224, 224]
-  name: fcn_resnet50
+  name: vgg16
+  input-size: [ 1, 3, 224, 224 ]
+
+accuracy:
+  device : "cuda"
+  bits: [16, 8]
+  calibration:
+    samples: null # null sets samples to all
+    file: './calibrations/vgg16_quant_calib.pkl'
+    datasets:
+      calibrate:
+        type: imagenet
+        kind: 'imagefolder'
+        path: '/tools/datasets/imagenet/val_images'
+        sample_limit: null # number of validation dataset samples to test for each individual
+        batch_size: 64
+        randomize: True
+
+>>>>>>> dev:examples/vgg16.yaml
 sensor:
   timeloop:
     accelerator: simba_like
