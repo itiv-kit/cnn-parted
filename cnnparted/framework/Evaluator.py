@@ -62,10 +62,10 @@ class Evaluator():
         self.res = OrderedDict()
 
         for layer in self.dnn.partition_points:
-            id = layer.get_layer_name(False, True)
+            id = layer.get('name')
 
             self.res[id] = {}
-            self.res[id]['output_size'] = layer.output_size
+            self.res[id]['output_size'] = layer.get('output_size')
 
             if id in self.sensorStats.keys():
                 self.res[id]['sensor_latency'] = self.sensorStats[id]['latency'][0]
@@ -96,7 +96,7 @@ class Evaluator():
             self.res[id]['energy'] = self.res[id]['sensor_energy'] + self.res[id]['link_energy'] + self.res[id]['edge_energy']
 
         # remove non-beneficial partitioning points based on bandwidth constraint
-        filtered_pp = [layer.get_layer_name(False, True) for layer in self.dnn.partpoints_filtered]
+        filtered_pp = [layer.get('name') for layer in self.dnn.partpoints_filtered]
         #print(filtered_pp)
         self.pp_res = {key:self.res[key] for key in self.res if key in filtered_pp}
 

@@ -1,9 +1,10 @@
 #! /usr/bin/env python3
 
 import argparse
-from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator, Dif_Evaluator
+from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator #, Dif_Evaluator
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
+from framework.node.Dramsim import Dramsim
 
 
 def main():
@@ -29,6 +30,13 @@ def main():
     config = conf_helper.get_config()
     model = conf_helper.get_model(main)
     constraints = conf_helper.get_constraints()
+    
+    
+    #####Test######################### 
+    drsim= Dramsim()
+    drsim.run("configs/DDR4_8Gb_x8_3200.ini",10000,"tests/example.trace")
+
+    ####Test end##############################
 
     dnn = DNNAnalyzer(model, (tuple(config['neural-network']['input-size'])),
                       constraints)

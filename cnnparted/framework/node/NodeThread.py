@@ -1,6 +1,9 @@
 from framework.ModuleThreadInterface import ModuleThreadInterface
 from .GenericNode import GenericNode
 from .Timeloop import Timeloop
+from framework.constants import NEW_MODEL_PATH , ROOT_DIR
+from framework.Model.modelsplitter import ModelSplitter
+import os
 
 import csv
 
@@ -35,9 +38,17 @@ class NodeThread(ModuleThreadInterface):
             self.stats[layer_name]['latency_iqr'] = 0
             self.stats[layer_name]['energy'] = 0
 
+        model_splitter = ModelSplitter(NEW_MODEL_PATH)
+
         # only iterate through filtered list to save time
         for point in self.dnn.partpoints_filtered:
-            layer_name = point.get_layer_name(False, True)
+            layer_name = point.get('name')
+            output_path_head = os.path.join(ROOT_DIR,layer_name+'head.onnx')
+            output_path_tail = os.path.join(ROOT_DIR,layer_name+'tail.onnx')
+
+            # last layer index out of range 
+            last_layer = model_splitter.split_model(layer_name,output_path_head,output_path_tail)
+
 
             if not self.reverse:
                 idx = part_points.index(point) + 1
@@ -45,9 +56,19 @@ class NodeThread(ModuleThreadInterface):
             else:
                 idx = layers.index(point) + 1
                 del layers[:idx]
-                input_size = point.output_size
+                input_size = point.get('output_size')
 
-            output = gn.run(layers, input_size)
+
+            if not last_layer :
+                output= gn.run(output_path_tail,input_size)
+            else :
+                output={'latency_ms':0,
+                        'latency_iqr':0,
+                        'energy_mJ':0
+                        }
+
+
+            
             self.stats[layer_name] = {}
             self.stats[layer_name]['latency'] = output['latency_ms']
             self.stats[layer_name]['latency_iqr'] = output['latency_iqr']
@@ -77,8 +98,8 @@ class NodeThread(ModuleThreadInterface):
             overall_latency += output['latency_ms']
             overall_energy += output['energy_mJ']
 
-            layer_name = layer.get_layer_name(False, True)
-            partpoint_name = self.dnn.search_partition_point(layer).get_layer_name(False, True)
+            layer_name = layer.get('name')
+            partpoint_name = self.dnn.search_partition_point(layer_name)
 
             if not partpoint_name in self.stats.keys():
                 self.stats[partpoint_name] = {}
@@ -106,7 +127,7 @@ class NodeThread(ModuleThreadInterface):
             plist = self.dnn.partition_points
 
         for point in plist:
-            l_name = point.get_layer_name(False, True)
+            l_name = point.get('name')
             if l_name in self.stats.keys():
                 prev_latency = self.stats[l_name]['latency']
                 prev_energy = self.stats[l_name]['energy']
