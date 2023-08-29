@@ -51,6 +51,8 @@ setup(
             'accelergy-aladdin-plug-in',
             'accelergy-cacti-plug-in',
             'accelergy-table-based-plug-ins',
+            'onnx',
+            'networkx',
             'model_explorer'
             ],
       python_requires = '>=3.9',

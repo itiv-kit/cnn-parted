@@ -3,8 +3,8 @@ import time
 
 import torch
 from torchvision import transforms, datasets
-from model_explorer.models.quantized_model import QuantizedModel
-from model_explorer.utils.data_loader_generator import DataLoaderGenerator
+#from model_explorer.models.quantized_model import QuantizedModel
+#from model_explorer.utils.data_loader_generator import DataLoaderGenerator
 
 from ..DNNAnalyzer import DNNAnalyzer, buildSequential
 from .generate_calibration import generate_calibration

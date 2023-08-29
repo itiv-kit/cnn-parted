@@ -36,9 +36,8 @@ class ModelSplitter:
 
     def get_node_index_by_name(self, model_def, node_name):
         for index, node in enumerate(model_def.graph.node):
-            # print("node name" , node.name)
+
             if node.name == node_name:
-                # print(index)
                 return index
         print(" Index Not found for :",node_name)
         return None

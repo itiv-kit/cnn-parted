@@ -1,4 +1,4 @@
-constraints: {max_out_size: 150000,  max_memory_size: 4000000, word_width: 16}
+constraints: {max_out_size: 150000,  max_memory_size: 3060000, word_width: 16}
 optimization-objectives: {device: sensor, metric: latency}
 edge: {device: cpu, max_threads: 10, num_runs: 500}
 link:

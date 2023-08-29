@@ -9,8 +9,6 @@ link:
 neural-network:
   input-size: [1, 3, 224, 224]
   name: googlenet
-<<<<<<< HEAD
-=======
   input-size: [ 1, 3, 224, 224 ]
 
 accuracy:
@@ -28,7 +26,6 @@ accuracy:
         batch_size: 64
         randomize: True
 
->>>>>>> dev
 sensor:
   timeloop:
     accelerator: simba_like
