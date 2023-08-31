@@ -70,7 +70,7 @@ class DNNAnalyzer:
                 input_shape = rand_tensor.shape[-2:]
                 res2 = functional.interpolate(res2, size=input_shape, mode='bilinear', align_corners=False)
 
-            if res1.size() != res2.size():      # hotfix for flattening in SqueezeNet
+            if len(res1.size()) != len(res2.size()):      # hotfix for flattening in SqueezeNet
                 res2 = torch.flatten(res2, 1)
 
             if not False in torch.unique(res1 == res2):
