@@ -20,10 +20,10 @@
 	path = tools/cacti
 	url = https://github.com/HewlettPackard/cacti.git
 	ignore = dirty
-[submodule "tools/DRAMsim3"]
-	path = tools/DRAMsim3
-	url = https://github.com/umd-memsys/DRAMsim3
-	ignore = dirty
+# [submodule "tools/DRAMsim3"]
+# 	path = tools/DRAMsim3
+# 	url = https://github.com/umd-memsys/DRAMsim3
+# 	ignore = dirty
 [submodule "tools/dnn-model-exploration"]
 	path = tools/dnn-model-exploration
 	url = https://github.com/itiv-kit/dnn-model-exploration.git
