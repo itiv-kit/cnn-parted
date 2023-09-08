@@ -53,7 +53,9 @@ setup(
             'accelergy-table-based-plug-ins',
             'onnx',
             'networkx',
-            'model_explorer'
+            'onnxruntime',
+            'pymoo==0.5.0'
+#            'model_explorer'
             ],
       python_requires = '>=3.9',
       include_package_data = True,

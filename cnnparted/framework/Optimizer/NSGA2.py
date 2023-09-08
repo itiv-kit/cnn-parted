@@ -1,12 +1,12 @@
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
-from pymoo.util.display.column import Column
-from pymoo.util.display.output import Output
+# from pymoo.util.display.column import Column
+# from pymoo.util.display.output import Output
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
-from pymoo.operators.sampling.rnd import IntegerRandomSampling
-from pymoo.termination import get_termination
+from pymoo.operators.sampling.rnd import FloatRandomSampling #IntegerRandomSampling
+#from pymoo.termination import get_termination
 from pymoo.optimize import minimize
 from pymoo.core.problem import ElementwiseProblem
 from .Optimizer import Optimizer
@@ -30,17 +30,17 @@ class NSGA2_Optimizer(Optimizer):
         algorithm = NSGA2(
         pop_size=self.pop_size,
         n_offsprings=self.pop_size,
-        sampling=IntegerRandomSampling(),#In the beginning, initial points need to be sampled
+        sampling=FloatRandomSampling(),#In the beginning, initial points need to be sampled
         crossover=SBX(eta = eta,  prob=1),
         mutation=PM(prob= mutation_prob),
         eliminate_duplicates=True
         )
 
-        termination = get_termination("n_gen", self.num_gen)
+        #termination = get_termination("n_gen", ..)
 
         res = minimize(problem,
                algorithm,
-               termination,
+               termination=('n_gen',self.num_gen),
                seed=1,
                save_history=True,
                verbose=False

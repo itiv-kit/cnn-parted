@@ -4,7 +4,7 @@ import argparse
 from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator #, Dif_Evaluator
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
-from framework.node.Dramsim import Dramsim
+#from framework.node.Dramsim import Dramsim
 import yaml
 import torch
 from framework.constants import MODEL_PATH
@@ -56,8 +56,7 @@ def main():
     
     
     #####Test######################### 
-    drsim= Dramsim()
-    drsim.run("configs/DDR4_8Gb_x8_3200.ini",10000,"tests/example.trace")
+
 
     #ramulator
     

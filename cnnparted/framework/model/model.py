@@ -86,6 +86,9 @@ class TreeModel:
         else :
             c= i_shape[0][1]
 
+        ofms    = o_shape[0][0]*o_shape[0][1]*o_shape[0][2]*o_shape[0][3]
+        weights = o_shape[0][1]*c*attributes['kernel_shape'][0]*attributes['kernel_shape'][1]
+        ifms    = o_shape[0][0]*c*((o_shape[0][3]-1)*attributes['strides'][1]+attributes['kernel_shape'][1])*((o_shape[0][2]-1)*attributes['strides'][0]+attributes['kernel_shape'][0])
         output = {
             'n': o_shape[0][0],
             'm': o_shape[0][1],
@@ -97,7 +100,10 @@ class TreeModel:
             'wpad': attributes['pads'][0],
             'hpad': attributes['pads'][1],
             'wstride': attributes['strides'][0],
-            'hstride': attributes['strides'][1]
+            'hstride': attributes['strides'][1],
+            'ifms':ifms,
+            'ofms':ofms,
+            'weights':weights
         }
 
         return output
