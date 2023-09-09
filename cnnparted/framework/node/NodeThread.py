@@ -12,11 +12,11 @@ class NodeThread(ModuleThreadInterface):
     def _eval(self) -> None:
         if not self.config:
             return
-
-        if self.name == "edge":
-            self.reverse = True
-        else:
-            self.reverse = False
+        # reverse no given as an argument
+        # if self.name == "edge":
+        #     self.reverse = True
+        # else:
+        #     self.reverse = False
 
         if self.config.get("timeloop"):
             self._run_timeloop(self.config["timeloop"])

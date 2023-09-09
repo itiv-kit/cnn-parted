@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "Settin up timeloop"
+
+
 # stop on error
 set -e
 

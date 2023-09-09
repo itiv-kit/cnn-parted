@@ -20,6 +20,7 @@ class Evaluator:
         self.linkStats = self._calc_stats(linkStats)
         self.edgeStats = self._calc_stats(edgeStats)
         self.accStats = accStats
+        self.input_size= dnn.input_size
         self._evaluate()
 
     def print_sim_time(self) -> None:
@@ -229,11 +230,10 @@ class Evaluator:
             output[i]["edge_latency"] = self.pp_res[layer]["edge_latency"]
             output[i]["edge_energy"] = self.pp_res[layer]["edge_energy"]
 
-            output[i]["throughput"] = np.prod(self.pp_res[layer]["output_size"]) / (
-                (
-                    float(self.pp_res[layer]["sensor_latency"])
-                    + float(self.pp_res[layer]["link_latency"])
-                )
-            )
-
+            # change it to min(input/sensor_latenc,link_latency/output_size,edge_latency/output_size)
+            sensor_thrp = np.prod(self.input_size) / float(self.pp_res[layer]["sensor_latency"])
+            link_thrp= np.prod(self.pp_res[layer]["output_size"]) / float(self.pp_res[layer]["link_latency"])
+            edge_thrp= np.prod(self.pp_res[layer]["output_size"]) / float(self.pp_res[layer]["edge_latency"])
+            
+            output[i]["throughput"] = min(sensor_thrp,link_thrp , edge_thrp)
         return output

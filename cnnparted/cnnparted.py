@@ -54,13 +54,6 @@ def main():
     #model = conf_helper.get_model(main)
     constraints = conf_helper.get_constraints()
     
-    
-    #####Test######################### 
-
-
-    #ramulator
-    
-    ####Test end##############################
 
     try:
         model_path, accuracy_function = setup_workload(config['neural-network'])
@@ -85,16 +78,24 @@ def main():
     sensorStats = {}
     linkStats = {}
     edgeStats = {}
-    for i in range(0, args.num_runs):
-        threads: list[ModuleThreadInterface] = [
-            NodeThread('sensor', dnn, config.get('sensor'), args.run_name,
-                       args.show_progress),
-            LinkThread('link', dnn, config.get('link'), args.run_name,
-                       args.show_progress),
-            NodeThread('edge', dnn, config.get('edge'), args.run_name,
-                       args.show_progress)
-        ]
 
+    ####Test####
+    node_components,link_components = conf_helper.get_system_components()
+    first_component_id = node_components[0]['id']
+
+    node_threads = [
+                NodeThread(component.get('name', str(component.get('id', 'N/A'))).lower(), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
+                for component in node_components
+            ]
+    link_threads = [
+                LinkThread(component.get('name', str(component.get('id', 'N/A'))).lower(), dnn, component,False, args.run_name, args.show_progress)
+                for component in link_components
+            ]
+    threads = node_threads + link_threads
+    
+
+    ############
+    for i in range(0, args.num_runs):
         for t in threads:
             t.start()
         for t in threads:

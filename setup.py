@@ -42,7 +42,7 @@ setup(
             'pyfiglet',
             'PyYAML',
             'scipy',
-            'torch>=1.13.1',
+            'torch',
             'torchinfo',
             'torchvision',
             'typing_extensions',
@@ -54,10 +54,11 @@ setup(
             'onnx',
             'networkx',
             'onnxruntime',
+            'traitlets',
             'pymoo==0.5.0'
 #            'model_explorer'
             ],
-      python_requires = '>=3.9',
+      python_requires = '>=3.6',
       include_package_data = True,
       scripts=['tools/setupTimeloop.sh'],
       cmdclass={'install': ToolsInstall}
