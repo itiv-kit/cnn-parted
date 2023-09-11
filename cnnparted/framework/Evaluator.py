@@ -21,6 +21,7 @@ class Evaluator:
         self.edgeStats = self._calc_stats(edgeStats)
         self.accStats = accStats
         self.input_size= dnn.input_size
+        self.part_point_memory= dnn.part_point_memory
         self._evaluate()
 
     def print_sim_time(self) -> None:
@@ -96,10 +97,11 @@ class Evaluator:
 
     def _evaluate(self) -> None:
         self.res = OrderedDict()
-
+        senso_mem = 0
         last_layer_fits_memory_found = False
         for layer in self.dnn.partition_points:
             id = layer.get("name")
+            
 
             if id == self.dnn.max_part_point:
                 last_layer_fits_memory_found = True
@@ -108,7 +110,9 @@ class Evaluator:
 
             self.res[id] = {}
             self.res[id]["output_size"] = layer.get("output_size")
+            self.res[id]["sensor_memory"]= self.part_point_memory[id]
 
+            
             if id in self.sensorStats.keys():
                 self.res[id]["sensor_latency"] = self.sensorStats[id]["latency"][0]
                 self.res[id]["sensor_latency_iqr"] = self.sensorStats[id][
@@ -182,6 +186,7 @@ class Evaluator:
                 "Sensor Latency",
                 "Sensor Latency IQR",
                 "Sensor Energy",
+                "Sensor Memory"
                 "Link Latency",
                 "Link Energy",
                 "Edge Latency",
@@ -200,6 +205,7 @@ class Evaluator:
                     str(data[layer]["sensor_latency"]),
                     str(data[layer]["sensor_latency_iqr"]),
                     str(data[layer]["sensor_energy"]),
+                    str(data[layer]["sensor_memory"]),
                     str(data[layer]["link_latency"]),
                     str(data[layer]["link_energy"]),
                     str(data[layer]["edge_latency"]),
@@ -223,6 +229,8 @@ class Evaluator:
 
             output[i]["sensor_latency"] = self.pp_res[layer]["sensor_latency"]
             output[i]["sensor_energy"] = self.pp_res[layer]["sensor_energy"]
+            output[i]["sensor_memory"] = self.pp_res[layer]["sensor_memory"]
+
 
             output[i]["link_latency"] = self.pp_res[layer]["link_latency"]
             output[i]["link_energy"] = self.pp_res[layer]["link_energy"]

@@ -16,10 +16,6 @@ class ToolsInstall(install):
         os.system("chmod +x "+path+"setupTimeloop.sh")
         os.system("sh "+path+"setupTimeloop.sh")
 
-        # Install DRAMsim3 
-        os.system("chmod +x " + path + "setupDramsim3.sh")
-        os.system("sh " + path + "setupDramsim3.sh") # CMake is needed
-
 setup(
     name='CNNParted',
       version='1.0',

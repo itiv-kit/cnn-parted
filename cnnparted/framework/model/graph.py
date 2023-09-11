@@ -162,4 +162,26 @@ class LayersGraph:
                 break
 
         return nearest_node
-            
+    
+    def find_the_nearest_descendant(self,source,node_list):
+        
+        if source == None:
+            return None
+        
+        graph = self._graph
+        simple_paths = list(nx.all_simple_paths(graph, source=source, target=node_list[0]))
+
+        if simple_paths:
+            simple_path = simple_paths[0]
+        else:
+            simple_path = []
+
+        nearest_node = None
+        nodes = [d["name"] for d in node_list]
+        for path_node in simple_path:
+            if path_node in nodes:
+                nearest_node = path_node
+                break
+
+        return nearest_node
+    
