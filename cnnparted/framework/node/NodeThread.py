@@ -12,7 +12,7 @@ class NodeThread(ModuleThreadInterface):
     def _eval(self) -> None:
         if not self.config:
             return
-        # reverse no given as an argument
+        # reverse now given as an argument
         # if self.name == "edge":
         #     self.reverse = True
         # else:
@@ -40,7 +40,7 @@ class NodeThread(ModuleThreadInterface):
 
         model_splitter = ModelSplitter(NEW_MODEL_PATH)
 
-        # only iterate through filtered list to save time
+        # only iterate through filtered list to save time; Mahdi : but the problem is that first layers will have zeros
         for point in self.dnn.partpoints_filtered:
             layer_name = point.get("name")
             output_path_head = os.path.join(ROOT_DIR, layer_name + "head.onnx")

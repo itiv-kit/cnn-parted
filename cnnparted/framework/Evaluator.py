@@ -97,7 +97,6 @@ class Evaluator:
 
     def _evaluate(self) -> None:
         self.res = OrderedDict()
-        senso_mem = 0
         last_layer_fits_memory_found = False
         for layer in self.dnn.partition_points:
             id = layer.get("name")
@@ -111,8 +110,7 @@ class Evaluator:
             self.res[id] = {}
             self.res[id]["output_size"] = layer.get("output_size")
             self.res[id]["sensor_memory"]= self.part_point_memory[id]
-
-            
+          
             if id in self.sensorStats.keys():
                 self.res[id]["sensor_latency"] = self.sensorStats[id]["latency"][0]
                 self.res[id]["sensor_latency_iqr"] = self.sensorStats[id][
@@ -156,6 +154,12 @@ class Evaluator:
                 + self.res[id]["edge_energy"]
             )
 
+            sensor_thrp = np.prod(self.input_size) / float(self.pp_res[id]["sensor_latency"])
+            link_thrp= np.prod(self.pp_res[id]["output_size"]) / float(self.pp_res[id]["link_latency"])
+            edge_thrp= np.prod(self.pp_res[id]["output_size"]) / float(self.pp_res[id]["edge_latency"])
+            
+            self.res[id]["throughput"] = min(sensor_thrp,link_thrp , edge_thrp)
+
         # remove non-beneficial partitioning points based on bandwidth constraint
         filtered_pp = [layer.get("name") for layer in self.dnn.partpoints_filtered]
         # print(filtered_pp)
@@ -186,12 +190,13 @@ class Evaluator:
                 "Sensor Latency",
                 "Sensor Latency IQR",
                 "Sensor Energy",
-                "Sensor Memory"
+                "Sensor Memory[bytes]",
                 "Link Latency",
                 "Link Energy",
                 "Edge Latency",
                 "Edge Latency IQR",
                 "Edge Energy",
+                "throughput",
             ]
             writer.writerow(header)
             for i, layer in enumerate(data.keys()):
@@ -211,6 +216,7 @@ class Evaluator:
                     str(data[layer]["edge_latency"]),
                     str(data[layer]["edge_latency_iqr"]),
                     str(data[layer]["edge_energy"]),
+                    str(data[layer]["throughput"]),
                 ]
                 writer.writerow(row)
 
@@ -236,12 +242,6 @@ class Evaluator:
             output[i]["link_energy"] = self.pp_res[layer]["link_energy"]
 
             output[i]["edge_latency"] = self.pp_res[layer]["edge_latency"]
-            output[i]["edge_energy"] = self.pp_res[layer]["edge_energy"]
-
-            # change it to min(input/sensor_latenc,link_latency/output_size,edge_latency/output_size)
-            sensor_thrp = np.prod(self.input_size) / float(self.pp_res[layer]["sensor_latency"])
-            link_thrp= np.prod(self.pp_res[layer]["output_size"]) / float(self.pp_res[layer]["link_latency"])
-            edge_thrp= np.prod(self.pp_res[layer]["output_size"]) / float(self.pp_res[layer]["edge_latency"])
-            
-            output[i]["throughput"] = min(sensor_thrp,link_thrp , edge_thrp)
+            output[i]["edge_energy"] = self.pp_res[layer]["edge_energy"]   
+            output[i]["throughput"] =  self.pp_res[layer]["throughput"]
         return output

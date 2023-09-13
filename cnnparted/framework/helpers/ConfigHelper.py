@@ -22,7 +22,6 @@ class ConfigHelper:
         link_components = []
         for component in sorted_components:
             if 'timeloop' in component or 'device' in component:
-                # This component is classified as a node
                 node_components.append(component)
             else:
                 link_components.append(component)

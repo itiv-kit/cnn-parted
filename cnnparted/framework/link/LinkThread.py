@@ -41,7 +41,7 @@ class LinkThread(ModuleThreadInterface):
                 latency = 0
                 energy = 0
 
-        self.stats[layer.get('name')] = {
+            self.stats[layer.get('name')] = {
                 'latency' : latency,
                 'energy' : energy
             }

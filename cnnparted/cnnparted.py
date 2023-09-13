@@ -75,42 +75,74 @@ def main():
     #     accEval = QuantizationEvaluator(model, dnn, config.get('accuracy'), accuracy_function, args.show_progress)
     #     accStats = accEval.get_stats()
 
-    sensorStats = {}
-    linkStats = {}
-    edgeStats = {}
-
-    ####Test####
+      
     node_components,link_components = conf_helper.get_system_components()
     first_component_id = node_components[0]['id']
 
     node_threads = [
-                NodeThread(component.get('name', str(component.get('id', 'N/A'))).lower(), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
+                NodeThread(component.get('name', "Partition"+str(component.get('id', 'N/A'))).lower(), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
                 for component in node_components
             ]
     link_threads = [
-                LinkThread(component.get('name', str(component.get('id', 'N/A'))).lower(), dnn, component,False, args.run_name, args.show_progress)
+                LinkThread(component.get('name', "Link"+str(component.get('id', 'N/A'))).lower(), dnn, component,False, args.run_name, args.show_progress)
                 for component in link_components
             ]
-    threads = node_threads + link_threads
-    
+
+    ####Test####
+    nodeStats={}
+    linkStats={}
+    for i in range (0, args.num_runs):
+        node_threads = [
+                NodeThread(component.get('name', "Partition"+str(component.get('id', 'N/A'))).lower(), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
+                for component in node_components
+            ]
+        link_threads = [
+                LinkThread(component.get('name', "Link"+str(component.get('id', 'N/A'))).lower(), dnn, component,False, args.run_name, args.show_progress)
+                for component in link_components
+            ]
+        
+        for t in node_threads:
+            t.start()
+        for t in link_threads:
+            t.start()
+
+        for t in node_threads:
+            t.join()
+        for t in link_threads:
+            t.join()
+        
+        
+        for index, node_thread in enumerate(node_threads):
+            stats = node_thread.getStats()
+            if index not in nodeStats:
+                nodeStats[index] = {}
+            nodeStats[index][i] = stats
+
+        for index,link_thread in  enumerate(link_threads):
+            stats = link_thread .getStats()
+            if index not in linkStats:
+                linkStats[index] = {}
+            linkStats[index][i] = stats
+
 
     ############
-    for i in range(0, args.num_runs):
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+    #threads = node_threads + link_threads
 
-        sensorStats[i] = threads[0].getStats()
-        linkStats[i] = threads[1].getStats()
-        edgeStats[i] = threads[2].getStats()
+    # for i in range(0, args.num_runs):
+    #     for t in threads:
+    #         t.start()
+    #     for t in threads:
+    #         t.join()
 
-    e = Evaluator(dnn, sensorStats, linkStats, edgeStats, {})
+    #     sensorStats[i] = threads[0].getStats()
+    #     linkStats[i] = threads[2].getStats()
+    #     edgeStats[i] = threads[1].getStats()
+
+    #Evaluator should be modified to support more than 2 accelerators setting
+    e = Evaluator(dnn, nodeStats[0], linkStats[0], nodeStats[1], {})
     e.print_sim_time()
     e.export_csv(args.run_name)
-    #de = Dif_Evaluator(dnn, sensorStats)
-    #de.save_stats(args.run_name, 'otherdnns.csv')
-
+ 
     nodes = e.get_all_layer_stats()
     
     if len(nodes) == 0:

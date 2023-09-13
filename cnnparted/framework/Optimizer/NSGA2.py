@@ -32,7 +32,7 @@ class NSGA2_Optimizer(Optimizer):
         n_offsprings=self.pop_size,
         sampling=FloatRandomSampling(),#In the beginning, initial points need to be sampled
         crossover=SBX(eta = eta,  prob=1),
-        mutation=PM(prob= mutation_prob),
+        mutation=PM(eta = eta,prob= mutation_prob),
         eliminate_duplicates=True
         )
 

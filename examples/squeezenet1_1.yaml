@@ -1,6 +1,6 @@
 constraints:
-  max_out_size: 150000
-  max_memory_size: 3060000
+  max_out_size: 150000 # must be node specific
+  max_memory_size: 3060000 
   word_width: 16
 
 optimization-objectives:
@@ -8,7 +8,6 @@ optimization-objectives:
   metric: latency
 
 neural-network:
-  input-size: [1, 3, 227, 227]
   name: squeezenet1_1
   input-size: [1, 3, 227, 227]
 
@@ -29,9 +28,9 @@ accuracy:
 
 components:
   - id: 0
-    name: sensor
+    name: sensor #optional
     timeloop:
-      accelerator: simba_like
+      accelerator: eyeriss_like
       frequency: 500000000
       layer: conv2d
       mapper:
@@ -40,7 +39,7 @@ components:
         num-threads: 8
         optimization-metrics: [energy, delay]
         timeout: 0
-        victory-condition: 10
+        victory-condition: 100
   - id: 1
     data_bit_width: 16
     ethernet:
