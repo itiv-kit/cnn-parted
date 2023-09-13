@@ -21,6 +21,7 @@ class Evaluator:
         self.edgeStats = self._calc_stats(edgeStats)
         self.accStats = accStats
         self.input_size= dnn.input_size
+        self.num_bytes = dnn.num_bytes
         self.part_point_memory= dnn.part_point_memory
         self._evaluate()
 
@@ -154,12 +155,11 @@ class Evaluator:
                 + self.res[id]["edge_energy"]
             )
 
-            sensor_thrp = np.prod(self.input_size) / float(self.pp_res[id]["sensor_latency"])
-            link_thrp= np.prod(self.pp_res[id]["output_size"]) / float(self.pp_res[id]["link_latency"])
-            edge_thrp= np.prod(self.pp_res[id]["output_size"]) / float(self.pp_res[id]["edge_latency"])
+            sensor_thrp = np.prod(self.input_size) / float(self.res[id]["sensor_latency"])
+            link_thrp= np.prod(self.res[id]["output_size"]) / float(self.res[id]["link_latency"])
+            edge_thrp= np.prod(self.res[id]["output_size"]) / float(self.res[id]["edge_latency"])
             
-            self.res[id]["throughput"] = min(sensor_thrp,link_thrp , edge_thrp)
-
+            self.res[id]["throughput"] = round(min(sensor_thrp,link_thrp , edge_thrp)* self.num_bytes / 1000,2) #(MBps = 1000/1e6 B/ms)
         # remove non-beneficial partitioning points based on bandwidth constraint
         filtered_pp = [layer.get("name") for layer in self.dnn.partpoints_filtered]
         # print(filtered_pp)
@@ -196,7 +196,7 @@ class Evaluator:
                 "Edge Latency",
                 "Edge Latency IQR",
                 "Edge Energy",
-                "throughput",
+                "throughput[MBps]",
             ]
             writer.writerow(header)
             for i, layer in enumerate(data.keys()):

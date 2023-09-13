@@ -27,6 +27,10 @@ class DNNAnalyzer:
         self.constraints = constraints
         self.memoryInfo = MemoryInfo()
 
+        self.num_bytes = int(self.constraints["word_width"] / 8)
+        if self.constraints["word_width"] % 8 > 0:
+            self.num_bytes += 1
+
         self.stats = {}
         t0 = time.time()
         # output_name = "model.onnx"
@@ -83,15 +87,11 @@ class DNNAnalyzer:
     def get_max_conv2d_layer(self):
         max_mem_allowed = self.constraints["max_memory_size"]
         
-        num_bytes = self.constraints["word_width"] / 8
-        if self.constraints["word_width"] % 8 > 0:
-            num_bytes += 1
-
         conv_layers = self.get_conv2d_layers()
         ofms, ifms, weights = self.memoryInfo.get_convs_memory(conv_layers)
 
         convs_subgraphs, root = self.graph.get_all_conv_subgraphs()
-        max_mem_bytes = (ifms[root] + ofms[root] + weights[root]) * num_bytes 
+        max_mem_bytes = (ifms[root] + ofms[root] + weights[root]) * self.num_bytes 
         
 
         max_layer = None
@@ -116,7 +116,7 @@ class DNNAnalyzer:
                 subgraph_min_memory_necessary = min(subgraph_max_memory.values())
 
                 max_memory = subgraph_min_memory_necessary + memory
-                max_mem_bytes = max(max_mem_bytes,max_memory* num_bytes)
+                max_mem_bytes = max(max_mem_bytes,max_memory* self.num_bytes)
 
                 last_node = orders[0][-1]
                 part_point = self.graph.find_the_nearest_descendant(last_node, self.partition_points)
