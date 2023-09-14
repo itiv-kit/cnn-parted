@@ -36,7 +36,6 @@ class ModelSplitter:
 
     def get_node_index_by_name(self, model_def, node_name):
         for index, node in enumerate(model_def.graph.node):
-
             if node.name == node_name:
                 return index
         print(" Index Not found for :",node_name)
@@ -127,9 +126,12 @@ class ModelSplitter:
 
         newmodelhead = onnx.load(new_model_path)
         newmodeltail = onnx.load(new_model_path)
-
+        
+        if node_name == 'input':
+            onnx.save(newmodeltail, output_path_tail)
+            return False
+        
         to_be_deleted_nodes_count = self.get_node_index_by_name(model, node_name) + 1
-
         node = self.get_node_by_name(model, node_name)
         shape, type = self.get_value_info_shape_and_type(model, node.output[0])
 

@@ -9,6 +9,7 @@ import yaml
 import torch
 from framework.constants import MODEL_PATH
 import sys
+import os
 
 import importlib
 
@@ -48,7 +49,7 @@ def main():
                         default=1,
                         help='Number of runs')
     args = parser.parse_args()
-
+    os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
     #model = conf_helper.get_model(main)

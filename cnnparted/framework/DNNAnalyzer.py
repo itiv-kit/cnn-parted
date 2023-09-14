@@ -90,13 +90,19 @@ class DNNAnalyzer:
         conv_layers = self.get_conv2d_layers()
         ofms, ifms, weights = self.memoryInfo.get_convs_memory(conv_layers)
 
-        convs_subgraphs, root = self.graph.get_all_conv_subgraphs()
+        convs_subgraphs, root,dummy_convs = self.graph.get_all_conv_subgraphs()
+        for dummy in dummy_convs:
+            ofms[dummy]=0
+            ifms[dummy]=0
+            weights[dummy]=0
         max_mem_bytes = (ifms[root] + ofms[root] + weights[root]) * self.num_bytes 
         
 
         max_layer = None
         self.part_point_memory = {}
-        self.part_point_memory[root]= max_mem_bytes
+
+        if root not in dummy_convs:
+            self.part_point_memory[root]= max_mem_bytes
 
         if max_mem_bytes > max_mem_allowed:
             max_layer = root

@@ -24,9 +24,10 @@ class LayersGraph:
 
     def _create_layer_relationships(self):
         for layer in self.model_tree:
-            self._graph.add_node(layer["name"], data=layer, children=[])
-            for child in layer["children"]:
-                self._graph.add_edge(layer["name"], child["name"])
+            if layer['op_type']!= 'Constant':
+                self._graph.add_node(layer["name"], data=layer, children=[])
+                for child in layer["children"]:
+                    self._graph.add_edge(layer["name"], child["name"])
 
     def get_graph_partition_points(self):
         return self._sorted_partition_points
@@ -94,19 +95,25 @@ class LayersGraph:
         return list(graph.successors(node))
 
     def get_conv_graph(self):
+        dummy_convs=[]
         conv_nodes = self.get_conv2d_layers()
         graph = copy.deepcopy(self._graph)
         for node in self._graph.nodes:
             if node not in conv_nodes:
                 predecessors = list(graph.predecessors(node))
-                successors = list(graph.successors(node))
+                successors = list(graph.successors(node))            
 
-                graph.remove_node(node)
-
-                for pred in predecessors:
-                    for succ in successors:
-                        graph.add_edge(pred, succ)
-        return graph
+                if len(predecessors) + len(successors) > 2:
+                    dummy= node+"_dummy_conv"
+                    graph = nx.relabel_nodes(graph, {node: dummy})
+                    dummy_convs.append(dummy)
+                    
+                else:
+                    graph.remove_node(node)
+                    for pred in predecessors:
+                        for succ in successors:
+                            graph.add_edge(pred, succ)
+        return graph,dummy_convs
 
     def get_conv2d_layers(self):
         output = [
@@ -124,7 +131,7 @@ class LayersGraph:
         return source, target
 
     def get_all_conv_subgraphs(self):
-        graph = self.get_conv_graph()
+        graph,dummy_convs = self.get_conv_graph()
         source = next(
             (node for node, in_degree in graph.in_degree() if in_degree == 0), None
         )
@@ -136,18 +143,23 @@ class LayersGraph:
         nodes_c_nodes = self._sorted_common_nodes(graph, paths)
         subgraphs = self._create_subgraphs(graph, nodes_c_nodes)
 
-        return subgraphs, source
+        return subgraphs, source,dummy_convs
 
     def get_all_topological_orders(self, graph):
         return list(nx.all_topological_sorts(graph))
     
     def find_the_nearest_ancestor(self,source,node_list):
+        _source=source
         
-        if source == None:
+        if _source == None:
             return None
+        if 'dummy_conv' in  _source:
+                _source = source.replace('_dummy_conv','')
+            
+
         
         graph_reversed= nx.reverse(self._graph)
-        reverse_simple_paths = list(nx.all_simple_paths(graph_reversed, source=source, target=node_list[0]))
+        reverse_simple_paths = list(nx.all_simple_paths(graph_reversed, source=_source, target=node_list[0]))
 
         if reverse_simple_paths:
             reverse_simple_path = reverse_simple_paths[0]
@@ -165,11 +177,13 @@ class LayersGraph:
     
     def find_the_nearest_descendant(self,source,node_list):
         
-        if source == None:
+        _source=source   
+        if _source == None:
             return None
-        
+        if 'dummy_conv' in  _source:
+                _source = source.replace('_dummy_conv','')
         graph = self._graph
-        simple_paths = list(nx.all_simple_paths(graph, source=source, target=node_list[0]))
+        simple_paths = list(nx.all_simple_paths(graph, source=_source, target=node_list[0]))
 
         if simple_paths:
             simple_path = simple_paths[0]

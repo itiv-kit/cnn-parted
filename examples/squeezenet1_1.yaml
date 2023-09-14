@@ -30,7 +30,7 @@ components:
   - id: 0
     name: sensor #optional
     timeloop:
-      accelerator: eyeriss_like
+      accelerator: simba_like
       frequency: 500000000
       layer: conv2d
       mapper:

@@ -17,7 +17,9 @@ class MemoryInfo:
           all_ifms[name] = ifms
           all_ofms[name] = ofms
           all_weights[name] = weights
-
+        all_ifms['dummy_conv']= 0
+        all_ofms['dummy_conv']= 0
+        all_weights['dummy_conv']= 0
         return all_ofms, all_ifms,all_weights
 
     def calculate_max_memory_usage(self,graph, weights, ifms, ofms, topological_orders):
