@@ -3,6 +3,7 @@ import statistics
 from collections import OrderedDict
 from typing import Optional
 import numpy as np
+from typing import List
 from .DNNAnalyzer import DNNAnalyzer
 
 
@@ -10,20 +11,32 @@ class Evaluator:
     def __init__(
         self,
         dnn: DNNAnalyzer,
-        sensorStats: dict,
-        linkStats: dict,
-        edgeStats: dict,
-        accStats: dict,
+        nodeStats: List[dict],
+        linkStats: List[dict],
+        accStats: List[dict],
     ) -> None:
         self.dnn = dnn
-        self.sensorStats = self._calc_stats(sensorStats)
-        self.linkStats = self._calc_stats(linkStats)
-        self.edgeStats = self._calc_stats(edgeStats)
-        self.accStats = accStats
+        self.nodeStats= nodeStats
+        self.linkStats= linkStats
+
+        allStats = OrderedDict()
+        allStats.update(nodeStats)
+        allStats.update(linkStats)
+        self.sorted_allStats = OrderedDict(sorted(allStats.items()))
+        self.first_id = next(iter(self.sorted_allStats))
+        
+        for component in self.sorted_allStats:
+            self.Stats= self._calc_stats(component)
+
+        # dont know yet how it is implemented, so it should be probably modified
+        for acc in accStats:
+            self.accStats[acc] = self._calc_stats(acc)
+
         self.input_size= dnn.input_size
         self.num_bytes = dnn.num_bytes
         self.part_point_memory= dnn.part_point_memory
         self._evaluate()
+
 
     def print_sim_time(self) -> None:
         print()
@@ -34,27 +47,20 @@ class Evaluator:
         if "sim_time" in self.accStats.keys():
             print("Accuracy Eval:", self.accStats["sim_time"], "s")
 
-        print(
-            "Sensor Node:  ",
-            self.sensorStats["sim_time"][0],
+        
+        for id,cmp in self.sorted_allStats.items():
+            if id in self.nodeStats:
+                name = "Node-"+str(id)
+            else:
+                name= "link-"+ str(id)
+            print(
+            name,"   :",
+            cmp["sim_time"][0],
             "s (stdev: ",
-            self.sensorStats["sim_time"][1],
+            cmp["sim_time"][1],
             "s)",
         )
-        print(
-            "Link:         ",
-            self.linkStats["sim_time"][0],
-            "s (stdev: ",
-            self.linkStats["sim_time"][1],
-            "s)",
-        )
-        print(
-            "Edge Node:    ",
-            self.edgeStats["sim_time"][0],
-            "s (stdev: ",
-            self.edgeStats["sim_time"][1],
-            "s)",
-        )
+
         print()
 
     def _calc_stats(self, stat: dict) -> None:
@@ -99,68 +105,126 @@ class Evaluator:
     def _evaluate(self) -> None:
         self.res = OrderedDict()
         last_layer_fits_memory_found = False
+        self.stats_names=[]
         for layer in self.dnn.partition_points:
-            id = layer.get("name")
+            layer_name = layer.get("name")
             
 
-            if id == self.dnn.max_part_point:
+            if layer_name == self.dnn.max_part_point:
                 last_layer_fits_memory_found = True
             elif last_layer_fits_memory_found:
                 break
 
-            self.res[id] = {}
-            self.res[id]["output_size"] = layer.get("output_size")
-            self.res[id]["sensor_memory"]= self.part_point_memory[id]
+            self.res[layer_name] = {}
+            self.res[layer_name]["output_size"] = layer.get("output_size")
+            self.res[layer_name]["sensor_memory"]= self.part_point_memory[layer_name]#we need more for more than 2 accelerator setting
+
+
+            for id,cmp in self.sorted_allStats.items():
+                if id in self.nodeStats:
+                    name = "Node-"+str(id)
+                    if layer_name in cmp.keys():
+                        self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
+                        self.res[layer_name][f"{name}_latency_iqr"] = cmp[layer_name]["latency_iqr"][0]
+                        self.res[layer_name]["sensor_energy"] = cmp[layer_name]["energy"][0]
+                    else:
+                        self.res[layer_name][f"{name}_latency"] = 0
+                        self.res[layer_name][f"{name}_latency_iqr"] = 0
+                        self.res[layer_name][f"{name}_energy"] = 0
+
+                elif id in self.linkStats :
+                    name= "Link-"+ str(id)
+                    if layer_name in cmp.keys():            
+                        self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
+                        self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
+                    else:
+                        self.res[layer_name][f"{name}_latency"] = 0
+                        self.res[layer_name][f"{name}_energy"] = 0
+
+                if name not in self.stats_names:
+                    self.stats_names.append(name)
+                
+
           
-            if id in self.sensorStats.keys():
-                self.res[id]["sensor_latency"] = self.sensorStats[id]["latency"][0]
-                self.res[id]["sensor_latency_iqr"] = self.sensorStats[id][
-                    "latency_iqr"
-                ][0]
-                self.res[id]["sensor_energy"] = self.sensorStats[id]["energy"][0]
+            # if layer_name in self.nodeStats.keys():
+            #     self.res[layer_name]["sensor_latency"] = self.nodeStats[layer_name]["latency"][0]
+            #     self.res[layer_name]["sensor_latency_iqr"] = self.nodeStats[layer_name][
+            #         "latency_iqr"
+            #     ][0]
+            #     self.res[layer_name]["sensor_energy"] = self.nodeStats[layer_name]["energy"][0]
+            # else:
+            #     self.res[layer_name]["sensor_latency"] = 0
+            #     self.res[layer_name]["sensor_latency_iqr"] = 0
+            #     self.res[layer_name]["sensor_energy"] = 0
+
+            # if layer_name in self.linkStats.keys():
+            #     self.res[layer_name]["link_latency"] = self.linkStats[layer_name]["latency"][0]
+            #     self.res[layer_name]["link_energy"] = self.linkStats[layer_name]["energy"][0]
+            # else:
+            #     self.res[layer_name]["link_latency"] = 0
+            #     self.res[layer_name]["link_energy"] = 0
+
+            # if layer_name in self.edgeStats.keys():
+            #     self.res[layer_name]["edge_latency"] = self.edgeStats[layer_name]["latency"][0]
+            #     self.res[layer_name]["edge_latency_iqr"] = self.edgeStats[layer_name]["latency_iqr"][0]
+            #     self.res[layer_name]["edge_energy"] = self.edgeStats[layer_name]["energy"][0]
+            # else:
+            #     self.res[layer_name]["edge_latency"] = 0
+            #     self.res[layer_name]["edge_latency_iqr"] = 0
+            #     self.res[layer_name]["edge_energy"] = 0
+
+            if layer_name in self.accStats.keys():
+                self.res[layer_name]["accuracy"] = self.accStats[layer_name]
             else:
-                self.res[id]["sensor_latency"] = 0
-                self.res[id]["sensor_latency_iqr"] = 0
-                self.res[id]["sensor_energy"] = 0
+                self.res[layer_name]["accuracy"] = 0
 
-            if id in self.linkStats.keys():
-                self.res[id]["link_latency"] = self.linkStats[id]["latency"][0]
-                self.res[id]["link_energy"] = self.linkStats[id]["energy"][0]
-            else:
-                self.res[id]["link_latency"] = 0
-                self.res[id]["link_energy"] = 0
 
-            if id in self.edgeStats.keys():
-                self.res[id]["edge_latency"] = self.edgeStats[id]["latency"][0]
-                self.res[id]["edge_latency_iqr"] = self.edgeStats[id]["latency_iqr"][0]
-                self.res[id]["edge_energy"] = self.edgeStats[id]["energy"][0]
-            else:
-                self.res[id]["edge_latency"] = 0
-                self.res[id]["edge_latency_iqr"] = 0
-                self.res[id]["edge_energy"] = 0
+            for name in self.stats_names:
+                latency_key = f"{name}_latency"
+                if latency_key in self.res[layer_name]:
+                    total_latency += self.res[layer_name][latency_key]
 
-            if id in self.accStats.keys():
-                self.res[id]["accuracy"] = self.accStats[id]
-            else:
-                self.res[id]["accuracy"] = 0
+            self.res[layer_name]["latency"] = total_latency
 
-            self.res[id]["latency"] = (
-                self.res[id]["sensor_latency"]
-                + self.res[id]["link_latency"]
-                + self.res[id]["edge_latency"]
-            )
-            self.res[id]["energy"] = (
-                self.res[id]["sensor_energy"]
-                + self.res[id]["link_energy"]
-                + self.res[id]["edge_energy"]
-            )
+            # self.res[layer_name]["latency"] = (
+            #     self.res[layer_name]["sensor_latency"]
+            #     + self.res[layer_name]["link_latency"]
+            #     + self.res[layer_name]["edge_latency"]
+            # )
 
-            sensor_thrp = np.prod(self.input_size) / float(self.res[id]["sensor_latency"])
-            link_thrp= np.prod(self.res[id]["output_size"]) / float(self.res[id]["link_latency"])
-            edge_thrp= np.prod(self.res[id]["output_size"]) / float(self.res[id]["edge_latency"])
+            for name in self.stats_names:
+                latency_key = f"{name}_energy"
+                if latency_key in self.res[layer_name]:
+                    total_latency += self.res[layer_name][latency_key]
+
+            self.res[layer_name]["energy"] = total_latency
+
+            # self.res[layer_name]["energy"] = (
+            #     self.res[layer_name]["sensor_energy"]
+            #     + self.res[layer_name]["link_energy"]
+            #     + self.res[layer_name]["edge_energy"]
+            # )
+            throughputs=[]      
+            for id,cmp in self.sorted_allStats.items():
+                if id in self.nodeStats:
+                    name = "Node-"+str(id)
+                else:
+                    name = "Link-" + str(id)
+
+                size = self.input_size if id==self.first_id else self.res[layer_name]["output_size"]
+    
+                throughput = np.prod(size) / float(self.res[layer_name][latency_key])
+                throughputs.append(throughput) 
             
-            self.res[id]["throughput"] = round(min(sensor_thrp,link_thrp , edge_thrp)* self.num_bytes / 1000,2) #(MBps = 1000/1e6 B/ms)
-        # remove non-beneficial partitioning points based on bandwidth constraint
+            min_throughput = min(throughputs)
+            self.res[layer_name]["throughput"] = round(min_throughput * self.num_bytes / 1000, 2)  # MBps = 1000/1e6 B/ms
+
+        #     sensor_thrp = np.prod(self.input_size) / float(self.res[layer_name]["sensor_latency"])
+        #     link_thrp= np.prod(self.res[layer_name]["output_size"]) / float(self.res[layer_name]["link_latency"])
+        #     edge_thrp= np.prod(self.res[layer_name]["output_size"]) / float(self.res[layer_name]["edge_latency"])
+            
+        #     self.res[layer_name]["throughput"] = round(min(sensor_thrp,link_thrp , edge_thrp)* self.num_bytes / 1000,2) #(MBps = 1000/1e6 B/ms)
+        # # remove non-beneficial partitioning points based on bandwidth constraint
         filtered_pp = [layer.get("name") for layer in self.dnn.partpoints_filtered]
         # print(filtered_pp)
         self.pp_res = {key: self.res[key] for key in self.res if key in filtered_pp}
@@ -180,68 +244,140 @@ class Evaluator:
     def _write_csv_file(self, filename: str, data: dict) -> None:
         with open(filename, "w", newline="") as f:
             writer = csv.writer(f, delimiter=";")
-            header = [
-                "No.",
-                "Layer",
-                "Output Size",
-                "Accuracy",
-                "Latency [ms]",
-                "Energy [mJ]",
-                "Sensor Latency",
-                "Sensor Latency IQR",
-                "Sensor Energy",
-                "Sensor Memory[bytes]",
-                "Link Latency",
-                "Link Energy",
-                "Edge Latency",
-                "Edge Latency IQR",
-                "Edge Energy",
-                "throughput[MBps]",
-            ]
+            base_header = ["No.", "Layer", "Output Size", "Accuracy", "Latency [ms]", "Energy [mJ]"]
+            dynamic_header = []
+        
+            for name in self.stats_names:
+                dynamic_header.extend([
+                    f"{name} Latency",
+                    f"{name} Latency IQR",
+                    f"{name} Energy"
+                ])
+                if "Node" in name:  # Adding memory header for nodes
+                    dynamic_header.append(f"{name} Memory[bytes]")
+
+            dynamic_header.append("throughput[MBps]")
+
+            header = base_header + dynamic_header
             writer.writerow(header)
+
             for i, layer in enumerate(data.keys()):
-                row = [
-                    (i + 1),
+                # Dynamic row generation
+                base_row = [
+                    i + 1,
                     layer,
                     str(data[layer]["output_size"]),
                     str(data[layer]["accuracy"]),
                     str(data[layer]["latency"]),
-                    str(data[layer]["energy"]),
-                    str(data[layer]["sensor_latency"]),
-                    str(data[layer]["sensor_latency_iqr"]),
-                    str(data[layer]["sensor_energy"]),
-                    str(data[layer]["sensor_memory"]),
-                    str(data[layer]["link_latency"]),
-                    str(data[layer]["link_energy"]),
-                    str(data[layer]["edge_latency"]),
-                    str(data[layer]["edge_latency_iqr"]),
-                    str(data[layer]["edge_energy"]),
-                    str(data[layer]["throughput"]),
+                    str(data[layer]["energy"])
                 ]
+
+                dynamic_row = []
+                for name in self.stats_names:
+                    dynamic_row.extend([
+                        str(data[layer].get(f"{name}_latency", "")),
+                        str(data[layer].get(f"{name}_latency_iqr", "")),
+                        str(data[layer].get(f"{name}_energy", ""))
+                    ])
+                    if "Node" in name:  # Extracting memory data for nodes
+                        dynamic_row.append(str(data[layer].get(f"{name}_memory", "")))
+
+                dynamic_row.append(str(data[layer]["throughput"]))
+
+                row = base_row + dynamic_row
                 writer.writerow(row)
+            # header = [
+            #     "No.",
+            #     "Layer",
+            #     "Output Size",
+            #     "Accuracy",
+            #     "Latency [ms]",
+            #     "Energy [mJ]",
+            #     "Sensor Latency",
+            #     "Sensor Latency IQR",
+            #     "Sensor Energy",
+            #     "Sensor Memory[bytes]",
+            #     "Link Latency",
+            #     "Link Energy",
+            #     "Edge Latency",
+            #     "Edge Latency IQR",
+            #     "Edge Energy",
+            #     "throughput[MBps]",
+            # ]
+            # writer.writerow(header)
+            # for i, layer in enumerate(data.keys()):
+            #     row = [
+            #         (i + 1),
+            #         layer,
+            #         str(data[layer]["output_size"]),
+            #         str(data[layer]["accuracy"]),
+            #         str(data[layer]["latency"]),
+            #         str(data[layer]["energy"]),
+            #         str(data[layer]["sensor_latency"]),
+            #         str(data[layer]["sensor_latency_iqr"]),
+            #         str(data[layer]["sensor_energy"]),
+            #         str(data[layer]["sensor_memory"]),
+            #         str(data[layer]["link_latency"]),
+            #         str(data[layer]["link_energy"]),
+            #         str(data[layer]["edge_latency"]),
+            #         str(data[layer]["edge_latency_iqr"]),
+            #         str(data[layer]["edge_energy"]),
+            #         str(data[layer]["throughput"]),
+            #     ]
+            #     writer.writerow(row)
 
     def get_all_layer_stats(self) -> OrderedDict:
-        output = OrderedDict()
-        # print(self.pp_res.keys())
+     output = OrderedDict()
 
-        for i, layer in enumerate(self.pp_res.keys()):
-            if i == 0:
-                continue
+     for i, layer in enumerate(self.pp_res.keys()):
+         if i == 0:
+             continue
 
-            output[i] = {}
-            output[i]["layer"] = layer
-            output[i]["energy"] = self.pp_res[layer]["energy"]
-            output[i]["latency"] = self.pp_res[layer]["latency"]
+         output[i] = {}
+         output[i]["layer"] = layer
+         output[i]["energy"] = self.pp_res[layer]["energy"]
+         output[i]["latency"] = self.pp_res[layer]["latency"]
 
-            output[i]["sensor_latency"] = self.pp_res[layer]["sensor_latency"]
-            output[i]["sensor_energy"] = self.pp_res[layer]["sensor_energy"]
-            output[i]["sensor_memory"] = self.pp_res[layer]["sensor_memory"]
+         for name in self.stats_names:
+             latency_key = f"{name}_latency"
+             energy_key = f"{name}_energy"
+             memory_key = f"{name}_memory"  # This might not exist for every name
+
+             output[i][latency_key] = self.pp_res[layer].get(latency_key, 0)
+             output[i][energy_key] = self.pp_res[layer].get(energy_key, 0)
+
+             if "Node" in name:
+                 output[i][memory_key] = self.pp_res[layer].get(memory_key, 0)
+
+         output[i]["throughput"] = self.pp_res[layer].get("throughput", 0)
+
+     return output
+
+   
+   
+   
+    # def get_all_layer_stats(self) -> OrderedDict:
+    #     output = OrderedDict()
+    #     # print(self.pp_res.keys())
+
+    #     for i, layer in enumerate(self.pp_res.keys()):
+    #         if i == 0:
+    #             continue
+
+    #         output[i] = {}
+    #         output[i]["layer"] = layer
+    #         output[i]["energy"] = self.pp_res[layer]["energy"]
+    #         output[i]["latency"] = self.pp_res[layer]["latency"]
+
+    #         output[i]["sensor_latency"] = self.pp_res[layer]["sensor_latency"]
+    #         output[i]["sensor_energy"] = self.pp_res[layer]["sensor_energy"]
+    #         output[i]["sensor_memory"] = self.pp_res[layer]["sensor_memory"]
 
 
-            output[i]["link_latency"] = self.pp_res[layer]["link_latency"]
-            output[i]["link_energy"] = self.pp_res[layer]["link_energy"]
+    #         output[i]["link_latency"] = self.pp_res[layer]["link_latency"]
+    #         output[i]["link_energy"] = self.pp_res[layer]["link_energy"]
 
-            output[i]["edge_latency"] = self.pp_res[layer]["edge_latency"]
-            output[i]["edge_energy"] = self.pp_res[layer]["edge_energy"]   
-            output[i]["throughput"] =  self.pp_res[layer]["throughput"]
-        return output
+    #         output[i]["edge_latency"] = self.pp_res[layer]["edge_latency"]
+    #         output[i]["edge_energy"] = self.pp_res[layer]["edge_energy"]   
+    #         output[i]["throughput"] =  self.pp_res[layer]["throughput"]
+    #     return output

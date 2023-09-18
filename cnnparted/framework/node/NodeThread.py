@@ -17,7 +17,6 @@ class NodeThread(ModuleThreadInterface):
         #     self.reverse = True
         # else:
         #     self.reverse = False
-
         if self.config.get("timeloop"):
             self._run_timeloop(self.config["timeloop"])
         else:

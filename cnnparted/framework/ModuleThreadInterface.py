@@ -4,9 +4,9 @@ import time
 from .DNNAnalyzer import DNNAnalyzer
 
 class ModuleThreadInterface(threading.Thread):
-    def __init__(self, name : str, dnn : DNNAnalyzer, config : dict,reverse : bool, runname : str, show_progress : bool) -> None:
+    def __init__(self, id : str, dnn : DNNAnalyzer, config : dict,reverse : bool, runname : str, show_progress : bool) -> None:
         threading.Thread.__init__(self)
-        self.name = name
+        self.id = id
         self.dnn = dnn
         self.config = config
         self.runname = runname
@@ -25,4 +25,4 @@ class ModuleThreadInterface(threading.Thread):
         raise NotImplementedError
 
     def getStats(self) -> dict:
-        return self.stats
+        return self.id ,self.stats

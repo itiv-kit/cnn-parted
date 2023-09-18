@@ -4,7 +4,6 @@ import argparse
 from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator #, Dif_Evaluator
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
-#from framework.node.Dramsim import Dramsim
 import yaml
 import torch
 from framework.constants import MODEL_PATH
@@ -80,25 +79,15 @@ def main():
     node_components,link_components = conf_helper.get_system_components()
     first_component_id = node_components[0]['id']
 
-    node_threads = [
-                NodeThread(component.get('name', "Partition"+str(component.get('id', 'N/A'))).lower(), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
-                for component in node_components
-            ]
-    link_threads = [
-                LinkThread(component.get('name', "Link"+str(component.get('id', 'N/A'))).lower(), dnn, component,False, args.run_name, args.show_progress)
-                for component in link_components
-            ]
-
-    ####Test####
     nodeStats={}
     linkStats={}
     for i in range (0, args.num_runs):
         node_threads = [
-                NodeThread(component.get('name', "Partition"+str(component.get('id', 'N/A'))).lower(), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
+                NodeThread(component.get('id'), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
                 for component in node_components
             ]
         link_threads = [
-                LinkThread(component.get('name', "Link"+str(component.get('id', 'N/A'))).lower(), dnn, component,False, args.run_name, args.show_progress)
+                LinkThread(component.get('id'), dnn, component,False, args.run_name, args.show_progress)
                 for component in link_components
             ]
         
@@ -113,34 +102,24 @@ def main():
             t.join()
         
         
-        for index, node_thread in enumerate(node_threads):
-            stats = node_thread.getStats()
-            if index not in nodeStats:
-                nodeStats[index] = {}
-            nodeStats[index][i] = stats
+        for node_thread in node_threads:
+            id,stats = node_thread.getStats()
+            if id not in nodeStats:
+                nodeStats[id] = {}
+            nodeStats[id][i] = stats
 
-        for index,link_thread in  enumerate(link_threads):
-            stats = link_thread .getStats()
-            if index not in linkStats:
-                linkStats[index] = {}
-            linkStats[index][i] = stats
+        for link_thread in  link_threads:
+            id,stats = link_thread .getStats()
+            if id not in linkStats:
+                linkStats[id] = {}
+            linkStats[id][i] = stats
+
+    
+    
 
 
-    ############
-    #threads = node_threads + link_threads
-
-    # for i in range(0, args.num_runs):
-    #     for t in threads:
-    #         t.start()
-    #     for t in threads:
-    #         t.join()
-
-    #     sensorStats[i] = threads[0].getStats()
-    #     linkStats[i] = threads[2].getStats()
-    #     edgeStats[i] = threads[1].getStats()
-
-    #Evaluator should be modified to support more than 2 accelerators setting
-    e = Evaluator(dnn, nodeStats[0], linkStats[0], nodeStats[1], {})
+   #Evaluator should be modified to support more than 2 accelerators setting
+    e = Evaluator(dnn, nodeStats, linkStats, {})
     e.print_sim_time()
     e.export_csv(args.run_name)
  
