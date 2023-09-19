@@ -13,10 +13,11 @@ class Evaluator:
         dnn: DNNAnalyzer,
         nodeStats: List[dict],
         linkStats: List[dict],
-        accStats: List[dict],
+        accStats: dict,
     ) -> None:
         self.dnn = dnn
         self.nodeStats= nodeStats
+
         self.linkStats= linkStats
 
         allStats = OrderedDict()
@@ -24,13 +25,12 @@ class Evaluator:
         allStats.update(linkStats)
         self.sorted_allStats = OrderedDict(sorted(allStats.items()))
         self.first_id = next(iter(self.sorted_allStats))
-        
-        for component in self.sorted_allStats:
-            self.Stats= self._calc_stats(component)
+        self.Stats={}
+        for id  , cmp in self.sorted_allStats.items():
+            self.Stats[id]= self._calc_stats(cmp)
 
         # dont know yet how it is implemented, so it should be probably modified
-        for acc in accStats:
-            self.accStats[acc] = self._calc_stats(acc)
+        self.accStats = accStats
 
         self.input_size= dnn.input_size
         self.num_bytes = dnn.num_bytes
@@ -48,7 +48,7 @@ class Evaluator:
             print("Accuracy Eval:", self.accStats["sim_time"], "s")
 
         
-        for id,cmp in self.sorted_allStats.items():
+        for id,cmp in self.Stats.items():
             if id in self.nodeStats:
                 name = "Node-"+str(id)
             else:
@@ -120,7 +120,7 @@ class Evaluator:
             self.res[layer_name]["sensor_memory"]= self.part_point_memory[layer_name]#we need more for more than 2 accelerator setting
 
 
-            for id,cmp in self.sorted_allStats.items():
+            for id,cmp in self.Stats.items():#for id,cmp in self.sorted_allStats.items():
                 if id in self.nodeStats:
                     name = "Node-"+str(id)
                     if layer_name in cmp.keys():
@@ -178,7 +178,7 @@ class Evaluator:
             else:
                 self.res[layer_name]["accuracy"] = 0
 
-
+            total_latency=0
             for name in self.stats_names:
                 latency_key = f"{name}_latency"
                 if latency_key in self.res[layer_name]:
@@ -192,12 +192,13 @@ class Evaluator:
             #     + self.res[layer_name]["edge_latency"]
             # )
 
+            total_energy=0
             for name in self.stats_names:
-                latency_key = f"{name}_energy"
-                if latency_key in self.res[layer_name]:
-                    total_latency += self.res[layer_name][latency_key]
+                energy_key = f"{name}_energy"
+                if energy_key in self.res[layer_name]:
+                    total_energy += self.res[layer_name][latency_key]
 
-            self.res[layer_name]["energy"] = total_latency
+            self.res[layer_name]["energy"] = total_energy
 
             # self.res[layer_name]["energy"] = (
             #     self.res[layer_name]["sensor_energy"]
@@ -205,7 +206,7 @@ class Evaluator:
             #     + self.res[layer_name]["edge_energy"]
             # )
             throughputs=[]      
-            for id,cmp in self.sorted_allStats.items():
+            for id,cmp in self.Stats.items():#for id,cmp in self.sorted_allStats.items():
                 if id in self.nodeStats:
                     name = "Node-"+str(id)
                 else:

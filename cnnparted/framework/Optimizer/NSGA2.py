@@ -16,8 +16,8 @@ from .OptimizerHelper import OptimizerHelper
 class NSGA2_Optimizer(Optimizer):
     def __init__(self, nodes):
         self.nodes = nodes
-        self.num_gen = 500 # needs to be problem specific
-        self.pop_size = 30 # same
+        self.num_gen = 10 * len(nodes) #10 time node size 
+        self.pop_size = len(nodes) // 2
         self.opt_helper = OptimizerHelper()
         
 
@@ -63,31 +63,45 @@ class NSGA2_Optimizer(Optimizer):
 
 class Problem(ElementwiseProblem):
     def __init__(self,data):
+
+        sample_entry = data[next(iter(data))]
+
         super().__init__(n_var=1,
-                         n_obj=9,
+                         n_obj=len(sample_entry)-1, # -1:layer is not an objective, check  evaluator.get_all_layer_stats() 
                          n_constr=0,
                          xl=1, # not zero to ignore the first layer
                          xu=len(data)-1)# number of partioning points to be evaluated
         self.data = data
 
+    # def _evaluate(self, x, out, *args, **kwargs):
+    #     idx = int(x.item())  # Convert numpy array to integer index
+    #     latency_objective = self.data[idx]['latency']
+    #     energy_objective = self.data[idx]['energy']
+    #     sensor_latency_objective = self.data[idx]['sensor_latency']
+    #     sensor_energy_objective = self.data[idx]['sensor_energy']
+    #     link_latency_objective = self.data[idx]['link_latency']
+    #     link_energy_objective = self.data[idx]['link_energy']
+    #     edge_latency_objective = self.data[idx]['edge_latency']
+    #     edge_energy_objective = self.data[idx]['edge_energy']
+    #     goodput_objective = -1 * self.data[idx]['throughput']  # needs to be maximized (* -1)
+
+    #     out["F"] = np.array([   latency_objective,
+    #                             energy_objective,
+    #                             sensor_latency_objective,
+    #                             sensor_energy_objective,
+    #                             link_latency_objective,
+    #                             link_energy_objective,
+    #                             edge_latency_objective,
+    #                             edge_energy_objective,
+    #                             goodput_objective])
+        
     def _evaluate(self, x, out, *args, **kwargs):
         idx = int(x.item())  # Convert numpy array to integer index
-        latency_objective = self.data[idx]['latency']
-        energy_objective = self.data[idx]['energy']
-        sensor_latency_objective = self.data[idx]['sensor_latency']
-        sensor_energy_objective = self.data[idx]['sensor_energy']
-        link_latency_objective = self.data[idx]['link_latency']
-        link_energy_objective = self.data[idx]['link_energy']
-        edge_latency_objective = self.data[idx]['edge_latency']
-        edge_energy_objective = self.data[idx]['edge_energy']
-        goodput_objective = -1 * self.data[idx]['throughput']  # needs to be maximized (* -1)
 
-        out["F"] = np.array([   latency_objective,
-                                energy_objective,
-                                sensor_latency_objective,
-                                sensor_energy_objective,
-                                link_latency_objective,
-                                link_energy_objective,
-                                edge_latency_objective,
-                                edge_energy_objective,
-                                goodput_objective])
+        objectives = [key for key in self.data[idx] if key not in ["layer", "throughput"]]
+
+        objectives_values = [self.data[idx][key] for key in objectives]
+
+        objectives_values.append(-1 * self.data[idx]['throughput'])
+
+        out["F"] = np.array(objectives_values)

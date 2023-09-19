@@ -71,18 +71,42 @@ class ConfigHelper:
 
         return model
     
-    def get_optimization_objectives(self):
+    # def get_optimization_objectives(self,nodes,links):
+    #     try:
+    #         component = self.config['optimization-objectives']['device']
+    #     except KeyError:
+    #         component = '0'
+    #     try:
+    #         metric = self.config['optimization-objectives']['metric']
+    #     except KeyError:
+    #         metric = 'energy'
+        
+    #     optimization_objectives = {
+    #         "component": component,
+    #         "metric": metric
+    #         }
+    #     return optimization_objectives
+    
+    def get_optimization_objectives(self, nodes, links):
         try:
-            device = self.config['optimization-objectives']['device']
+            id = self.config['optimization-objectives']['device']
         except KeyError:
-            device = 'sensor'
+            id = '0'
+
         try:
             metric = self.config['optimization-objectives']['metric']
         except KeyError:
             metric = 'energy'
+
+        if any(str(node.get('id')) == id for node in nodes):
+            name = "Node-" + str(id)
+
+        elif any(str(link.get('id')) == id for link in links):
+            name = "Link-" + str(id)
+        else:
+            raise ValueError(f"ID {id} not found in nodes or links.")
         
-        optimization_objectives = {
-            "device": device,
-            "metric": metric
-            }
-        return optimization_objectives
+        key_name = f"{name}_{metric}"
+
+
+        return key_name

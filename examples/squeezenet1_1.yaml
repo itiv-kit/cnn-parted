@@ -4,7 +4,7 @@ constraints:
   word_width: 16
 
 optimization-objectives:
-  device: sensor
+  component: 0
   metric: latency
 
 neural-network:
@@ -30,8 +30,8 @@ components:
   - id: 0
     name: sensor #optional
     timeloop:
-      accelerator: simba_like
-      frequency: 500000000
+      accelerator: eyeriss_like
+      frequency: 200000000
       layer: conv2d
       mapper:
         algorithm: linear-pruned
@@ -39,7 +39,7 @@ components:
         num-threads: 8
         optimization-metrics: [energy, delay]
         timeout: 0
-        victory-condition: 100
+        victory-condition: 1
   - id: 1
     data_bit_width: 16
     ethernet:
@@ -53,4 +53,4 @@ components:
     name: edge
     device: cpu
     max_threads: 10
-    num_runs: 500
+    num_runs: 200

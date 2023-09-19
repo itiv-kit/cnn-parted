@@ -77,6 +77,7 @@ def main():
 
       
     node_components,link_components = conf_helper.get_system_components()
+    objective = conf_helper.get_optimization_objectives(node_components,link_components)
     first_component_id = node_components[0]['id']
 
     nodeStats={}
@@ -129,8 +130,9 @@ def main():
         print("No benificial partitioning point found: check the bandwidth and memory constraints: ")
         sys.exit()
 
+    
     nsga2 = NSGA2_Optimizer(nodes)
-    optimizer = nsga2.optimize(conf_helper.get_optimization_objectives())
+    optimizer = nsga2.optimize(objective)
 
     print("best partioning Point: ")
     print(optimizer)
