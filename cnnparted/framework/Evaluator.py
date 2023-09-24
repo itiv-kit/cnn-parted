@@ -13,6 +13,7 @@ class Evaluator:
         dnn: DNNAnalyzer,
         nodeStats: List[dict],
         linkStats: List[dict],
+        memoryStats:dict,
         accStats: dict,
     ) -> None:
         self.dnn = dnn
@@ -126,7 +127,7 @@ class Evaluator:
                     if layer_name in cmp.keys():
                         self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
                         self.res[layer_name][f"{name}_latency_iqr"] = cmp[layer_name]["latency_iqr"][0]
-                        self.res[layer_name]["sensor_energy"] = cmp[layer_name]["energy"][0]
+                        self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
                     else:
                         self.res[layer_name][f"{name}_latency"] = 0
                         self.res[layer_name][f"{name}_latency_iqr"] = 0
@@ -143,35 +144,7 @@ class Evaluator:
 
                 if name not in self.stats_names:
                     self.stats_names.append(name)
-                
-
-          
-            # if layer_name in self.nodeStats.keys():
-            #     self.res[layer_name]["sensor_latency"] = self.nodeStats[layer_name]["latency"][0]
-            #     self.res[layer_name]["sensor_latency_iqr"] = self.nodeStats[layer_name][
-            #         "latency_iqr"
-            #     ][0]
-            #     self.res[layer_name]["sensor_energy"] = self.nodeStats[layer_name]["energy"][0]
-            # else:
-            #     self.res[layer_name]["sensor_latency"] = 0
-            #     self.res[layer_name]["sensor_latency_iqr"] = 0
-            #     self.res[layer_name]["sensor_energy"] = 0
-
-            # if layer_name in self.linkStats.keys():
-            #     self.res[layer_name]["link_latency"] = self.linkStats[layer_name]["latency"][0]
-            #     self.res[layer_name]["link_energy"] = self.linkStats[layer_name]["energy"][0]
-            # else:
-            #     self.res[layer_name]["link_latency"] = 0
-            #     self.res[layer_name]["link_energy"] = 0
-
-            # if layer_name in self.edgeStats.keys():
-            #     self.res[layer_name]["edge_latency"] = self.edgeStats[layer_name]["latency"][0]
-            #     self.res[layer_name]["edge_latency_iqr"] = self.edgeStats[layer_name]["latency_iqr"][0]
-            #     self.res[layer_name]["edge_energy"] = self.edgeStats[layer_name]["energy"][0]
-            # else:
-            #     self.res[layer_name]["edge_latency"] = 0
-            #     self.res[layer_name]["edge_latency_iqr"] = 0
-            #     self.res[layer_name]["edge_energy"] = 0
+        
 
             if layer_name in self.accStats.keys():
                 self.res[layer_name]["accuracy"] = self.accStats[layer_name]
@@ -186,12 +159,6 @@ class Evaluator:
 
             self.res[layer_name]["latency"] = total_latency
 
-            # self.res[layer_name]["latency"] = (
-            #     self.res[layer_name]["sensor_latency"]
-            #     + self.res[layer_name]["link_latency"]
-            #     + self.res[layer_name]["edge_latency"]
-            # )
-
             total_energy=0
             for name in self.stats_names:
                 energy_key = f"{name}_energy"
@@ -200,11 +167,6 @@ class Evaluator:
 
             self.res[layer_name]["energy"] = total_energy
 
-            # self.res[layer_name]["energy"] = (
-            #     self.res[layer_name]["sensor_energy"]
-            #     + self.res[layer_name]["link_energy"]
-            #     + self.res[layer_name]["edge_energy"]
-            # )
             throughputs=[]      
             for id,cmp in self.Stats.items():#for id,cmp in self.sorted_allStats.items():
                 if id in self.nodeStats:
@@ -220,14 +182,7 @@ class Evaluator:
             min_throughput = min(throughputs)
             self.res[layer_name]["throughput"] = round(min_throughput * self.num_bytes / 1000, 2)  # MBps = 1000/1e6 B/ms
 
-        #     sensor_thrp = np.prod(self.input_size) / float(self.res[layer_name]["sensor_latency"])
-        #     link_thrp= np.prod(self.res[layer_name]["output_size"]) / float(self.res[layer_name]["link_latency"])
-        #     edge_thrp= np.prod(self.res[layer_name]["output_size"]) / float(self.res[layer_name]["edge_latency"])
-            
-        #     self.res[layer_name]["throughput"] = round(min(sensor_thrp,link_thrp , edge_thrp)* self.num_bytes / 1000,2) #(MBps = 1000/1e6 B/ms)
-        # # remove non-beneficial partitioning points based on bandwidth constraint
         filtered_pp = [layer.get("name") for layer in self.dnn.partpoints_filtered]
-        # print(filtered_pp)
         self.pp_res = {key: self.res[key] for key in self.res if key in filtered_pp}
 
     def export_csv(self, name) -> None:
@@ -287,45 +242,6 @@ class Evaluator:
 
                 row = base_row + dynamic_row
                 writer.writerow(row)
-            # header = [
-            #     "No.",
-            #     "Layer",
-            #     "Output Size",
-            #     "Accuracy",
-            #     "Latency [ms]",
-            #     "Energy [mJ]",
-            #     "Sensor Latency",
-            #     "Sensor Latency IQR",
-            #     "Sensor Energy",
-            #     "Sensor Memory[bytes]",
-            #     "Link Latency",
-            #     "Link Energy",
-            #     "Edge Latency",
-            #     "Edge Latency IQR",
-            #     "Edge Energy",
-            #     "throughput[MBps]",
-            # ]
-            # writer.writerow(header)
-            # for i, layer in enumerate(data.keys()):
-            #     row = [
-            #         (i + 1),
-            #         layer,
-            #         str(data[layer]["output_size"]),
-            #         str(data[layer]["accuracy"]),
-            #         str(data[layer]["latency"]),
-            #         str(data[layer]["energy"]),
-            #         str(data[layer]["sensor_latency"]),
-            #         str(data[layer]["sensor_latency_iqr"]),
-            #         str(data[layer]["sensor_energy"]),
-            #         str(data[layer]["sensor_memory"]),
-            #         str(data[layer]["link_latency"]),
-            #         str(data[layer]["link_energy"]),
-            #         str(data[layer]["edge_latency"]),
-            #         str(data[layer]["edge_latency_iqr"]),
-            #         str(data[layer]["edge_energy"]),
-            #         str(data[layer]["throughput"]),
-            #     ]
-            #     writer.writerow(row)
 
     def get_all_layer_stats(self) -> OrderedDict:
      output = OrderedDict()

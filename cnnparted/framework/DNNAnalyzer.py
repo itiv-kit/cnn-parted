@@ -4,6 +4,7 @@ from torch.nn import functional
 from torchinfo import summary
 from torchinfo.layer_info import LayerInfo
 
+
 # from framework.Memory_Estimator.Estimator import Estimator
 import time
 import numpy as np
@@ -26,6 +27,7 @@ class DNNAnalyzer:
         self.input_size = input_size
         self.constraints = constraints
         self.memoryInfo = MemoryInfo()
+
 
         self.num_bytes = int(self.constraints["word_width"] / 8)
         if self.constraints["word_width"] % 8 > 0:

@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 import argparse
-from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator #, Dif_Evaluator
+from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator#, Dif_Evaluator
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
 import yaml
@@ -12,7 +12,7 @@ import os
 
 import importlib
 
-from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator#, QuantizationEvaluator
+from framework import DNNAnalyzer, NodeThread, LinkThread, Evaluator ,MemoryNodeThread#, QuantizationEvaluator
 
 MODEL_FOLDER = "workloads"
 
@@ -80,9 +80,21 @@ def main():
     objective = conf_helper.get_optimization_objectives(node_components,link_components)
     first_component_id = node_components[0]['id']
 
+    #test
+    from framework.memoryNode.ddr3memoryNode import DDR3Node
+    mem = DDR3Node()
+    mem.get_latency_ms_and_enrgy_mW(500)
+
+
+    #end of test
     nodeStats={}
     linkStats={}
+
+    memory_thread= MemoryNodeThread(-1, dnn, None,False, args.run_name, args.show_progress)
+    memory_thread.start()
+    
     for i in range (0, args.num_runs):
+        
         node_threads = [
                 NodeThread(component.get('id'), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
                 for component in node_components
@@ -116,11 +128,12 @@ def main():
             linkStats[id][i] = stats
 
     
-    
+    memory_thread.join()
+    memory_stats = memory_thread.getStats()
 
 
    #Evaluator should be modified to support more than 2 accelerators setting
-    e = Evaluator(dnn, nodeStats, linkStats, {})
+    e = Evaluator(dnn, nodeStats, linkStats, memory_stats,{})
     e.print_sim_time()
     e.export_csv(args.run_name)
  

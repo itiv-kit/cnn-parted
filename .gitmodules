@@ -27,3 +27,9 @@
 [submodule "tools/dnn-model-exploration"]
 	path = tools/dnn-model-exploration
 	url = https://github.com/itiv-kit/dnn-model-exploration.git
+[submodule "tools/ramulator"]
+	path = tools/ramulator
+	url = https://github.com/CMU-SAFARI/ramulator.git
+[submodule "tools/VAMPIRE"]
+	path = tools/VAMPIRE
+	url = https://github.com/CMU-SAFARI/VAMPIRE.git
