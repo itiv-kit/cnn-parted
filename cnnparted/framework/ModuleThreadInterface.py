@@ -1,7 +1,9 @@
 import threading
 import time
+import os
 
 from .DNNAnalyzer import DNNAnalyzer
+from framework.constants import ROOT_DIR
 
 class ModuleThreadInterface(threading.Thread):
     def __init__(self, id : str, dnn : DNNAnalyzer, config : dict,reverse : bool, runname : str, show_progress : bool) -> None:
@@ -12,6 +14,10 @@ class ModuleThreadInterface(threading.Thread):
         self.runname = runname
         self.show_progress = show_progress
         self.reverse= reverse
+        self.work_path= os.path.join(ROOT_DIR,self.runname)
+        if not os.path.exists(self.work_path):
+            os.makedirs(self.work_path)
+
 
         self.stats = {}
 

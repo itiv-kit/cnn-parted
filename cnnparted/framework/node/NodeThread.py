@@ -4,7 +4,6 @@ from .Timeloop import Timeloop
 from framework.constants import NEW_MODEL_PATH, ROOT_DIR
 from framework.model.modelsplitter import ModelSplitter
 import os
-
 import csv
 
 
@@ -25,6 +24,7 @@ class NodeThread(ModuleThreadInterface):
     def _run_generic(self, config: dict) -> None:
         part_points = self.dnn.partition_points
         input_size = self.dnn.input_size
+        
 
         gn = GenericNode(config)
 
@@ -37,13 +37,13 @@ class NodeThread(ModuleThreadInterface):
             self.stats[layer_name]["latency_iqr"] = 0
             self.stats[layer_name]["energy"] = 0
 
-        model_splitter = ModelSplitter(NEW_MODEL_PATH)
+        model_splitter = ModelSplitter(NEW_MODEL_PATH,self.work_path)
 
         # only iterate through filtered list to save time; Mahdi : but the problem is that first layers will have zeros
         for point in self.dnn.partpoints_filtered:
             layer_name = point.get("name")
-            output_path_head = os.path.join(ROOT_DIR, layer_name + "head.onnx")
-            output_path_tail = os.path.join(ROOT_DIR, layer_name + "tail.onnx")
+            output_path_head = os.path.join(self.work_path, layer_name + "head.onnx")
+            output_path_tail = os.path.join(self.work_path, layer_name + "tail.onnx")
 
             # last layer index out of range
             last_layer = model_splitter.split_model(

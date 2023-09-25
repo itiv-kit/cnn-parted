@@ -1,12 +1,13 @@
 import onnx
 from onnx import shape_inference
 import os
-from framework.constants import NEW_MODEL_PATH, ROOT_DIR
+from framework.constants import  ROOT_DIR ,NEW_MODEL_PATH
 
 
 class ModelSplitter:
-    def __init__(self, input_path):
+    def __init__(self, input_path,work_path):
         self.input_path = input_path
+        self.work_path = work_path
         # model = onnx.load(input_path)
 
     def GiveUniqueNodeNames(self, model, prefix=""):
@@ -112,7 +113,7 @@ class ModelSplitter:
             return True
          
         new_model = "new_model.onnx"
-        new_model_path = os.path.join(ROOT_DIR, node_name + new_model)
+        new_model_path = os.path.join(self.work_path,node_name + new_model)
 
         model = onnx.load(self.input_path)
 

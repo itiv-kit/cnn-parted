@@ -1,24 +1,10 @@
-import torch
-from torch import nn, Tensor
-from torch.nn import functional
-from torchinfo import summary
-from torchinfo.layer_info import LayerInfo
-
-
-# from framework.Memory_Estimator.Estimator import Estimator
 import time
 import numpy as np
 import time
-import os
-from collections import OrderedDict
-
 from .model.model import TreeModel
 from .model.graph import LayersGraph
 from .model.memoryHelper import MemoryInfo
-from typing import List, Dict
 from framework.constants import MODEL_PATH
-from copy import deepcopy
-import networkx as nx
 
 
 class DNNAnalyzer:
@@ -28,18 +14,12 @@ class DNNAnalyzer:
         self.constraints = constraints
         self.memoryInfo = MemoryInfo()
 
-
         self.num_bytes = int(self.constraints["word_width"] / 8)
         if self.constraints["word_width"] % 8 > 0:
             self.num_bytes += 1
 
         self.stats = {}
         t0 = time.time()
-        # output_name = "model.onnx"
-        # model_path = os.path.join(ROOT_DIR, output_name)
-
-        # x = torch.randn(input_size)
-        # torch.onnx.export(model, x, MODEL_PATH, verbose=False, input_names=['input'], output_names=['output'])
 
         self._Tree_Model = TreeModel(model_path)
         self._tree = self._Tree_Model.get_Tree()
@@ -71,8 +51,8 @@ class DNNAnalyzer:
         self.max_part_point = self.graph.find_the_nearest_ancestor(
             source=self.max_conv_layer, node_list=self.partition_points
         )
-        
-        last_mem = 0 
+
+        last_mem = 0
         for point in self.partition_points:
             pnt_name = point["name"]
             if pnt_name in self.part_point_memory:
@@ -80,40 +60,35 @@ class DNNAnalyzer:
             else:
                 self.part_point_memory[pnt_name] = last_mem
 
-
     def get_conv2d_layers(self):
         output = [layer for layer in self._tree if layer.get("op_type") == "Conv"]
         return output
-        # return [layer for layer in self.layers if isinstance(layer.module, nn.Conv2d)]
 
     def get_max_conv2d_layer(self):
         max_mem_allowed = self.constraints["max_memory_size"]
-        
+
         conv_layers = self.get_conv2d_layers()
         ofms, ifms, weights = self.memoryInfo.get_convs_memory(conv_layers)
 
-        convs_subgraphs, root,dummy_convs = self.graph.get_all_conv_subgraphs()
+        convs_subgraphs, root, dummy_convs = self.graph.get_all_conv_subgraphs()
         for dummy in dummy_convs:
-            ofms[dummy]=0
-            ifms[dummy]=0
-            weights[dummy]=0
-        max_mem_bytes = (ifms[root] + ofms[root] + weights[root]) * self.num_bytes 
-        
+            ofms[dummy] = 0
+            ifms[dummy] = 0
+            weights[dummy] = 0
+        max_mem_bytes = (ifms[root] + ofms[root] + weights[root]) * self.num_bytes
 
         max_layer = None
         self.part_point_memory = {}
 
         if root not in dummy_convs:
-            self.part_point_memory[root]= max_mem_bytes
+            self.part_point_memory[root] = max_mem_bytes
 
         if max_mem_bytes > max_mem_allowed:
             max_layer = root
         else:
-
             memory = weights[root]
             max_layer_found = False
             for subgraph in convs_subgraphs:
-                print("subgraph nodes",list(subgraph.nodes()))
                 orders = self.graph.get_all_topological_orders(subgraph)
                 (
                     subgraph_max_memory,
@@ -124,13 +99,14 @@ class DNNAnalyzer:
                 subgraph_min_memory_necessary = min(subgraph_max_memory.values())
 
                 max_memory = subgraph_min_memory_necessary + memory
-                max_mem_bytes = max(max_mem_bytes,max_memory* self.num_bytes)
+                max_mem_bytes = max(max_mem_bytes, max_memory * self.num_bytes)
 
                 last_node = orders[0][-1]
-                part_point = self.graph.find_the_nearest_descendant(last_node, self.partition_points)
-                self.part_point_memory[part_point]= max_mem_bytes
+                part_point = self.graph.find_the_nearest_descendant(
+                    last_node, self.partition_points
+                )
+                self.part_point_memory[part_point] = max_mem_bytes
 
-                
                 if max_mem_bytes > max_mem_allowed:
                     if not max_layer_found:
                         max_layer = orders[0][0]

@@ -54,6 +54,7 @@ def main():
     #model = conf_helper.get_model(main)
     constraints = conf_helper.get_constraints()
     
+    
 
     try:
         model_path, accuracy_function = setup_workload(config['neural-network'])
@@ -80,18 +81,14 @@ def main():
     objective = conf_helper.get_optimization_objectives(node_components,link_components)
     first_component_id = node_components[0]['id']
 
-    #test
-    from framework.memoryNode.ddr3memoryNode import DDR3Node
-    mem = DDR3Node()
-    mem.get_latency_ms_and_enrgy_mW(500)
-
-
-    #end of test
     nodeStats={}
     linkStats={}
+    memoryStats={}
 
-    memory_thread= MemoryNodeThread(-1, dnn, None,False, args.run_name, args.show_progress)
-    memory_thread.start()
+    memory_threads= [MemoryNodeThread(first_component_id-1, dnn, None,False, args.run_name, args.show_progress)]
+    for memt in memory_threads:
+            memt.start()
+    
     
     for i in range (0, args.num_runs):
         
@@ -128,12 +125,17 @@ def main():
             linkStats[id][i] = stats
 
     
-    memory_thread.join()
-    memory_stats = memory_thread.getStats()
+    for memt in memory_threads:
+            memt.join()
+    
+    for mem_thread in memory_threads:
+        id,stats = mem_thread.getStats()
+        if id not in memoryStats:
+            memoryStats[id]={}
+        memoryStats[id][0]=stats
 
 
-   #Evaluator should be modified to support more than 2 accelerators setting
-    e = Evaluator(dnn, nodeStats, linkStats, memory_stats,{})
+    e = Evaluator(dnn, nodeStats, linkStats, memoryStats,{})
     e.print_sim_time()
     e.export_csv(args.run_name)
  
@@ -145,10 +147,12 @@ def main():
 
     
     nsga2 = NSGA2_Optimizer(nodes)
-    optimizer = nsga2.optimize(objective)
+    optimizer,paretos = nsga2.optimize(objective)
 
     print("best partioning Point: ")
     print(optimizer)
+    for layer in paretos:      
+        print(layer['layer'])
     
 
 

@@ -37,7 +37,6 @@ components:
         algorithm: linear-pruned
         live-status: false
         num-threads: 8
-        optimization-metrics: [energy, delay]
         timeout: 0
         victory-condition: 1
   - id: 1

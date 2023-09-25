@@ -20,10 +20,12 @@ class Evaluator:
         self.nodeStats= nodeStats
 
         self.linkStats= linkStats
-
+        self.memoryStats= memoryStats
         allStats = OrderedDict()
         allStats.update(nodeStats)
         allStats.update(linkStats)
+        allStats.update(memoryStats)
+        self.memory_name = "DDR3" 
         self.sorted_allStats = OrderedDict(sorted(allStats.items()))
         self.first_id = next(iter(self.sorted_allStats))
         self.Stats={}
@@ -52,8 +54,10 @@ class Evaluator:
         for id,cmp in self.Stats.items():
             if id in self.nodeStats:
                 name = "Node-"+str(id)
-            else:
+            elif id in self.linkStats:
                 name= "link-"+ str(id)
+            else:
+                name= self.memory_name 
             print(
             name,"   :",
             cmp["sim_time"][0],
@@ -118,32 +122,48 @@ class Evaluator:
 
             self.res[layer_name] = {}
             self.res[layer_name]["output_size"] = layer.get("output_size")
-            self.res[layer_name]["sensor_memory"]= self.part_point_memory[layer_name]#we need more for more than 2 accelerator setting
+            #self.res[layer_name]["sensor_memory"]= self.part_point_memory[layer_name]#we need more for more than 2 accelerator setting
 
 
             for id,cmp in self.Stats.items():#for id,cmp in self.sorted_allStats.items():
-                if id in self.nodeStats:
-                    name = "Node-"+str(id)
-                    if layer_name in cmp.keys():
-                        self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
-                        self.res[layer_name][f"{name}_latency_iqr"] = cmp[layer_name]["latency_iqr"][0]
-                        self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
-                    else:
-                        self.res[layer_name][f"{name}_latency"] = 0
-                        self.res[layer_name][f"{name}_latency_iqr"] = 0
-                        self.res[layer_name][f"{name}_energy"] = 0
 
-                elif id in self.linkStats :
-                    name= "Link-"+ str(id)
-                    if layer_name in cmp.keys():            
-                        self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
-                        self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
-                    else:
-                        self.res[layer_name][f"{name}_latency"] = 0
-                        self.res[layer_name][f"{name}_energy"] = 0
+                if id in self.memoryStats:
+                    mem_name = self.memory_name
+                    if layer_name in cmp.keys():                              
+                        self.res[layer_name][f"{mem_name}_write_latency"] = cmp[layer_name]["write_latency_ms"][0]
+                        self.res[layer_name][f"{mem_name}_write_energy"] = cmp[layer_name]["write_energy"][0]
+                        self.res[layer_name][f"{mem_name}_read_latency"] = cmp[layer_name]["read_latency_ms"][0]
+                        self.res[layer_name][f"{mem_name}_read_energy"] = cmp[layer_name]["read_energy"][0]
 
-                if name not in self.stats_names:
-                    self.stats_names.append(name)
+                    else:
+                        self.res[layer_name][f"{mem_name}_write_latency"]=0
+                        self.res[layer_name][f"{mem_name}_wrtie_energy"] =0
+                        self.res[layer_name][f"{mem_name}_read_latency"] =0
+                        self.res[layer_name][f"{mem_name}_read_energy"]  =0
+                else:
+                    if id in self.nodeStats:
+                        name = "Node-"+str(id)
+                        if layer_name in cmp.keys():
+                            self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
+                            self.res[layer_name][f"{name}_latency_iqr"] = cmp[layer_name]["latency_iqr"][0]
+                            self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
+                            self.res[layer_name][f"{name}_memory"]= self.part_point_memory[layer_name]
+                        else:
+                            self.res[layer_name][f"{name}_latency"] = 0
+                            self.res[layer_name][f"{name}_latency_iqr"] = 0
+                            self.res[layer_name][f"{name}_energy"] = 0
+
+                    else:
+                        name= "Link-"+ str(id)
+                        if layer_name in cmp.keys():            
+                            self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
+                            self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
+                        else:
+                            self.res[layer_name][f"{name}_latency"] = 0
+                            self.res[layer_name][f"{name}_energy"] = 0
+
+                    if name not in self.stats_names:
+                        self.stats_names.append(name)            
         
 
             if layer_name in self.accStats.keys():
@@ -213,8 +233,9 @@ class Evaluator:
                     dynamic_header.append(f"{name} Memory[bytes]")
 
             dynamic_header.append("throughput[MBps]")
+            memory_header=["DDR3 Write Latency[ms]","DDR3 Write Energy[mJ]", "DDR3 Read Latency[ms]","DDR3 Read Energy[mJ]"]
 
-            header = base_header + dynamic_header
+            header = base_header + dynamic_header + memory_header
             writer.writerow(header)
 
             for i, layer in enumerate(data.keys()):
@@ -240,7 +261,17 @@ class Evaluator:
 
                 dynamic_row.append(str(data[layer]["throughput"]))
 
-                row = base_row + dynamic_row
+                memory_row=[]
+                name = self.memory_name
+                memory_row.extend([
+                    str(data[layer].get(f"{name}_write_latency", "")),
+                    str(data[layer].get(f"{name}_write_energy", "")),
+                    str(data[layer].get(f"{name}_read_latency", "")),
+                    str(data[layer].get(f"{name}_read_energy", ""))
+
+                ])
+
+                row = base_row + dynamic_row + memory_row
                 writer.writerow(row)
 
     def get_all_layer_stats(self) -> OrderedDict:
@@ -254,6 +285,10 @@ class Evaluator:
          output[i]["layer"] = layer
          output[i]["energy"] = self.pp_res[layer]["energy"]
          output[i]["latency"] = self.pp_res[layer]["latency"]
+         output[i][f"{self.memory_name}_write_latency"] = self.pp_res[layer][f"{self.memory_name}_write_latency"]
+         output[i][f"{self.memory_name}_write_energy"] = self.pp_res[layer][f"{self.memory_name}_write_energy"]
+         output[i][f"{self.memory_name}_read_latency"] = self.pp_res[layer][f"{self.memory_name}_read_latency"]
+         output[i][f"{self.memory_name}_read_energy"] = self.pp_res[layer][f"{self.memory_name}_read_energy"]
 
          for name in self.stats_names:
              latency_key = f"{name}_latency"
@@ -269,32 +304,3 @@ class Evaluator:
          output[i]["throughput"] = self.pp_res[layer].get("throughput", 0)
 
      return output
-
-   
-   
-   
-    # def get_all_layer_stats(self) -> OrderedDict:
-    #     output = OrderedDict()
-    #     # print(self.pp_res.keys())
-
-    #     for i, layer in enumerate(self.pp_res.keys()):
-    #         if i == 0:
-    #             continue
-
-    #         output[i] = {}
-    #         output[i]["layer"] = layer
-    #         output[i]["energy"] = self.pp_res[layer]["energy"]
-    #         output[i]["latency"] = self.pp_res[layer]["latency"]
-
-    #         output[i]["sensor_latency"] = self.pp_res[layer]["sensor_latency"]
-    #         output[i]["sensor_energy"] = self.pp_res[layer]["sensor_energy"]
-    #         output[i]["sensor_memory"] = self.pp_res[layer]["sensor_memory"]
-
-
-    #         output[i]["link_latency"] = self.pp_res[layer]["link_latency"]
-    #         output[i]["link_energy"] = self.pp_res[layer]["link_energy"]
-
-    #         output[i]["edge_latency"] = self.pp_res[layer]["edge_latency"]
-    #         output[i]["edge_energy"] = self.pp_res[layer]["edge_energy"]   
-    #         output[i]["throughput"] =  self.pp_res[layer]["throughput"]
-    #     return output

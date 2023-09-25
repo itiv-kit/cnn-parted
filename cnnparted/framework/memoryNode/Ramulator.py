@@ -28,7 +28,7 @@ class Ramulator:
         ]
 
         try:           
-            subprocess.run(command, cwd=self.ramulator_path,check=True)
+            subprocess.run(command,stdout=subprocess.PIPE, cwd=self.ramulator_path,check=True)
             return self._modify_trace_file()
         except subprocess.CalledProcessError as e:
             print(f"Error executing command: {e}")
@@ -37,20 +37,23 @@ class Ramulator:
 
    
     def _modify_trace_file(self):
-        commands_to_modify = {'ACT', 'RD', 'RDA', 'WR', 'WRA'}
+        
+        commands_to_modify = {'ACT', 'RD', 'WR'}
+        commands_to_keep = {'RD', 'WR', 'PRE','ACT'}# vampire supports solely these commands
+        
         in_path = os.path.join(self.ramulator_path, self.vampire_trace)
         out_path =os.path.join(self.ramulator_path,  self.vampire_input_trace)
+        
         with open(in_path, 'r') as infile, open(out_path, 'w') as outfile:
             for line in infile:
                 parts = line.strip().split(',')
                 if len(parts) == 3:
                     timestamp, command, value = parts
-                    if command in commands_to_modify:
-                        outfile.write(f"{timestamp},{command},{value},0\n")
-                    else:
-                        outfile.write(f"{timestamp},{command},{value}\n")
-                else:
-                    outfile.write(line)
+                    if command in commands_to_keep:
+                        if command in commands_to_modify:
+                            outfile.write(f"{timestamp},{command},{value},0\n")
+                        else:
+                            outfile.write(f"{timestamp},{command},{value}\n")                 
         
         return out_path
         
@@ -65,7 +68,7 @@ class Ramulator:
         file_path=os.path.join(self.ramulator_path, self.trace_file_name)
 
         with open(file_path, "w") as file:
-            for _ in range(size):
+            for _ in range(int(size)):
                 random_number = random.randint(0x00000000, 0xFFFFFFFF)
                 modulo_result = random_number % 0x80
                 power_of_0x80 = random_number - modulo_result
