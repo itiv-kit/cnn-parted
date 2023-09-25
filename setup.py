@@ -12,13 +12,17 @@ class ToolsInstall(install):
         os.system("make -C"+path+"cacti")
         os.system("chmod -R 777 "+path+"cacti")
 
+        # Install Ramulator and vampire
+        os.system("echo 'Setting up ramulator and vampire")
+
+        os.system("make -j -C"+path+"ramulator")
+        os.system("make -j -C"+path+"VAMPIRE")
+
         # Install Timeloop
         os.system("chmod +x "+path+"setupTimeloop.sh")
         os.system("sh "+path+"setupTimeloop.sh")
 
-        # Install Ramulator and vampire
-        os.system("make -j -C"+path+"ramulator")
-        os.system("make -j -C"+path+"VAMPIRE")
+
 
 setup(
     name='CNNParted',
