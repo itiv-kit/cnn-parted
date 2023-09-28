@@ -8,14 +8,30 @@ accuracy:
   calibration:
     samples: null # null sets samples to all
     file: './calibrations/efficientnet_b0_quant_calib.pkl'
-    datasets:
-      calibrate:
-        type: imagenet
-        kind: 'imagefolder'
-        path: '/tools/datasets/imagenet/val_images'
-        sample_limit: null # number of validation dataset samples to test for each individual
-        batch_size: 64
-        randomize: True
+  retraining:
+    epochs: 2
+  datasets:
+    calibrate:
+      type: imagenet
+      kind: 'imagefolder'
+      path: '/tools/datasets/imagenet/val_images'
+      sample_limit: null # number of validation dataset samples to test for each individual
+      batch_size: 64
+      randomize: True
+    validation:
+      type: imagenet
+      kind: 'imagefolder'
+      path: '/tools/datasets/imagenet/val_images'
+      sample_limit: 8192 # number of validation dataset samples to test for each individual
+      batch_size: 256
+      randomize: True
+    train:
+      type: imagenet
+      kind: 'webdataset'
+      path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
+      total_samples: 1281167
+      batch_size: 256
+      sample_limit: null
 
 sensor:
   timeloop:
