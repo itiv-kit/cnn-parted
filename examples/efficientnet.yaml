@@ -9,7 +9,7 @@ accuracy:
     samples: null # null sets samples to all
     file: './calibrations/efficientnet_b0_quant_calib.pkl'
   retraining:
-    epochs: 2
+    epochs: 0 # skip training
   datasets:
     calibrate:
       type: imagenet
