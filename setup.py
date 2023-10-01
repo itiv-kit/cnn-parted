@@ -43,6 +43,7 @@ setup(
             'torchvision',
             'typing_extensions',
             'yamlordereddictloader',
+            'tqdm',
             'accelergy',
             'accelergy-aladdin-plug-in',
             'accelergy-cacti-plug-in',
