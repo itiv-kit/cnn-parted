@@ -9,6 +9,7 @@ import torch
 from framework.constants import MODEL_PATH
 import sys
 import os
+import json
 
 import importlib
 
@@ -147,13 +148,21 @@ def main():
 
     
     nsga2 = NSGA2_Optimizer(nodes)
-    optimizer,paretos = nsga2.optimize(objective)
+    optimizer,paretos = nsga2.optimize(objective)   
 
-    print("best partioning Point: ")
+    data = {
+    "best partitioning Point": optimizer,
+    "Paretos": [layer['layer'] for layer in paretos]
+    }
+
+    with open(args.run_name + '_optimals.json', 'w') as jsonfile:
+        json.dump(data, jsonfile, indent=4)
+
+    print("best partitioning Point: ")
     print(optimizer)
-    for layer in paretos:      
+    print("Paretos:")
+    for layer in paretos:
         print(layer['layer'])
-    
 
 
 if __name__ == '__main__':

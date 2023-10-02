@@ -21,7 +21,7 @@ The framework currently includes a custom Ethernet model as well as hardware acc
 
 2. Run installation
     ```sh
-    git submodule foreach --recursive 'if [ -f setup.py ]; then pip install -e .; fi'
+    git submodule foreach --recursive 'if [ -f setup.py ]; then pip install .; fi'
     pip install -e .
     pip install -r requirements.txt
     ```

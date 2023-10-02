@@ -130,16 +130,16 @@ class Evaluator:
                 if id in self.memoryStats:
                     mem_name = self.memory_name
                     if layer_name in cmp.keys():                              
-                        self.res[layer_name][f"{mem_name}_write_latency"] = cmp[layer_name]["write_latency_ms"][0]
-                        self.res[layer_name][f"{mem_name}_write_energy"] = cmp[layer_name]["write_energy"][0]
-                        self.res[layer_name][f"{mem_name}_read_latency"] = cmp[layer_name]["read_latency_ms"][0]
-                        self.res[layer_name][f"{mem_name}_read_energy"] = cmp[layer_name]["read_energy"][0]
+                        self.res[layer_name][f"{mem_name}_latency"] = cmp[layer_name]["latency_ms"][0]
+                        self.res[layer_name][f"{mem_name}_energy"] = cmp[layer_name]["energy"][0]
+                        #self.res[layer_name][f"{mem_name}_read_latency"] = cmp[layer_name]["read_latency_ms"][0]
+                        #self.res[layer_name][f"{mem_name}_read_energy"] = cmp[layer_name]["read_energy"][0]
 
                     else:
-                        self.res[layer_name][f"{mem_name}_write_latency"]=0
-                        self.res[layer_name][f"{mem_name}_wrtie_energy"] =0
-                        self.res[layer_name][f"{mem_name}_read_latency"] =0
-                        self.res[layer_name][f"{mem_name}_read_energy"]  =0
+                        self.res[layer_name][f"{mem_name}_latency"]=0
+                        self.res[layer_name][f"{mem_name}_energy"] =0
+                        #self.res[layer_name][f"{mem_name}_read_latency"] =0
+                        #self.res[layer_name][f"{mem_name}_read_energy"]  =0
                 else:
                     if id in self.nodeStats:
                         name = "Node-"+str(id)
@@ -189,19 +189,27 @@ class Evaluator:
 
             throughputs=[]      
             for id,cmp in self.Stats.items():#for id,cmp in self.sorted_allStats.items():
-                if id in self.nodeStats:
-                    name = "Node-"+str(id)
-                else:
-                    name = "Link-" + str(id)
+                if id not in self.memoryStats:
+                    if id in self.nodeStats:
+                        name = "Node-"+str(id)
+                    else:
+                        name = "Link-" + str(id)
 
-                size = self.input_size if id==self.first_id else self.res[layer_name]["output_size"]
-    
-                throughput = np.prod(size) / float(self.res[layer_name][latency_key])
-                throughputs.append(throughput) 
+                    latency_key = f"{name}_latency"
+
+                    size = self.input_size if id==self.first_id else self.res[layer_name]["output_size"]
+
+                    # throughput = np.prod(size) / float(self.res[layer_name][latency_key])
+                    if float(self.res[layer_name][latency_key]) != 0:
+                        throughput = np.prod(size) / float(self.res[layer_name][latency_key])
+                    else:
+                        throughput = +np.inf  
+
+                    throughputs.append(throughput) 
             
             min_throughput = min(throughputs)
-            self.res[layer_name]["throughput"] = round(min_throughput * self.num_bytes / 1000, 2)  # MBps = 1000/1e6 B/ms
-
+            self.res[layer_name]["throughput"] = round((1000*min_throughput) / (np.prod(self.input_size)), 2)  #FPS=1000FPms
+            self.res[layer_name]["efficiency"] = 1000*np.prod(size)/(np.prod(self.input_size)*total_energy) #Frames/J=1000Frames/mJ
         filtered_pp = [layer.get("name") for layer in self.dnn.partpoints_filtered]
         self.pp_res = {key: self.res[key] for key in self.res if key in filtered_pp}
 
@@ -220,7 +228,7 @@ class Evaluator:
     def _write_csv_file(self, filename: str, data: dict) -> None:
         with open(filename, "w", newline="") as f:
             writer = csv.writer(f, delimiter=";")
-            base_header = ["No.", "Layer", "Output Size", "Accuracy", "Latency [ms]", "Energy [mJ]"]
+            base_header = ["No.", "Layer", "Output Size", "Accuracy", "Latency [ms]", "Energy [mJ]","Energy Efficiency [Frames/J]"]
             dynamic_header = []
         
             for name in self.stats_names:
@@ -232,8 +240,9 @@ class Evaluator:
                 if "Node" in name:  # Adding memory header for nodes
                     dynamic_header.append(f"{name} Memory[bytes]")
 
-            dynamic_header.append("throughput[MBps]")
-            memory_header=["DDR3 Write Latency[ms]","DDR3 Write Energy[mJ]", "DDR3 Read Latency[ms]","DDR3 Read Energy[mJ]"]
+            dynamic_header.append("throughput[FPS]")
+            memory_header=["DDR3 Latency[ms]","DDR3 Energy[mJ]"]
+
 
             header = base_header + dynamic_header + memory_header
             writer.writerow(header)
@@ -246,7 +255,8 @@ class Evaluator:
                     str(data[layer]["output_size"]),
                     str(data[layer]["accuracy"]),
                     str(data[layer]["latency"]),
-                    str(data[layer]["energy"])
+                    str(data[layer]["energy"]),
+                    str(data[layer]["efficiency"])
                 ]
 
                 dynamic_row = []
@@ -264,10 +274,10 @@ class Evaluator:
                 memory_row=[]
                 name = self.memory_name
                 memory_row.extend([
-                    str(data[layer].get(f"{name}_write_latency", "")),
-                    str(data[layer].get(f"{name}_write_energy", "")),
-                    str(data[layer].get(f"{name}_read_latency", "")),
-                    str(data[layer].get(f"{name}_read_energy", ""))
+                    str(data[layer].get(f"{name}_latency", "")),
+                    str(data[layer].get(f"{name}_energy", ""))
+                    #str(data[layer].get(f"{name}_read_latency", "")),
+                    #str(data[layer].get(f"{name}_read_energy", ""))
 
                 ])
 
@@ -285,10 +295,9 @@ class Evaluator:
          output[i]["layer"] = layer
          output[i]["energy"] = self.pp_res[layer]["energy"]
          output[i]["latency"] = self.pp_res[layer]["latency"]
-         output[i][f"{self.memory_name}_write_latency"] = self.pp_res[layer][f"{self.memory_name}_write_latency"]
-         output[i][f"{self.memory_name}_write_energy"] = self.pp_res[layer][f"{self.memory_name}_write_energy"]
-         output[i][f"{self.memory_name}_read_latency"] = self.pp_res[layer][f"{self.memory_name}_read_latency"]
-         output[i][f"{self.memory_name}_read_energy"] = self.pp_res[layer][f"{self.memory_name}_read_energy"]
+         output[i]["efficiency"] = self.pp_res[layer]["efficiency"]
+         output[i][f"{self.memory_name}_latency"] = self.pp_res[layer][f"{self.memory_name}_latency"]
+         output[i][f"{self.memory_name}_energy"] = self.pp_res[layer][f"{self.memory_name}_energy"]
 
          for name in self.stats_names:
              latency_key = f"{name}_latency"

@@ -6,17 +6,20 @@ from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
 from pymoo.operators.sampling.rnd import FloatRandomSampling #IntegerRandomSampling
-#from pymoo.termination import get_termination
+from pymoo.factory import get_termination 
 from pymoo.optimize import minimize
 from pymoo.core.problem import ElementwiseProblem
 from .Optimizer import Optimizer
 import numpy as np
+
 from .OptimizerHelper import OptimizerHelper 
+
+
 
 class NSGA2_Optimizer(Optimizer):
     def __init__(self, nodes):
         self.nodes = nodes
-        self.num_gen = 10 * len(nodes) #10 time node size 
+        self.num_gen = 20 * len(nodes) #10 time node size 
         self.pop_size = len(nodes) // 2
         self.opt_helper = OptimizerHelper()
         
@@ -38,7 +41,7 @@ class NSGA2_Optimizer(Optimizer):
 
         res = minimize(problem,
                algorithm,
-               termination=('n_gen',self.num_gen),
+               termination=get_termination('n_gen',self.num_gen),
                seed=1,
                save_history=True,
                verbose=False
@@ -74,10 +77,11 @@ class Problem(ElementwiseProblem):
     def _evaluate(self, x, out, *args, **kwargs):
         idx = int(x.item())  # Convert numpy array to integer index
 
-        objectives = [key for key in self.data[idx] if key not in ["layer", "throughput"]]
+        objectives = [key for key in self.data[idx] if key not in ["layer", "throughput","efficiency"]]
 
         objectives_values = [self.data[idx][key] for key in objectives]
 
         objectives_values.append(-1 * self.data[idx]['throughput'])
+        objectives_values.append(-1 * self.data[idx]['efficiency'])
 
         out["F"] = np.array(objectives_values)

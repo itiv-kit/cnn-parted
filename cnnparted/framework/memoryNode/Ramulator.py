@@ -29,20 +29,20 @@ class Ramulator:
 
         try:           
             subprocess.run(command,stdout=subprocess.PIPE, cwd=self.ramulator_path,check=True)
-            return self._modify_trace_file()
+            return self._modify_trace_file(operation)
         except subprocess.CalledProcessError as e:
             print(f"Error executing command: {e}")
 
         
 
    
-    def _modify_trace_file(self):
+    def _modify_trace_file(self,operation):
         
         commands_to_modify = {'ACT', 'RD', 'WR'}
         commands_to_keep = {'RD', 'WR', 'PRE','ACT'}# vampire supports solely these commands
         
         in_path = os.path.join(self.ramulator_path, self.vampire_trace)
-        out_path =os.path.join(self.ramulator_path,  self.vampire_input_trace)
+        out_path =os.path.join(self.ramulator_path,  operation+self.vampire_input_trace)
         
         with open(in_path, 'r') as infile, open(out_path, 'w') as outfile:
             for line in infile:

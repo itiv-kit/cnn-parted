@@ -57,7 +57,7 @@ setup(
             'accelergy-table-based-plug-ins',
             'onnx',
             'networkx',
-            'onnxruntime',
+            'onnxruntime-gpu',
             'traitlets',
             'pymoo==0.5.0'
 #            'model_explorer'

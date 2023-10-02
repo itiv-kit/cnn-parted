@@ -20,9 +20,9 @@ class Vampire:
             "-csv",csv_filename,
             "-dramSpec",self.spec
         ]
-
         try:
             resut = subprocess.run(command,stdout=subprocess.PIPE,cwd=self.vampire_path,check=True )
             return os.path.join(self.vampire_path,csv_filename)
         except subprocess.CalledProcessError as e:
             print(f"Error executing command: {e}")
+        

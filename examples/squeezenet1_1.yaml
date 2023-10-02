@@ -30,15 +30,15 @@ components:
   - id: 0
     name: sensor #optional
     timeloop:
-      accelerator: eyeriss_like
-      frequency: 200000000
+      accelerator: simba_like
+      frequency: 500000000
       layer: conv2d
       mapper:
         algorithm: linear-pruned
         live-status: false
         num-threads: 8
         timeout: 0
-        victory-condition: 1
+        victory-condition: 100
   - id: 1
     data_bit_width: 16
     ethernet:

@@ -1,10 +1,11 @@
 constraints: {max_out_size: 200000,  max_memory_size: 6000000, word_width: 16}
-optimization-objectives: {device: edge, metric: latency}
+optimization-objectives:
+  component: 0
+  metric: latency
 
 neural-network:
   input-size: [1, 3, 224, 224]
   name: googlenet
-  input-size: [ 1, 3, 224, 224 ]
 
 accuracy:
   device : "cuda"
@@ -25,8 +26,8 @@ components:
   - id: 0
     name: sensor #optional
     timeloop:
-      accelerator: simba_like
-      frequency: 500000000
+      accelerator: eyeriss_like
+      frequency: 200000000
       layer: conv2d
       mapper:
         algorithm: linear-pruned
@@ -46,7 +47,6 @@ components:
     fps: 25
   - id: 2
     name: edge
-    device: cpu
+    device: cuda
     max_threads: 10
     num_runs: 500
-

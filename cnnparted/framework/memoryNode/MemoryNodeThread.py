@@ -22,15 +22,16 @@ class MemoryNodeThread(ModuleThreadInterface):
         computed = {}  
         for layer in layer_list:
             layer_name = layer.get('name')
+            layer_out_size = layer.get('output_size')
+            slice_size = self._get_slice_size(layer_out_size, num_bytes)
 
-            if layer_name in computed:
-                # Use the computed values if available
-                self.stats[layer_name] = computed[layer_name]
+            if slice_size in computed:
+                self.stats[layer_name] = computed[slice_size]
             else:
-                slice_size = self._get_slice_size(layer.get('output_size'), num_bytes)
+                
 
                 try:
-                    r_energy_pJ, r_cycles, w_energy_pJ, w_cycles = memory.get_latency_ms_and_enrgy_mW(slice_size / 8)  # Assuming 8 bits per byte
+                    r_energy_pJ, r_cycles, w_energy_pJ, w_cycles = memory.get_latency_ms_and_enrgy_mW(slice_size / 8)
                 except ValueError as e:
                     print(e)
                     r_energy_pJ = 0
@@ -44,11 +45,9 @@ class MemoryNodeThread(ModuleThreadInterface):
                 read_energy = r_energy_pJ / 1e9
 
                 self.stats[layer_name] = {
-                    'write_latency_ms': write_latency_ms,
-                    'write_energy': write_energy,
-                    'read_latency_ms': read_latency_ms,
-                    'read_energy': read_energy
+                    'latency_ms': write_latency_ms + read_latency_ms,
+                    'energy': write_energy + read_energy
                 }
 
-                computed[layer_name] = self.stats[layer_name]
+                computed[slice_size] = self.stats[layer_name]
 

@@ -16,5 +16,6 @@ providers = {
     'nuphar': 'NupharExecutionProvider',        # Nuphar execution provider for FPGA and custom hardware acceleration.
     'dnnl': 'DnnlExecutionProvider',            # DNNL execution provider for deep learning acceleration on Intel architectures.
     'rocm': 'ROCmExecutionProvider',            # ROCm execution provider for AMD GPUs.
-    'vitisai': 'VitisAIExecutionProvider'       # Vitis-AI execution provider for Xilinx FPGAs and AI acceleration.
+    'vitisai': 'VitisAIExecutionProvider',       # Vitis-AI execution provider for Xilinx FPGAs and AI acceleration.
+    'azure' : 'AzureExecutionProvider'          #The Azure Execution Provider enables ONNX Runtime to invoke a remote Azure endpoint for inference
 }
