@@ -20,7 +20,7 @@ class NSGA2_Optimizer(Optimizer):
     def __init__(self, nodes):
         self.nodes = nodes
         self.num_gen = 20 * len(nodes) #10 time node size 
-        self.pop_size = len(nodes) // 2
+        self.pop_size = len(nodes) // 2 if len(nodes)>20 else len(nodes)
         self.opt_helper = OptimizerHelper()
         
 
@@ -77,11 +77,8 @@ class Problem(ElementwiseProblem):
     def _evaluate(self, x, out, *args, **kwargs):
         idx = int(x.item())  # Convert numpy array to integer index
 
-        objectives = [key for key in self.data[idx] if key not in ["layer", "throughput","efficiency"]]
+        objectives = [key for key in self.data[idx] if not key.endswith("_opt") and key not in ["layer"]]
 
-        objectives_values = [self.data[idx][key] for key in objectives]
-
-        objectives_values.append(-1 * self.data[idx]['throughput'])
-        objectives_values.append(-1 * self.data[idx]['efficiency'])
+        objectives_values = [self.data[idx][key] * self.data[idx].get(f"{key}_opt", 1) for key in objectives]
 
         out["F"] = np.array(objectives_values)

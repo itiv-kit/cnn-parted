@@ -78,6 +78,11 @@ class NodeThread(ModuleThreadInterface):
                     self.name,
                     "models",
                 )
+            
+            self._remove_file(output_path_head)
+            self._remove_file(output_path_tail)
+
+            
 
     def _run_timeloop(self, config: dict) -> None:
         overall_latency = 0
@@ -172,3 +177,12 @@ class NodeThread(ModuleThreadInterface):
                         ]
                         writer.writerow(row)
                         row_num += 1
+
+
+    def _remove_file(self,file_path):
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        #else:
+           # print(f"File {file_path} does not exist!")
+

@@ -100,17 +100,31 @@ def main():
         link_threads = [
                 LinkThread(component.get('id'), dnn, component,False, args.run_name, args.show_progress)
                 for component in link_components
-            ]
+            ]      
+
         
-        for t in node_threads:
-            t.start()
-        for t in link_threads:
-            t.start()
+        for t in node_threads and link_threads:
+            if not t.config.get("timeloop"):
+                t.start()
 
         for t in node_threads:
-            t.join()
-        for t in link_threads:
-            t.join()
+            if t.config.get("timeloop"): # run them simply on main thread
+                t.run()
+
+        for t in node_threads and link_threads:
+            if not t.config.get("timeloop"):
+                t.join()
+
+        
+        # for t in node_threads:
+        #     t.start()
+        # for t in link_threads:
+        #     t.start()
+
+        # for t in node_threads:
+        #     t.join()
+        # for t in link_threads:
+        #     t.join()
         
         
         for node_thread in node_threads:

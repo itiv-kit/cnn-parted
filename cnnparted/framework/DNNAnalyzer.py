@@ -47,7 +47,7 @@ class DNNAnalyzer:
 
         print("Found", len(self.partpoints_filtered), "partition points.")
 
-        self.max_conv_layer = self.get_max_conv2d_layer()
+        self.max_conv_layer,mems = self.get_max_conv2d_layer()
         self.max_part_point = self.graph.find_the_nearest_ancestor(
             source=self.max_conv_layer, node_list=self.partition_points
         )
@@ -65,17 +65,20 @@ class DNNAnalyzer:
         return output
 
     def get_max_conv2d_layer(self):
+        subgraph_memories = {}
         max_mem_allowed = self.constraints["max_memory_size"]
 
         conv_layers = self.get_conv2d_layers()
         ofms, ifms, weights = self.memoryInfo.get_convs_memory(conv_layers)
 
-        convs_subgraphs, root, dummy_convs = self.graph.get_all_conv_subgraphs()
+        convs_subgraphs,subgraphs_ids, root, dummy_convs = self.graph.get_all_conv_subgraphs()
         for dummy in dummy_convs:
             ofms[dummy] = 0
             ifms[dummy] = 0
             weights[dummy] = 0
         max_mem_bytes = (ifms[root] + ofms[root] + weights[root]) * self.num_bytes
+        first_max_mem_bytes = max_mem_bytes
+
 
         max_layer = None
         self.part_point_memory = {}
@@ -83,39 +86,39 @@ class DNNAnalyzer:
         if root not in dummy_convs:
             self.part_point_memory[root] = max_mem_bytes
 
-        if max_mem_bytes > max_mem_allowed:
-            max_layer = root
-        else:
-            memory = weights[root]
-            max_layer_found = False
-            for subgraph in convs_subgraphs:
-                orders = self.graph.get_all_topological_orders(subgraph)
-                (
-                    subgraph_max_memory,
-                    orders_memory,
-                ) = self.memoryInfo.calculate_max_memory_usage(
-                    subgraph, weights, ifms, ofms, orders
-                )
-                subgraph_min_memory_necessary = min(subgraph_max_memory.values())
+        memory = weights[root]
+        max_layer_found = False
+        for i,subgraph in enumerate(convs_subgraphs):
+            orders = self.graph.get_all_topological_orders(subgraph)
+            (
+                subgraph_max_memory,
+                orders_memory,
+            ) = self.memoryInfo.calculate_max_memory_usage(
+                subgraph, weights, ifms, ofms, orders
+            )
+            subgraph_min_memory_necessary = min(subgraph_max_memory.values())
+            max_memory = subgraph_min_memory_necessary + memory
+            max_mem_bytes = max(max_mem_bytes, max_memory * self.num_bytes)
+            last_node = orders[0][-1]
+            part_point = self.graph.find_the_nearest_descendant(
+                last_node, self.partition_points
+            )
+            self.part_point_memory[part_point] = max_mem_bytes
+            if max_mem_bytes > max_mem_allowed:
+                if not max_layer_found:
+                    max_layer = orders[0][0]
+                    max_layer_found = True
+            weights_to_sum = [weights[key] for key in orders[0][1:]]
+            weights_sum = sum(weights_to_sum)            
+            subgraph_id = subgraphs_ids[i]
+            subgraph_memories[subgraph_id]=subgraph_min_memory_necessary + weights_sum
+            memory += weights_sum
 
-                max_memory = subgraph_min_memory_necessary + memory
-                max_mem_bytes = max(max_mem_bytes, max_memory * self.num_bytes)
+            if first_max_mem_bytes > max_mem_allowed:
+                max_layer = root        
+        subgraph_memories[subgraphs_ids[0]]+=weights[root]
 
-                last_node = orders[0][-1]
-                part_point = self.graph.find_the_nearest_descendant(
-                    last_node, self.partition_points
-                )
-                self.part_point_memory[part_point] = max_mem_bytes
-
-                if max_mem_bytes > max_mem_allowed:
-                    if not max_layer_found:
-                        max_layer = orders[0][0]
-                        max_layer_found = True
-
-                weights_to_sum = [weights[key] for key in orders[0][1:]]
-                weights_sum = sum(weights_to_sum)
-                memory += weights_sum
-        return max_layer
+        return max_layer,subgraph_memories
 
     def search_partition_point(self, layer_name):
         match = next(

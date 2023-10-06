@@ -183,7 +183,7 @@ class Evaluator:
             for name in self.stats_names:
                 energy_key = f"{name}_energy"
                 if energy_key in self.res[layer_name]:
-                    total_energy += self.res[layer_name][latency_key]
+                    total_energy += self.res[layer_name][energy_key]
 
             self.res[layer_name]["energy"] = total_energy
 
@@ -284,32 +284,72 @@ class Evaluator:
                 row = base_row + dynamic_row + memory_row
                 writer.writerow(row)
 
+    # def get_all_layer_stats(self) -> OrderedDict:
+    #  output = OrderedDict()
+
+    #  for i, layer in enumerate(self.pp_res.keys()):
+    #      if i == 0:
+    #          continue
+
+    #      output[i] = {}
+    #      output[i]["layer"] = layer
+    #      output[i]["energy"] = self.pp_res[layer]["energy"]
+    #      output[i]["latency"] = self.pp_res[layer]["latency"]
+    #      output[i]["efficiency"] = self.pp_res[layer]["efficiency"]
+    #      output[i][f"{self.memory_name}_latency"] = self.pp_res[layer][f"{self.memory_name}_latency"]
+    #      output[i][f"{self.memory_name}_energy"] = self.pp_res[layer][f"{self.memory_name}_energy"]
+
+    #      for name in self.stats_names:
+    #          latency_key = f"{name}_latency"
+    #          energy_key = f"{name}_energy"
+    #          memory_key = f"{name}_memory"  # This might not exist for every name
+
+    #          output[i][latency_key] = self.pp_res[layer].get(latency_key, 0)
+    #          output[i][energy_key] = self.pp_res[layer].get(energy_key, 0)
+
+    #          if "Node" in name:
+    #              output[i][memory_key] = self.pp_res[layer].get(memory_key, 0)
+
+    #      output[i]["throughput"] = self.pp_res[layer].get("throughput", 0)
+
+    #  return output
+
     def get_all_layer_stats(self) -> OrderedDict:
-     output = OrderedDict()
+        output = OrderedDict()
+        
+        optimization_direction = {
+            #min=1 ,max=-1
+            "energy": 1,
+            "latency": 1,
+            "efficiency": -1,
+            f"{self.memory_name}_latency": 1,
+            f"{self.memory_name}_energy": 1,
+            "throughput": -1,
+        }
+        
+        for name in self.stats_names:
+            latency_key = f"{name}_latency"
+            energy_key = f"{name}_energy"
+            optimization_direction[latency_key] = 1
+            optimization_direction[energy_key] = 1
+        
+        for i, layer in enumerate(self.pp_res.keys()):
+            if i == 0:
+                continue
 
-     for i, layer in enumerate(self.pp_res.keys()):
-         if i == 0:
-             continue
+            output[i] = {}
+            output[i]["layer"] = layer
 
-         output[i] = {}
-         output[i]["layer"] = layer
-         output[i]["energy"] = self.pp_res[layer]["energy"]
-         output[i]["latency"] = self.pp_res[layer]["latency"]
-         output[i]["efficiency"] = self.pp_res[layer]["efficiency"]
-         output[i][f"{self.memory_name}_latency"] = self.pp_res[layer][f"{self.memory_name}_latency"]
-         output[i][f"{self.memory_name}_energy"] = self.pp_res[layer][f"{self.memory_name}_energy"]
+            for metric, direction in optimization_direction.items():
+                output[i][metric] = self.pp_res[layer].get(metric, 0)
+                output[i][f"{metric}_opt"] = direction
 
-         for name in self.stats_names:
-             latency_key = f"{name}_latency"
-             energy_key = f"{name}_energy"
-             memory_key = f"{name}_memory"  # This might not exist for every name
+            # Add memory metric if "Node" is present in name
+            for name in self.stats_names:
+                if "Node" in name:
+                    memory_key = f"{name}_memory"
+                    output[i][memory_key] = self.pp_res[layer].get(memory_key, 0)
+                    optimization_direction[memory_key] = 1
+                    output[i][f"{memory_key}_opt"] = 1
 
-             output[i][latency_key] = self.pp_res[layer].get(latency_key, 0)
-             output[i][energy_key] = self.pp_res[layer].get(energy_key, 0)
-
-             if "Node" in name:
-                 output[i][memory_key] = self.pp_res[layer].get(memory_key, 0)
-
-         output[i]["throughput"] = self.pp_res[layer].get("throughput", 0)
-
-     return output
+        return output

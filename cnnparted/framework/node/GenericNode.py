@@ -44,7 +44,7 @@ class GenericNode:
         output = {
             'latency_ms': median_time_per_run * 1e3,
             'latency_iqr': IQR * 1e3,
-            'energy_mJ': 1  
+            'energy_mJ': 0 
         }
 
         return output

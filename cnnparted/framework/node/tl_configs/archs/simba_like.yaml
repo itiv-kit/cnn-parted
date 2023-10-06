@@ -198,7 +198,7 @@ architecture:
                 nports: 2
                 meshX: 1
           subtree:
-            - name: PE[0..15]
+            - name: PE[0..15] #15 und 7
               local:
                 - name: PEInputBuffer
                   class: storage
@@ -208,14 +208,14 @@ architecture:
                     memory_width: 64
                     word-bits: 8
                     block-size: 8
-                    meshX: 16
+                    meshX: 16 # 8 und 16
                 - name: PEWeightBuffer[0..3]
                   class: storage
                   subclass: smartbuffer_RF
                   attributes:
                     memory_depth: 4096
                     word-bits: 8
-                    meshX: 16
+                    meshX: 16 ##
                     block-size: 8
                     n_banks: 8
                 - name: PEAccuBuffer[0..3]
@@ -225,7 +225,7 @@ architecture:
                     memory_depth: 128
                     word-bits: 24
                     datawidth: 24
-                    meshX: 16
+                    meshX: 16 ##
                 - name: PEWeightRegs[0..15]
                   class: storage
                   subclass: reg_storage

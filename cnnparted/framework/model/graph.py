@@ -43,10 +43,13 @@ class LayersGraph:
 
     def _create_subgraphs(self, Graph, sorted_common_nodes):
         subgraphs = []
+        subgraph_ids = []
 
         for i in range(len(sorted_common_nodes) - 1):
             source = sorted_common_nodes[i]
             target = sorted_common_nodes[i + 1]
+            unique_id = f"{source}->{target}"
+            subgraph_ids.append(unique_id)
 
             # Find all simple paths between source and target
             all_paths = list(nx.all_simple_paths(Graph, source=source, target=target))
@@ -58,7 +61,7 @@ class LayersGraph:
 
             subgraphs.append(subgraph)
 
-        return subgraphs
+        return subgraphs,subgraph_ids
 
     # optimized _create subgraphs for long chains: needs to be tested first
     def opt_create_subgraphs(self, Graph, sorted_common_nodes):
@@ -141,9 +144,9 @@ class LayersGraph:
 
         paths = list(nx.all_simple_paths(graph, source, target))
         nodes_c_nodes = self._sorted_common_nodes(graph, paths)
-        subgraphs = self._create_subgraphs(graph, nodes_c_nodes)
+        subgraphs,ids = self._create_subgraphs(graph, nodes_c_nodes)
 
-        return subgraphs, source,dummy_convs
+        return subgraphs,ids, source,dummy_convs
 
     def get_all_topological_orders(self, graph):
         return list(nx.all_topological_sorts(graph))
