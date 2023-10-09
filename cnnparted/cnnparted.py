@@ -103,9 +103,12 @@ def main():
             ]      
 
         
-        for t in node_threads and link_threads:
+        for t in node_threads:
             if not t.config.get("timeloop"):
                 t.start()
+        
+        for t in link_threads:
+            t.start()
 
         for t in node_threads:
             if t.config.get("timeloop"): # run them simply on main thread
@@ -114,18 +117,6 @@ def main():
         for t in node_threads and link_threads:
             if not t.config.get("timeloop"):
                 t.join()
-
-        
-        # for t in node_threads:
-        #     t.start()
-        # for t in link_threads:
-        #     t.start()
-
-        # for t in node_threads:
-        #     t.join()
-        # for t in link_threads:
-        #     t.join()
-        
         
         for node_thread in node_threads:
             id,stats = node_thread.getStats()
