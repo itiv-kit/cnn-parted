@@ -131,14 +131,14 @@ def main():
             linkStats[id][i] = stats
 
     
-    for memt in memory_threads:
-            memt.join()
+    # for memt in memory_threads:
+    #         memt.join()
     
-    for mem_thread in memory_threads:
-        id,stats = mem_thread.getStats()
-        if id not in memoryStats:
-            memoryStats[id]={}
-        memoryStats[id][0]=stats
+    # for mem_thread in memory_threads:
+    #     id,stats = mem_thread.getStats()
+    #     if id not in memoryStats:
+    #         memoryStats[id]={}
+    #     memoryStats[id][0]=stats
 
 
     e = Evaluator(dnn, nodeStats, linkStats, memoryStats,{})

@@ -27,7 +27,7 @@ accuracy:
         randomize: True
 
 components:
-  - id: 0
+  - id: 2
     name: sensor #optional
     timeloop:
       accelerator: simba_like
@@ -48,8 +48,15 @@ components:
       enable_eee: false
       eth_mode: BASE1000-T
     fps: 25
-  - id: 2
-    name: edge
-    device: cpu
-    max_threads: 10
-    num_runs: 200
+  - id: 0
+    name: sensor #optional
+    timeloop:
+      accelerator: eyeriss_like
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: linear-pruned
+        live-status: false
+        num-threads: 8
+        timeout: 0
+        victory-condition: 100
