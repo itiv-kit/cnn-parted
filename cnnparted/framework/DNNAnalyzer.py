@@ -1,11 +1,49 @@
 import time
 import numpy as np
-import time
+import torch
+from torch import nn, Tensor
+from torch.nn import functional
+from torchinfo import summary
 from .model.model import TreeModel
 from .model.graph import LayersGraph
 from .model.memoryHelper import MemoryInfo
 from framework.constants import MODEL_PATH
+from collections import OrderedDict
+from typing import List, Dict
+from copy import deepcopy
+from torchinfo.layer_info import LayerInfo
 
+
+
+class _DictToTensorModel(nn.Module):
+    def __init__(self, d : Dict[str, Tensor]) -> None:
+        super(_DictToTensorModel, self).__init__()
+
+        self.key = list(d.keys())[0]
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x[self.key]
+
+
+def buildSequential(layers : List[LayerInfo], input_size : list, device : str) -> nn.Sequential:
+    modules = OrderedDict()
+    output_size = list(input_size)
+    for layer in layers:
+        if len(layer.input_size) != len(output_size):
+            modules[str(layer.layer_id) + 'f'] = nn.Flatten(1)
+
+        modules[str(layer.layer_id)] = layer.module
+
+        output_size = layer.output_size
+
+        rand_tensor = torch.randn(layer.input_size, device=device)
+        m = deepcopy(layer.module)
+        m.to(device)
+        out = m(rand_tensor)
+        if isinstance(out, dict):
+            modules[str(layer.layer_id)] = _DictToTensorModel(out)
+
+    return nn.Sequential(modules)
 
 class DNNAnalyzer:
     def __init__(self, model_path: str, input_size: tuple, constraints: dict) -> None:

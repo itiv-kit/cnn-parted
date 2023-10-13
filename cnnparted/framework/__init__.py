@@ -2,7 +2,7 @@ __all__ = ['DNNAnalyzer', 'ModuleThreadInterface', 'NodeThread', 'LinkThread', '
 
 from .DNNAnalyzer import DNNAnalyzer
 from .Evaluator import Evaluator
-#from .quantization.QuantizationEvaluator import QuantizationEvaluator
+from .quantization.QuantizationEvaluator import QuantizationEvaluator
 from .ModuleThreadInterface import ModuleThreadInterface
 from .node.NodeThread import NodeThread
 from .link.LinkThread import LinkThread

@@ -46,15 +46,17 @@ setup(
             'pyfiglet',
             'PyYAML',
             'scipy',
-            'torch',
+            'torch>=1.13.1',
             'torchinfo',
             'torchvision',
             'typing_extensions',
             'yamlordereddictloader',
+            'tqdm',
             'accelergy',
             'accelergy-aladdin-plug-in',
             'accelergy-cacti-plug-in',
             'accelergy-table-based-plug-ins',
+            'model_explorer',
             'onnx',
             'networkx',
             'onnxruntime-gpu',
@@ -62,7 +64,7 @@ setup(
             'pymoo==0.5.0'
 #            'model_explorer'
             ],
-      python_requires = '>=3.6',
+      python_requires = '>=3.9',
       include_package_data = True,
       scripts=['tools/setupTimeloop.sh'],
       cmdclass={'install': ToolsInstall}

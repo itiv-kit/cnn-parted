@@ -3,8 +3,9 @@ import time
 
 import torch
 from torchvision import transforms, datasets
-#from model_explorer.models.quantized_model import QuantizedModel
-#from model_explorer.utils.data_loader_generator import DataLoaderGenerator
+from model_explorer.models.quantized_model import QuantizedModel
+from model_explorer.utils.data_loader_generator import DataLoaderGenerator
+from model_explorer.utils.setup import build_dataloader_generators
 
 from ..DNNAnalyzer import DNNAnalyzer, buildSequential
 from .generate_calibration import generate_calibration
@@ -12,7 +13,7 @@ from .generate_calibration import generate_calibration
 from torchinfo import summary
 from torchinfo.layer_info import LayerInfo
 from copy import deepcopy
-
+from tqdm import tqdm
 
 class QuantizationEvaluator():
     def __init__(self, model : torch.nn.Module, dnn : DNNAnalyzer, config : dict, accfunc : callable, showProgress : bool) -> None:
@@ -27,13 +28,17 @@ class QuantizationEvaluator():
 
         t0 = time.time()
 
+        dataloaders = build_dataloader_generators(config['datasets'])
+
         for i in range(0,2):
             if self.bits[i] != 32:
-                self.models.append(self._create_quantized_model(self.fmodel, self.bits[i], config.get('calibration')))
+                self.models.append(self._create_quantized_model(self.fmodel, self.bits[i], config.get('calibration'), dataloaders['calibrate']))
             else:
                 self.models.append(self.part_points_orig)
 
-        self._eval(config['calibration']['datasets']['calibrate'].get('path'), dnn.partpoints_filtered, showProgress)
+
+        num_epochs = config['retraining'].get('epochs')
+        self._eval(dataloaders['train'], num_epochs, dataloaders['validation'], dnn.partpoints_filtered, showProgress)
 
         t1 = time.time()
         self.stats['sim_time'] = t1 - t0
@@ -49,8 +54,15 @@ class QuantizationEvaluator():
                 return self._cmp_layers_by_name(l1.parent_info, l2.parent_info)
             else:
                 return False
+        if l1.var_name == l2.var_name:
+            if l1.parent_info is None and l2.parent_info is None:
+                return True
+            elif l1.parent_info is not None and l2.parent_info is not None:
+                return self._cmp_layers_by_name(l1.parent_info, l2.parent_info)
+            else:
+                return False
 
-    def _create_quantized_model(self, m : torch.nn.Module, bit : int, calib_conf : dict) -> list[LayerInfo]:
+    def _create_quantized_model(self, m : torch.nn.Module, bit : int, calib_conf : dict, dataloader : DataLoaderGenerator) -> list[LayerInfo]:
         model = deepcopy(m)
 
         gpu_device = torch.device(self.device)
@@ -58,7 +70,7 @@ class QuantizationEvaluator():
 
         param_path = calib_conf.get('file')
         if not os.path.exists(param_path):
-            generate_calibration(deepcopy(m), calib_conf, True, param_path)
+            generate_calibration(deepcopy(m), dataloader, True, param_path)
 
         qmodel.load_parameters(param_path)
 
@@ -78,19 +90,7 @@ class QuantizationEvaluator():
 
         return q_partition_points
 
-    def _eval(self, dir_path : str, part_points : list[LayerInfo], showProgress : bool) -> None:
-        normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                        std=[0.229, 0.224, 0.225])
-
-        transf = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(self.input_size[-1]),
-            transforms.ToTensor(), normalize
-        ])
-
-        dataset = datasets.ImageFolder(dir_path, transf)
-        dataloadergen = DataLoaderGenerator(dataset, None, batch_size=64)
-
+    def _eval(self, train_dataloadergen: DataLoaderGenerator, num_epochs : int, eval_dataloadergen : DataLoaderGenerator, part_points : list[LayerInfo], showProgress : bool) -> None:
         for layer in part_points:
             layer_name = layer.get_layer_name(False, True)
 
@@ -101,7 +101,46 @@ class QuantizationEvaluator():
             seqMod = buildSequential(layers, self.input_size, self.device)
             seqMod.append(torch.nn.Flatten(1))
 
+            # Training
+            criterion = torch.nn.CrossEntropyLoss()
+            optimizer = torch.optim.SGD(seqMod.parameters(), lr=0.0001)
+            lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
+                                                                step_size=1,
+                                                                gamma=0.1)
+
+            seqMod.train()
+            for epoch_idx in range(num_epochs):
+                if showProgress:
+                    pbar = tqdm(total=len(train_dataloadergen), ascii=True,
+                                desc="Epoch {} / {}".format(epoch_idx + 1, num_epochs),
+                                position=1)
+
+                running_loss = 0.0
+                train_dataloader = train_dataloadergen.get_dataloader()
+
+                for image, target, *_ in train_dataloader:
+                    image, target = image.to(self.device), target.to(self.device)
+
+                    optimizer.zero_grad()
+
+                    with torch.set_grad_enabled(mode=True):
+                        output = seqMod(image)
+                        loss = criterion(output, target)
+                        loss.backward()
+                        optimizer.step()
+
+                        running_loss += loss.item() * output.size(0)
+
+                        if showProgress:
+                            pbar.update(output.size(0))
+
+                lr_scheduler.step()
+
+                if showProgress:
+                    pbar.close()
+
             # inference loop
-            acc = self.accfunc(seqMod, dataloadergen, progress=showProgress, title=f"Infere {layer_name}")
+            seqMod.eval()
+            acc = self.accfunc(seqMod, eval_dataloadergen, progress=showProgress, title=f"Infere {layer_name}")
 
             self.stats[layer_name] = acc.cpu().detach().numpy()

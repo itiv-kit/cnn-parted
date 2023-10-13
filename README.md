@@ -11,7 +11,8 @@ The framework currently includes a custom Ethernet model as well as hardware acc
     python3.9 -m venv pythonEnv
     source pythonEnv/bin/activate
     pip install --upgrade pip
-    pip install wheel nvidia-pyindex pytorch_quantization
+    pip install wheel
+    pip install nvidia-pyindex pytorch_quantization
     ```
 
 1. Download submodules
@@ -21,7 +22,7 @@ The framework currently includes a custom Ethernet model as well as hardware acc
 
 2. Run installation
     ```sh
-    git submodule foreach --recursive 'if [ -f setup.py ]; then pip install .; fi'
+    git submodule foreach --recursive 'if [ -f setup.py ]; then pip install -e .; fi'
     pip install -e .
     pip install -r requirements.txt
     ```

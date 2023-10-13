@@ -1,5 +1,4 @@
 #! /usr/bin/env python3
-
 import argparse
 from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator#, Dif_Evaluator
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
@@ -10,26 +9,25 @@ from framework.constants import MODEL_PATH
 import sys
 import os
 import json
-
 import importlib
-
-from framework import DNNAnalyzer, NodeThread, LinkThread, Evaluator ,MemoryNodeThread#, QuantizationEvaluator
-
+from framework import DNNAnalyzer, NodeThread, LinkThread, Evaluator ,MemoryNodeThread, QuantizationEvaluator
 MODEL_FOLDER = "workloads"
 
 def setup_workload(model_settings: dict) -> tuple:
     model = importlib.import_module(
         f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
     ).model
+
+    accuracy_function = importlib.import_module(
+        f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
+    ).accuracy_function
+    
     input_size= model_settings['input-size']
     x = torch.randn(input_size)
     torch.onnx.export(model, x, MODEL_PATH, verbose=False, input_names=['input'], output_names=['output'])
 
-    # accuracy_function = importlib.import_module(
-    #     f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
-    # ).accuracy_function
 
-    return MODEL_PATH,None# accuracy_function
+    return model, accuracy_function
 
 def main():
     parser = argparse.ArgumentParser(
@@ -52,13 +50,12 @@ def main():
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
-    #model = conf_helper.get_model(main)
     constraints = conf_helper.get_constraints()
     
     
 
     try:
-        model_path, accuracy_function = setup_workload(config['neural-network'])
+        model, accuracy_function = setup_workload(config['neural-network'])
     except KeyError:
         print()
         print('\033[1m' + 'Workload not available' + '\033[0m')
@@ -66,16 +63,16 @@ def main():
         quit(1)
 
 
-
-    dnn = DNNAnalyzer(model_path, (tuple(config['neural-network']['input-size'])),
+    dnn = DNNAnalyzer(MODEL_PATH, (tuple(config['neural-network']['input-size'])),
                       constraints)
     if len(dnn.partpoints_filtered) == 0:
+        print("ERROR: No partitioning points found.")
         quit(1)
 
-    # accStats = {}
-    # if 'accuracy' in config.keys():
-    #     accEval = QuantizationEvaluator(model, dnn, config.get('accuracy'), accuracy_function, args.show_progress)
-    #     accStats = accEval.get_stats()
+    accStats = {}
+    if 'accuracy' in config.keys():
+        accEval = QuantizationEvaluator(model, dnn, config.get('accuracy'), accuracy_function, args.show_progress)
+        accStats = accEval.get_stats()
 
       
     node_components,link_components = conf_helper.get_system_components()
@@ -131,14 +128,14 @@ def main():
             linkStats[id][i] = stats
 
     
-    # for memt in memory_threads:
-    #         memt.join()
+    for memt in memory_threads:
+            memt.join()
     
-    # for mem_thread in memory_threads:
-    #     id,stats = mem_thread.getStats()
-    #     if id not in memoryStats:
-    #         memoryStats[id]={}
-    #     memoryStats[id][0]=stats
+    for mem_thread in memory_threads:
+        id,stats = mem_thread.getStats()
+        if id not in memoryStats:
+            memoryStats[id]={}
+        memoryStats[id][0]=stats
 
 
     e = Evaluator(dnn, nodeStats, linkStats, memoryStats,{})
