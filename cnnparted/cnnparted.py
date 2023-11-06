@@ -11,7 +11,9 @@ import os
 import json
 import importlib
 from framework import DNNAnalyzer, NodeThread, LinkThread, Evaluator ,MemoryNodeThread, QuantizationEvaluator
-MODEL_FOLDER = "workloads"
+from framework.model.modelHelper import modelHelper
+MODEL_FOLDER = "workloads" 
+import statistics
 
 def setup_workload(model_settings: dict) -> tuple:
     model = importlib.import_module(
@@ -23,9 +25,9 @@ def setup_workload(model_settings: dict) -> tuple:
     ).accuracy_function
     
     input_size= model_settings['input-size']
+    
     x = torch.randn(input_size)
     torch.onnx.export(model, x, MODEL_PATH, verbose=False, input_names=['input'], output_names=['output'])
-
 
     return model, accuracy_function
 
@@ -50,7 +52,7 @@ def main():
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
-    constraints = conf_helper.get_constraints()
+    node_components,link_components = conf_helper.get_system_components()
     
     
 
@@ -61,21 +63,23 @@ def main():
         print('\033[1m' + 'Workload not available' + '\033[0m')
         print()
         quit(1)
+    
+    sim_times = []
+    mem_sim_times=[]
 
+    dnn = DNNAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']), conf_helper)#,node_components,link_components ,constraints)
 
-    dnn = DNNAnalyzer(MODEL_PATH, (tuple(config['neural-network']['input-size'])),
-                      constraints)
     if len(dnn.partpoints_filtered) == 0:
-        print("ERROR: No partitioning points found.")
+        print("ERROR: No partitioning points found. Please check your system constraints: max_memory_size, max_out_size ")
         quit(1)
+    
 
     accStats = {}
     if 'accuracy' in config.keys():
-        accEval = QuantizationEvaluator(model, dnn, config.get('accuracy'), accuracy_function, args.show_progress)
+        accEval = QuantizationEvaluator(dnn, config.get('accuracy'), accuracy_function, args.show_progress)
         accStats = accEval.get_stats()
-
-      
-    node_components,link_components = conf_helper.get_system_components()
+        print(accStats)
+    
     objective = conf_helper.get_optimization_objectives(node_components,link_components)
     first_component_id = node_components[0]['id']
 
@@ -86,8 +90,7 @@ def main():
     memory_threads= [MemoryNodeThread(first_component_id-1, dnn, None,False, args.run_name, args.show_progress)]
     for memt in memory_threads:
             memt.start()
-    
-    
+        
     for i in range (0, args.num_runs):
         
         node_threads = [
@@ -138,7 +141,7 @@ def main():
         memoryStats[id][0]=stats
 
 
-    e = Evaluator(dnn, nodeStats, linkStats, memoryStats,{})
+    e = Evaluator(dnn, nodeStats, linkStats, memoryStats,accStats)
     e.print_sim_time()
     e.export_csv(args.run_name)
  

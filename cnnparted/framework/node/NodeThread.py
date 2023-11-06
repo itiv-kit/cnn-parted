@@ -24,7 +24,6 @@ class NodeThread(ModuleThreadInterface):
     def _run_generic(self, config: dict) -> None:
         part_points = self.dnn.partition_points
         input_size = self.dnn.input_size
-        
 
         gn = GenericNode(config)
 
@@ -39,7 +38,7 @@ class NodeThread(ModuleThreadInterface):
 
         model_splitter = ModelSplitter(NEW_MODEL_PATH,self.work_path)
 
-        # only iterate through filtered list to save time; Mahdi : but the problem is that first layers will have zeros
+        # only iterate through filtered list to save time;
         for point in self.dnn.partpoints_filtered:
             layer_name = point.get("name")
             output_path_head = os.path.join(self.work_path, layer_name + "head.onnx")
@@ -81,8 +80,7 @@ class NodeThread(ModuleThreadInterface):
             
             self._remove_file(output_path_head)
             self._remove_file(output_path_tail)
-
-            
+           
 
     def _run_timeloop(self, config: dict) -> None:
         overall_latency = 0
@@ -99,12 +97,12 @@ class NodeThread(ModuleThreadInterface):
         tl = Timeloop(config)
 
         last_layer_partpoint_found = False
-        last_layer_partpoint_fits_in_memory = self.dnn.max_part_point
+        last_layer_partpoint_fits_in_memory = self.dnn.part_max_layer[self.id]
+
         for layer in conv_layers:
             layer_name = layer.get("name")
 
             partpoint_name = self.dnn.search_partition_point(layer_name)
-
 
             if last_layer_partpoint_fits_in_memory == partpoint_name:
                 last_layer_partpoint_found = True

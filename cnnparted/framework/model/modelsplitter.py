@@ -1,7 +1,6 @@
 import onnx
 from onnx import shape_inference
 import os
-from framework.constants import  ROOT_DIR ,NEW_MODEL_PATH
 
 
 class ModelSplitter:
@@ -174,3 +173,24 @@ class ModelSplitter:
         onnx.save(newmodeltail, output_path_tail)
 
         return False
+
+    def merge_models(self,head_model, tail_model):
+        head_model = onnx.load(head_model)
+        tail_model = onnx.load(tail_model)
+        # Extract the nodes from the head and tail models
+        head_nodes = [node for node in head_model.graph.node]
+        tail_nodes = [node for node in tail_model.graph.node]
+
+        # Create a new ONNX model
+        merged_model = onnx.helper.make_model(onnx.helper.make_graph(
+            head_nodes + tail_nodes, 
+            'merged_model',
+            inputs=head_model.graph.input,
+            outputs=tail_model.graph.output,
+            initializer=list(head_model.graph.initializer) + list(tail_model.graph.initializer)
+        ))
+
+        # Return the merged model
+        return merged_model
+
+

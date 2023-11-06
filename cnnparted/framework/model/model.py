@@ -2,10 +2,14 @@ import onnx
 from onnx import shape_inference
 import numpy as np
 from framework.constants import NEW_MODEL_PATH
+from .modelHelper import modelHelper
+
 
 class TreeModel:
-    def __init__(self, model_path):
+    def __init__(self, model_path,input_size):
         self._model_path = model_path
+        self.input_size = input_size
+        self.model_helper = modelHelper()
         self._model = onnx.load(self._model_path)
         onnx.checker.check_model(self._model)
         self._model = shape_inference.infer_shapes(self._model)
@@ -13,7 +17,11 @@ class TreeModel:
         self.output_sizes = self._get_output_sizes()
         self._layerTree = self._get_layers_data()
         onnx.save(self._model,NEW_MODEL_PATH)
+        #self.model_helper.save_model(NEW_MODEL_PATH)
+        self._identity_model = self.model_helper.add_identity_layers(self._model)
 
+    def get_torchModels(self):
+        return self.model_helper.convert_to_pytorch(self._model),self.model_helper.convert_to_pytorch(self._identity_model)
 
     def get_Tree(self):
         return self._layerTree

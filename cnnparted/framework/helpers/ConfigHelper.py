@@ -58,6 +58,20 @@ class ConfigHelper:
             }
         return constraints
 
+    def get_node_memory_sizes(self, node_components ):
+        memories=[]
+        for node in node_components:
+            memories.append( node["max_memory_size"])
+        
+        return memories
+
+    def get_num_bytes(self):
+        constraints = self.get_constraints()
+        num_bytes = int(constraints["word_width"] / 8)  
+        if constraints["word_width"] % 8 > 0:
+            num_bytes += 1
+        return num_bytes
+
     def get_model(self,main):
         try:
             model = DNN_DICT[self.config['neural-network']['name']]()
@@ -70,22 +84,6 @@ class ConfigHelper:
             quit(1)
 
         return model
-    
-    # def get_optimization_objectives(self,nodes,links):
-    #     try:
-    #         component = self.config['optimization-objectives']['device']
-    #     except KeyError:
-    #         component = '0'
-    #     try:
-    #         metric = self.config['optimization-objectives']['metric']
-    #     except KeyError:
-    #         metric = 'energy'
-        
-    #     optimization_objectives = {
-    #         "component": component,
-    #         "metric": metric
-    #         }
-    #     return optimization_objectives
     
     def get_optimization_objectives(self, nodes, links):
         try:

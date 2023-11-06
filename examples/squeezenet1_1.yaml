@@ -1,6 +1,6 @@
 constraints:
-  max_out_size: 150000 # must be node specific
-  max_memory_size: 3060000 
+  max_out_size: 15000 # must be link specific
+  max_memory_size: 20000000 
   word_width: 16
 
 optimization-objectives:
@@ -25,26 +25,26 @@ accuracy:
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
       sample_limit: null # number of validation dataset samples to test for each individual
-      batch_size: 64
+      batch_size: 16
       randomize: True
     validation:
       type: imagenet
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
       sample_limit: 8192 # number of validation dataset samples to test for each individual
-      batch_size: 256
+      batch_size: 64
       randomize: True
     train:
       type: imagenet
       kind: 'webdataset'
       path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
       total_samples: 1281167
-      batch_size: 256
+      batch_size: 64
       sample_limit: null
 
 components:
   - id: 2
-    name: sensor #optional
+    max_memory_size: 3000000 
     timeloop:
       accelerator: simba_like
       frequency: 500000000
@@ -54,8 +54,9 @@ components:
         live-status: false
         num-threads: 8
         timeout: 0
-        victory-condition: 100
+        victory-condition: 500
   - id: 1
+    max_out_size: 15000
     data_bit_width: 16
     ethernet:
       cable_len_m: 5
@@ -65,7 +66,7 @@ components:
       eth_mode: BASE1000-T
     fps: 25
   - id: 0
-    name: sensor #optional
+    max_memory_size: 3000000 
     timeloop:
       accelerator: eyeriss_like
       frequency: 200000000
@@ -75,4 +76,4 @@ components:
         live-status: false
         num-threads: 8
         timeout: 0
-        victory-condition: 100
+        victory-condition: 500

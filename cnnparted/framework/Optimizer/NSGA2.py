@@ -18,22 +18,22 @@ from .OptimizerHelper import OptimizerHelper
 
 class NSGA2_Optimizer(Optimizer):
     def __init__(self, nodes):
-        self.nodes = nodes
-        self.num_gen = 20 * len(nodes) #10 time node size 
-        self.pop_size = len(nodes) // 2 if len(nodes)>20 else len(nodes)
+        self.partioninig_points = nodes
+        self.num_gen = 30 * len(nodes) #10 time node size 
+        self.pop_size = 50 if len(nodes)>100 else len(nodes)//2  if len(nodes)>30 else 15 if len(nodes)>20 else len(nodes)
         self.opt_helper = OptimizerHelper()
         
 
     def optimize(self,optimization_objectives):
-        problem= Problem(self.nodes)
-        #bounds = [(1, len(self.nodes)-1)] 
+        problem= Problem(self.partioninig_points)
         eta = 20
-        mutation_prob = 0.1
+        mutation_prob  = 0.1
+        crossover_prob = 1
 
         algorithm = NSGA2(
         pop_size=self.pop_size,
         n_offsprings=self.pop_size,
-        sampling=FloatRandomSampling(),#In the beginning, initial points need to be sampled
+        sampling=FloatRandomSampling(),
         crossover=SBX(eta = eta,  prob=1),
         mutation=PM(eta = eta,prob= mutation_prob),
         eliminate_duplicates=True
@@ -53,13 +53,13 @@ class NSGA2_Optimizer(Optimizer):
         for x in X_unique:
             paretos.append(int(x))
         
-        opt_nodes=[]
-        for node in paretos:
-            opt_nodes.append(self.nodes[node])
+        opt_partioning_points=[]
+        for point in paretos:
+            opt_partioning_points.append(self.partioninig_points[point])
 
-        optimizer = self.opt_helper.find_best_node(opt_nodes,optimization_objectives)
+        optimizer = self.opt_helper.find_best_node(opt_partioning_points,optimization_objectives)
 
-        return optimizer,opt_nodes
+        return optimizer,opt_partioning_points
 
 
 class Problem(ElementwiseProblem):

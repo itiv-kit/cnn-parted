@@ -1,16 +1,15 @@
 import networkx as nx
 import copy
 
-
 class LayersGraph:
     def __init__(self, model_tree):
         self.model_tree = model_tree
         self._graph = nx.DiGraph()
         self._create_layer_relationships()
-        self.paths = list(nx.all_simple_paths(self._graph, "input", "output"))
-        self._sorted_partition_points = self._sorted_common_nodes(
-            self._graph, self.paths
-        )
+        self.paths =  list(nx.all_simple_paths(self._graph, "input", "output"))
+        self._sorted_partition_points =  self._sorted_common_nodes(
+             self._graph, self.paths
+         )
 
     def get_Graph(self):
         return self._graph
@@ -21,6 +20,54 @@ class LayersGraph:
         paths = list(nx.all_simple_paths(graph, src, end))
 
         return paths
+    
+    # def get_all_simple_paths_eff(self, graph):
+    #     sorted_common_nodes=["input","Mul_3","Mul_5","Mul_7","Add_0","Mul_13","Mul_15",
+    #     "Add_1","Mul_23","Add_2","Add_3","Mul_33","Mul_35","Add_4","Mul_45","Add_6","Add_7"
+    #     ,"Add_8","output"]
+    #     _,_,paths = self._create_subgraphs(graph, sorted_common_nodes)
+    #     all_paths = self.stitch_paths(paths, "input", "output",sorted_common_nodes)
+    #     return all_paths
+
+
+    def stitch_paths(self, subgraph_paths, start_node, end_node, sorted_common_nodes):
+    # The initial stitched paths are the paths in the first subgraph that start with the start_node
+    
+        stitched_paths = {start_node: []}
+        for path in subgraph_paths[0]:
+            if path[0] == start_node:
+                stitched_paths[start_node].append(path)
+
+        # Iterate over pairs of subgraph paths and stitch them together
+        for i in range(len(sorted_common_nodes) - 2):  # -2 because we look ahead by one, and the last node has no out-paths
+            new_stitched = []
+            # Get the end node of the current segment to find the next starting paths
+            current_end_node = sorted_common_nodes[i+1]
+            next_node_paths = subgraph_paths[i + 1]  # Paths to stitch next
+            for path in stitched_paths.get(current_end_node, []):
+                # Check all the paths in the next subgraph and see if we can stitch them to the current path
+                for next_path in next_node_paths:
+                    if next_path[0] == path[-1]:  # Check if paths can be stitched
+                        # Avoid including the last node of the current path twice
+                        new_stitched.append(path + next_path[1:])
+            # The new stitched paths become the current stitched paths for the next iteration
+            stitched_paths[current_end_node] = new_stitched
+
+        # At the end, we're interested in paths that reach the end_node
+        # Return all paths that end with the end_node
+        return [path for path in stitched_paths.get(sorted_common_nodes[-2], []) if path[-1] == end_node]
+
+
+        
+      
+
+        return final_stitched_paths
+
+        
+
+
+
+
 
     def _create_layer_relationships(self):
         for layer in self.model_tree:
@@ -44,6 +91,7 @@ class LayersGraph:
     def _create_subgraphs(self, Graph, sorted_common_nodes):
         subgraphs = []
         subgraph_ids = []
+        paths=[]
 
         for i in range(len(sorted_common_nodes) - 1):
             source = sorted_common_nodes[i]
@@ -53,7 +101,7 @@ class LayersGraph:
 
             # Find all simple paths between source and target
             all_paths = list(nx.all_simple_paths(Graph, source=source, target=target))
-
+            paths.append(all_paths)
             # Create subgraphs from all paths
             subgraph = nx.DiGraph()
             for path in all_paths:
@@ -61,7 +109,7 @@ class LayersGraph:
 
             subgraphs.append(subgraph)
 
-        return subgraphs,subgraph_ids
+        return subgraphs,subgraph_ids,paths
 
     # optimized _create subgraphs for long chains: needs to be tested first
     def opt_create_subgraphs(self, Graph, sorted_common_nodes):
@@ -144,7 +192,7 @@ class LayersGraph:
 
         paths = list(nx.all_simple_paths(graph, source, target))
         nodes_c_nodes = self._sorted_common_nodes(graph, paths)
-        subgraphs,ids = self._create_subgraphs(graph, nodes_c_nodes)
+        subgraphs,ids,_ = self._create_subgraphs(graph, nodes_c_nodes)
 
         return subgraphs,ids, source,dummy_convs
 
@@ -201,4 +249,3 @@ class LayersGraph:
                 break
 
         return nearest_node
-    

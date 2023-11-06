@@ -7,5 +7,4 @@ from .ModuleThreadInterface import ModuleThreadInterface
 from .node.NodeThread import NodeThread
 from .link.LinkThread import LinkThread
 from .memoryNode.MemoryNodeThread import MemoryNodeThread
-#from .Dif_Evaluator import Dif_Evaluator
 
