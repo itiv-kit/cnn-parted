@@ -1,16 +1,16 @@
+import time
+import numpy as np
 import torch
 from torch import nn, Tensor
-from torch.nn import functional
-from torchinfo import summary
-from torchinfo.layer_info import LayerInfo
-
-import numpy as np
-import time
+from .model.model import TreeModel
+from .model.graph import LayersGraph
+from .model.memoryHelper import MemoryInfo
+from framework.constants import MODEL_PATH
 from collections import OrderedDict
-
 from typing import List, Dict
 from copy import deepcopy
-
+from torchinfo.layer_info import LayerInfo
+from .Filter import Filter
 
 class _DictToTensorModel(nn.Module):
     def __init__(self, d : Dict[str, Tensor]) -> None:
@@ -22,140 +22,89 @@ class _DictToTensorModel(nn.Module):
         return x[self.key]
 
 
-def buildSequential(layers : List[LayerInfo], input_size : list, device : str) -> nn.Sequential:
-    modules = OrderedDict()
-    output_size = list(input_size)
-    for layer in layers:
-        if len(layer.input_size) != len(output_size):
-            modules[str(layer.layer_id) + 'f'] = nn.Flatten(1)
-
-        modules[str(layer.layer_id)] = layer.module
-
-        output_size = layer.output_size
-
-        rand_tensor = torch.randn(layer.input_size, device=device)
-        m = deepcopy(layer.module)
-        m.to(device)
-        out = m(rand_tensor)
-        if isinstance(out, dict):
-            modules[str(layer.layer_id)] = _DictToTensorModel(out)
-
-    return nn.Sequential(modules)
-
-
 class DNNAnalyzer:
-    def _find_partitions(self, layers : List[LayerInfo], root_layer : LayerInfo) -> bool:
-        if isinstance(root_layer.module, nn.ModuleDict): # skip nn.ModuleDict
-            if root_layer in self.partition_points:
-                root_idx = self.partition_points.index(root_layer)
-                self.partition_points[root_idx:root_idx] = layers
-                self.partition_points.remove(root_layer)
-            return True
-
-        if root_layer.input_size != []:
-            seq = buildSequential(layers, root_layer.input_size, self.device)
-            rand_tensor = torch.randn(root_layer.input_size, device=self.device)
-        else:
-            seq = buildSequential(layers, self.input_size, self.device)
-            rand_tensor = torch.randn(self.input_size, device=self.device)
-
-        try:
-            root_layer.module.eval()
-            res1 = root_layer.module(rand_tensor)
-            seq.eval()
-            res2 = seq(rand_tensor)
-
-            if isinstance(res1, dict):          # hotfix for FCN_ResNet architecture
-                res1 = _DictToTensorModel(res1)(res1)
-                input_shape = rand_tensor.shape[-2:]
-                res2 = functional.interpolate(res2, size=input_shape, mode='bilinear', align_corners=False)
-
-            if len(res1.size()) != len(res2.size()):      # hotfix for flattening in SqueezeNet
-                res2 = torch.flatten(res2, 1)
-
-            if not False in torch.unique(res1 == res2):
-                if root_layer in self.partition_points:
-                    root_idx = self.partition_points.index(root_layer)
-                    self.partition_points[root_idx:root_idx] = layers
-                    self.partition_points.remove(root_layer)
-                else:
-                    for layer in layers:
-                        self.partition_points.append(layer)
-
-                return True
-
-        except RuntimeError as rte:
-            if not 'expected input' in rte.args[0]:
-                raise Exception
-
-        return False
-
-
-    def _scan(self, graph : dict, node : LayerInfo) -> None:
-        found = True
-        if not node.is_leaf_layer:
-            found = self._find_partitions(graph[node.layer_id], node)
-        elif node.is_leaf_layer and (not node in self.partition_points):
-            self.partition_points.append(node)
-
-        if found:
-            for neighbor in graph[node.layer_id]:
-                self._scan(graph, neighbor)
-
-
-    def _add_dummy_input(self) -> None:
-        input_data = LayerInfo('Identity', nn.Identity(), 0)
-        input_data.input_size = self.input_size
-        input_data.output_size = self.input_size
-        self.partition_points.insert(0, input_data)
-        self.partpoints_filtered.insert(0, input_data)
-
-
-    def __init__(self, model : nn.Module, input_size : tuple, max_size : int) -> None:
-        self.partition_points : list[LayerInfo] = []
-        modsum = summary(model, input_size, depth=100, verbose=0)
-        self.layers = [layer for layer in modsum.summary_list if layer.class_name != "Dropout" ]
+    def __init__(self, model_path: str, input_size: tuple,conf_helper) -> None:
+        self.partition_points = []
         self.input_size = input_size
+        self.config_helper = conf_helper
+        self.constraints = conf_helper.get_constraints()
+        self.node_components,self.link_components =  conf_helper.get_system_components()
+        self.memoryInfo = MemoryInfo()       
 
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        self._topLayer = None
-        self._layerTree = {}
+        self.num_bytes = int(self.constraints["word_width"] / 8)
+        if self.constraints["word_width"] % 8 > 0:
+            self.num_bytes += 1
 
         self.stats = {}
         t0 = time.time()
 
-        for layer in self.layers:
-            self._layerTree[layer.layer_id] = []
-            if layer.parent_info == None:
-                self._topLayer = layer
-            else:
-                self._layerTree[layer.parent_info.layer_id].append(layer)
+        self._Tree_Model = TreeModel(model_path,self.input_size)
+        self._tree = self._Tree_Model.get_Tree()
+        self.torchModels= self._Tree_Model.get_torchModels()
 
-        self._scan(self._layerTree, self._topLayer)
+        self.graph = LayersGraph(self._tree)
+        graph_pp = self.graph.get_graph_partition_points()
 
-        if max_size != 0:
-            self.partpoints_filtered = [layer for layer in self.partition_points if np.prod(layer.output_size) < max_size]
-        else:
-            self.partpoints_filtered = self.partition_points.copy()
-        self._add_dummy_input()
+        self.partition_points = [
+            point for point in self._tree if point["name"] in graph_pp
+        ]
 
+        conv_layers = self.get_conv2d_layers()
+        mems = self.memoryInfo.get_max_conv2d_layer(self.graph,conv_layers ,self.input_size)
+
+        self.Filter = Filter(self.memoryInfo,self.config_helper,self.partition_points,mems)
+        self.partpoints_filtered, self.part_max_layer,self.nodes_memory  = self.Filter.apply_filter()
+        
         t1 = time.time()
-        self.stats['sim_time'] = t1 - t0
+        self.stats["sim_time"] = t1 - t0
 
         print("Found", len(self.partpoints_filtered), "partition points.")
+        
+        t0 = time.time()
 
+        t1 = time.time()
+        self.stats["mem_estimation_time"] = t1 - t0
 
-    def get_conv2d_layers(self) -> List[LayerInfo]:
-        return [layer for layer in self.layers if isinstance(layer.module, nn.Conv2d)]
+    def get_conv2d_layers(self):
+        output = [layer for layer in self._tree if layer.get("op_type") == "Conv"]
+        return output
 
+    def search_partition_point(self, layer_name):
+        match = next(
+            (
+                layer
+                for layer in self._tree
+                if layer.get("name") == layer_name and layer in self.partition_points
+            ),
+            None,
+        )
+        if match != None:
+            return layer_name
+        else:
+            found_current_layer = False
+            layer_graph = self.graph.get_Graph()
+            nodes = layer_graph.nodes()
+            sorted_nodes = sorted(
+                nodes, key=lambda node: list(layer_graph.nodes()).index(node)
+            )
 
-    def search_partition_point(self, layer : LayerInfo) -> LayerInfo:
-        for pp in self.partition_points:
-            if layer.layer_id == pp.layer_id:
-                return pp
+            for node in sorted_nodes:
+                if node == layer_name:
+                    found_current_layer = True
+                    continue
 
-        if layer.parent_info:
-            return self.search_partition_point(layer.parent_info)
+                if found_current_layer:
+                    match = next(
+                        (
+                            layer
+                            for layer in self._tree
+                            if layer.get("name") == node
+                            and layer in self.partition_points
+                        ),
+                        None,
+                    )
+                    if match == None:
+                        continue
+                    return match.get("name")
 
-        raise Exception("Not able to find parent partition point")
+            raise Exception("Not able to find parent partition point")

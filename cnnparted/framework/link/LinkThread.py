@@ -1,5 +1,6 @@
 from framework.ModuleThreadInterface import ModuleThreadInterface
 from framework.link.LinkModelInterface import LinkModelInterface
+import numpy as np
 
 from .EthernetLink import EthernetLink
 
@@ -31,7 +32,7 @@ class LinkThread(ModuleThreadInterface):
 
         # DNN layers
         for layer in layer_list:
-            slice_size = self._get_slice_size(layer.output_size, num_bytes)
+            slice_size = self._get_slice_size(layer.get('output_size'), num_bytes)
             try:
                 latency = link.get_latency_ms(slice_size, self.config['fps'])
                 energy = link.get_pow_cons_mW(slice_size, self.config['fps']) * latency / 1e3
@@ -40,7 +41,7 @@ class LinkThread(ModuleThreadInterface):
                 latency = 0
                 energy = 0
 
-            self.stats[layer.get_layer_name(False, True)] = {
+            self.stats[layer.get('name')] = {
                 'latency' : latency,
                 'energy' : energy
             }

@@ -12,9 +12,17 @@ class ToolsInstall(install):
         os.system("make -C"+path+"cacti")
         os.system("chmod -R 777 "+path+"cacti")
 
+        # Install Ramulator and vampire
+        os.system("echo 'Setting up ramulator and vampire")
+
+        os.system("make -j -C"+path+"ramulator")
+        os.system("make -j -C"+path+"VAMPIRE")
+
         # Install Timeloop
         os.system("chmod +x "+path+"setupTimeloop.sh")
         os.system("sh "+path+"setupTimeloop.sh")
+
+
 
 setup(
     name='CNNParted',
@@ -48,7 +56,13 @@ setup(
             'accelergy-aladdin-plug-in',
             'accelergy-cacti-plug-in',
             'accelergy-table-based-plug-ins',
-            'model_explorer'
+            'model_explorer',
+            'onnx',
+            'networkx',
+            'onnxruntime-gpu',
+            'traitlets',
+            'pymoo==0.5.0'
+#            'model_explorer'
             ],
       python_requires = '>=3.9',
       include_package_data = True,

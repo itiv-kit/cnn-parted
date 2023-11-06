@@ -1,40 +1,50 @@
+import onnxruntime
+import numpy as np
 import torch
-from torch import nn
-import torch.utils.benchmark as benchmark
+import time
 from typing import List
-
-from framework.DNNAnalyzer import buildSequential
-
-def run_model(model : nn.Module, tensor : torch.tensor) -> None:
-        model.eval()
-        model(tensor)
+from .GenericProviders import providers
 
 class GenericNode:
-    def __init__(self, config : dict) -> None:
-        self.num_threads = torch.get_num_threads()  if not config.get('max_threads') else config['max_threads']
-        self.num_runs    = 1000                     if not config.get('num_runs') else config['num_runs']
-        self.device      = "cpu"                    if not config.get('device') else config['device']
+    def __init__(self, config: dict) -> None:
+        self.num_threads = config.get('max_threads', torch.get_num_threads())
+        self.num_runs = config.get('num_runs', 1000)
+        provider = config.get('device', 'cpu')
+        
+        if provider in providers:
+            self.device = providers[provider]
+        else:
+            supported_keys = list(providers.keys())
+            raise ValueError(f"device '{provider}' is not supported. Supported providers: {supported_keys}")
 
-    def run(self, layers : list, input_size : List[int]) -> float:
-        model = buildSequential(layers, input_size, self.device)
-        rand_tensor = torch.randn(input_size, device=self.device)
-        model.to(self.device)
+    def run(self, model_path: str, input_size: List[int]) -> dict:
+        ort_session = onnxruntime.InferenceSession(model_path, providers=[self.device])
+        ort_inputs = {ort_session.get_inputs()[0].name: np.random.randn(*input_size).astype(np.float32)}
 
-        tim = benchmark.Timer(
-            stmt='run_model(m, x)',
-            setup='from framework.node.GenericNode import run_model',
-            globals={'m' : model, 'x': rand_tensor},
-            num_threads=self.num_threads)
+        # Warm-up runs
+        for _ in range(10):
+            ort_session.run(None, ort_inputs)
 
-        try:
-            meas = tim.timeit(self.num_runs)
-            output = {
-                'latency_ms' : meas.median * 1e3,
-                'latency_iqr' : meas.iqr * 1e3,
-                'energy_mJ' : 0
-            }
-        except RuntimeError as rte:
-            print("Warning:", rte.args[0])
-            output = {}
+        run_times = []
+        for _ in range(self.num_runs):
+            start_time = time.time()
+            ort_session.run(None, ort_inputs)
+            end_time = time.time()
+            run_times.append(end_time - start_time)
+
+        run_times.sort()
+
+        median_time_per_run = run_times[self.num_runs // 2] if self.num_runs % 2 == 1 else \
+            (run_times[(self.num_runs - 1) // 2] + run_times[self.num_runs // 2]) / 2.0
+
+        Q1 = run_times[self.num_runs // 4]
+        Q3 = run_times[(3 * self.num_runs) // 4]
+        IQR = Q3 - Q1
+
+        output = {
+            'latency_ms': median_time_per_run * 1e3,
+            'latency_iqr': IQR * 1e3,
+            'energy_mJ': 0 
+        }
 
         return output

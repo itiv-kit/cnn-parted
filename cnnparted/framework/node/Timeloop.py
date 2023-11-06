@@ -58,7 +58,7 @@ class Timeloop:
         if os.path.isfile(os.path.join(self.configs_dir, 'archs', (self.accname + '.cfg'))):
             self.type_cfg = '.cfg'
 
-        runname = layer.class_name + str(layer.depth) + str(layer.depth_index) + self.accname
+        runname = layer.get('name') + self.accname
         dirname = os.path.join(ROOT_DIR, self.runroot, runname)
         subprocess.check_call(['mkdir', '-p', dirname])
         os.chdir(dirname)
@@ -106,18 +106,21 @@ class Timeloop:
             elif "yaml" in src:
                 f.write(yaml.dump(config))
 
-    def _get_timeloop_params(self, config : dict, layer : LayerInfo) -> list:
-        q = layer.output_size[2]
-        p = layer.output_size[3]
-        c = layer.input_size[1]            # input channels
-        n = layer.input_size[0]            # input batch_size
-        m = layer.output_size[1]
-        s = layer.module.kernel_size[0]
-        r = layer.module.kernel_size[1]
-        wpad = layer.module.padding[0]
-        hpad = layer.module.padding[1]
-        wstride = layer.module.stride[0]
-        hstride = layer.module.stride[1]
+    def _get_timeloop_params(self, config: dict, layer: LayerInfo) -> list:
+
+        conv_params = layer.get('conv_params')
+        q = conv_params.get('q')
+        p = conv_params.get('p')
+        c = conv_params.get('c')  # input channels
+        n = conv_params.get('n')  # input batch_size
+        m = conv_params.get('m')
+        s = conv_params.get('s')
+        r = conv_params.get('r')
+        wpad = conv_params.get('wpad')
+        hpad = conv_params.get('hpad')
+        wstride = conv_params.get('wstride')
+        hstride = conv_params.get('hstride')
+
 
         config['problem']['instance']['R'] = r
         config['problem']['instance']['S'] = s

@@ -41,7 +41,7 @@ The framework currently includes a custom Ethernet model as well as hardware acc
 
 If accelergy does not run correctly, add the main directory to `PATH` and execute `accelergyTables`:
 ```sh
-export PATH=$PATH:<path/to/cnn-parted>
+export PATH=$PATH:<path/to/cnn-parted/cnnparted>
 accelergyTables
 ```
 
