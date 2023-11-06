@@ -8,8 +8,8 @@ class DDR3Node(MemoryModelInterface):
     def __init__(self):
         self.ramulator= Ramulator()
         self.vampire = Vampire()
-        
-    def get_latency_ms_and_enrgy_mW(self, slice_size: int) -> float:
+
+    def get_latency_ms_and_energy_mW(self, slice_size: int) -> float:
         # Function to handle read operation
         def read_thread():
             nonlocal r_trace, r_stats_file_path
@@ -37,7 +37,7 @@ class DDR3Node(MemoryModelInterface):
         r_energy_pJ, r_cycles = self._get_energy_and_cycles_from_csv(r_stats_file_path)
         w_energy_pJ, w_cycles = self._get_energy_and_cycles_from_csv(w_stats_file_path)
 
-        return r_energy_pJ , r_cycles, w_energy_pJ , w_cycles     
+        return r_energy_pJ , r_cycles, w_energy_pJ , w_cycles
 
     def _get_energy_and_cycles_from_csv(self, csv_file_path):
         total_energy = None
@@ -58,7 +58,7 @@ class DDR3Node(MemoryModelInterface):
                         try:
                             total_cycles = int(row[1])  # Convert to int
                         except ValueError:
-                            raise ValueError(f"Invalid totalCycleCount value in CSV file: {row[1]}")     
+                            raise ValueError(f"Invalid totalCycleCount value in CSV file: {row[1]}")
 
         if total_energy is not None and total_cycles is not None:
             return total_energy, total_cycles

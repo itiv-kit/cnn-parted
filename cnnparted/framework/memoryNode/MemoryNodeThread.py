@@ -4,7 +4,7 @@ from .ddr3memoryNode import DDR3Node
 from framework.helpers.ConfigHelper import ConfigHelper
 
 class MemoryNodeThread(ModuleThreadInterface):
- 
+
     def _get_slice_size(self, size : int, word_bytes : int) -> int:
         slice_size = word_bytes
         for i in size:
@@ -13,13 +13,13 @@ class MemoryNodeThread(ModuleThreadInterface):
 
     def _eval(self) -> None:
 
-        
+
         memory= MemoryModelInterface
-        memory = DDR3Node()     
+        memory = DDR3Node()
         num_bytes = self.dnn.num_bytes
         layer_list = self.dnn.partition_points
 
-        computed = {}  
+        computed = {}
         for layer in layer_list:
             layer_name = layer.get('name')
             layer_out_size = layer.get('output_size')
@@ -28,10 +28,10 @@ class MemoryNodeThread(ModuleThreadInterface):
             if slice_size in computed:
                 self.stats[layer_name] = computed[slice_size]
             else:
-                
+
 
                 try:
-                    r_energy_pJ, r_cycles, w_energy_pJ, w_cycles = memory.get_latency_ms_and_enrgy_mW(slice_size / 8)
+                    r_energy_pJ, r_cycles, w_energy_pJ, w_cycles = memory.get_latency_ms_and_energy_mW(slice_size / 8)
                 except ValueError as e:
                     print(e)
                     r_energy_pJ = 0
