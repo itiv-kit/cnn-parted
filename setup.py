@@ -62,7 +62,6 @@ setup(
             'onnxruntime-gpu',
             'traitlets',
             'pymoo==0.5.0'
-#            'model_explorer'
             ],
       python_requires = '>=3.9',
       include_package_data = True,

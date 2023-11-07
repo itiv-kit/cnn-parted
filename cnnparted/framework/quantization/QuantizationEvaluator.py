@@ -2,7 +2,6 @@ import os
 import time
 
 import torch
-from torchvision import transforms, datasets
 #  import QuantizedModel
 from .quantizer import QuantizedModel
 
@@ -16,9 +15,6 @@ from torchinfo import summary
 from torchinfo.layer_info import LayerInfo
 from copy import deepcopy
 from tqdm import tqdm
-from torch.utils.data import DataLoader
-from collections import OrderedDict
-from torch import nn
 
 
 class QuantizationEvaluator():
@@ -26,7 +22,6 @@ class QuantizationEvaluator():
         self.fmodel,self.identity_fmodel = dnn.torchModels
         self.input_size = dnn.input_size
         self.accfunc = accfunc
-        self.models : list[list[LayerInfo]] = []
         self.device = config.get('device')
         self.bits = config.get('bits')
         self.part_points_orig = dnn.partition_points
@@ -63,30 +58,12 @@ class QuantizationEvaluator():
             return True
         return False
 
-    
-
-
-        # if l1.var_name == l2.var_name:
-        #     if l1.parent_info is None and l2.parent_info is None:
-        #         return True
-        #     elif l1.parent_info is not None and l2.parent_info is not None:
-        #         return self._cmp_layers_by_name(l1.parent_info, l2.parent_info)
-        #     else:
-        #         return False
-        # if l1.var_name == l2.var_name:
-        #     if l1.parent_info is None and l2.parent_info is None:
-        #         return True
-        #     elif l1.parent_info is not None and l2.parent_info is not None:
-        #         return self._cmp_layers_by_name(l1.parent_info, l2.parent_info)
-        #     else:
-        #         return False
-
     def _create_quantized_model(self, m : torch.nn.Module, bit : int, calib_conf : dict, dataloader : DataLoaderGenerator) -> list[LayerInfo]:
         model = deepcopy(m)
-        
+
         gpu_device = torch.device(self.device)
         qmodel = QuantizedModel(model, gpu_device)
-        
+
 
         param_path = calib_conf.get('file')
         if not os.path.exists(param_path):
@@ -124,12 +101,12 @@ class QuantizationEvaluator():
 
 
         return q_partition_points
-  
+
     def _get_part_points(self,model):
         modsum = summary(model, self.input_size, depth=100, verbose=0)
 
         q_layers = [layer for layer in modsum.summary_list]
-        
+
         _identity = '_identity'
         self.qpoints_dict = {}
         self.qpoints_dict['input'] = q_layers[0].var_name
@@ -138,7 +115,7 @@ class QuantizationEvaluator():
             for layer in q_layers:
                 if ('_' + point['name'] + _identity) in layer.var_name:
                     modified_name = layer.var_name.replace('_' + point['name'] + _identity, '')
-                    layer_type = point['name'].split('_')  
+                    layer_type = point['name'].split('_')
                     modified_name = modified_name.replace('Identity_',layer_type[0] + '_')
                     self.qpoints_dict[point['name']] = modified_name
 
@@ -154,18 +131,18 @@ class QuantizationEvaluator():
                     break
 
         return q_partition_points
-    
+
 
 
     def _eval(self, train_dataloadergen: DataLoaderGenerator, num_epochs : int, eval_dataloadergen : DataLoaderGenerator, part_points : list[LayerInfo], showProgress : bool) -> None:
         gpu_device = torch.device(self.device)
         qmodel = QuantizedModel(self.fmodel, gpu_device)
-        
+
         for layer in part_points:
             torch_layer_name =  self.qpoints_dict[layer['name']]
-           
+
             seqMod = qmodel.create_model(self.fmodel,torch_layer_name,self.bits)
-                   
+
             # Training
             criterion = torch.nn.CrossEntropyLoss()
             optimizer = torch.optim.SGD(seqMod.parameters(), lr=0.0001)
@@ -181,7 +158,7 @@ class QuantizationEvaluator():
                                 position=1)
 
                 running_loss = 0.0
-                train_dataloader = train_dataloadergen.get_dataloader()              
+                train_dataloader = train_dataloadergen.get_dataloader()
 
                 for image, target, *_ in train_dataloader:
                     image, target = image.to(self.device), target.to(self.device)
@@ -207,7 +184,7 @@ class QuantizationEvaluator():
             # inference loop
             seqMod.eval()
             acc = self.accfunc(seqMod, eval_dataloadergen, progress=showProgress, title=f"Infere {layer_name}")
-            
+
             if self.bits[0] == self.bits[1]:
                 for layer in part_points:
                     layer_name =  self.qpoints_dict[layer['name']]

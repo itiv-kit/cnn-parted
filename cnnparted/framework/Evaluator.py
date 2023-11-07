@@ -29,7 +29,7 @@ class Evaluator:
         allStats.update(nodeStats)
         allStats.update(linkStats)
         allStats.update(memoryStats)
-        self.memory_name = "DDR3" 
+        self.memory_name = "DDR3"
         self.sorted_allStats = OrderedDict(sorted(allStats.items()))
         self.first_id = next(iter(self.sorted_allStats))
         self.Stats={}
@@ -52,14 +52,14 @@ class Evaluator:
         if "sim_time" in self.accStats.keys():
             print("Accuracy Eval:", self.accStats["sim_time"], "s")
 
-        
+
         for id,cmp in self.Stats.items():
             if id in self.nodeStats:
                 name = "Node-"+str(id)
             elif id in self.linkStats:
                 name= "link-"+ str(id)
             else:
-                name= self.memory_name 
+                name= self.memory_name
             print(
             name,"   :",
             cmp["sim_time"][0],
@@ -115,7 +115,7 @@ class Evaluator:
         self.stats_names=[]
         for layer in self.dnn.partition_points:
             layer_name = layer.get("name")
-            
+
 
             # if layer_name == self.dnn.max_part_point:
             #     last_layer_fits_memory_found = True
@@ -129,7 +129,7 @@ class Evaluator:
 
                 if id in self.memoryStats:
                     mem_name = self.memory_name
-                    if layer_name in cmp.keys():                              
+                    if layer_name in cmp.keys():
                         self.res[layer_name][f"{mem_name}_latency"] = cmp[layer_name]["latency_ms"][0]
                         self.res[layer_name][f"{mem_name}_energy"] = cmp[layer_name]["energy"][0]
                     else:
@@ -151,7 +151,7 @@ class Evaluator:
 
                     else:
                         name= "Link-"+ str(id)
-                        if layer_name in cmp.keys():            
+                        if layer_name in cmp.keys():
                             self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
                             self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
                         else:
@@ -159,8 +159,8 @@ class Evaluator:
                             self.res[layer_name][f"{name}_energy"] = 0
 
                     if name not in self.stats_names:
-                        self.stats_names.append(name)            
-        
+                        self.stats_names.append(name)
+
 
             if layer_name in self.accStats.keys():
                 self.res[layer_name]["accuracy"] = self.accStats[layer_name]
@@ -183,7 +183,7 @@ class Evaluator:
 
             self.res[layer_name]["energy"] = total_energy
 
-            throughputs=[]      
+            throughputs=[]
             for id,cmp in self.Stats.items():#for id,cmp in self.sorted_allStats.items():
                 if id not in self.memoryStats:
                     if id in self.nodeStats:
@@ -199,14 +199,13 @@ class Evaluator:
                     if float(self.res[layer_name][latency_key]) != 0:
                         throughput = np.prod(size) / float(self.res[layer_name][latency_key])
                     else:
-                        throughput = +np.inf  
-                    throughputs.append(throughput) 
-            
+                        throughput = +np.inf
+                    throughputs.append(throughput)
+
             min_throughput = min(throughputs)
             self.res[layer_name]["throughput"] = round((1000*min_throughput) / (np.prod(self.input_size)), 2)  #FPS=1000FPms
-            #self.res[layer_name]["efficiency"] = 1000*np.prod(size)/(np.prod(self.input_size)*total_energy) #Frames/J=1000Frames/mJ
-            self.res[layer_name]["efficiency"] = self.res[layer_name]["throughput"]*self.res[layer_name]["latency"] /self.res[layer_name]["energy"] #Frames/J=1000Frames/mJ
-            # 1/self.res[layer_name]["energy"]
+            self.res[layer_name]["efficiency"] = float(1)/self.res[layer_name]["energy"] # Frames/J
+
         filtered_pp = [layer.get("name") for layer in self.dnn.partpoints_filtered]
         self.pp_res = {key: self.res[key] for key in self.res if key in filtered_pp}
 
@@ -221,13 +220,13 @@ class Evaluator:
     ) -> None:
         self._write_csv_file((runname + "_all.csv"), all_pp)
         self._write_csv_file((runname + ".csv"), filtered_pp)
-    
+
     def _write_csv_file(self, filename: str, data: dict) -> None:
         with open(filename, "w", newline="") as f:
             writer = csv.writer(f, delimiter=";")
             base_header = ["No.", "Layer", "Output Size", "Accuracy", "Latency [ms]", "Energy [mJ]","Energy Efficiency [Frames/J]"]
             dynamic_header = []
-        
+
             for name in self.stats_names:
                 dynamic_header.extend([
                     f"{name} Latency",
@@ -278,7 +277,7 @@ class Evaluator:
                 row = base_row + dynamic_row + memory_row
                 writer.writerow(row)
 
-    
+
 
 
     # def get_all_layer_stats(self) -> OrderedDict:
@@ -313,7 +312,7 @@ class Evaluator:
 
     def get_all_layer_stats(self) -> OrderedDict:
         output = OrderedDict()
-        
+
         optimization_direction = {
             #min=1 ,max=-1
             "energy": 1,
@@ -323,13 +322,13 @@ class Evaluator:
             f"{self.memory_name}_energy": 1,
             "throughput": -1,
         }
-        
+
         for name in self.stats_names:
             latency_key = f"{name}_latency"
             energy_key = f"{name}_energy"
             optimization_direction[latency_key] = 1
             optimization_direction[energy_key] = 1
-        
+
         for i, layer in enumerate(self.pp_res.keys()):
             if i == 0:
                 continue

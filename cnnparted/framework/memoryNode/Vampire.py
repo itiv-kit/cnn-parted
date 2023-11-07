@@ -25,4 +25,3 @@ class Vampire:
             return os.path.join(self.vampire_path,csv_filename)
         except subprocess.CalledProcessError as e:
             print(f"Error executing command: {e}")
-        

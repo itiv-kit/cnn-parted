@@ -160,7 +160,7 @@ class QuantizedModel(CustomModel):
                     self.weight_quantizers.append(module)
 
     def create_model(self, m: torch_nn.Module, layer,bits) -> None:
-        
+
         model = deepcopy(m)
         modules = model.named_modules()
         layer_reached = False
@@ -198,11 +198,11 @@ class QuantizedModel(CustomModel):
                     module_name = name.split('/')[-1]
                     module_path = name.split('.')[:-1]
                     #module_parent = functools.reduce(getattr, [self.base_model] + module_path)
-                    setattr(module, name, quant_conv)                                
+                    setattr(module, name, quant_conv)
 
                 if name ==  layer:
                     layer_reached = True
-            
+
         for name, module in model.named_modules():
             if isinstance(module, quant_nn.TensorQuantizer):
                 self.explorable_module_names.append(name)
@@ -212,7 +212,7 @@ class QuantizedModel(CustomModel):
                     self.input_quantizers.append(module)
                 elif name.endswith('_weight_quantizer'):
                     self.weight_quantizers.append(module)
-        
+
         return model
 
     def generate_calibration_file(self, dataloader: DataLoader, progress=True,
@@ -237,24 +237,6 @@ class QuantizedModel(CustomModel):
                              ascii=True):
             # no need for actual accuracy function ...
             self.base_model(data.to(self.device))
-        # for data, *_ in tqdm(dataloader,
-        #              desc="Calibrating",
-        #              disable=not progress,
-        #              ascii=True):
-        #     # Assuming data shape is [batch_size, channels, height, width]
-        #     for item in data:
-        #         # Add a new dimension for batch (which is 1 in this case)
-        #         input_tensor = item.unsqueeze(0).to(self.device)
-        #         self.base_model(input_tensor)
-        # for data, *_ in tqdm(dataloader,
-        #                      desc="Calibrating",
-        #                      disable=not progress,
-        #                      ascii=True):
-        #     # Assuming data shape is [batch_size, channels, height, width]
-        #     for item in data:
-        #         # Add a new dimension for batch (which is 1 in this case)
-        #         input_tensor = item.unsqueeze(0).to(self.device)
-        #         self.base_model(input_tensor)
 
         # Disable Calibrators
         for module in self.input_quantizers:

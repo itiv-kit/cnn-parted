@@ -21,29 +21,29 @@ class Ramulator:
         trace_path = os.path.join(self.ramulator_path, self.trace_file_name)
 
         command = [
-            self.cmd,  
-            conf_path, 
-            "--mode=dram", 
+            self.cmd,
+            conf_path,
+            "--mode=dram",
             trace_path
         ]
 
-        try:           
+        try:
             subprocess.run(command,stdout=subprocess.PIPE, cwd=self.ramulator_path,check=True)
             return self._modify_trace_file(operation)
         except subprocess.CalledProcessError as e:
             print(f"Error executing command: {e}")
 
-        
 
-   
+
+
     def _modify_trace_file(self,operation):
-        
+
         commands_to_modify = {'ACT', 'RD', 'WR'}
         commands_to_keep = {'RD', 'WR', 'PRE','ACT'}# vampire supports solely these commands
-        
+
         in_path = os.path.join(self.ramulator_path, self.vampire_trace)
         out_path =os.path.join(self.ramulator_path,  operation+self.vampire_input_trace)
-        
+
         with open(in_path, 'r') as infile, open(out_path, 'w') as outfile:
             for line in infile:
                 parts = line.strip().split(',')
@@ -53,18 +53,18 @@ class Ramulator:
                         if command in commands_to_modify:
                             outfile.write(f"{timestamp},{command},{value},0\n")
                         else:
-                            outfile.write(f"{timestamp},{command},{value}\n")                 
-        
+                            outfile.write(f"{timestamp},{command},{value}\n")
+
         return out_path
-        
+
 
     def _generate_memory_trace_file(self,size, operation):
-        
+
         #size : how many 64 bits should be written or read
 
         if operation not in ['R', 'W']:
             raise ValueError("Invalid operation. Choose 'R' or 'W'.")
-        
+
         file_path=os.path.join(self.ramulator_path, self.trace_file_name)
 
         with open(file_path, "w") as file:

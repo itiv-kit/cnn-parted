@@ -1,9 +1,9 @@
 class OptimizerHelper:
     def __init__(self):
         pass
-    
+
     def find_best_node(self, nodes_list, optimization_objectives):
-        
+
         # # Define the key function to extract the desired metric for the specified device
         # def key_function(node):
         #     if device == "sensor" and metric == "latency":
@@ -26,6 +26,6 @@ class OptimizerHelper:
         #         return node['latency']
         #     else:
         #         raise ValueError("Invalid device or metric.")
-        
+
         best_node =  min(nodes_list, key=lambda node: node.get(optimization_objectives, float('inf')))
         return best_node

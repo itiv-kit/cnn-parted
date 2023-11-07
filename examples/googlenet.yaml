@@ -1,4 +1,5 @@
 constraints: {max_out_size: 20000000,  max_memory_size: 600000000, word_width: 16}
+
 optimization-objectives:
   component: 0
   metric: latency
@@ -40,7 +41,7 @@ accuracy:
 
 components:
   - id: 0
-    max_memory_size: 6000000 
+    max_memory_size: 6000000
     name: sensor #optional
     timeloop:
       accelerator: eyeriss_like
@@ -64,7 +65,7 @@ components:
       eth_mode: BASE1000-T
     fps: 25
   - id: 2
-    max_memory_size: 6000000 
+    max_memory_size: 6000000
     timeloop:
       accelerator: simba_like
       frequency: 500000000

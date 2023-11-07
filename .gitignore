@@ -9,6 +9,7 @@ run*
 timeloop-mapper.*
 !examples/results/*
 calibrations*
+*.onnx
 
 #visualization outputs
 _visualizations/

@@ -110,7 +110,7 @@ class ModelSplitter:
     def split_model(self, node_name, output_path_head, output_path_tail):
         if node_name == 'output':
             return True
-         
+
         new_model = "new_model.onnx"
         new_model_path = os.path.join(self.work_path,node_name + new_model)
 
@@ -126,11 +126,11 @@ class ModelSplitter:
 
         newmodelhead = onnx.load(new_model_path)
         newmodeltail = onnx.load(new_model_path)
-        
+
         if node_name == 'input':
             onnx.save(newmodeltail, output_path_tail)
             return False
-        
+
         to_be_deleted_nodes_count = self.get_node_index_by_name(model, node_name) + 1
         node = self.get_node_by_name(model, node_name)
         shape, type = self.get_value_info_shape_and_type(model, node.output[0])
@@ -183,7 +183,7 @@ class ModelSplitter:
 
         # Create a new ONNX model
         merged_model = onnx.helper.make_model(onnx.helper.make_graph(
-            head_nodes + tail_nodes, 
+            head_nodes + tail_nodes,
             'merged_model',
             inputs=head_model.graph.input,
             outputs=tail_model.graph.output,
@@ -192,5 +192,3 @@ class ModelSplitter:
 
         # Return the merged model
         return merged_model
-
-

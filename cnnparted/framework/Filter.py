@@ -7,7 +7,7 @@ class Filter:
         self.partition_points = partition_points
         self.node_components,_ = config_helper.get_system_components()
         self.constraints = config_helper.get_constraints()
-        self.mems = mems  
+        self.mems = mems
         self.num_bytes = config_helper.get_num_bytes()
 
         self.part_1_memory = {}
@@ -54,4 +54,4 @@ class Filter:
                 self.part_2_memory.get(layer["name"], float('inf')) < memory_sizes[1])
         ]
 
-        return self.partpoints_filtered, self.part_max_layer,self.nodes_memory 
+        return self.partpoints_filtered, self.part_max_layer,self.nodes_memory

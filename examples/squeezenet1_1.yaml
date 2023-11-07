@@ -1,6 +1,6 @@
 constraints:
   max_out_size: 15000 # must be link specific
-  max_memory_size: 20000000 
+  max_memory_size: 20000000
   word_width: 16
 
 optimization-objectives:
@@ -44,7 +44,7 @@ accuracy:
 
 components:
   - id: 2
-    max_memory_size: 3000000 
+    max_memory_size: 3000000
     timeloop:
       accelerator: simba_like
       frequency: 500000000
@@ -66,7 +66,7 @@ components:
       eth_mode: BASE1000-T
     fps: 25
   - id: 0
-    max_memory_size: 3000000 
+    max_memory_size: 3000000
     timeloop:
       accelerator: eyeriss_like
       frequency: 200000000

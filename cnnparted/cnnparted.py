@@ -3,7 +3,6 @@ import argparse
 from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator#, Dif_Evaluator
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
-import yaml
 import torch
 from framework.constants import MODEL_PATH
 import sys
@@ -12,8 +11,7 @@ import json
 import importlib
 from framework import DNNAnalyzer, NodeThread, LinkThread, Evaluator ,MemoryNodeThread, QuantizationEvaluator
 from framework.model.modelHelper import modelHelper
-MODEL_FOLDER = "workloads" 
-import statistics
+MODEL_FOLDER = "workloads"
 
 def setup_workload(model_settings: dict) -> tuple:
     model = importlib.import_module(
@@ -23,9 +21,9 @@ def setup_workload(model_settings: dict) -> tuple:
     accuracy_function = importlib.import_module(
         f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
     ).accuracy_function
-    
+
     input_size= model_settings['input-size']
-    
+
     x = torch.randn(input_size)
     torch.onnx.export(model, x, MODEL_PATH, verbose=False, input_names=['input'], output_names=['output'])
 
@@ -53,8 +51,8 @@ def main():
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
     node_components,link_components = conf_helper.get_system_components()
-    
-    
+
+
 
     try:
         model, accuracy_function = setup_workload(config['neural-network'])
@@ -63,7 +61,7 @@ def main():
         print('\033[1m' + 'Workload not available' + '\033[0m')
         print()
         quit(1)
-    
+
     sim_times = []
     mem_sim_times=[]
 
@@ -72,14 +70,14 @@ def main():
     if len(dnn.partpoints_filtered) == 0:
         print("ERROR: No partitioning points found. Please check your system constraints: max_memory_size, max_out_size ")
         quit(1)
-    
+
 
     accStats = {}
     if 'accuracy' in config.keys():
         accEval = QuantizationEvaluator(dnn, config.get('accuracy'), accuracy_function, args.show_progress)
         accStats = accEval.get_stats()
         print(accStats)
-    
+
     objective = conf_helper.get_optimization_objectives(node_components,link_components)
     first_component_id = node_components[0]['id']
 
@@ -90,9 +88,9 @@ def main():
     memory_threads= [MemoryNodeThread(first_component_id-1, dnn, None,False, args.run_name, args.show_progress)]
     for memt in memory_threads:
             memt.start()
-        
+
     for i in range (0, args.num_runs):
-        
+
         node_threads = [
                 NodeThread(component.get('id'), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
                 for component in node_components
@@ -100,13 +98,13 @@ def main():
         link_threads = [
                 LinkThread(component.get('id'), dnn, component,False, args.run_name, args.show_progress)
                 for component in link_components
-            ]      
+            ]
 
-        
+
         for t in node_threads:
             if not t.config.get("timeloop"):
                 t.start()
-        
+
         for t in link_threads:
             t.start()
 
@@ -117,7 +115,7 @@ def main():
         for t in node_threads and link_threads:
             if not t.config.get("timeloop"):
                 t.join()
-        
+
         for node_thread in node_threads:
             id,stats = node_thread.getStats()
             if id not in nodeStats:
@@ -130,10 +128,10 @@ def main():
                 linkStats[id] = {}
             linkStats[id][i] = stats
 
-    
+
     for memt in memory_threads:
             memt.join()
-    
+
     for mem_thread in memory_threads:
         id,stats = mem_thread.getStats()
         if id not in memoryStats:
@@ -144,16 +142,16 @@ def main():
     e = Evaluator(dnn, nodeStats, linkStats, memoryStats,accStats)
     e.print_sim_time()
     e.export_csv(args.run_name)
- 
+
     nodes = e.get_all_layer_stats()
-    
+
     if len(nodes) == 0:
         print("No benificial partitioning point found: check the bandwidth and memory constraints: ")
         sys.exit()
 
-    
+
     nsga2 = NSGA2_Optimizer(nodes)
-    optimizer,paretos = nsga2.optimize(objective)   
+    optimizer,paretos = nsga2.optimize(objective)
 
     data = {
     "best partitioning Point": optimizer,

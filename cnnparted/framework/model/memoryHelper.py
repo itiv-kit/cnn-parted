@@ -1,11 +1,10 @@
 from traitlets.traitlets import All
-import networkx as nx
 import numpy as np
 
 class MemoryInfo:
-    def __init__(self) -> None:  
+    def __init__(self) -> None:
        pass
-    
+
     def get_convs_memory(self,conv_layers):
         all_ifms={}
         all_ofms={}
@@ -43,10 +42,10 @@ class MemoryInfo:
           else:
               mem_1[point["name"]] = last_mem_1
           # For mem_2
-          
+
           max_fmaps_2 = 0
           total_weights_2 = 0
-          passed_point = False    
+          passed_point = False
           if point["name"] in mems:
               for key in mems:
                   if key == point["name"]:
@@ -73,7 +72,7 @@ class MemoryInfo:
           visited_node = []
           memory_nodes = {}
           max_memory[order_id] = 0
-          memory = ofms[order[0]] 
+          memory = ofms[order[0]]
           ofms_in_memory_list.append(order[0])
 
           for node_id, node in enumerate(order[1:]):
@@ -81,7 +80,7 @@ class MemoryInfo:
               visited_node.append(node)
               parents =  list(graph.predecessors(node))
 
-              # If Last node not a parent we should store its ofms 
+              # If Last node not a parent we should store its ofms
               if order[node_id] not in parents:
                  memory += ofms[order[node_id]]
                  ofms_in_memory_list.append(order[node_id])
@@ -104,28 +103,28 @@ class MemoryInfo:
                     memory += ofms[node]+ weights[node]
                   else:
                      memory += ofms[node]+ ifms[node]+ weights[node]
-              else: # if node has multiple inputs 
+              else: # if node has multiple inputs
                  memory += ofms[node]+ifms[node]+ weights[node]
 
               max_memory[order_id] = max(max_memory[order_id],memory)
-              memory_nodes[node] = memory 
+              memory_nodes[node] = memory
 
               if len(parents) == 1:
                   if parents[0] in ofms_in_memory_list:
                     memory -= ofms[node]
                   else:
-                     memory -= ofms[node]+ifms[node] 
+                     memory -= ofms[node]+ifms[node]
 
               else:
-                 memory -= ofms[node]+ifms[node]                
-       
+                 memory -= ofms[node]+ifms[node]
+
           orders_memory[order_id] = memory_nodes
 
         weights_mem=0
         for node in topological_orders[0]:
            weights_mem +=  weights[node]
-           
-           
+
+
         return max_memory,weights_mem,orders_memory
 
 

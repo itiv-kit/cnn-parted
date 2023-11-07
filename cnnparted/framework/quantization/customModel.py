@@ -4,7 +4,7 @@ class CustomModel(nn.Module):
     def __init__(self, layer_infos):
         super(CustomModel, self).__init__()
 
-        
+
     def forward(self, x):
         for layer in self.infos:
             x = layer.module(x)

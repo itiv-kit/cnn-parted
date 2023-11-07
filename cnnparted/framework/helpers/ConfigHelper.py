@@ -1,23 +1,22 @@
 from framework.constants import DNN_DICT
 import yaml
-from collections import defaultdict
 
 class ConfigHelper:
     def __init__(self, fname : str):
         self.fname = fname
         self.config = self.__load_config()
-    
+
     def __load_config(self) -> dict:
         with open(self.fname) as f:
             return yaml.load(f, Loader = yaml.SafeLoader)
 
     def get_config(self) -> dict:
         return self.config
-    
+
     def get_system_components(self):
         components = self.config.get('components', [])
         sorted_components = sorted(components, key=lambda x: x.get('id', -1))
-        
+
         node_components = []
         link_components = []
         for component in sorted_components:
@@ -27,7 +26,7 @@ class ConfigHelper:
                 link_components.append(component)
 
         return node_components,link_components
-    
+
     def print_all_keys(self,data_dict, indent=''):
         for key, value in data_dict.items():
             if isinstance(value, dict):
@@ -45,12 +44,12 @@ class ConfigHelper:
             max_memory_size = self.config['constraints']['max_memory_size']
         except KeyError:
             max_memory_size = 0
-        
+
         try:
             word_width = self.config['constraints']['word_width']
         except KeyError:
             word_width = 16 # default 2 bytes
-        
+
         constraints = {
             "max_out_size": max_size,
             "max_memory_size": max_memory_size,
@@ -62,12 +61,12 @@ class ConfigHelper:
         memories=[]
         for node in node_components:
             memories.append( node["max_memory_size"])
-        
+
         return memories
 
     def get_num_bytes(self):
         constraints = self.get_constraints()
-        num_bytes = int(constraints["word_width"] / 8)  
+        num_bytes = int(constraints["word_width"] / 8)
         if constraints["word_width"] % 8 > 0:
             num_bytes += 1
         return num_bytes
@@ -84,7 +83,7 @@ class ConfigHelper:
             quit(1)
 
         return model
-    
+
     def get_optimization_objectives(self, nodes, links):
         try:
             id = self.config['optimization-objectives']['device']
@@ -103,7 +102,7 @@ class ConfigHelper:
             name = "Link-" + str(id)
         else:
             raise ValueError(f"ID {id} not found in nodes or links.")
-        
+
         key_name = f"{name}_{metric}"
 
 

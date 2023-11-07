@@ -29,7 +29,7 @@ class DNNAnalyzer:
         self.config_helper = conf_helper
         self.constraints = conf_helper.get_constraints()
         self.node_components,self.link_components =  conf_helper.get_system_components()
-        self.memoryInfo = MemoryInfo()       
+        self.memoryInfo = MemoryInfo()
 
         self.num_bytes = int(self.constraints["word_width"] / 8)
         if self.constraints["word_width"] % 8 > 0:
@@ -54,12 +54,12 @@ class DNNAnalyzer:
 
         self.Filter = Filter(self.memoryInfo,self.config_helper,self.partition_points,mems)
         self.partpoints_filtered, self.part_max_layer,self.nodes_memory  = self.Filter.apply_filter()
-        
+
         t1 = time.time()
         self.stats["sim_time"] = t1 - t0
 
         print("Found", len(self.partpoints_filtered), "partition points.")
-        
+
         t0 = time.time()
 
         t1 = time.time()
