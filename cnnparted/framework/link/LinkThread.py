@@ -11,7 +11,7 @@ class LinkThread(ModuleThreadInterface):
             slice_size *= i
         return slice_size
 
-    def _eval(self) -> None:
+    def eval(self) -> None:
         if not self.config:
             return
 

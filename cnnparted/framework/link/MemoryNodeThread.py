@@ -11,7 +11,7 @@ class MemoryNodeThread(ModuleThreadInterface):
             slice_size *= i
         return slice_size
 
-    def _eval(self) -> None:
+    def eval(self) -> None:
 
         
         memory= MemoryModelInterface
@@ -45,7 +45,7 @@ class MemoryNodeThread(ModuleThreadInterface):
                 read_energy = r_energy_pJ / 1e9
 
                 self.stats[layer_name] = {
-                    'latency_ms': write_latency_ms + read_latency_ms,
+                    'latency': write_latency_ms + read_latency_ms,
                     'energy': write_energy + read_energy
                 }
 

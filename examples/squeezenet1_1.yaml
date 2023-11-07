@@ -13,7 +13,7 @@ neural-network:
 
 accuracy:
   device : "cuda"
-  bits: [8, 32]
+  bits: [16, 16]
   calibration:
     samples: null # null sets samples to all
     file: './calibrations/squeezenet1_1_quant_calib.pkl'
@@ -32,14 +32,14 @@ accuracy:
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
       sample_limit: 8192 # number of validation dataset samples to test for each individual
-      batch_size: 64
+      batch_size: 32
       randomize: True
     train:
       type: imagenet
       kind: 'webdataset'
       path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
       total_samples: 1281167
-      batch_size: 64
+      batch_size: 16
       sample_limit: null
 
 components:
@@ -56,14 +56,8 @@ components:
         timeout: 0
         victory-condition: 500
   - id: 1
-    max_out_size: 15000
-    data_bit_width: 16
-    ethernet:
-      cable_len_m: 5
-      eee_lmi_ratio: 0.1
-      eee_toff_ms: 0
-      enable_eee: false
-      eth_mode: BASE1000-T
+    memory: DDR3
+
     fps: 25
   - id: 0
     max_memory_size: 3000000 

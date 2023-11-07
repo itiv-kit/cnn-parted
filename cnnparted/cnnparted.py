@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 import argparse
-from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator#, Dif_Evaluator
+from framework import DNNAnalyzer, NodeThread,  Evaluator#, Dif_Evaluator
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
 import yaml
@@ -10,7 +10,7 @@ import sys
 import os
 import json
 import importlib
-from framework import DNNAnalyzer, NodeThread, LinkThread, Evaluator ,MemoryNodeThread, QuantizationEvaluator
+from framework import DNNAnalyzer, NodeThread,LinkComputationThread, Evaluator , QuantizationEvaluator
 from framework.model.modelHelper import modelHelper
 MODEL_FOLDER = "workloads" 
 import statistics
@@ -63,9 +63,6 @@ def main():
         print('\033[1m' + 'Workload not available' + '\033[0m')
         print()
         quit(1)
-    
-    sim_times = []
-    mem_sim_times=[]
 
     dnn = DNNAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']), conf_helper)#,node_components,link_components ,constraints)
 
@@ -75,31 +72,26 @@ def main():
     
 
     accStats = {}
-    if 'accuracy' in config.keys():
-        accEval = QuantizationEvaluator(dnn, config.get('accuracy'), accuracy_function, args.show_progress)
-        accStats = accEval.get_stats()
-        print(accStats)
+    # if 'accuracy' in config.keys():
+    #     accEval = QuantizationEvaluator(dnn, config.get('accuracy'), accuracy_function, args.show_progress)
+    #     accStats = accEval.get_stats()
+    #     print(accStats)
     
     objective = conf_helper.get_optimization_objectives(node_components,link_components)
     first_component_id = node_components[0]['id']
 
     nodeStats={}
     linkStats={}
-    memoryStats={}
 
-    memory_threads= [MemoryNodeThread(first_component_id-1, dnn, None,False, args.run_name, args.show_progress)]
-    for memt in memory_threads:
-            memt.start()
-        
     for i in range (0, args.num_runs):
         
         node_threads = [
                 NodeThread(component.get('id'), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
                 for component in node_components
             ]
-        link_threads = [
-                LinkThread(component.get('id'), dnn, component,False, args.run_name, args.show_progress)
-                for component in link_components
+        link_threads = [LinkComputationThread(component.get('id'), dnn, component,False, args.run_name, args.show_progress)
+                 for component in link_components
+
             ]      
 
         
@@ -125,23 +117,12 @@ def main():
             nodeStats[id][i] = stats
 
         for link_thread in  link_threads:
-            id,stats = link_thread .getStats()
+            id,stats = link_thread.getStats()
             if id not in linkStats:
                 linkStats[id] = {}
             linkStats[id][i] = stats
 
-    
-    for memt in memory_threads:
-            memt.join()
-    
-    for mem_thread in memory_threads:
-        id,stats = mem_thread.getStats()
-        if id not in memoryStats:
-            memoryStats[id]={}
-        memoryStats[id][0]=stats
-
-
-    e = Evaluator(dnn, nodeStats, linkStats, memoryStats,accStats)
+    e = Evaluator(dnn, nodeStats, linkStats, accStats)
     e.print_sim_time()
     e.export_csv(args.run_name)
  
