@@ -15,7 +15,7 @@ class Timeloop:
     # Output file names.
     out_prefix = "timeloop-mapper."
     exec_path = os.path.join(ROOT_DIR, 'tools', 'timeloop', 'build', 'timeloop-mapper')
-    configs_dir = os.path.join(ROOT_DIR, 'cnnparted', 'framework', 'node', 'tl_configs')
+    configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
 
     def __init__ (self, tl_config : dict) -> None:
         log_file_name = self.out_prefix + "log"
