@@ -16,7 +16,7 @@ from pytorch_quantization import tensor_quant
 from pytorch_quantization.tensor_quant import QuantDescriptor
 
 from model_explorer.exploration.weighting_functions import bits_weighted_linear
-from model_explorer.models.custom_model import CustomModel
+#from model_explorer.models.custom_model import CustomModel
 from .custom_model import CustomModel
 
 
@@ -41,7 +41,8 @@ class QuantizedModel(CustomModel):
         self.weight_quantizers = []
 
         # supposingly this is not going to change
-        self._create_quantized_model()
+        #self._create_quantized_model()
+        
 
         # Energy Model ...
         if dram_analysis_file != "":
@@ -164,8 +165,12 @@ class QuantizedModel(CustomModel):
         model = deepcopy(m)
         modules = model.named_modules()
         layer_reached = False
+                
+        _bits = bits * self.get_explorable_parameter_count()  
+        self.bit_widths = _bits
 
         for name, module in modules:
+
             if layer_reached== True and bits[1] == 32:
                     break
             if (layer_reached == False and bits[0]!= 32) or (layer_reached== True and bits[1]!=32):

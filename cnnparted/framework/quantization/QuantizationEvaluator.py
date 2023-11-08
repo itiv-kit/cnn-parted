@@ -31,14 +31,21 @@ class QuantizationEvaluator():
         self.bits = config.get('bits')
         self.part_points_orig = dnn.partition_points
         self.stats = {}
+        self.calib_conf = config.get('calibration')
+        gpu_device = torch.device(self.device)
+        self.fmodel.to(gpu_device)
+        
 
         t0 = time.time()
 
         dataloaders = build_dataloader_generators(config['datasets'])
-        #self._create_quantized_model(self.fmodel, self.bits[i], config.get('calibration'), dataloaders['calibrate'])
-        for i in range(0,2):
-            if self.bits[i] != 32:
-                self._create_quantized_model(self.fmodel, self.bits[i], config.get('calibration'), dataloaders['calibrate'])
+        self.calib_dataloader = dataloaders['calibrate']
+        self.part_points_orig_model = self._get_part_points(self.identity_fmodel)
+        self.part_points_orig_model = self.part_points_orig_model[1:]
+       
+        # for i in range(0,2):
+        #     if self.bits[i] != 32:
+        #         self._create_quantized_model(self.fmodel, self.bits[i], config.get('calibration'), dataloaders['calibrate'])
 
         num_epochs = config['retraining'].get('epochs')
         self._eval(dataloaders['train'], num_epochs, dataloaders['validation'], dnn.partpoints_filtered, showProgress)
@@ -81,49 +88,48 @@ class QuantizationEvaluator():
         #     else:
         #         return False
 
-    def _create_quantized_model(self, m : torch.nn.Module, bit : int, calib_conf : dict, dataloader : DataLoaderGenerator) -> list[LayerInfo]:
-        model = deepcopy(m)
+    # def _create_quantized_model(self, m : torch.nn.Module, bit : int, calib_conf : dict, dataloader : DataLoaderGenerator) -> list[LayerInfo]:
+    #     model = deepcopy(m)
         
-        gpu_device = torch.device(self.device)
-        qmodel = QuantizedModel(model, gpu_device)
-        
+    #     gpu_device = torch.device(self.device)
+    #     qmodel = QuantizedModel(model, gpu_device)        
 
-        param_path = calib_conf.get('file')
-        if not os.path.exists(param_path):
-            generate_calibration(deepcopy(m), dataloader, True, param_path)
+    #     param_path = calib_conf.get('file')
+    #     if not os.path.exists(param_path):
+    #         generate_calibration(deepcopy(m), dataloader, True, param_path)
 
-        qmodel.load_parameters(param_path)
+    #     qmodel.load_parameters(param_path)
 
-        bits = [bit] * qmodel.get_explorable_parameter_count()
-        qmodel.bit_widths = bits
-        self.qmodel = qmodel.base_model
-        modsum = summary(qmodel.base_model, self.input_size, depth=100, verbose=0)
-        self.q_layers = [layer for layer in modsum.summary_list]
-        x = torch.randn(self.input_size)
+    #     bits = [bit] * qmodel.get_explorable_parameter_count()
+    #     qmodel.bit_widths = bits
+    #     self.qmodel = qmodel.base_model
+    #     modsum = summary(qmodel.base_model, self.input_size, depth=100, verbose=0)
+    #     self.q_layers = [layer for layer in modsum.summary_list]
+    #     x = torch.randn(self.input_size)
 
-        torch.onnx.export(qmodel.base_model, x.cuda(), 'qmodel.onnx', verbose=False, input_names=['input'], output_names=['output'])
+    #     torch.onnx.export(qmodel.base_model, x.cuda(), 'qmodel.onnx', verbose=False, input_names=['input'], output_names=['output'])
 
-        modsum = summary(self.fmodel, self.input_size, depth=100, verbose=0)
-        self.f_layers = [layer for layer in modsum.summary_list]
-        x = torch.randn(self.input_size)
-        torch.onnx.export(self.fmodel, x.cuda(), 'fmodel.onnx', verbose=False, input_names=['input'], output_names=['output'])
+    #     modsum = summary(self.fmodel, self.input_size, depth=100, verbose=0)
+    #     self.f_layers = [layer for layer in modsum.summary_list]
+    #     x = torch.randn(self.input_size)
+    #     torch.onnx.export(self.fmodel, x.cuda(), 'fmodel.onnx', verbose=False, input_names=['input'], output_names=['output'])
 
-        self.part_points_orig_model = self._get_part_points(self.identity_fmodel)
-        self.part_points_orig_model = self.part_points_orig_model[1:]
-        input_data = LayerInfo('Identity', torch.nn.Identity(), 0)
-        input_data.input_size = self.input_size
-        input_data.output_size = self.input_size
+    #     self.part_points_orig_model = self._get_part_points(self.identity_fmodel)
+    #     self.part_points_orig_model = self.part_points_orig_model[1:]
+    #     input_data = LayerInfo('Identity', torch.nn.Identity(), 0)
+    #     input_data.input_size = self.input_size
+    #     input_data.output_size = self.input_size
 
-        q_partition_points : list[LayerInfo] = []
-        q_partition_points.append(input_data)  # Append Identity Layer
-        for point in self.part_points_orig_model:
-            for layer in self.q_layers:
-                if self._cmp_layers_by_name(point, layer):
-                    q_partition_points.append(layer)
-                    break
+    #     q_partition_points : list[LayerInfo] = []
+    #     q_partition_points.append(input_data)  # Append Identity Layer
+    #     for point in self.part_points_orig_model:
+    #         for layer in self.q_layers:
+    #             if self._cmp_layers_by_name(point, layer):
+    #                 q_partition_points.append(layer)
+    #                 break
 
 
-        return q_partition_points
+    #     return q_partition_points
   
     def _get_part_points(self,model):
         modsum = summary(model, self.input_size, depth=100, verbose=0)
@@ -158,9 +164,19 @@ class QuantizationEvaluator():
 
 
     def _eval(self, train_dataloadergen: DataLoaderGenerator, num_epochs : int, eval_dataloadergen : DataLoaderGenerator, part_points : list[LayerInfo], showProgress : bool) -> None:
+
+        model = deepcopy(self.fmodel)
         gpu_device = torch.device(self.device)
-        qmodel = QuantizedModel(self.fmodel, gpu_device)
+        qmodel = QuantizedModel(model, gpu_device)
         
+        param_path = self.calib_conf.get('file')
+
+        if not os.path.exists(param_path):
+            generate_calibration(model, self.calib_dataloader, True, param_path)
+
+        qmodel.load_parameters(param_path)
+
+
         for layer in part_points:
             torch_layer_name =  self.qpoints_dict[layer['name']]
            
@@ -184,7 +200,7 @@ class QuantizationEvaluator():
                 train_dataloader = train_dataloadergen.get_dataloader()              
 
                 for image, target, *_ in train_dataloader:
-                    image, target = image.to(self.device), target.to(self.device)
+                    image, target = image.to(gpu_device), target.to(gpu_device)
 
                     optimizer.zero_grad()
 
