@@ -11,42 +11,42 @@ neural-network:
   name: squeezenet1_1
   input-size: [ 1, 3, 227, 227 ]
 
-accuracy:
-  device : "cuda"
-  bits: [8, 32]
-  calibration:
-    samples: null # null sets samples to all
-    file: './calibrations/squeezenet1_1_quant_calib.pkl'
-  retraining:
-    epochs: 2
-  datasets:
-    calibrate:
-      type: imagenet
-      kind: 'imagefolder'
-      path: '/tools/datasets/imagenet/val_images'
-      sample_limit: null # number of validation dataset samples to test for each individual
-      batch_size: 16
-      randomize: True
-    validation:
-      type: imagenet
-      kind: 'imagefolder'
-      path: '/tools/datasets/imagenet/val_images'
-      sample_limit: 8192 # number of validation dataset samples to test for each individual
-      batch_size: 64
-      randomize: True
-    train:
-      type: imagenet
-      kind: 'webdataset'
-      path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
-      total_samples: 1281167
-      batch_size: 64
-      sample_limit: null
+# accuracy:
+#   device : "cuda"
+#   bits: [8, 32]
+#   calibration:
+#     samples: null # null sets samples to all
+#     file: './calibrations/squeezenet1_1_quant_calib.pkl'
+#   retraining:
+#     epochs: 2
+#   datasets:
+#     calibrate:
+#       type: imagenet
+#       kind: 'imagefolder'
+#       path: '/tools/datasets/imagenet/val_images'
+#       sample_limit: null # number of validation dataset samples to test for each individual
+#       batch_size: 16
+#       randomize: True
+#     validation:
+#       type: imagenet
+#       kind: 'imagefolder'
+#       path: '/tools/datasets/imagenet/val_images'
+#       sample_limit: 8192 # number of validation dataset samples to test for each individual
+#       batch_size: 64
+#       randomize: True
+#     train:
+#       type: imagenet
+#       kind: 'webdataset'
+#       path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
+#       total_samples: 1281167
+#       batch_size: 64
+#       sample_limit: null
 
 components:
   - id: 2
     max_memory_size: 3000000
     timeloop:
-      accelerator: simba_like
+      accelerator: eyeriss_like
       frequency: 500000000
       layer: conv2d
       mapper:
@@ -54,7 +54,7 @@ components:
         live-status: false
         num-threads: 8
         timeout: 0
-        victory-condition: 500
+        victory-condition: 100
   - id: 1
     max_out_size: 15000
     data_bit_width: 16
@@ -67,13 +67,5 @@ components:
     fps: 25
   - id: 0
     max_memory_size: 3000000
-    timeloop:
-      accelerator: eyeriss_like
-      frequency: 200000000
-      layer: conv2d
-      mapper:
-        algorithm: linear-pruned
-        live-status: false
-        num-threads: 8
-        timeout: 0
-        victory-condition: 500
+    mnsim:
+      conf_path: '/configs/mnsim_configs/SimConfig.ini'

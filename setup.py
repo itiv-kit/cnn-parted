@@ -22,6 +22,9 @@ class ToolsInstall(install):
         os.system("chmod +x "+path+"setupTimeloop.sh")
         os.system("sh "+path+"setupTimeloop.sh")
 
+        # Update MNSIM
+        os.system("git -C "+path+"MNSIM-2.0 apply ../mnsim.patch")
+
 
 
 setup(

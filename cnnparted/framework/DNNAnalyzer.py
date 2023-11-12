@@ -1,15 +1,9 @@
 import time
-import numpy as np
-import torch
 from torch import nn, Tensor
 from .model.model import TreeModel
 from .model.graph import LayersGraph
 from .model.memoryHelper import MemoryInfo
-from framework.constants import MODEL_PATH
-from collections import OrderedDict
-from typing import List, Dict
-from copy import deepcopy
-from torchinfo.layer_info import LayerInfo
+from typing import Dict
 from .Filter import Filter
 
 class _DictToTensorModel(nn.Module):
@@ -64,6 +58,9 @@ class DNNAnalyzer:
 
         t1 = time.time()
         self.stats["mem_estimation_time"] = t1 - t0
+
+    def get_layers(self):
+        return [layer for layer in self._tree]
 
     def get_conv2d_layers(self):
         output = [layer for layer in self._tree if layer.get("op_type") == "Conv"]

@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 import argparse
-from framework import DNNAnalyzer, ModuleThreadInterface, NodeThread, LinkThread, Evaluator#, Dif_Evaluator
+from framework import DNNAnalyzer, NodeThread, LinkThread, Evaluator
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
 import torch
@@ -10,7 +10,6 @@ import os
 import json
 import importlib
 from framework import DNNAnalyzer, NodeThread, LinkThread, Evaluator ,MemoryNodeThread, QuantizationEvaluator
-from framework.model.modelHelper import modelHelper
 MODEL_FOLDER = "workloads"
 
 def setup_workload(model_settings: dict) -> tuple:
@@ -61,9 +60,6 @@ def main():
         print('\033[1m' + 'Workload not available' + '\033[0m')
         print()
         quit(1)
-
-    sim_times = []
-    mem_sim_times=[]
 
     dnn = DNNAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']), conf_helper)#,node_components,link_components ,constraints)
 

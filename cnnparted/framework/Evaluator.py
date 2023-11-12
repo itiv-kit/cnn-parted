@@ -141,7 +141,10 @@ class Evaluator:
                         name = "Node-"+str(id)
                         if layer_name in cmp.keys():
                             self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
-                            self.res[layer_name][f"{name}_latency_iqr"] = cmp[layer_name]["latency_iqr"][0]
+                            if 'latency_iqr' in cmp[layer_name]:
+                                self.res[layer_name][f"{name}_latency_iqr"] = cmp[layer_name]["latency_iqr"][0]
+                            else:
+                                self.res[layer_name][f"{name}_latency_iqr"] = 0
                             self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
                             self.res[layer_name][f"{name}_memory"]= self.nodes_memory[id][layer_name]
                         else:
@@ -230,7 +233,7 @@ class Evaluator:
             for name in self.stats_names:
                 dynamic_header.extend([
                     f"{name} Latency",
-                    f"{name} Latency IQR",
+                    # f"{name} Latency IQR",
                     f"{name} Energy"
                 ])
                 if "Node" in name:  # Adding memory header for nodes
@@ -259,7 +262,7 @@ class Evaluator:
                 for name in self.stats_names:
                     dynamic_row.extend([
                         format_float(data[layer].get(f"{name}_latency", "")),
-                        format_float(data[layer].get(f"{name}_latency_iqr", "")),
+                        # format_float(data[layer].get(f"{name}_latency_iqr", "")),
                         format_float(data[layer].get(f"{name}_energy", ""))
                     ])
                     if "Node" in name:  # Extracting memory data for nodes

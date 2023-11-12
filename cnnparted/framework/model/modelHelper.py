@@ -13,7 +13,6 @@ class modelHelper:
         model = deepcopy(_model)
         """Add identity layers after every node in the ONNX model."""
         for i, node in enumerate(list(model.graph.node)):
-            print(node.name)
             # Create an identity node
             identity_node = onnx_helper.make_node(
                 'Identity',

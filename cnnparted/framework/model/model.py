@@ -57,14 +57,37 @@ class TreeModel:
                 layer['output'] = self.out_layer['name']
 
             output.append(layer)
-
             if node.op_type =='Conv':
                 conv_params = self._get_conv_params(node)
                 layer['conv_params'] = conv_params
+            elif node.op_type =='MaxPool':
+                pool_params = self._get_pool_params(node)
+                layer['pool_params'] = pool_params
+            elif node.op_type =='AveragePool':
+                pool_params = self._get_pool_params(node)
+                layer['pool_params'] = pool_params
 
 
         output.append(self.out_layer)
         self._create_layer_relationships(output)
+
+        return output
+
+    def _get_pool_params(self,node):
+        attributes = {}
+        for attr in node.attribute:
+            if attr.name == 'kernel_shape':
+                attributes['kernel_shape'] = list(attr.ints)
+            elif attr.name == 'strides':
+                attributes['strides'] = list(attr.ints)
+            elif attr.name == 'pads':
+                attributes['pads'] = list(attr.ints)
+
+        output = {
+            'kernel': attributes.get('kernel_shape'),
+            'padding': attributes.get('pads'),
+            'stride': attributes.get('strides')
+        }
 
         return output
 
