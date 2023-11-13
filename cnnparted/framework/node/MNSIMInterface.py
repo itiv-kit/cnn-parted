@@ -84,7 +84,6 @@ class MNSIMInterface(TrainTestInterface):
 
         for l in layers:
             op_type = l.get('op_type')
-
             lyr = None
             if op_type == "Conv":
                 conv_params = l.get('conv_params')
@@ -106,7 +105,8 @@ class MNSIMInterface(TrainTestInterface):
                 srd = pool_params.get('stride')[0]
                 lyr = {'type': 'pooling', 'mode': 'AVE', 'kernel_size': krl, 'stride': srd}
             elif op_type == "GlobalAveragePool":
-                lyr = {'type': 'pooling', 'mode': 'AVE', 'kernel_size': 2, 'stride': 1}
+                input_size = layers[layers.index(l) - 1].get('output_size')
+                lyr = {'type': 'pooling', 'mode': 'AVE', 'kernel_size': input_size[2], 'stride': 1}
             elif op_type == "Relu":
                 lyr = {'type': 'relu'}
             elif op_type == "Add":
@@ -119,7 +119,10 @@ class MNSIMInterface(TrainTestInterface):
                 lyr = {'type': 'fc', 'in_features': input_size[1], 'out_features': num_classes}
             elif op_type == "Concat":
                 lyr = {'type': 'concat'}
+            elif op_type == 1: # DNN input/output
+                continue
             else:
+                print("[MNSIMInterface] Warning: unknown Op_type ", op_type)
                 continue
 
             inputs = l.get('input')
