@@ -29,3 +29,6 @@
 [submodule "tools/VAMPIRE"]
 	path = tools/VAMPIRE
 	url = https://github.com/CMU-SAFARI/VAMPIRE.git
+[submodule "tools/MNSIM-2.0"]
+	path = tools/MNSIM-2.0
+	url = https://github.com/thu-nics/MNSIM-2.0.git

@@ -1,7 +1,8 @@
 from framework.ModuleThreadInterface import ModuleThreadInterface
 from .GenericNode import GenericNode
 from .Timeloop import Timeloop
-from framework.constants import NEW_MODEL_PATH, ROOT_DIR
+from .MNSIMInterface import MNSIMInterface
+from framework.constants import NEW_MODEL_PATH
 from framework.model.modelsplitter import ModelSplitter
 import os
 import csv
@@ -11,13 +12,11 @@ class NodeThread(ModuleThreadInterface):
     def _eval(self) -> None:
         if not self.config:
             return
-        # reverse now given as an argument
-        # if self.name == "edge":
-        #     self.reverse = True
-        # else:
-        #     self.reverse = False
+
         if self.config.get("timeloop"):
             self._run_timeloop(self.config["timeloop"])
+        elif self.config.get("mnsim"):
+            self._run_mnsim(self.config["mnsim"])
         else:
             self._run_generic(self.config)
 
@@ -77,41 +76,61 @@ class NodeThread(ModuleThreadInterface):
                     self.name,
                     "models",
                 )
-            
+
             self._remove_file(output_path_head)
             self._remove_file(output_path_tail)
-           
+
+    def _run_mnsim(self, config: dict) -> None:
+        mn = MNSIMInterface(self.dnn.get_layers(), config, self.dnn.input_size)
+        mn.run()
+
+        self._set_stats(self.dnn.get_layers(), mn.stats)
+
+        if self.show_progress:
+            print(
+                    "Finished",
+                    self.name,
+                    "layers",
+                )
 
     def _run_timeloop(self, config: dict) -> None:
-        overall_latency = 0
-        overall_energy = 0
-
         conv_layers = self.dnn.get_conv2d_layers()
 
         if self.reverse:
             conv_layers = conv_layers[::-1]
 
+        layers = []
+
+        last_layer_partpoint_fits_in_memory = self.dnn.part_max_layer[self.id]
+        for layer in conv_layers:
+            layer_name = layer.get("name")
+            partpoint_name = self.dnn.search_partition_point(layer_name)
+
+            layers.append(layer)
+            if last_layer_partpoint_fits_in_memory == partpoint_name:
+                break
+
         runroot = "run" + self.name
         config["run_root"] = runroot
 
         tl = Timeloop(config)
+        tl.run(layers, self.show_progress)
 
-        last_layer_partpoint_found = False
-        last_layer_partpoint_fits_in_memory = self.dnn.part_max_layer[self.id]
+        self._set_stats(layers, tl.stats)
 
-        for layer in conv_layers:
+    def _set_stats(self, layers : list, stats : dict) -> None:
+        overall_latency = 0
+        overall_energy = 0
+
+        for layer in layers:
             layer_name = layer.get("name")
-
             partpoint_name = self.dnn.search_partition_point(layer_name)
 
-            if last_layer_partpoint_fits_in_memory == partpoint_name:
-                last_layer_partpoint_found = True
-            elif last_layer_partpoint_found:
-                break
-
-            output = tl.run(layer)
-            overall_latency += output["latency_ms"]
-            overall_energy += output["energy_mJ"]
+            if layer_name not in stats:
+                print("[NodeThread] Warning: ", layer_name, " not found.")
+                continue
+            overall_latency += stats[layer_name]["latency"]
+            overall_energy += stats[layer_name]["energy"]
 
             if not partpoint_name in self.stats.keys():
                 self.stats[partpoint_name] = {}
@@ -122,13 +141,9 @@ class NodeThread(ModuleThreadInterface):
 
             # save single layer stats
             self.stats[partpoint_name][layer_name] = {}
-            self.stats[partpoint_name][layer_name]["latency"] = output["latency_ms"]
+            self.stats[partpoint_name][layer_name]["latency"] = stats[layer_name]["latency"]
             self.stats[partpoint_name][layer_name]["latency_iqr"] = 0
-            self.stats[partpoint_name][layer_name]["energy"] = output["energy_mJ"]
-
-            if self.show_progress:
-                layer_i = conv_layers.index(layer) + 1
-                print("Finished", layer_i, "/", len(conv_layers), self.name, "layers")
+            self.stats[partpoint_name][layer_name]["energy"] = stats[layer_name]["energy"]
 
         # Fill up dict with partitioning points not containing CONVs
         prev_latency = 0
@@ -149,9 +164,9 @@ class NodeThread(ModuleThreadInterface):
                 self.stats[l_name]["latency_iqr"] = 0
                 self.stats[l_name]["energy"] = prev_energy
 
-        self._write_timeloop_csv(self.runname + "_" + self.name + "_tl_layers.csv")
+        self._write_layer_csv(self.runname + "_" + self.name + "_layers.csv")
 
-    def _write_timeloop_csv(self, filename: str) -> None:
+    def _write_layer_csv(self, filename: str) -> None:
         with open(filename, "w", newline="") as f:
             writer = csv.writer(f, delimiter=";")
             header = [
@@ -180,7 +195,3 @@ class NodeThread(ModuleThreadInterface):
     def _remove_file(self,file_path):
         if os.path.exists(file_path):
             os.remove(file_path)
-
-        #else:
-           # print(f"File {file_path} does not exist!")
-

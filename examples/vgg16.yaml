@@ -47,20 +47,23 @@ accuracy:
       sample_limit: null
 
 components:
-  - id: 0
+  - id: 2
+    max_memory_size: 600000000
     name: sensor #optional
     timeloop:
       accelerator: simba_like
-      frequency: 500000000
+      frequency: 200000000
       layer: conv2d
       mapper:
         algorithm: linear-pruned
         live-status: false
         num-threads: 8
+        optimization-metrics: [energy, delay]
         timeout: 0
         victory-condition: 100
   - id: 1
-    data_bit_width: 16
+    max_out_size: 20000000
+    data_bit_width: 8
     ethernet:
       cable_len_m: 5
       eee_lmi_ratio: 0.1
@@ -68,8 +71,7 @@ components:
       enable_eee: false
       eth_mode: BASE1000-T
     fps: 25
-  - id: 2
-    name: edge
-    device: cpu
-    max_threads: 10
-    num_runs: 500
+  - id: 0
+    max_memory_size: 600000000
+    mnsim:
+      conf_path: '/configs/mnsim_configs/SimConfig.ini'

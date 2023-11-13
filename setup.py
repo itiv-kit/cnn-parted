@@ -22,6 +22,9 @@ class ToolsInstall(install):
         os.system("chmod +x "+path+"setupTimeloop.sh")
         os.system("sh "+path+"setupTimeloop.sh")
 
+        # Update MNSIM
+        os.system("git -C "+path+"MNSIM-2.0 apply ../mnsim.patch")
+
 
 
 setup(
@@ -62,7 +65,6 @@ setup(
             'onnxruntime-gpu',
             'traitlets',
             'pymoo==0.5.0'
-#            'model_explorer'
             ],
       python_requires = '>=3.9',
       include_package_data = True,

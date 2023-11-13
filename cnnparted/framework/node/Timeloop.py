@@ -4,7 +4,6 @@ import subprocess
 import libconf
 import yaml
 import glob
-from torchinfo.layer_info import LayerInfo
 
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
@@ -15,7 +14,7 @@ class Timeloop:
     # Output file names.
     out_prefix = "timeloop-mapper."
     exec_path = os.path.join(ROOT_DIR, 'tools', 'timeloop', 'build', 'timeloop-mapper')
-    configs_dir = os.path.join(ROOT_DIR, 'cnnparted', 'framework', 'node', 'tl_configs')
+    configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
 
     def __init__ (self, tl_config : dict) -> None:
         log_file_name = self.out_prefix + "log"
@@ -51,8 +50,23 @@ class Timeloop:
         self.type_cfg = '.yaml'
         self.runroot = tl_config['run_root']
 
-    def run(self,
-            layer : LayerInfo,
+        self.stats = {}
+
+    def run(self, layers : dict, progress : bool = False):
+        for layer in layers:
+            layer_name = layer.get("name")
+            output = self._run_single(layer)
+
+            self.stats[layer_name] = {}
+            self.stats[layer_name]["latency"] = output["latency_ms"]
+            self.stats[layer_name]["energy"] = output["energy_mJ"]
+
+            if progress:
+                layer_i = layers.index(layer) + 1
+                print("Finished", layer_i, "/", len(layers), self.prob_name, "layers")
+
+    def _run_single(self,
+            layer : dict,
             logfile : str = 'timeloop.log'
         ) -> dict:
         if os.path.isfile(os.path.join(self.configs_dir, 'archs', (self.accname + '.cfg'))):
@@ -106,7 +120,7 @@ class Timeloop:
             elif "yaml" in src:
                 f.write(yaml.dump(config))
 
-    def _get_timeloop_params(self, config: dict, layer: LayerInfo) -> list:
+    def _get_timeloop_params(self, config: dict, layer: dict) -> list:
 
         conv_params = layer.get('conv_params')
         q = conv_params.get('q')
@@ -137,7 +151,7 @@ class Timeloop:
         config['problem']['instance']['Wdilation'] = 1
         config['problem']['instance']['Hdilation'] = 1
 
-    def _rewrite_workload_bounds(self, src : str, dst : str, layer : LayerInfo) -> None:
+    def _rewrite_workload_bounds(self, src : str, dst : str, layer : dict) -> None:
         with open(src, "r") as f:
             if "cfg" in src:
                 config = libconf.load(f)

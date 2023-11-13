@@ -1,6 +1,6 @@
 constraints:
   max_out_size: 15000 # must be link specific
-  max_memory_size: 20000000 
+  max_memory_size: 20000000
   word_width: 16
 
 optimization-objectives:
@@ -12,7 +12,7 @@ neural-network:
   input-size: [ 1, 3, 227, 227 ]
 
 accuracy:
-  device : "cuda:3"
+  device : "cuda"
   bits: [16, 16]
   calibration:
     samples: null # null sets samples to all
@@ -44,9 +44,9 @@ accuracy:
 
 components:
   - id: 2
-    max_memory_size: 3000000 
+    max_memory_size: 3000000
     timeloop:
-      accelerator: simba_like
+      accelerator: eyeriss_like
       frequency: 500000000
       layer: conv2d
       mapper:
@@ -54,20 +54,11 @@ components:
         live-status: false
         num-threads: 8
         timeout: 0
-        victory-condition: 500
+        victory-condition: 100
   - id: 1
     memory: DDR3
-
     fps: 25
   - id: 0
-    max_memory_size: 3000000 
-    timeloop:
-      accelerator: eyeriss_like
-      frequency: 200000000
-      layer: conv2d
-      mapper:
-        algorithm: linear-pruned
-        live-status: false
-        num-threads: 8
-        timeout: 0
-        victory-condition: 500
+    max_memory_size: 3000000
+    mnsim:
+      conf_path: '/configs/mnsim_configs/SimConfig.ini'

@@ -9,4 +9,4 @@ NEW_MODEL_PATH =  os.path.join(ROOT_DIR, "new_model.onnx")
 
 import torchvision.models as tvmodels
 import torchvision.models.segmentation as segmodels
-DNN_DICT = {**tvmodels.__dict__, **segmodels.__dict__} # move to constants.py
+DNN_DICT = {**tvmodels.__dict__, **segmodels.__dict__}

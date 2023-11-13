@@ -20,7 +20,7 @@ class LayersGraph:
         paths = list(nx.all_simple_paths(graph, src, end))
 
         return paths
-    
+
     # def get_all_simple_paths_eff(self, graph):
     #     sorted_common_nodes=["input","Mul_3","Mul_5","Mul_7","Add_0","Mul_13","Mul_15",
     #     "Add_1","Mul_23","Add_2","Add_3","Mul_33","Mul_35","Add_4","Mul_45","Add_6","Add_7"
@@ -32,7 +32,7 @@ class LayersGraph:
 
     def stitch_paths(self, subgraph_paths, start_node, end_node, sorted_common_nodes):
     # The initial stitched paths are the paths in the first subgraph that start with the start_node
-    
+
         stitched_paths = {start_node: []}
         for path in subgraph_paths[0]:
             if path[0] == start_node:
@@ -56,18 +56,6 @@ class LayersGraph:
         # At the end, we're interested in paths that reach the end_node
         # Return all paths that end with the end_node
         return [path for path in stitched_paths.get(sorted_common_nodes[-2], []) if path[-1] == end_node]
-
-
-        
-      
-
-        return final_stitched_paths
-
-        
-
-
-
-
 
     def _create_layer_relationships(self):
         for layer in self.model_tree:
@@ -152,13 +140,13 @@ class LayersGraph:
         for node in self._graph.nodes:
             if node not in conv_nodes:
                 predecessors = list(graph.predecessors(node))
-                successors = list(graph.successors(node))            
+                successors = list(graph.successors(node))
 
                 if len(predecessors) + len(successors) > 2:
                     dummy= node+"_dummy_conv"
                     graph = nx.relabel_nodes(graph, {node: dummy})
                     dummy_convs.append(dummy)
-                    
+
                 else:
                     graph.remove_node(node)
                     for pred in predecessors:
@@ -198,17 +186,17 @@ class LayersGraph:
 
     def get_all_topological_orders(self, graph):
         return list(nx.all_topological_sorts(graph))
-    
+
     def find_the_nearest_ancestor(self,source,node_list):
         _source=source
-        
+
         if _source == None:
             return None
         if 'dummy_conv' in  _source:
                 _source = source.replace('_dummy_conv','')
-            
 
-        
+
+
         graph_reversed= nx.reverse(self._graph)
         reverse_simple_paths = list(nx.all_simple_paths(graph_reversed, source=_source, target=node_list[0]))
 
@@ -225,10 +213,10 @@ class LayersGraph:
                 break
 
         return nearest_node
-    
+
     def find_the_nearest_descendant(self,source,node_list):
-        
-        _source=source   
+
+        _source=source
         if _source == None:
             return None
         if 'dummy_conv' in  _source:

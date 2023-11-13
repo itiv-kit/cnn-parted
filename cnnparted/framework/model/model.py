@@ -25,52 +25,75 @@ class TreeModel:
 
     def get_Tree(self):
         return self._layerTree
-    
+
     def _get_layers_data(self):
         graph_def = self._model.graph
-        
+
 
         self.in_layer, self.out_layer = self._get_in_out_layers(graph_def)
 
         nodes = graph_def.node
         output = []
         output.append(self.in_layer)
-        
-        for node in nodes:            
-            if node.op_type == 'Identity':              
+
+        for node in nodes:
+            if node.op_type == 'Identity':
                 continue
-            
+
             layer = {
                 "name": node.name,
                 "op_type": node.op_type,
                 "input": node.input,
             }
-            
+
             # Check if any of the node's outputs match the keys in output_sizes
             matched_outputs = [output for output in node.output if output in self.output_sizes]
-            
+
             if matched_outputs:
                 layer["output_size"] = np.array([self.output_sizes[i] for i in matched_outputs]).flatten()
                 layer["output"] = matched_outputs
             else:
                 layer["output_size"] = self.out_layer['output_size']
                 layer['output'] = self.out_layer['name']
-           
-            output.append(layer)
 
+            output.append(layer)
             if node.op_type =='Conv':
                 conv_params = self._get_conv_params(node)
                 layer['conv_params'] = conv_params
+            elif node.op_type =='MaxPool':
+                pool_params = self._get_pool_params(node)
+                layer['pool_params'] = pool_params
+            elif node.op_type =='AveragePool':
+                pool_params = self._get_pool_params(node)
+                layer['pool_params'] = pool_params
 
-                              
+
         output.append(self.out_layer)
         self._create_layer_relationships(output)
-             
+
+        return output
+
+    def _get_pool_params(self,node):
+        attributes = {}
+        for attr in node.attribute:
+            if attr.name == 'kernel_shape':
+                attributes['kernel_shape'] = list(attr.ints)
+            elif attr.name == 'strides':
+                attributes['strides'] = list(attr.ints)
+            elif attr.name == 'pads':
+                attributes['pads'] = list(attr.ints)
+
+        output = {
+            'kernel': attributes.get('kernel_shape'),
+            'padding': attributes.get('pads'),
+            'stride': attributes.get('strides')
+        }
+
         return output
 
     def _get_conv_params(self,node):
-        #(N,Cin​,H,W) and output (N,Cout,Hout,Wout)(N,Cout​,Hout​,Wout​) 
-        attributes = {} 
+        #(N,Cin​,H,W) and output (N,Cout,Hout,Wout)(N,Cout​,Hout​,Wout​)
+        attributes = {}
         for attr in node.attribute:
             if attr.name == 'kernel_shape':
                 attributes['kernel_shape'] = list(attr.ints)
@@ -87,7 +110,7 @@ class TreeModel:
         o_shape = [self.output_sizes[i] for i in matched_outputs]
         matched_inputs = [input for input in node.input if input in self.output_sizes]
         i_shape = [self.output_sizes[i] for i in matched_inputs]
-        
+
 
         if matched_inputs == [] and node.input[0]=="input":
             c = self.in_layer['output_size'][1]
@@ -116,7 +139,7 @@ class TreeModel:
 
         return output
 
-    def _create_layer_relationships(self, layers_data):       
+    def _create_layer_relationships(self, layers_data):
         for layer in layers_data:
 
             layer['children'] = []
@@ -135,7 +158,7 @@ class TreeModel:
             dims = [dim.dim_value for dim in info.type.tensor_type.shape.dim]
             output_sizes[info.name] = dims
         return output_sizes
-    
+
     def _give_unique_node_names(self, model, prefix=""):
         optype_count = {}
         for n in model.graph.node:
@@ -144,10 +167,10 @@ class TreeModel:
             n.name = f"{prefix}{n.op_type}_{optype_count[n.op_type]}"
             optype_count[n.op_type] += 1
         return model
-    
+
     def _get_in_out_layers(self,graph_def):
-        
-        graph_output = graph_def.output[0]        
+
+        graph_output = graph_def.output[0]
         out_shape=[]
 
         for d in graph_output.type.tensor_type.shape.dim:
@@ -181,5 +204,3 @@ class TreeModel:
             "input":[]
             }
         return input_layer,output_layer
-
-

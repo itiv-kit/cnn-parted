@@ -1,4 +1,5 @@
 constraints: {max_out_size: 20000000,  max_memory_size: 600000000, word_width: 16}
+
 optimization-objectives:
   component: 0
   metric: latency
@@ -40,19 +41,10 @@ accuracy:
 
 components:
   - id: 0
-    max_memory_size: 6000000 
+    max_memory_size: 6000000
     name: sensor #optional
-    timeloop:
-      accelerator: eyeriss_like
-      frequency: 200000000
-      layer: conv2d
-      mapper:
-        algorithm: linear-pruned
-        live-status: false
-        num-threads: 8
-        optimization-metrics: [energy, delay]
-        timeout: 0
-        victory-condition: 100
+    mnsim:
+      conf_path: '/configs/mnsim_configs/SimConfig.ini'
   - id: 1
     max_out_size: 20000000
     data_bit_width: 16
@@ -64,7 +56,7 @@ components:
       eth_mode: BASE1000-T
     fps: 25
   - id: 2
-    max_memory_size: 6000000 
+    max_memory_size: 6000000
     timeloop:
       accelerator: simba_like
       frequency: 500000000

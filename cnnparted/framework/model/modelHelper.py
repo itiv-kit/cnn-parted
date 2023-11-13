@@ -1,8 +1,5 @@
 import onnx
 from onnx import helper as onnx_helper
-import torch
-import torch.onnx
-import torch.nn as nn
 from onnx2pytorch import ConvertModel
 from copy import deepcopy
 
@@ -16,7 +13,6 @@ class modelHelper:
         model = deepcopy(_model)
         """Add identity layers after every node in the ONNX model."""
         for i, node in enumerate(list(model.graph.node)):
-            print(node.name)
             # Create an identity node
             identity_node = onnx_helper.make_node(
                 'Identity',
@@ -34,7 +30,7 @@ class modelHelper:
 
             # Append the identity node to the model graph
             model.graph.node.insert(i + 1, identity_node)
-        
+
         return model
 
     def save_model(self,model, output_path):
