@@ -41,7 +41,7 @@ class QuantizedModel(CustomModel):
         self.weight_quantizers = []
 
         # supposingly this is not going to change
-        #self._create_quantized_model()
+        self._create_quantized_model()
         
 
         # Energy Model ...
@@ -161,13 +161,10 @@ class QuantizedModel(CustomModel):
                     self.weight_quantizers.append(module)
 
     def create_model(self, m: torch_nn.Module, layer,bits) -> None:
-        
+
         model = deepcopy(m)
         modules = model.named_modules()
         layer_reached = False
-                
-        _bits = bits * self.get_explorable_parameter_count()  
-        self.bit_widths = _bits
 
         for name, module in modules:
 
