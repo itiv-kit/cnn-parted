@@ -48,6 +48,7 @@ def main():
                         type=int,
                         default=1,
                         help='Number of runs')
+    parser.add_argument('--accuracy', action='store_true', default=False, help='Compute with accuracy')
     args = parser.parse_args()
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
     conf_helper = ConfigHelper(args.conf_file_path)
@@ -72,10 +73,11 @@ def main():
     
 
     accStats = {}
-    if 'accuracy' in config.keys():
-        accEval = QuantizationEvaluator(dnn, config.get('accuracy'), accuracy_function, args.show_progress)
-        accStats = accEval.get_stats()
-        print(accStats)
+    if args.accuracy:
+        if 'accuracy' in config.keys():
+            accEval = QuantizationEvaluator(dnn, config.get('accuracy'), accuracy_function, args.show_progress)
+            accStats = accEval.get_stats()
+            print(accStats)
     
     objective = conf_helper.get_optimization_objectives(node_components,link_components)
     first_component_id = node_components[0]['id']
