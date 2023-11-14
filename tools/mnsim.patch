@@ -62,7 +62,7 @@ index 2380519..fd7f8d9 100644
                      )
                  )
 diff --git a/MNSIM/Interface/quantize.py b/MNSIM/Interface/quantize.py
-index 3e7da17..b560969 100644
+index 3e7da17..3aa04f2 100644
 --- a/MNSIM/Interface/quantize.py
 +++ b/MNSIM/Interface/quantize.py
 @@ -142,6 +142,7 @@ class QuantizeLayer(nn.Module):
@@ -86,7 +86,15 @@ index 3e7da17..b560969 100644
  class EleSumLayer(nn.Module):
      def __init__(self):
          super(EleSumLayer, self).__init__()
-@@ -374,6 +381,8 @@ class StraightLayer(nn.Module):
+@@ -368,12 +375,16 @@ class StraightLayer(nn.Module):
+                     stride = self.layer_config['stride'], \
+                     padding = self.layer_config['padding']
+                 )
++            elif self.layer_config['mode'] == 'ADA':
++                self.layer = nn.AdaptiveAvgPool2d((1, 1))
+             else:
+                 assert 0, f'not support {self.layer_config["mode"]}'
+         elif self.layer_config['type'] == 'relu':
              self.layer = nn.ReLU()
          elif self.layer_config['type'] == 'view':
              self.layer = ViewLayer()
@@ -95,7 +103,7 @@ index 3e7da17..b560969 100644
          elif self.layer_config['type'] == 'bn':
              self.layer = nn.BatchNorm2d(self.layer_config['features'])
          elif self.layer_config['type'] == 'dropout':
-@@ -387,13 +396,14 @@ class StraightLayer(nn.Module):
+@@ -387,13 +398,14 @@ class StraightLayer(nn.Module):
          # self.last_value[0] = 1
          self.layer_info = None
      def structure_forward(self, input):
@@ -111,7 +119,7 @@ index 3e7da17..b560969 100644
              if self.layer_config['type'] == 'pooling':
                  self.layer_info['type'] = 'pooling'
                  self.layer_info['Inputchannel'] = int(self.input_shape[1])
-@@ -415,11 +425,12 @@ class StraightLayer(nn.Module):
+@@ -415,11 +427,12 @@ class StraightLayer(nn.Module):
              else:
                  assert 0, f'not support {self.layer_config["type"]}'
          else:
@@ -126,7 +134,7 @@ index 3e7da17..b560969 100644
          self.layer_info['Inputbit'] = self.quantize_config['activation_bit']
          self.layer_info['Weightbit'] = self.quantize_config['weight_bit']
          self.layer_info['outputbit'] = self.quantize_config['activation_bit']
-@@ -448,4 +459,4 @@ class StraightLayer(nn.Module):
+@@ -448,4 +461,4 @@ class StraightLayer(nn.Module):
          return None
      def extra_repr(self):
          return str(self.hardware_config) + ' ' + str(self.layer_config) + ' ' + str(self.quantize_config)

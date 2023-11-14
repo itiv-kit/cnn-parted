@@ -106,7 +106,7 @@ class MNSIMInterface(TrainTestInterface):
                 lyr = {'type': 'pooling', 'mode': 'AVE', 'kernel_size': krl, 'stride': srd}
             elif op_type == "GlobalAveragePool":
                 input_size = layers[layers.index(l) - 1].get('output_size')
-                lyr = {'type': 'pooling', 'mode': 'AVE', 'kernel_size': input_size[2], 'stride': 1}
+                lyr = {'type': 'pooling', 'mode': 'ADA', 'kernel_size': input_size[2], 'stride': 1}
             elif op_type == "Relu":
                 lyr = {'type': 'relu'}
             elif op_type == "Add":
