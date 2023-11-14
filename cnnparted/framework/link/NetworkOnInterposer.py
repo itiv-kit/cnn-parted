@@ -9,6 +9,31 @@ class NoILink(LinkModelInterface):
     'UCIe'
   ]
 
+# for SerDes:
+#   number_of_wires = 32
+#   data_rate_Gbps = 112
+#   latency_ns = 5.5
+#   power_per_bit_pj = 2
+
+# for AIB:
+#   number_of_wires = 32
+#   data_rate_Gbps = 6.4
+#   latency_ns = 3.5
+#   power_per_bit_pj = 0.5
+
+# for BoW:
+#   number_of_wires = 32
+#   data_rate_Gbps = 16
+#   latency_ns = 3
+#   power_per_bit_pj = 0.7
+
+# for UCIe:
+#   number_of_wires = 32
+#   data_rate_Gbps = 32
+#   latency_ns = 1
+#   power_per_bit_pj = 0.25
+
+
   def __init__(self, NoI_mode : str = 'UCIe', 
     number_of_wires : int = 32, data_rate_Gbps : float = 32,
     latency_ns : float = 2, power_per_bit_pj : float = 0.25) -> None:
