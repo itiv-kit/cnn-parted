@@ -41,7 +41,7 @@ class NoILink(LinkModelInterface):
       raise ValueError(f"{NoI_mode} is an invalid NoI mode. Valid modes: {self.NoI_modes}.")
     self.NoI_mode = NoI_mode
     self.number_of_wires = number_of_wires
-    self.data_rate_Gbps = data_rate_Gbps
+    self.data_rate_Gbps = data_rate_Gbps * 1e9
     self.bandwidth_GBps = self.number_of_wires * self.data_rate_Gbps / 8
     self.latency_ns = latency_ns
     self.power_per_bit_pj = power_per_bit_pj
@@ -60,12 +60,12 @@ class NoILink(LinkModelInterface):
     data_rate = n_data_bytes * frame_rate
     if data_rate > self.bandwidth_GBps:
       raise ValueError(f'[NoILink] Not enough bandwidth: data rate {data_rate}, bandwidth {self.bandwidth_GBps}')
-    latency_us = n_data_bytes / self.bandwidth_GBps * 1e3 + self.latency_ns * 1e3
+    latency_us = self.latency_ns * n_data_bytes / (self.number_of_wires / 8) * 1e-3
     return float(latency_us)
 
 
   def get_latency_ms(self, slice_size : int, frame_rate : int) -> float:
-    return self._compute_latency_us(slice_size, frame_rate)
+    return self._compute_latency_us(slice_size, frame_rate) / 1e3
 
   def get_pow_cons_mW(self, slice_size : int, frame_rate : int) -> float:
     return self._compute_power_mW(slice_size, frame_rate)

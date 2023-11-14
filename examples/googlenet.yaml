@@ -49,10 +49,10 @@ components:
     max_out_size: 20000000
     data_bit_width: 8
     noi:
-      eth_mode: UCIe
-      width: 32
+      noi_mode: UCIe
+      width: 16
       data_rate: 32
-      latency_ns: 2
+      latency_ns: 2 # including D2D Adapter and PHY
       power_bit_pj: 0.5
     fps: 25
   - id: 0
