@@ -60,7 +60,7 @@ class NoILink(LinkModelInterface):
     data_rate = n_data_bytes * frame_rate
     if data_rate > self.bandwidth_GBps:
       raise ValueError(f'[NoILink] Not enough bandwidth: data rate {data_rate}, bandwidth {self.bandwidth_GBps}')
-    latency_us = self.latency_ns * n_data_bytes / (self.number_of_wires / 8) * 1e-3
+    latency_us = n_data_bytes / self.bandwidth_GBps * 1e6 + self.latency_ns * 1e-3
     return float(latency_us)
 
 

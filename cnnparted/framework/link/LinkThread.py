@@ -24,7 +24,7 @@ class LinkThread(ModuleThreadInterface):
                                 conf['eee_toff_ms'])
         elif self.config.get('noi'):
             conf = self.config['noi']
-            link = NoILink(conf['noi_mode'], conf['width'], conf['data_rate'],
+            link = NoILink(conf['noi_mode'], conf['width'], conf['data_rate_Gbps'],
                            conf['latency_ns'], conf['power_bit_pj'])
         else:
             raise NotImplementedError

@@ -51,7 +51,7 @@ components:
     noi:
       noi_mode: UCIe
       width: 16
-      data_rate: 32
+      data_rate_Gbps: 4
       latency_ns: 2 # including D2D Adapter and PHY
       power_bit_pj: 0.5
     fps: 25
