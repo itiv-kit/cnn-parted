@@ -3,6 +3,7 @@ from framework.link.LinkModelInterface import LinkModelInterface
 import numpy as np
 
 from .EthernetLink import EthernetLink
+from .NetworkOnInterposer import NoILink
 
 class LinkThread(ModuleThreadInterface):
     def _get_slice_size(self, size : int, word_bytes : int) -> int:
@@ -21,6 +22,10 @@ class LinkThread(ModuleThreadInterface):
             link = EthernetLink(conf['eth_mode'], conf['cable_len_m'],
                                 conf['enable_eee'], conf['eee_lmi_ratio'],
                                 conf['eee_toff_ms'])
+        elif self.config.get('noi'):
+            conf = self.config['noi']
+            link = NoILink(conf['eth_mode'], conf['width'], conf['data_rate'],
+                           conf['latency_ns'], conf['power_bit_pj'])
         else:
             raise NotImplementedError
 

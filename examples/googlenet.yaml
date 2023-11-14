@@ -47,13 +47,13 @@ components:
       conf_path: '/configs/mnsim_configs/SimConfig.ini'
   - id: 1
     max_out_size: 20000000
-    data_bit_width: 16
-    ethernet:
-      cable_len_m: 5
-      eee_lmi_ratio: 0.1
-      eee_toff_ms: 0
-      enable_eee: false
-      eth_mode: BASE1000-T
+    data_bit_width: 8
+    noi:
+      eth_mode: UCIe
+      width: 32
+      data_rate: 32
+      latency_ns: 2
+      power_bit_pj: 0.5
     fps: 25
   - id: 0
     max_memory_size: 6000000
