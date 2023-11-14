@@ -17,19 +17,16 @@ class Evaluator:
         dnn: DNNAnalyzer,
         nodeStats: List[dict],
         linkStats: List[dict],
-        memoryStats:dict,
+        #memoryStats:dict,
         accStats: dict,
     ) -> None:
         self.dnn = dnn
         self.nodeStats= nodeStats
         self.nodes_memory = dnn.nodes_memory
         self.linkStats= linkStats
-        self.memoryStats= memoryStats
         allStats = OrderedDict()
         allStats.update(nodeStats)
         allStats.update(linkStats)
-        allStats.update(memoryStats)
-        self.memory_name = "DDR3"
         self.sorted_allStats = OrderedDict(sorted(allStats.items()))
         self.first_id = next(iter(self.sorted_allStats))
         self.Stats={}
@@ -56,10 +53,8 @@ class Evaluator:
         for id,cmp in self.Stats.items():
             if id in self.nodeStats:
                 name = "Node-"+str(id)
-            elif id in self.linkStats:
-                name= "link-"+ str(id)
             else:
-                name= self.memory_name
+                name= "link-"+ str(id)
             print(
             name,"   :",
             cmp["sim_time"][0],
@@ -126,43 +121,30 @@ class Evaluator:
             self.res[layer_name]["output_size"] = layer.get("output_size")
 
             for id,cmp in self.Stats.items():
-
-                if id in self.memoryStats:
-                    mem_name = self.memory_name
+                if id in self.nodeStats:
+                    name = "Node-"+str(id)
                     if layer_name in cmp.keys():
-                        self.res[layer_name][f"{mem_name}_latency"] = cmp[layer_name]["latency_ms"][0]
-                        self.res[layer_name][f"{mem_name}_energy"] = cmp[layer_name]["energy"][0]
-                    else:
-                        self.res[layer_name][f"{mem_name}_latency"]=0
-                        self.res[layer_name][f"{mem_name}_energy"] =0
-
-                else:
-                    if id in self.nodeStats:
-                        name = "Node-"+str(id)
-                        if layer_name in cmp.keys():
-                            self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
-                            if 'latency_iqr' in cmp[layer_name]:
+                        self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
+                        if 'latency_iqr' in cmp[layer_name]:
                                 self.res[layer_name][f"{name}_latency_iqr"] = cmp[layer_name]["latency_iqr"][0]
-                            else:
-                                self.res[layer_name][f"{name}_latency_iqr"] = 0
-                            self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
-                            self.res[layer_name][f"{name}_memory"]= self.nodes_memory[id][layer_name]
                         else:
-                            self.res[layer_name][f"{name}_latency"] = 0
                             self.res[layer_name][f"{name}_latency_iqr"] = 0
-                            self.res[layer_name][f"{name}_energy"] = 0
-
+                        self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
+                        self.res[layer_name][f"{name}_memory"]= self.nodes_memory[id][layer_name]
                     else:
-                        name= "Link-"+ str(id)
-                        if layer_name in cmp.keys():
-                            self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
-                            self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
-                        else:
-                            self.res[layer_name][f"{name}_latency"] = 0
-                            self.res[layer_name][f"{name}_energy"] = 0
-
-                    if name not in self.stats_names:
-                        self.stats_names.append(name)
+                        self.res[layer_name][f"{name}_latency"] = 0
+                        self.res[layer_name][f"{name}_latency_iqr"] = 0
+                        self.res[layer_name][f"{name}_energy"] = 0
+                else:
+                    name= "Link-"+ str(id)
+                    if layer_name in cmp.keys():
+                        self.res[layer_name][f"{name}_latency"] = cmp[layer_name]["latency"][0]
+                        self.res[layer_name][f"{name}_energy"] = cmp[layer_name]["energy"][0]
+                    else:
+                        self.res[layer_name][f"{name}_latency"] = 0
+                        self.res[layer_name][f"{name}_energy"] = 0
+                if name not in self.stats_names:
+                    self.stats_names.append(name)
 
 
             if layer_name in self.accStats.keys():
@@ -188,27 +170,22 @@ class Evaluator:
 
             throughputs=[]
             for id,cmp in self.Stats.items():#for id,cmp in self.sorted_allStats.items():
-                if id not in self.memoryStats:
-                    if id in self.nodeStats:
-                        name = "Node-"+str(id)
-                    else:
-                        name = "Link-" + str(id)
-
-                    latency_key = f"{name}_latency"
-
-                    size = self.input_size if id==self.first_id else self.res[layer_name]["output_size"]
-
-                    # throughput = np.prod(size) / float(self.res[layer_name][latency_key])
-                    if float(self.res[layer_name][latency_key]) != 0:
-                        throughput = np.prod(size) / float(self.res[layer_name][latency_key])
-                    else:
-                        throughput = +np.inf
-                    throughputs.append(throughput)
+                if id in self.nodeStats:
+                    name = "Node-"+str(id)
+                else:
+                    name = "Link-" + str(id)
+                latency_key = f"{name}_latency"
+                size = self.input_size if id==self.first_id else self.res[layer_name]["output_size"]
+                # throughput = np.prod(size) / float(self.res[layer_name][latency_key])
+                if float(self.res[layer_name][latency_key]) != 0:
+                    throughput = np.prod(size) / float(self.res[layer_name][latency_key])
+                else:
+                    throughput = +np.inf
+                throughputs.append(throughput)
 
             min_throughput = min(throughputs)
             self.res[layer_name]["throughput"] = round((1000*min_throughput) / (np.prod(self.input_size)), 2)  #FPS=1000FPms
-            self.res[layer_name]["efficiency"] = float(1)/self.res[layer_name]["energy"] # Frames/J
-
+            self.res[layer_name]["efficiency"] = 1000/self.res[layer_name]["energy"]
         filtered_pp = [layer.get("name") for layer in self.dnn.partpoints_filtered]
         self.pp_res = {key: self.res[key] for key in self.res if key in filtered_pp}
 
@@ -240,10 +217,8 @@ class Evaluator:
                     dynamic_header.append(f"{name} Memory[bytes]")
 
             dynamic_header.append("throughput[FPS]")
-            memory_header=["DDR3 Latency[ms]","DDR3 Energy[mJ]"]
 
-
-            header = base_header + dynamic_header + memory_header
+            header = base_header + dynamic_header
             writer.writerow(header)
 
             for i, layer in enumerate(data.keys()):
@@ -270,48 +245,9 @@ class Evaluator:
 
                 dynamic_row.append(format_float(data[layer]["throughput"]))
 
-                memory_row = []
-                name = self.memory_name
-                memory_row.extend([
-                    format_float(data[layer].get(f"{name}_latency", "")),
-                    format_float(data[layer].get(f"{name}_energy", ""))
-                ])
-
-                row = base_row + dynamic_row + memory_row
+                row = base_row + dynamic_row #+ memory_row
                 writer.writerow(row)
 
-
-
-
-    # def get_all_layer_stats(self) -> OrderedDict:
-    #  output = OrderedDict()
-
-    #  for i, layer in enumerate(self.pp_res.keys()):
-    #      if i == 0:
-    #          continue
-
-    #      output[i] = {}
-    #      output[i]["layer"] = layer
-    #      output[i]["energy"] = self.pp_res[layer]["energy"]
-    #      output[i]["latency"] = self.pp_res[layer]["latency"]
-    #      output[i]["efficiency"] = self.pp_res[layer]["efficiency"]
-    #      output[i][f"{self.memory_name}_latency"] = self.pp_res[layer][f"{self.memory_name}_latency"]
-    #      output[i][f"{self.memory_name}_energy"] = self.pp_res[layer][f"{self.memory_name}_energy"]
-
-    #      for name in self.stats_names:
-    #          latency_key = f"{name}_latency"
-    #          energy_key = f"{name}_energy"
-    #          memory_key = f"{name}_memory"  # This might not exist for every name
-
-    #          output[i][latency_key] = self.pp_res[layer].get(latency_key, 0)
-    #          output[i][energy_key] = self.pp_res[layer].get(energy_key, 0)
-
-    #          if "Node" in name:
-    #              output[i][memory_key] = self.pp_res[layer].get(memory_key, 0)
-
-    #      output[i]["throughput"] = self.pp_res[layer].get("throughput", 0)
-
-    #  return output
 
     def get_all_layer_stats(self) -> OrderedDict:
         output = OrderedDict()
@@ -321,8 +257,6 @@ class Evaluator:
             "energy": 1,
             "latency": 1,
             "efficiency": -1,
-            f"{self.memory_name}_latency": 1,
-            f"{self.memory_name}_energy": 1,
             "throughput": -1,
         }
 
