@@ -163,7 +163,7 @@ class MNSIMInterface(TrainTestInterface):
         struct_file = self.get_structure()
         mod_l = Model_latency(struct_file, self.SimConfig)
         mod_e = Model_energy(struct_file, self.SimConfig)
-        mod_l.calculate_model_latency_nopipe()
+        mod_l.calculate_model_latency()
 
         for idx, layer in enumerate(struct_file):
             latency = (max(mod_l.finish_time[idx]) - max(mod_l.finish_time[idx - 1])) if idx > 0 else max(mod_l.finish_time[idx])

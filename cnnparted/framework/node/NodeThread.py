@@ -81,10 +81,13 @@ class NodeThread(ModuleThreadInterface):
             self._remove_file(output_path_tail)
 
     def _run_mnsim(self, config: dict) -> None:
-        mn = MNSIMInterface(self.dnn.get_layers(), config, self.dnn.input_size)
+        layers = self.dnn.get_layers()
+        mn = MNSIMInterface(layers, config, self.dnn.input_size)
         mn.run()
 
-        self._set_stats(self.dnn.get_layers(), mn.stats)
+        if self.reverse:
+            layers = layers[::-1]
+        self._set_stats(layers, mn.stats)
 
         if self.show_progress:
             print(

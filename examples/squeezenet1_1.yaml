@@ -43,7 +43,7 @@ neural-network:
 #       sample_limit: null
 
 components:
-  - id: 2
+  - id: 0
     max_memory_size: 3000000
     timeloop:
       accelerator: eyeriss_like
@@ -65,7 +65,7 @@ components:
       enable_eee: false
       eth_mode: BASE1000-T
     fps: 25
-  - id: 0
+  - id: 2
     max_memory_size: 3000000
     mnsim:
       conf_path: '/configs/mnsim_configs/SimConfig.ini'
