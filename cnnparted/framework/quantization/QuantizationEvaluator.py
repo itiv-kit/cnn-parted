@@ -5,6 +5,8 @@ import torch
 from .quantizer import QuantizedModel
 
 from model_explorer.utils.data_loader_generator import DataLoaderGenerator
+#from .data_loader_generator import DataLoaderGenerator
+#from .setup import build_dataloader_generators
 from model_explorer.utils.setup import build_dataloader_generators
 
 from ..DNNAnalyzer import DNNAnalyzer
@@ -157,11 +159,10 @@ class QuantizationEvaluator():
             seqMod.eval()
             acc = self.accfunc(seqMod, eval_dataloadergen, progress=showProgress, title=f"Infere {torch_layer_name}")
 
-            #should ask Fabian
-            # if self.bits[0] == self.bits[1]:
-            #     for layer in part_points:
-            #         layer_name =  self.qpoints_dict[layer['name']]
-            #         self.stats[layer['name']] = acc.cpu().detach().numpy()
-            #     break
+            if self.bits[0] == self.bits[1]:
+                for layer in part_points:
+                    #layer_name =  self.qpoints_dict[layer['name']]
+                    self.stats[layer['name']] = acc.cpu().detach().numpy()
+                break
 
             self.stats[layer['name']] = acc.cpu().detach().numpy()
