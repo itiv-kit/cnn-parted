@@ -32,42 +32,41 @@ class CustomModel():
     def get_explorable_parameter_count(self) -> int:
         return len(self.explorable_modules)
 
-    def load_parameters(self, filename: str):
-        saved_state_dict = torch.load(filename, map_location=self.device)
+    def load_parameters_file(self, filename: str):
+        self.load_parameters(torch.load(filename, map_location=self.device))
+
+    def load_parameters(self, saved_state_dict: dict):
         self.base_model.to(self.device)
 
+        # print("Saved state_dict keys:")
+        # print(saved_state_dict.keys())
 
+        # print("\nbase_model state_dict keys:")
+        # print(self.base_model.state_dict().keys())
+        # # Find keys that are in the saved state_dict but not in the base_model's state_dict
+        # missing_in_base_model = set(saved_state_dict.keys()) - set(self.base_model.state_dict().keys())
+        # print("\nKeys in saved state_dict but not in base_model:")
+        # print(missing_in_base_model)
 
-        print("Saved state_dict keys:")
-        print(saved_state_dict.keys())
+        # # Find keys that are in the base_model's state_dict but not in the saved state_dict
+        # missing_in_saved = set(self.base_model.state_dict().keys()) - set(saved_state_dict.keys())
+        # print("\nKeys in base_model but not in saved state_dict:")
+        # print(missing_in_saved)
 
-        print("\nbase_model state_dict keys:")
-        print(self.base_model.state_dict().keys())
-        # Find keys that are in the saved state_dict but not in the base_model's state_dict
-        missing_in_base_model = set(saved_state_dict.keys()) - set(self.base_model.state_dict().keys())
-        print("\nKeys in saved state_dict but not in base_model:")
-        print(missing_in_base_model)
+        # for key in saved_state_dict:
+        #     if saved_state_dict[key].shape != self.base_model.state_dict()[key].shape:
+        #         print(f"Shape mismatch for key {key}: saved_state_dict - {saved_state_dict[key].shape} vs base_model - {self.base_model.state_dict()[key].shape}")
+        # for key in saved_state_dict:
+        #     if saved_state_dict[key].dtype != self.base_model.state_dict()[key].dtype:
+        #         print(f"Data type mismatch for key {key}: saved_state_dict - {saved_state_dict[key].dtype} vs base_model - {self.base_model.state_dict()[key].dtype}")
 
-        # Find keys that are in the base_model's state_dict but not in the saved state_dict
-        missing_in_saved = set(self.base_model.state_dict().keys()) - set(saved_state_dict.keys())
-        print("\nKeys in base_model but not in saved state_dict:")
-        print(missing_in_saved)
-
-        for key in saved_state_dict:
-            if saved_state_dict[key].shape != self.base_model.state_dict()[key].shape:
-                print(f"Shape mismatch for key {key}: saved_state_dict - {saved_state_dict[key].shape} vs base_model - {self.base_model.state_dict()[key].shape}")
-        for key in saved_state_dict:
-            if saved_state_dict[key].dtype != self.base_model.state_dict()[key].dtype:
-                print(f"Data type mismatch for key {key}: saved_state_dict - {saved_state_dict[key].dtype} vs base_model - {self.base_model.state_dict()[key].dtype}")
-
-        for key in saved_state_dict:
-            if saved_state_dict[key].device != self.base_model.state_dict()[key].device:
-                print(f"Device mismatch for key {key}: saved_state_dict - {saved_state_dict[key].device} vs base_model - {self.base_model.state_dict()[key].device}")
+        # for key in saved_state_dict:
+        #     if saved_state_dict[key].device != self.base_model.state_dict()[key].device:
+        #         print(f"Device mismatch for key {key}: saved_state_dict - {saved_state_dict[key].device} vs base_model - {self.base_model.state_dict()[key].device}")
 
         # Load the saved state_dict into the base_model
         #self.base_model.load_state_dict(saved_state_dict)
-        self.base_model.load_state_dict(
-            torch.load(filename, map_location=self.device),strict=False)
+        self.base_model.load_state_dict(saved_state_dict,strict=False)
 
     def save_parameters(self, filename: str):
         torch.save(self.base_model.state_dict(), filename)

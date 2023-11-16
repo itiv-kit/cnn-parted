@@ -109,22 +109,36 @@ class QuantizationEvaluator():
         if not os.path.exists(param_path):
             generate_calibration(model, self.calib_dataloader, True, param_path)
 
-        qmodel.load_parameters(param_path)
-
-
         for layer in part_points:
             torch_layer_name =  self.qpoints_dict[layer['name']]
 
-            seqMod = qmodel.create_model(self.fmodel,torch_layer_name,self.bits)
+            layer_bits = []
+            part1_layers = []
+            part2_layers = []
+
+            layer_reached = False
+            for base_layer, _ in qmodel.base_model.named_modules():
+                if 'quantizer' in base_layer:
+                    if layer_reached == True:
+                        layer_bits.append(self.bits[1])
+                        part2_layers.append(base_layer)
+                    else:
+                        layer_bits.append(self.bits[0])
+                        part1_layers.append(base_layer)
+                if torch_layer_name in base_layer:
+                    layer_reached = True
+
+            qmodel.bit_widths = layer_bits
+            qmodel.load_parameters_file(param_path)
 
             # Training
             criterion = torch.nn.CrossEntropyLoss()
-            optimizer = torch.optim.SGD(seqMod.parameters(), lr=0.0001)
+            optimizer = torch.optim.SGD(qmodel.base_model.parameters(), lr=0.0001)
             lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
                                                                 step_size=1,
                                                                 gamma=0.1)
 
-            seqMod.train()
+            qmodel.base_model.train()
             for epoch_idx in range(num_epochs):
                 if showProgress:
                     pbar = tqdm(total=len(train_dataloadergen), ascii=True,
@@ -140,7 +154,7 @@ class QuantizationEvaluator():
                     optimizer.zero_grad()
 
                     with torch.set_grad_enabled(mode=True):
-                        output = seqMod(image)
+                        output = qmodel.base_model(image)
                         loss = criterion(output, target)
                         loss.backward()
                         optimizer.step()
@@ -155,9 +169,10 @@ class QuantizationEvaluator():
                 if showProgress:
                     pbar.close()
 
+            qmodel.base_model.eval()
+
             # inference loop
-            seqMod.eval()
-            acc = self.accfunc(seqMod, eval_dataloadergen, progress=showProgress, title=f"Infere {torch_layer_name}")
+            acc = self.accfunc(qmodel.base_model, eval_dataloadergen, progress=showProgress, title=f"Infere {torch_layer_name}")
 
             if self.bits[0] == self.bits[1]:
                 for layer in part_points:

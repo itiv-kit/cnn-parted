@@ -42,7 +42,6 @@ class QuantizedModel(CustomModel):
 
         # supposingly this is not going to change
         self._create_quantized_model()
-        
 
         # Energy Model ...
         if dram_analysis_file != "":
@@ -144,11 +143,7 @@ class QuantizedModel(CustomModel):
                 quant_conv.weight = module.weight
                 quant_conv.bias = module.bias
 
-                # FIXME: is this save for all networks?
-                module_name = name.split('/')[-1]
-                module_path = name.split('.')[:-1]
-                #module_parent = functools.reduce(getattr, [self.base_model] + module_path)
-                setattr(module, name, quant_conv)
+                setattr(self.base_model, name, quant_conv)
 
         for name, module in self.base_model.named_modules():
             if isinstance(module, quant_nn.TensorQuantizer):
@@ -160,62 +155,6 @@ class QuantizedModel(CustomModel):
                 elif name.endswith('_weight_quantizer'):
                     self.weight_quantizers.append(module)
 
-    def create_model(self, m: torch_nn.Module, layer,bits) -> None:
-
-        model = deepcopy(m)
-        modules = model.named_modules()
-        layer_reached = False
-
-        for name, module in modules:
-
-            if layer_reached== True and bits[1] == 32:
-                    break
-            if (layer_reached == False and bits[0]!= 32) or (layer_reached== True and bits[1]!=32):
-                if isinstance(module, torch_nn.Conv2d):
-                    # The file /pytorch_quantization/nn/modules/_utils.py:L161 has
-                    # some very strange kwargs check, therefore this simple solution
-                    # is not possible and we had to make it explicit :/
-                    # quant_conv = quant_nn.QuantConv2d(**module.__dict__, quant_desc...=...)
-                    bias_bool = module.bias is not None
-
-                    quant_conv = quant_nn.QuantConv2d(
-                        in_channels=module.in_channels,
-                        out_channels=module.out_channels,
-                        kernel_size=module.kernel_size,
-                        stride=module.stride,
-                        padding=module.padding,
-                        dilation=module.dilation,
-                        groups=module.groups,
-                        bias=bias_bool,
-                        padding_mode=module.padding_mode,
-                        quant_desc_input=self.quantization_descriptor,
-                        quant_desc_weight=self.quantization_descriptor
-                    )
-
-                    # copy weights and biases
-                    quant_conv.weight = module.weight
-                    quant_conv.bias = module.bias
-
-                    # FIXME: is this save for all networks?
-                    module_name = name.split('/')[-1]
-                    module_path = name.split('.')[:-1]
-                    #module_parent = functools.reduce(getattr, [self.base_model] + module_path)
-                    setattr(module, name, quant_conv)
-
-                if name ==  layer:
-                    layer_reached = True
-
-        for name, module in model.named_modules():
-            if isinstance(module, quant_nn.TensorQuantizer):
-                self.explorable_module_names.append(name)
-                self.explorable_modules.append(module)
-
-                if name.endswith('_input_quantizer'):
-                    self.input_quantizers.append(module)
-                elif name.endswith('_weight_quantizer'):
-                    self.weight_quantizers.append(module)
-
-        return model
 
     def generate_calibration_file(self, dataloader: DataLoader, progress=True,
                                   calib_method='histogram', **kwargs):
