@@ -151,6 +151,7 @@ class QuantizationEvaluator():
                     optimizer.zero_grad()
 
                     with torch.set_grad_enabled(mode=True):
+                        qmodel.base_model.to(gpu_device)
                         output = qmodel.base_model(image)
                         loss = criterion(output, target)
                         loss.backward()
