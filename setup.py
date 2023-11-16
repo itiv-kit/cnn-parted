@@ -64,7 +64,8 @@ setup(
             'networkx',
             'onnxruntime-gpu',
             'traitlets',
-            'pymoo==0.5.0'
+            'pymoo',
+            'onnx2pytorch'
             ],
       python_requires = '>=3.9',
       include_package_data = True,
