@@ -5,12 +5,12 @@ import torch
 from .quantizer import QuantizedModel
 
 from model_explorer.utils.data_loader_generator import DataLoaderGenerator
-#from .data_loader_generator import DataLoaderGenerator
-#from .setup import build_dataloader_generators
 from model_explorer.utils.setup import build_dataloader_generators
 
 from ..DNNAnalyzer import DNNAnalyzer
 from .generate_calibration import generate_calibration
+
+from ..node.MNSIMInterface import add_weight_noise
 
 from torchinfo import summary
 from torchinfo.layer_info import LayerInfo
@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 
 class QuantizationEvaluator():
-    def __init__(self, dnn : DNNAnalyzer, config : dict, accfunc : callable, showProgress : bool) -> None:
+    def __init__(self, dnn : DNNAnalyzer, config : dict, nodes : list, accfunc : callable, showProgress : bool) -> None:
         self.fmodel,self.identity_fmodel = dnn.torchModels
         self.input_size = dnn.input_size
         self.accfunc = accfunc
@@ -31,6 +31,7 @@ class QuantizationEvaluator():
         gpu_device = torch.device(self.device)
         self.fmodel.to(gpu_device)
 
+        self.nodes = nodes
 
         t0 = time.time()
 
@@ -38,10 +39,6 @@ class QuantizationEvaluator():
         self.calib_dataloader = dataloaders['calibrate']
         self.part_points_orig_model = self._get_part_points(self.identity_fmodel)
         self.part_points_orig_model = self.part_points_orig_model[1:]
-
-        # for i in range(0,2):
-        #     if self.bits[i] != 32:
-        #         self._create_quantized_model(self.fmodel, self.bits[i], config.get('calibration'), dataloaders['calibrate'])
 
         num_epochs = config['retraining'].get('epochs')
         self._eval(dataloaders['train'], num_epochs, dataloaders['validation'], dnn.partpoints_filtered, showProgress)
@@ -171,13 +168,20 @@ class QuantizationEvaluator():
 
             qmodel.base_model.eval()
 
+            # weight update for PIM-based accelerators
+            if self.nodes[0].get('mnsim'):
+                qmodel.load_parameters(add_weight_noise(self.nodes[0].get('mnsim')['conf_path'], qmodel.base_model.state_dict(), part1_layers, showProgress))
+            elif self.nodes[-1].get('mnsim'):
+                qmodel.load_parameters(add_weight_noise(self.nodes[-1].get('mnsim')['conf_path'], qmodel.base_model.state_dict(), part2_layers, showProgress))
+
             # inference loop
             acc = self.accfunc(qmodel.base_model, eval_dataloadergen, progress=showProgress, title=f"Infere {torch_layer_name}")
 
-            if self.bits[0] == self.bits[1]:
-                for layer in part_points:
-                    #layer_name =  self.qpoints_dict[layer['name']]
-                    self.stats[layer['name']] = acc.cpu().detach().numpy()
-                break
+            if self.nodes[0].get('mnsim') == None and self.nodes[-1].get('mnsim') == None:
+                if self.bits[0] == self.bits[1]:
+                    for layer in part_points:
+                        #layer_name =  self.qpoints_dict[layer['name']]
+                        self.stats[layer['name']] = acc.cpu().detach().numpy()
+                    break
 
             self.stats[layer['name']] = acc.cpu().detach().numpy()

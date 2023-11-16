@@ -72,9 +72,8 @@ def main():
     accStats = {}
     if args.accuracy:
         if 'accuracy' in config.keys():
-            accEval = QuantizationEvaluator(dnn, config.get('accuracy'), accuracy_function, args.show_progress)
+            accEval = QuantizationEvaluator(dnn, config.get('accuracy'), node_components, accuracy_function, args.show_progress)
             accStats = accEval.get_stats()
-            print(accStats)
 
     objective = conf_helper.get_optimization_objectives(node_components,link_components)
     first_component_id = node_components[0]['id']

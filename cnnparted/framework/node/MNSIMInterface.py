@@ -1,6 +1,8 @@
 import collections
 import configparser
 import math
+import torch
+from tqdm import tqdm
 
 import sys
 import os
@@ -11,6 +13,8 @@ from MNSIM.Interface.network import NetworkGraph
 from MNSIM.Interface.interface import TrainTestInterface
 from MNSIM.Latency_Model.Model_latency import Model_latency
 from MNSIM.Energy_Model.Model_energy import Model_energy
+
+from pytorch_quantization import tensor_quant
 
 class MNSIMInterface(TrainTestInterface):
     def __init__ (self, layers : list, config : dict, input_size : list) -> None:
@@ -172,3 +176,33 @@ class MNSIMInterface(TrainTestInterface):
             self.stats[layer[0][0].get('name')] = {}
             self.stats[layer[0][0].get('name')]["latency"] = latency / 1e6 # ns -> ms
             self.stats[layer[0][0].get('name')]["energy"] = energy / 1e6 # nJ -> mJ
+
+
+def add_weight_noise(conf_path : str, weight : dict, layers : list, showProgress : bool = False):
+    SimConfig_path = ROOT_DIR + conf_path
+    wu_config = configparser.ConfigParser()
+    wu_config.read(SimConfig_path, encoding='UTF-8')
+    SAF_dist = list(map(int, wu_config.get('Device level', 'Device_SAF').split(',')))
+    saf = float((SAF_dist[0] + SAF_dist[-1]) / 100000)
+
+    if showProgress:
+        pbar = tqdm(total=len(weight), ascii=True,
+                    desc="Layer Weight Noise", position=1)
+
+    for label, x in weight.items():
+        if ".weight" in label:
+            conv_label = label[:label.find('.weight')]
+            if next((s for s in layers if conv_label in s), None) is None:
+                continue
+            quant_x, scale = tensor_quant.tensor_quant(x, x.abs().max())
+            quant_x = quant_x.int().view(-1)
+            crpt = torch.zeros(int(quant_x.shape[0] * 8 * saf)).uniform_(0,quant_x.shape[0]*8).int() # uniformly distribute errors over bits
+            for i in crpt:
+                quant_x[int(i/8)] = torch.bitwise_xor(quant_x[int(i/8)],torch.bitwise_left_shift(torch.tensor(1), i % 8))
+            x = quant_x.view(x.shape) / scale
+            weight.update({label: x.float()})
+
+        if showProgress:
+            pbar.update(1)
+
+    return weight
