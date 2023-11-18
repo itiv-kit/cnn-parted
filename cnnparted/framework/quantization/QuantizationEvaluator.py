@@ -104,7 +104,7 @@ class QuantizationEvaluator():
         param_path = self.calib_conf.get('file')
 
         if not os.path.exists(param_path):
-            generate_calibration(model, self.calib_dataloader, True, param_path)
+            generate_calibration(model, self.calib_dataloader, showProgress, param_path)
 
         for layer in part_points:
             torch_layer_name =  self.qpoints_dict[layer['name']]
