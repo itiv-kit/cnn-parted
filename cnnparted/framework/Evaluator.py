@@ -256,6 +256,7 @@ class Evaluator:
             #min=1 ,max=-1
             "energy": 1,
             "latency": 1,
+            "accuracy" : -1,
             "efficiency": -1,
             "throughput": -1,
         }

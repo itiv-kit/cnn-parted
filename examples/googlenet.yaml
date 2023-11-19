@@ -29,25 +29,34 @@ accuracy:
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
       sample_limit: 8192 # number of validation dataset samples to test for each individual
-      batch_size: 256
+      batch_size: 512
       randomize: False
     train:
       type: imagenet
       kind: 'webdataset'
       path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
       total_samples: 1281167
-      batch_size: 256
+      batch_size: 512
       sample_limit: null
 
 components:
-  - id: 2
-    max_memory_size: 6000000
+  - id: 0
+    max_memory_size: 600000000
     name: sensor #optional
-    mnsim:
-      conf_path: '/configs/mnsim_configs/SimConfig.ini'
+    timeloop:
+      accelerator: eyeriss_like
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: linear-pruned
+        live-status: false
+        num-threads: 8
+        optimization-metrics: [energy, delay]
+        timeout: 0
+        victory-condition: 100
   - id: 1
     max_out_size: 20000000
-    data_bit_width: 8
+    data_bit_width: 16
     noi:
       noi_mode: UCIe
       width: 16
@@ -55,8 +64,8 @@ components:
       latency_ns: 2 # including D2D Adapter and PHY
       power_bit_pj: 0.5
     fps: 25
-  - id: 0
-    max_memory_size: 6000000
+  - id: 2
+    max_memory_size: 600000000
     timeloop:
       accelerator: simba_like
       frequency: 500000000

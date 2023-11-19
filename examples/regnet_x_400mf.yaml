@@ -13,10 +13,10 @@ neural-network:
 
 accuracy:
   device : "cuda"
-  bits: [8, 32]
+  bits: [16, 8]
   calibration:
     samples: null # null sets samples to all
-    file: './calibrations/squeezenet1_1_quant_calib.pkl'
+    file: './calibrations/regnet_x_400mf_quant_calib.pkl'
   retraining:
     epochs: 2
   datasets:
@@ -25,28 +25,43 @@ accuracy:
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
       sample_limit: null # number of validation dataset samples to test for each individual
-      batch_size: 16
-      randomize: True
+      batch_size: 64
+      randomize: False
     validation:
       type: imagenet
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
       sample_limit: 8192 # number of validation dataset samples to test for each individual
-      batch_size: 64
-      randomize: True
+      batch_size: 256
+      randomize: False
     train:
       type: imagenet
       kind: 'webdataset'
       path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
       total_samples: 1281167
-      batch_size: 64
+      batch_size: 256
       sample_limit: null
 
 components:
   - id: 2
     max_memory_size: 3000000000
+    name: sensor #optional
+    mnsim:
+      conf_path: '/configs/mnsim_configs/SimConfig.ini'
+  - id: 1
+    max_out_size: 20000000
+    data_bit_width: 8
+    noi:
+      noi_mode: UCIe
+      width: 16
+      data_rate_Gbps: 4
+      latency_ns: 2 # including D2D Adapter and PHY
+      power_bit_pj: 0.5
+    fps: 25
+  - id: 0
+    max_memory_size: 3000000000
     timeloop:
-      accelerator: eyeriss_like
+      accelerator: simba_like
       frequency: 500000000
       layer: conv2d
       mapper:
@@ -55,17 +70,3 @@ components:
         num-threads: 8
         timeout: 0
         victory-condition: 100
-  - id: 1
-    max_out_size: 150000000
-    data_bit_width: 16
-    ethernet:
-      cable_len_m: 5
-      eee_lmi_ratio: 0.1
-      eee_toff_ms: 0
-      enable_eee: false
-      eth_mode: BASE1000-T
-    fps: 25
-  - id: 0
-    max_memory_size: 3000000000
-    mnsim:
-      conf_path: '/configs/mnsim_configs/SimConfig.ini'

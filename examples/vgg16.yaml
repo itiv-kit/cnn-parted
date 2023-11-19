@@ -13,14 +13,6 @@ accuracy:
   calibration:
     samples: null # null sets samples to all
     file: './calibrations/vgg16_quant_calib.pkl'
-    datasets:
-      calibrate:
-        type: imagenet
-        kind: 'imagefolder'
-        path: '/tools/datasets/imagenet/val_images'
-        sample_limit: null # number of validation dataset samples to test for each individual
-        batch_size: 64
-        randomize: True
   retraining:
     epochs: 2
   datasets:
@@ -30,14 +22,14 @@ accuracy:
       path: '/tools/datasets/imagenet/val_images'
       sample_limit: null # number of validation dataset samples to test for each individual
       batch_size: 64
-      randomize: True
+      randomize: False
     validation:
       type: imagenet
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
       sample_limit: 8192 # number of validation dataset samples to test for each individual
       batch_size: 256
-      randomize: True
+      randomize: False
     train:
       type: imagenet
       kind: 'webdataset'
@@ -48,30 +40,29 @@ accuracy:
 
 components:
   - id: 2
-    max_memory_size: 600000000
+    max_memory_size: 3000000000
     name: sensor #optional
+    mnsim:
+      conf_path: '/configs/mnsim_configs/SimConfig.ini'
+  - id: 1
+    max_out_size: 20000000
+    data_bit_width: 8
+    noi:
+      noi_mode: UCIe
+      width: 16
+      data_rate_Gbps: 4
+      latency_ns: 2 # including D2D Adapter and PHY
+      power_bit_pj: 0.5
+    fps: 25
+  - id: 0
+    max_memory_size: 3000000000
     timeloop:
       accelerator: simba_like
-      frequency: 200000000
+      frequency: 500000000
       layer: conv2d
       mapper:
         algorithm: linear-pruned
         live-status: false
         num-threads: 8
-        optimization-metrics: [energy, delay]
         timeout: 0
         victory-condition: 100
-  - id: 1
-    max_out_size: 20000000
-    data_bit_width: 8
-    ethernet:
-      cable_len_m: 5
-      eee_lmi_ratio: 0.1
-      eee_toff_ms: 0
-      enable_eee: false
-      eth_mode: BASE1000-T
-    fps: 25
-  - id: 0
-    max_memory_size: 600000000
-    mnsim:
-      conf_path: '/configs/mnsim_configs/SimConfig.ini'

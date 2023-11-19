@@ -182,7 +182,7 @@ class QuantizationEvaluator():
                 if self.bits[0] == self.bits[1]:
                     for layer in part_points:
                         #layer_name =  self.qpoints_dict[layer['name']]
-                        self.stats[layer['name']] = acc.cpu().detach().numpy()
+                        self.stats[layer['name']] = acc.cpu().detach().numpy().item()
                     break
 
-            self.stats[layer['name']] = acc.cpu().detach().numpy()
+            self.stats[layer['name']] = acc.cpu().detach().numpy().item()
