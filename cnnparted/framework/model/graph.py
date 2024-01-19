@@ -6,10 +6,10 @@ class LayersGraph:
         self.model_tree = model_tree
         self._graph = nx.DiGraph()
         self._create_layer_relationships()
-        self.paths =  list(nx.all_simple_paths(self._graph, "input", "output"))
-        self._sorted_partition_points =  self._sorted_common_nodes(
-             self._graph, self.paths
-         )
+        # self.paths =  list(nx.all_simple_paths(self._graph, "input", "output"))
+        # self._sorted_partition_points =  self._sorted_common_nodes(
+        #      self._graph, self.paths
+        #  )
 
     def get_Graph(self):
         return self._graph

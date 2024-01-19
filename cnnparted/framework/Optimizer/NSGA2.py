@@ -10,73 +10,156 @@ from pymoo.core.problem import ElementwiseProblem
 from .Optimizer import Optimizer
 import numpy as np
 
-from .OptimizerHelper import OptimizerHelper
-
-
+import tqdm
+from joblib import Parallel, delayed
 
 class NSGA2_Optimizer(Optimizer):
-    def __init__(self, nodes):
-        self.partioninig_points = nodes
-        self.num_gen = 30 * len(nodes) #10 time node size
-        self.pop_size = 50 if len(nodes)>100 else len(nodes)//2  if len(nodes)>30 else 15 if len(nodes)>20 else len(nodes)
-        self.opt_helper = OptimizerHelper()
+    def __init__(self, schedules, nodeStats, link_components) -> None:
+        nodes = len(schedules[0])
+        self.num_gen = 100 * nodes #10 time node size
+        self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
 
+        self.schedules = schedules
+        self.nodeStats = nodeStats
 
-    def optimize(self,optimization_objectives):
-        problem= Problem(self.partioninig_points)
-        eta = 20
-        mutation_prob  = 0.1
-        crossover_prob = 1
-
-        algorithm = NSGA2(
-        pop_size=self.pop_size,
-        n_offsprings=self.pop_size,
-        sampling=FloatRandomSampling(),
-        crossover=SBX(eta = eta,  prob=1),
-        mutation=PM(eta = eta,prob= mutation_prob),
-        eliminate_duplicates=True
+    def optimize(self, optimization_objectives):
+        sorts = Parallel(n_jobs=4, backend="multiprocessing")(
+            delayed(self._optimize_single)(s)
+            for s in tqdm.tqdm(self.schedules)
         )
 
-        res = minimize(problem,
-               algorithm,
-               termination=get_termination('n_gen',self.num_gen),
-               seed=1,
-               save_history=True,
-               verbose=False
-               )
+        np.set_printoptions(precision=2)
+        print(sorts)
 
-        paretos = []
-        X_rounded=np.floor(res.X)
-        X_unique =np.unique(X_rounded, axis=0)
-        for x in X_unique:
-            paretos.append(int(x))
+    def _optimize_single(self, schedule):
+        problem = PartitioningProblem(self.nodeStats, schedule)
 
-        opt_partioning_points=[]
-        for point in paretos:
-            opt_partioning_points.append(self.partioninig_points[point])
+        algorithm = NSGA2(
+            pop_size=self.pop_size,
+            n_offsprings=self.pop_size,
+            sampling=FloatRandomSampling(),
+            crossover=SBX(prob=0.9, eta=15),
+            mutation=PM(eta=20),
+            eliminate_duplicates=True
+        )
 
-        optimizer = self.opt_helper.find_best_node(opt_partioning_points,optimization_objectives)
+        res = minimize( problem,
+                        algorithm,
+                        termination=get_termination('n_gen',self.num_gen),
+                        seed=1,
+                        save_history=False,
+                        verbose=False)
 
-        return optimizer,opt_partioning_points
+        X = res.X
+        F = res.F
 
+        X_rounded=np.round(res.X)
 
-class Problem(ElementwiseProblem):
-    def __init__(self,data):
+        PP = []
+        for i in range(0, len(X)):
+            PP.append(np.append(X_rounded[i], F[i]))
 
-        sample_entry = data[next(iter(data))]
+        PP_unique = np.unique(PP, axis=0)
 
-        super().__init__(n_var=1,
-                         n_obj=len(sample_entry)-1, # -1:layer is not an objective, check  evaluator.get_all_layer_stats()
-                         n_constr=0,
-                         xl=1, # not zero to ignore the first layer
-                         xu=len(data)-1)# number of possible partioning points to be evaluated
-        self.data = data
+        return PP_unique
+
+class PartitioningProblem(ElementwiseProblem):
+    def __init__(self, nodeStats : dict, schedule : list):
+        self.nodeStats = nodeStats
+        self.num_acc = len(nodeStats)
+        self.num_pp = self.num_acc - 1
+        assert self.num_acc > 1, "Only one accelerator found"
+
+        n_var = self.num_pp * 2 + 1 ## Number of max. partitioning points + device ID
+
+        self.schedule = schedule
+        self.num_layers = len(schedule)
+
+        xu_pp = np.empty(self.num_pp)
+        xu_pp.fill(self.num_layers)
+        xu_acc = np.empty(self.num_pp + 1)
+        xu_acc.fill(self.num_acc)
+
+        xu = np.append(xu_pp, xu_acc)
+
+        super().__init__(n_var=n_var,
+                         n_obj=3,  ## latency and energy, add throughput?
+                         n_constr=1,
+                         xl=1,
+                         xu=xu)
+
 
     def _evaluate(self, x, out, *args, **kwargs):
-        idx = int(x.item())  # Convert numpy array to integer index
+        p = []
+        for i in x:
+            p.append(int(np.round(i)))
 
-        objectives = [key for key in self.data[idx] if not key.endswith("_opt") and key not in ["layer"]]
+        latency = 0.0
+        energy = 0.0
+        throughput = 0.0
 
-        objectives_values = [self.data[idx][key] * self.data[idx].get(f"{key}_opt", 1) for key in objectives]
+        if not np.array_equal(np.sort(p[:self.num_pp-1]), p[:self.num_pp-1]):
+            out["G"] = x[0]
+        elif np.unique(p[self.num_pp:]).size != np.asarray(p[self.num_pp:]).size:
+            out["G"] = x[0]
+        else:
+            out["G"] = -x[0]
 
-        out["F"] = np.array(objectives_values)
+            last_pp = 0
+            th_pp = []
+            ## partitioning points
+            for i, pp in enumerate(p[0:self.num_pp], self.num_pp):
+                acc = p[i] - 1
+                acc_latency = 0.0
+                for j in range(last_pp + 1, pp + 1):
+                    acc_latency += self._get_layer_latency(acc, j)
+                    latency += self._get_layer_latency(acc, j)
+                    energy += self._get_layer_energy(acc, j)
+
+                th_pp.append(self._zero_division(1.0, acc_latency))
+                last_pp = pp
+
+                if pp == p[self.num_pp - 1]:
+                    acc = p[i+1] - 1
+                    acc_latency = 0.0
+                    for j in range(last_pp + 1, self.num_layers + 1):
+                        acc_latency += self._get_layer_latency(acc, j)
+                        latency += self._get_layer_latency(acc, j)
+                        energy += self._get_layer_energy(acc, j)
+
+                    th_pp.append(self._zero_division(1.0, acc_latency))
+
+                # else:
+                #     latency += self._get_link_latency(acc, j)
+                #     energy += self._get_link_energy(acc, j)
+
+            throughput = max(th_pp) * -1
+
+        out["F"] = [latency, energy, throughput]
+
+    def _get_layer_latency(self, acc : int, idx : int) -> float:
+        layer_name = self.schedule[idx-1]
+        acc = list(self.nodeStats.keys())[acc]
+
+        if self.nodeStats[acc].get(layer_name):
+            return float(self.nodeStats[acc][layer_name]['latency'])
+        else:
+            return 0
+
+    def _get_layer_energy(self, acc : int, idx : int) -> float:
+        layer_name = self.schedule[idx-1]
+        acc = list(self.nodeStats.keys())[acc]
+
+        if self.nodeStats[acc].get(layer_name):
+            return float(self.nodeStats[acc][layer_name]['energy'])
+        else:
+            return 0
+
+    def _zero_division(self, a : float, b : float) -> float:
+        return b and a / b or 0
+
+    def _get_link_latency(self, acc : int, idx : int) -> float:
+        return 0
+
+    def _get_link_energy(self, acc : int, idx : int) -> float:
+        return 0

@@ -6,6 +6,8 @@ from .model.memoryHelper import MemoryInfo
 from typing import Dict
 from .Filter import Filter
 
+from .model.scheduling import topo_sort_random_start_node
+
 class _DictToTensorModel(nn.Module):
     def __init__(self, d : Dict[str, Tensor]) -> None:
         super(_DictToTensorModel, self).__init__()
@@ -37,6 +39,12 @@ class DNNAnalyzer:
         self.torchModels= self._Tree_Model.get_torchModels()
 
         self.graph = LayersGraph(self._tree)
+
+        print(len(topo_sort_random_start_node(G=self.graph.get_Graph(), n=64, seed=0, as_ndarray=True, n_jobs=1)))
+
+        quit()
+
+
         graph_pp = self.graph.get_graph_partition_points()
 
         self.partition_points = [

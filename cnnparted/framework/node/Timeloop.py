@@ -48,7 +48,7 @@ class Timeloop:
         self.freq = tl_config['frequency']
         self.mapper_cfg = {} if not tl_config.get('mapper') else tl_config['mapper']
         self.type_cfg = '.yaml'
-        self.runroot = tl_config['run_root']
+        self.runroot = 'run_' + tl_config['run_root']
 
         self.stats = {}
 

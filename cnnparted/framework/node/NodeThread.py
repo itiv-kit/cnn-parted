@@ -1,9 +1,5 @@
 from framework.ModuleThreadInterface import ModuleThreadInterface
-from .GenericNode import GenericNode
 from .Timeloop import Timeloop
-from .MNSIMInterface import MNSIMInterface
-from framework.constants import NEW_MODEL_PATH
-from framework.model.modelsplitter import ModelSplitter
 import os
 import csv
 
@@ -15,184 +11,63 @@ class NodeThread(ModuleThreadInterface):
 
         if self.config.get("timeloop"):
             self._run_timeloop(self.config["timeloop"])
-        elif self.config.get("mnsim"):
-            self._run_mnsim(self.config["mnsim"])
         else:
             self._run_generic(self.config)
 
     def _run_generic(self, config: dict) -> None:
-        part_points = self.dnn.partition_points
-        input_size = self.dnn.input_size
-
-        gn = GenericNode(config)
-
-        layer_name = "Identity"
-        if self.reverse:
-            layers = part_points.copy()
-        else:  # Set stats to zero for Identity
-            self.stats[layer_name] = {}
-            self.stats[layer_name]["latency"] = 0
-            self.stats[layer_name]["latency_iqr"] = 0
-            self.stats[layer_name]["energy"] = 0
-
-        model_splitter = ModelSplitter(NEW_MODEL_PATH,self.work_path)
-
-        # only iterate through filtered list to save time;
-        for point in self.dnn.partpoints_filtered:
-            layer_name = point.get("name")
-            output_path_head = os.path.join(self.work_path, layer_name + "head.onnx")
-            output_path_tail = os.path.join(self.work_path, layer_name + "tail.onnx")
-
-            # last layer index out of range
-            last_layer = model_splitter.split_model(
-                layer_name, output_path_head, output_path_tail
-            )
-
-            if not self.reverse:
-                idx = part_points.index(point) + 1
-                layers = part_points[:idx]
-            else:
-                idx = layers.index(point) + 1
-                del layers[:idx]
-                input_size = point.get("output_size")
-
-            if not last_layer:
-                output = gn.run(output_path_tail, input_size)
-            else:
-                output = {"latency_ms": 0, "latency_iqr": 0, "energy_mJ": 0}
-
-            self.stats[layer_name] = {}
-            self.stats[layer_name]["latency"] = output["latency_ms"]
-            self.stats[layer_name]["latency_iqr"] = output["latency_iqr"]
-            self.stats[layer_name]["energy"] = output["energy_mJ"]
-
-            if self.show_progress:
-                layer_i = self.dnn.partpoints_filtered.index(point) + 1
-                print(
-                    "Finished",
-                    layer_i,
-                    "/",
-                    len(self.dnn.partpoints_filtered),
-                    self.name,
-                    "models",
-                )
-
-            self._remove_file(output_path_head)
-            self._remove_file(output_path_tail)
-
-    def _run_mnsim(self, config: dict) -> None:
-        layers = self.dnn.get_layers()
-        mn = MNSIMInterface(layers, config, self.dnn.input_size)
-        mn.run()
-
-        if self.reverse:
-            layers = layers[::-1]
-        self._set_stats(layers, mn.stats)
-
-        if self.show_progress:
-            print(
-                    "Finished",
-                    self.name,
-                    "layers",
-                )
+        raise NotImplementedError
 
     def _run_timeloop(self, config: dict) -> None:
-        conv_layers = self.dnn.get_conv2d_layers()
-
-        if self.reverse:
-            conv_layers = conv_layers[::-1]
-
-        layers = []
-
-        last_layer_partpoint_fits_in_memory = self.dnn.part_max_layer[self.id]
-        for layer in conv_layers:
-            layer_name = layer.get("name")
-            partpoint_name = self.dnn.search_partition_point(layer_name)
-
-            layers.append(layer)
-            if last_layer_partpoint_fits_in_memory == partpoint_name:
-                break
-
-        runroot = "run" + self.name
+        runroot = self.runname + "_" + config["accelerator"]
         config["run_root"] = runroot
+        fname_csv = runroot + "_convlayers.csv"
 
+        if os.path.isfile(fname_csv):
+            self.stats = self._read_layer_csv(fname_csv)
+            return
+
+        layers = self.ga.get_conv2d_layers()
         tl = Timeloop(config)
         tl.run(layers, self.show_progress)
 
-        self._set_stats(layers, tl.stats)
+        self.stats = tl.stats
 
-    def _set_stats(self, layers : list, stats : dict) -> None:
-        overall_latency = 0
-        overall_energy = 0
+        self._write_layer_csv(fname_csv)
 
-        for layer in layers:
-            layer_name = layer.get("name")
-            partpoint_name = self.dnn.search_partition_point(layer_name)
+    def _read_layer_csv(self, filename: str) -> dict:
+        stats = {}
 
-            if layer_name not in stats:
-                print("[NodeThread] Warning: ", layer_name, " not found.")
-                continue
-            overall_latency += stats[layer_name]["latency"]
-            overall_energy += stats[layer_name]["energy"]
+        with open(filename, 'r', newline="") as f:
+            reader = csv.DictReader(f, delimiter=";")
+            for row in reader:
+                layer_name = row['Layer']
+                stats[layer_name] = {}
+                stats[layer_name]['latency'] = row['Latency [ms]']
+                stats[layer_name]['energy'] = row['Energy [mJ]']
 
-            if not partpoint_name in self.stats.keys():
-                self.stats[partpoint_name] = {}
-
-            self.stats[partpoint_name]["latency"] = overall_latency
-            self.stats[partpoint_name]["latency_iqr"] = 0
-            self.stats[partpoint_name]["energy"] = overall_energy
-
-            # save single layer stats
-            self.stats[partpoint_name][layer_name] = {}
-            self.stats[partpoint_name][layer_name]["latency"] = stats[layer_name]["latency"]
-            self.stats[partpoint_name][layer_name]["latency_iqr"] = 0
-            self.stats[partpoint_name][layer_name]["energy"] = stats[layer_name]["energy"]
-
-        # Fill up dict with partitioning points not containing CONVs
-        prev_latency = 0
-        prev_energy = 0
-        if self.reverse:
-            plist = self.dnn.partition_points[::-1]
-        else:
-            plist = self.dnn.partition_points
-
-        for point in plist:
-            l_name = point.get("name")
-            if l_name in self.stats.keys():
-                prev_latency = self.stats[l_name]["latency"]
-                prev_energy = self.stats[l_name]["energy"]
-            else:
-                self.stats[l_name] = {}
-                self.stats[l_name]["latency"] = prev_latency
-                self.stats[l_name]["latency_iqr"] = 0
-                self.stats[l_name]["energy"] = prev_energy
-
-        self._write_layer_csv(self.runname + "_" + self.name + "_layers.csv")
+        return stats
 
     def _write_layer_csv(self, filename: str) -> None:
         with open(filename, "w", newline="") as f:
             writer = csv.writer(f, delimiter=";")
             header = [
                 "No.",
-                "Partitioning Point",
                 "Layer",
                 "Latency [ms]",
                 "Energy [mJ]",
             ]
             writer.writerow(header)
             row_num = 1
-            for pp in self.stats.keys():
-                for l in self.stats[pp].keys():
-                    if isinstance(self.stats[pp][l], dict):
-                        row = [
-                            row_num,
-                            pp,
-                            l,
-                            str(self.stats[pp][l]["latency"]),
-                            str(self.stats[pp][l]["energy"]),
-                        ]
-                        writer.writerow(row)
-                        row_num += 1
+            for l in self.stats.keys():
+                if isinstance(self.stats[l], dict):
+                    row = [
+                        row_num,
+                        l,
+                        str(self.stats[l]["latency"]),
+                        str(self.stats[l]["energy"]),
+                    ]
+                    writer.writerow(row)
+                    row_num += 1
 
 
     def _remove_file(self,file_path):

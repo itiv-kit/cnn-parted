@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 import argparse
-from framework import DNNAnalyzer, NodeThread,  Evaluator
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
 import torch
@@ -9,7 +8,8 @@ import sys
 import os
 import json
 import importlib
-from framework import DNNAnalyzer, NodeThread,LinkComputationThread, Evaluator , QuantizationEvaluator
+from framework import DNNAnalyzer, NodeThread,LinkComputationThread, Evaluator , QuantizationEvaluator, GraphAnalyzer
+
 MODEL_FOLDER = "workloads"
 
 def setup_workload(model_settings: dict) -> tuple:
@@ -48,11 +48,10 @@ def main():
     parser.add_argument('--accuracy', action='store_true', default=False, help='Compute with accuracy')
     args = parser.parse_args()
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
+
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
-    node_components,link_components = conf_helper.get_system_components()
-
-
+    node_components, link_components = conf_helper.get_system_components()
 
     try:
         model, accuracy_function = setup_workload(config['neural-network'])
@@ -62,90 +61,116 @@ def main():
         print()
         quit(1)
 
-    dnn = DNNAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']), conf_helper)#,node_components,link_components ,constraints)
+    ga = GraphAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']))
 
-    if len(dnn.partpoints_filtered) == 0:
-        print("ERROR: No partitioning points found. Please check your system constraints: max_memory_size, max_out_size ")
-        quit(1)
+    nodeStats = {}
+    node_threads = [
+            NodeThread(component.get('id'), ga, component, args.run_name, args.show_progress)
+            for component in node_components
+        ]
 
-
-    accStats = {}
-    if args.accuracy:
-        if 'accuracy' in config.keys():
-            accEval = QuantizationEvaluator(dnn, config.get('accuracy'), node_components, accuracy_function, args.show_progress)
-            accStats = accEval.get_stats()
-
-    objective = conf_helper.get_optimization_objectives(node_components,link_components)
-    first_component_id = node_components[0]['id']
-
-    nodeStats={}
-    linkStats={}
-
-    for i in range (0, args.num_runs):
-
-        node_threads = [
-                NodeThread(component.get('id'), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
-                for component in node_components
-            ]
-        link_threads = [LinkComputationThread(component.get('id'), dnn, component,False, args.run_name, args.show_progress)
-                 for component in link_components
-
-            ]
-
-        for t in node_threads:
-            if not t.config.get("timeloop"):
-                t.start()
-
-        for t in link_threads:
+    for t in node_threads:
+        if not t.config.get("timeloop"):
             t.start()
 
-        for t in node_threads:
-            if t.config.get("timeloop"): # run them simply on main thread
-                t.run()
+    for t in node_threads:
+        if t.config.get("timeloop"): # run them simply on main thread
+            t.run()
+        else:
+            t.join()
 
-        for t in node_threads and link_threads:
-            if not t.config.get("timeloop"):
-                t.join()
+    for node_thread in node_threads:
+        id,stats = node_thread.getStats()
+        nodeStats[id] = stats
 
-        for node_thread in node_threads:
-            id,stats = node_thread.getStats()
-            if id not in nodeStats:
-                nodeStats[id] = {}
-            nodeStats[id][i] = stats
+    nsga2 = NSGA2_Optimizer(ga.schedules, nodeStats, link_components)
+    objective = conf_helper.get_optimization_objectives(node_components,link_components)
+    nsga2.optimize(objective)
 
-        for link_thread in  link_threads:
-            id,stats = link_thread.getStats()
-            if id not in linkStats:
-                linkStats[id] = {}
-            linkStats[id][i] = stats
+    # dnn = DNNAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']), conf_helper)#,node_components,link_components ,constraints)
 
-    e = Evaluator(dnn, nodeStats, linkStats, accStats)
-    e.print_sim_time()
-    e.export_csv(args.run_name)
-
-    nodes = e.get_all_layer_stats()
-
-    if len(nodes) == 0:
-        print("No benificial partitioning point found: check the bandwidth and memory constraints: ")
-        sys.exit()
+    # if len(dnn.partpoints_filtered) == 0:
+    #     print("ERROR: No partitioning points found. Please check your system constraints: max_memory_size, max_out_size ")
+    #     quit(1)
 
 
-    nsga2 = NSGA2_Optimizer(nodes)
-    optimizer,paretos = nsga2.optimize(objective)
+    # accStats = {}
+    # if args.accuracy:
+    #     if 'accuracy' in config.keys():
+    #         accEval = QuantizationEvaluator(dnn, config.get('accuracy'), node_components, accuracy_function, args.show_progress)
+    #         accStats = accEval.get_stats()
 
-    data = {
-    "best partitioning Point": optimizer,
-    "Paretos": [layer['layer'] for layer in paretos]
-    }
+    # objective = conf_helper.get_optimization_objectives(node_components,link_components)
+    # first_component_id = node_components[0]['id']
 
-    with open(args.run_name + '_optimals.json', 'w') as jsonfile:
-        json.dump(data, jsonfile, indent=4)
+    # nodeStats={}
+    # linkStats={}
 
-    print("best partitioning Point: ")
-    print(optimizer)
-    print("Paretos:")
-    for layer in paretos:
-        print(layer['layer'])
+    # for i in range (0, args.num_runs):
+
+    #     node_threads = [
+    #             NodeThread(component.get('id'), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
+    #             for component in node_components
+    #         ]
+    #     link_threads = [LinkComputationThread(component.get('id'), dnn, component,False, args.run_name, args.show_progress)
+    #              for component in link_components
+
+    #         ]
+
+    #     for t in node_threads:
+    #         if not t.config.get("timeloop"):
+    #             t.start()
+
+    #     for t in link_threads:
+    #         t.start()
+
+    #     for t in node_threads:
+    #         if t.config.get("timeloop"): # run them simply on main thread
+    #             t.run()
+
+    #     for t in node_threads and link_threads:
+    #         if not t.config.get("timeloop"):
+    #             t.join()
+
+    #     for node_thread in node_threads:
+    #         id,stats = node_thread.getStats()
+    #         if id not in nodeStats:
+    #             nodeStats[id] = {}
+    #         nodeStats[id][i] = stats
+
+    #     for link_thread in  link_threads:
+    #         id,stats = link_thread.getStats()
+    #         if id not in linkStats:
+    #             linkStats[id] = {}
+    #         linkStats[id][i] = stats
+
+    # e = Evaluator(dnn, nodeStats, linkStats, accStats)
+    # e.print_sim_time()
+    # e.export_csv(args.run_name)
+
+    # nodes = e.get_all_layer_stats()
+
+    # if len(nodes) == 0:
+    #     print("No benificial partitioning point found: check the bandwidth and memory constraints: ")
+    #     sys.exit()
+
+
+    # nsga2 = NSGA2_Optimizer(nodes)
+    # optimizer,paretos = nsga2.optimize(objective)
+
+    # data = {
+    # "best partitioning Point": optimizer,
+    # "Paretos": [layer['layer'] for layer in paretos]
+    # }
+
+    # with open(args.run_name + '_optimals.json', 'w') as jsonfile:
+    #     json.dump(data, jsonfile, indent=4)
+
+    # print("best partitioning Point: ")
+    # print(optimizer)
+    # print("Paretos:")
+    # for layer in paretos:
+    #     print(layer['layer'])
 
 
 if __name__ == '__main__':
