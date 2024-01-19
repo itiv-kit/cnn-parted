@@ -83,7 +83,7 @@ def main():
         id,stats = node_thread.getStats()
         nodeStats[id] = stats
 
-    nsga2 = NSGA2_Optimizer(ga.schedules, nodeStats, link_components)
+    nsga2 = NSGA2_Optimizer(ga, nodeStats, link_components)
     objective = conf_helper.get_optimization_objectives(node_components,link_components)
     nsga2.optimize(objective)
 

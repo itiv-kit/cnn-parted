@@ -13,26 +13,30 @@ import numpy as np
 import tqdm
 from joblib import Parallel, delayed
 
+from ..GraphAnalyzer import GraphAnalyzer
+from ..model.graph import LayersGraph
+
 class NSGA2_Optimizer(Optimizer):
-    def __init__(self, schedules, nodeStats, link_components) -> None:
-        nodes = len(schedules[0])
+    def __init__(self, ga : GraphAnalyzer, nodeStats, link_components) -> None:
+        nodes = len(ga.schedules[0])
         self.num_gen = 100 * nodes #10 time node size
         self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
 
-        self.schedules = schedules
+        self.graph = ga.graph
+        self.schedules = ga.schedules
         self.nodeStats = nodeStats
 
     def optimize(self, optimization_objectives):
-        sorts = Parallel(n_jobs=4, backend="multiprocessing")(
-            delayed(self._optimize_single)(s)
+        sorts = Parallel(n_jobs=1, backend="multiprocessing")(
+            delayed(self._optimize_single)(s, self.graph)
             for s in tqdm.tqdm(self.schedules)
         )
 
         np.set_printoptions(precision=2)
         print(sorts)
 
-    def _optimize_single(self, schedule):
-        problem = PartitioningProblem(self.nodeStats, schedule)
+    def _optimize_single(self, schedule, graph):
+        problem = PartitioningProblem(self.nodeStats, schedule, graph)
 
         algorithm = NSGA2(
             pop_size=self.pop_size,
@@ -64,7 +68,7 @@ class NSGA2_Optimizer(Optimizer):
         return PP_unique
 
 class PartitioningProblem(ElementwiseProblem):
-    def __init__(self, nodeStats : dict, schedule : list):
+    def __init__(self, nodeStats : dict, schedule : list, graph : LayersGraph):
         self.nodeStats = nodeStats
         self.num_acc = len(nodeStats)
         self.num_pp = self.num_acc - 1
@@ -74,6 +78,8 @@ class PartitioningProblem(ElementwiseProblem):
 
         self.schedule = schedule
         self.num_layers = len(schedule)
+
+        self.graph = graph
 
         xu_pp = np.empty(self.num_pp)
         xu_pp.fill(self.num_layers)
@@ -107,8 +113,11 @@ class PartitioningProblem(ElementwiseProblem):
 
             last_pp = 0
             th_pp = []
-            ## partitioning points
+
             for i, pp in enumerate(p[0:self.num_pp], self.num_pp):
+                successors = []
+                successors.append(self.schedule[0])
+
                 acc = p[i] - 1
                 acc_latency = 0.0
                 for j in range(last_pp + 1, pp + 1):
@@ -116,8 +125,17 @@ class PartitioningProblem(ElementwiseProblem):
                     latency += self._get_layer_latency(acc, j)
                     energy += self._get_layer_energy(acc, j)
 
+                    layer = self.schedule[j-1]
+                    while layer in successors: successors.remove(layer)
+                    successors += [s for s in self.graph.get_successors(layer)]
+
                 th_pp.append(self._zero_division(1.0, acc_latency))
                 last_pp = pp
+
+                link_l, link_e = self._get_link_metrics(successors)
+                th_pp.append(self._zero_division(1.0, link_l))
+                latency += link_l
+                energy += link_e
 
                 if pp == p[self.num_pp - 1]:
                     acc = p[i+1] - 1
@@ -129,11 +147,7 @@ class PartitioningProblem(ElementwiseProblem):
 
                     th_pp.append(self._zero_division(1.0, acc_latency))
 
-                # else:
-                #     latency += self._get_link_latency(acc, j)
-                #     energy += self._get_link_energy(acc, j)
-
-            throughput = max(th_pp) * -1
+            throughput = min(th_pp) * -1
 
         out["F"] = [latency, energy, throughput]
 
@@ -156,10 +170,8 @@ class PartitioningProblem(ElementwiseProblem):
             return 0
 
     def _zero_division(self, a : float, b : float) -> float:
-        return b and a / b or 0
+        return a / b if b else np.inf
 
-    def _get_link_latency(self, acc : int, idx : int) -> float:
-        return 0
-
-    def _get_link_energy(self, acc : int, idx : int) -> float:
-        return 0
+    def _get_link_metrics(self, successors : list) -> (float, float):
+        print(successors)
+        return 0, 0

@@ -130,8 +130,8 @@ class LayersGraph:
     def _get_all_topological_sorts(_graph):
         return list(nx.all_topological_sorts(_graph))
 
-    def get_successors(self, graph, node):
-        return list(graph.successors(node))
+    def get_successors(self, node):
+        return list(self._graph.successors(node))
 
     def get_conv_graph(self):
         dummy_convs=[]
