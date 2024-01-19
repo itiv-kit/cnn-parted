@@ -1,10 +1,9 @@
-import threading
 from framework.ModuleThreadInterface import ModuleThreadInterface
 from .LinkThread import LinkThread
 from .MemoryNodeThread import MemoryNodeThread
 class LinkComputationThread(ModuleThreadInterface):
-    def __init__(self, id, dnn, config, reverse, runname, show_progress):
-        super().__init__(id, dnn, config, reverse, runname, show_progress)  # Initialize the superclass
+    def __init__(self, id, dnn, config, runname, show_progress):
+        super().__init__(id, dnn, config, runname, show_progress)  # Initialize the superclass
         self._select_strategy()
 
     def _select_strategy(self):

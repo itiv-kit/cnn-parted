@@ -22,21 +22,23 @@ class NSGA2_Optimizer(Optimizer):
         self.num_gen = 100 * nodes #10 time node size
         self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
 
-        self.graph = ga.graph
+        self.lgraph = ga.graph
         self.schedules = ga.schedules
         self.nodeStats = nodeStats
 
+        self.links = link_components
+
     def optimize(self, optimization_objectives):
         sorts = Parallel(n_jobs=1, backend="multiprocessing")(
-            delayed(self._optimize_single)(s, self.graph)
+            delayed(self._optimize_single)(s, self.lgraph)
             for s in tqdm.tqdm(self.schedules)
         )
 
         np.set_printoptions(precision=2)
         print(sorts)
 
-    def _optimize_single(self, schedule, graph):
-        problem = PartitioningProblem(self.nodeStats, schedule, graph)
+    def _optimize_single(self, schedule : list, lgraph : LayersGraph):
+        problem = PartitioningProblem(self.nodeStats, schedule, lgraph)
 
         algorithm = NSGA2(
             pop_size=self.pop_size,
@@ -68,7 +70,7 @@ class NSGA2_Optimizer(Optimizer):
         return PP_unique
 
 class PartitioningProblem(ElementwiseProblem):
-    def __init__(self, nodeStats : dict, schedule : list, graph : LayersGraph):
+    def __init__(self, nodeStats : dict, schedule : list, lgraph : LayersGraph):
         self.nodeStats = nodeStats
         self.num_acc = len(nodeStats)
         self.num_pp = self.num_acc - 1
@@ -79,7 +81,7 @@ class PartitioningProblem(ElementwiseProblem):
         self.schedule = schedule
         self.num_layers = len(schedule)
 
-        self.graph = graph
+        self.lgraph = lgraph
 
         xu_pp = np.empty(self.num_pp)
         xu_pp.fill(self.num_layers)
@@ -127,7 +129,7 @@ class PartitioningProblem(ElementwiseProblem):
 
                     layer = self.schedule[j-1]
                     while layer in successors: successors.remove(layer)
-                    successors += [s for s in self.graph.get_successors(layer)]
+                    successors += [s for s in self.lgraph.get_successors(layer)]
 
                 th_pp.append(self._zero_division(1.0, acc_latency))
                 last_pp = pp
@@ -173,5 +175,13 @@ class PartitioningProblem(ElementwiseProblem):
         return a / b if b else np.inf
 
     def _get_link_metrics(self, successors : list) -> (float, float):
-        print(successors)
+        layers = []
+        for layer in np.unique(successors):
+            layers += list(self.lgraph.get_Graph().predecessors(layer))
+        layers = np.unique([layer for layer in layers if layer not in successors])
+
+        data_sizes = [np.prod(layer["output_size"]) for layer in self.lgraph.model_tree if layer.get("name") in layers]
+
+        print(np.sum(data_sizes))
+
         return 0, 0

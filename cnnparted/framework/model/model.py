@@ -56,7 +56,6 @@ class TreeModel:
                 layer["output_size"] = self.out_layer['output_size']
                 layer['output'] = self.out_layer['name']
 
-            output.append(layer)
             if node.op_type =='Conv':
                 conv_params = self._get_conv_params(node)
                 layer['conv_params'] = conv_params
@@ -67,6 +66,7 @@ class TreeModel:
                 pool_params = self._get_pool_params(node)
                 layer['pool_params'] = pool_params
 
+            output.append(layer)
 
         output.append(self.out_layer)
         self._create_layer_relationships(output)
