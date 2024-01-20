@@ -3,69 +3,59 @@ import argparse
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
 import torch
-from framework.constants import MODEL_PATH
-import sys
+from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 import os
-import json
+import subprocess
 import importlib
-from framework import DNNAnalyzer, NodeThread, Link, Evaluator , QuantizationEvaluator, GraphAnalyzer
+from framework import NodeThread, GraphAnalyzer
 
-MODEL_FOLDER = "workloads"
 
-def setup_workload(model_settings: dict) -> tuple:
-    model = importlib.import_module(
-        f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
-    ).model
-
-    accuracy_function = importlib.import_module(
-        f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
-    ).accuracy_function
-
-    input_size= model_settings['input-size']
-
-    x = torch.randn(input_size)
-    torch.onnx.export(model, x, MODEL_PATH, verbose=False, input_names=['input'], output_names=['output'])
-
-    return model, accuracy_function
-
-def main():
-    parser = argparse.ArgumentParser(
-        description='Explore partition point metrics for DNNs')
-    parser.add_argument('conf_file_path', help='Path to config file')
-    parser.add_argument('run_name',
-                        type=str,
-                        default='run',
-                        help='Name of run')
-    parser.add_argument('-p',
-                        '--show-progress',
-                        action='store_true',
-                        help='Show progress of run')
-    parser.add_argument('-n',
-                        '--num-runs',
-                        type=int,
-                        default=1,
-                        help='Number of runs')
-    parser.add_argument('--accuracy', action='store_true', default=False, help='Compute with accuracy')
-    args = parser.parse_args()
-    os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
-
+def main(args):
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
     node_components, link_components = conf_helper.get_system_components()
 
+    accuracy_function = setup_workload(args.run_name, config['neural-network'])
+
+    ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']))
+
+    nodeStats = node_evaluation(ga, node_components, args.run_name, args.show_progress)
+
+    nsga2 = NSGA2_Optimizer(ga, nodeStats, link_components)
+    objective = conf_helper.get_optimization_objectives(node_components, link_components)
+    nsga2.optimize(objective)
+
+
+def setup_workload(run_name : str, model_settings: dict) -> tuple:
     try:
-        model, accuracy_function = setup_workload(config['neural-network'])
+        model = importlib.import_module(
+            f"{WORKLOAD_FOLDER}.{model_settings['name']}", package=__package__
+        ).model
+
+        accuracy_function = importlib.import_module(
+            f"{WORKLOAD_FOLDER}.{model_settings['name']}", package=__package__
+        ).accuracy_function
+
+        input_size= model_settings['input-size']
+
+        x = torch.randn(input_size)
+        subprocess.check_call(['mkdir', '-p', os.path.join(MODEL_PATH, run_name)])
+        filename = os.path.join(MODEL_PATH, run_name, "model.onnx")
+        torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
+
+        return accuracy_function
+
     except KeyError:
         print()
         print('\033[1m' + 'Workload not available' + '\033[0m')
         print()
         quit(1)
 
-    ga = GraphAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']))
 
+def node_evaluation(ga : GraphAnalyzer, node_components : list, run_name : str, progress : bool) -> dict:
     nodeStats = {}
     node_threads = [
-            NodeThread(component.get('id'), ga, component, args.run_name, args.show_progress)
+            NodeThread(component.get('id'), ga, component, run_name, progress)
             for component in node_components
         ]
 
@@ -83,9 +73,34 @@ def main():
         id,stats = node_thread.getStats()
         nodeStats[id] = stats
 
-    nsga2 = NSGA2_Optimizer(ga, nodeStats, link_components)
-    objective = conf_helper.get_optimization_objectives(node_components, link_components)
-    nsga2.optimize(objective)
+    return nodeStats
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+    description='Explore partition point metrics for DNNs')
+    parser.add_argument('conf_file_path', help='Path to config file')
+    parser.add_argument('run_name',
+                        type=str,
+                        default='run',
+                        help='Name of run')
+    parser.add_argument('-p',
+                        '--show-progress',
+                        action='store_true',
+                        help='Show progress of run')
+    parser.add_argument('-n',
+                        '--num-runs',
+                        type=int,
+                        default=1,
+                        help='Number of runs')
+    parser.add_argument('--accuracy', action='store_true', default=False, help='Compute with accuracy')
+    args = parser.parse_args()
+
+    os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
+
+    main(args)
+
+
 
     # dnn = DNNAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']), conf_helper)#,node_components,link_components ,constraints)
 
@@ -171,7 +186,3 @@ def main():
     # print("Paretos:")
     # for layer in paretos:
     #     print(layer['layer'])
-
-
-if __name__ == '__main__':
-    main()

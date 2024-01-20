@@ -5,9 +5,9 @@ from .model.graph import LayersGraph
 from .model.scheduling import topo_sort_random_start_node
 
 class GraphAnalyzer:
-    def __init__(self, model_path: str, input_size: tuple) -> None:
+    def __init__(self, run_name : str, input_size : tuple) -> None:
         self.input_size = input_size
-        self._Tree_Model = TreeModel(model_path,self.input_size)
+        self._Tree_Model = TreeModel(run_name, self.input_size)
         self._tree = self._Tree_Model.get_Tree()
 
         self.graph = LayersGraph(self._tree)

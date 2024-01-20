@@ -28,7 +28,7 @@ class NodeThread(ModuleThreadInterface):
 
         layers = self.ga.get_conv2d_layers()
         tl = Timeloop(config)
-        tl.run(layers, self.show_progress)
+        tl.run(layers, self.progress)
 
         self.stats = tl.stats
 

@@ -4,6 +4,7 @@
 *.json
 
 #run outputs
+onnx_models/
 run*
 *.csv
 timeloop-mapper.*
