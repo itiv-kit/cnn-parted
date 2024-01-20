@@ -27,16 +27,24 @@ class Link():
         if self.config['data_bit_width'] % 8 > 0:
             self.num_bytes += 1
 
+        # Look-Up Table to increase performance
+        self.lut = {}
+
 
     def eval(self, slice_size) -> None:
         slice_size *= self.num_bytes
 
-        try:
-            latency = self.link.get_latency_ms(slice_size, self.config['fps'])
-            energy = self.link.get_pow_cons_mW(slice_size, self.config['fps']) * latency / 1e3
-        except ValueError as e:
-            print(e)
-            latency = 0
-            energy = 0
+        if slice_size in self.lut.keys():
+            return self.lut[slice_size] + [slice_size]
+        else:
+            try:
+                latency = self.link.get_latency_ms(slice_size, self.config['fps'])
+                energy = self.link.get_pow_cons_mW(slice_size, self.config['fps']) * latency / 1e3
+            except ValueError as e:
+                print(e)
+                latency = 0
+                energy = 0
 
-        return latency, energy, slice_size
+            self.lut[slice_size] = [latency, energy]
+
+            return latency, energy, slice_size
