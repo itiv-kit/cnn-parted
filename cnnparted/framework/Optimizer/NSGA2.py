@@ -17,6 +17,7 @@ from ..GraphAnalyzer import GraphAnalyzer
 from ..model.graph import LayersGraph
 from ..link.Link import Link
 
+
 class NSGA2_Optimizer(Optimizer):
     def __init__(self, ga : GraphAnalyzer, nodeStats : dict, link_components : list, progress : bool) -> None:
         nodes = len(ga.schedules[0])
@@ -31,6 +32,7 @@ class NSGA2_Optimizer(Optimizer):
 
         self.progress = progress
 
+
     def optimize(self, optimization_objectives):
         sorts = Parallel(n_jobs=1, backend="multiprocessing")(
             delayed(self._optimize_single)(s, self.lgraph, self.link_confs)
@@ -38,7 +40,11 @@ class NSGA2_Optimizer(Optimizer):
         )
 
         np.set_printoptions(precision=2)
-        print(sorts)
+        for s in sorts:
+            for p in s:
+                if p[-1]:
+                    print(p)
+
 
     def _optimize_single(self, schedule : list, lgraph : LayersGraph, link_confs : list):
         problem = PartitioningProblem(self.nodeStats, schedule, lgraph, link_confs)
@@ -56,21 +62,50 @@ class NSGA2_Optimizer(Optimizer):
                         algorithm,
                         termination=get_termination('n_gen',self.num_gen),
                         seed=1,
-                        save_history=False,
+                        save_history=True,
                         verbose=False)
 
-        X = res.X
-        F = res.F
+        X = np.round(res.X)
+        F = np.abs(res.F)
 
-        X_rounded=np.round(res.X)
-
-        PP = []
+        data = []
         for i in range(0, len(X)):
-            PP.append(np.append(X_rounded[i], F[i]))
+            data.append(np.append(X[i], F[i]))
 
-        PP_unique = np.unique(PP, axis=0)
+        for h in res.history:
+            for ind in h.pop:
+                if ind.get("G") > 0:
+                    continue
+                data.append(np.append(np.round(ind.get("X").tolist()), ind.get("F").tolist()))
+        data = np.unique(data, axis=0)
 
-        return PP_unique
+        x_len = len(X[0])
+        comp_hist = np.delete(data, np.s_[0:x_len], axis=1)
+        paretos = self._is_pareto_efficient(comp_hist)
+        paretos = np.expand_dims(paretos, 1)
+        data = np.hstack([data, paretos])
+
+        return data
+
+
+    # https://stackoverflow.com/a/40239615
+    def _is_pareto_efficient(self, costs : np.ndarray, return_mask : bool = True) -> np.ndarray:
+        is_efficient = np.arange(costs.shape[0])
+        n_points = costs.shape[0]
+        next_point_index = 0  # Next index in the is_efficient array to search for
+        while next_point_index<len(costs):
+            nondominated_point_mask = np.any(costs<costs[next_point_index], axis=1)
+            nondominated_point_mask[next_point_index] = True
+            is_efficient = is_efficient[nondominated_point_mask]  # Remove dominated points
+            costs = costs[nondominated_point_mask]
+            next_point_index = np.sum(nondominated_point_mask[:next_point_index])+1
+        if return_mask:
+            is_efficient_mask = np.zeros(n_points, dtype = bool)
+            is_efficient_mask[is_efficient] = True
+            return is_efficient_mask
+        else:
+            return is_efficient
+
 
 class PartitioningProblem(ElementwiseProblem):
     def __init__(self, nodeStats : dict, schedule : list, lgraph : LayersGraph, link_confs : list):
