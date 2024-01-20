@@ -17,11 +17,11 @@ def main(args):
 
     accuracy_function = setup_workload(args.run_name, config['neural-network'])
 
-    ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']))
+    ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
 
     nodeStats = node_evaluation(ga, node_components, args.run_name, args.show_progress)
 
-    nsga2 = NSGA2_Optimizer(ga, nodeStats, link_components)
+    nsga2 = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
     objective = conf_helper.get_optimization_objectives(node_components, link_components)
     nsga2.optimize(objective)
 

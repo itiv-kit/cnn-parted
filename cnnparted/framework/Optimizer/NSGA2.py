@@ -18,7 +18,7 @@ from ..model.graph import LayersGraph
 from ..link.Link import Link
 
 class NSGA2_Optimizer(Optimizer):
-    def __init__(self, ga : GraphAnalyzer, nodeStats : dict, link_components : list) -> None:
+    def __init__(self, ga : GraphAnalyzer, nodeStats : dict, link_components : list, progress : bool) -> None:
         nodes = len(ga.schedules[0])
         self.num_gen = 100 * nodes #10 time node size
         self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
@@ -29,10 +29,12 @@ class NSGA2_Optimizer(Optimizer):
 
         self.link_confs = link_components
 
+        self.progress = progress
+
     def optimize(self, optimization_objectives):
         sorts = Parallel(n_jobs=1, backend="multiprocessing")(
             delayed(self._optimize_single)(s, self.lgraph, self.link_confs)
-            for s in tqdm.tqdm(self.schedules, "Optimizer")
+            for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
         )
 
         np.set_printoptions(precision=2)
