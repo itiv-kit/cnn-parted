@@ -32,7 +32,7 @@ class NSGA2_Optimizer(Optimizer):
     def optimize(self, optimization_objectives):
         sorts = Parallel(n_jobs=1, backend="multiprocessing")(
             delayed(self._optimize_single)(s, self.lgraph, self.link_confs)
-            for s in tqdm.tqdm(self.schedules)
+            for s in tqdm.tqdm(self.schedules, "Optimizer")
         )
 
         np.set_printoptions(precision=2)

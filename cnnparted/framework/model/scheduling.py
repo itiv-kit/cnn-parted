@@ -144,7 +144,7 @@ def topo_sort_random_start_node(G, n: int = 1, seed: int = None, as_ndarray: boo
     starting_points = random.choices(list(G.nodes), k=n)
     sorts = Parallel(n_jobs=n_jobs, backend="multiprocessing")(
         delayed(topo_sort_starting_node)(G, starting_point, seed=None, as_ndarray=as_ndarray)
-        for starting_point in tqdm.tqdm(starting_points)
+        for starting_point in tqdm.tqdm(starting_points, "Schedules")
     )
 
     if as_ndarray:

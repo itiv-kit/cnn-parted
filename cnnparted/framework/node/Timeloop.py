@@ -4,6 +4,7 @@ import subprocess
 import libconf
 import yaml
 import glob
+import tqdm
 
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
@@ -53,17 +54,13 @@ class Timeloop:
         self.stats = {}
 
     def run(self, layers : dict, progress : bool = False):
-        for layer in layers:
+        for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
             layer_name = layer.get("name")
             output = self._run_single(layer)
 
             self.stats[layer_name] = {}
             self.stats[layer_name]["latency"] = output["latency_ms"]
             self.stats[layer_name]["energy"] = output["energy_mJ"]
-
-            if progress:
-                layer_i = layers.index(layer) + 1
-                print("Finished", layer_i, "/", len(layers), self.prob_name, "layers")
 
     def _run_single(self,
             layer : dict,
