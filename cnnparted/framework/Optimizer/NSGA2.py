@@ -15,9 +15,10 @@ from joblib import Parallel, delayed
 
 from ..GraphAnalyzer import GraphAnalyzer
 from ..model.graph import LayersGraph
+from ..link.Link import Link
 
 class NSGA2_Optimizer(Optimizer):
-    def __init__(self, ga : GraphAnalyzer, nodeStats, link_components) -> None:
+    def __init__(self, ga : GraphAnalyzer, nodeStats : dict, link_components : list) -> None:
         nodes = len(ga.schedules[0])
         self.num_gen = 100 * nodes #10 time node size
         self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
@@ -26,19 +27,19 @@ class NSGA2_Optimizer(Optimizer):
         self.schedules = ga.schedules
         self.nodeStats = nodeStats
 
-        self.links = link_components
+        self.link_confs = link_components
 
     def optimize(self, optimization_objectives):
         sorts = Parallel(n_jobs=1, backend="multiprocessing")(
-            delayed(self._optimize_single)(s, self.lgraph)
+            delayed(self._optimize_single)(s, self.lgraph, self.link_confs)
             for s in tqdm.tqdm(self.schedules)
         )
 
         np.set_printoptions(precision=2)
         print(sorts)
 
-    def _optimize_single(self, schedule : list, lgraph : LayersGraph):
-        problem = PartitioningProblem(self.nodeStats, schedule, lgraph)
+    def _optimize_single(self, schedule : list, lgraph : LayersGraph, link_confs : list):
+        problem = PartitioningProblem(self.nodeStats, schedule, lgraph, link_confs)
 
         algorithm = NSGA2(
             pop_size=self.pop_size,
@@ -70,7 +71,7 @@ class NSGA2_Optimizer(Optimizer):
         return PP_unique
 
 class PartitioningProblem(ElementwiseProblem):
-    def __init__(self, nodeStats : dict, schedule : list, lgraph : LayersGraph):
+    def __init__(self, nodeStats : dict, schedule : list, lgraph : LayersGraph, link_confs : list):
         self.nodeStats = nodeStats
         self.num_acc = len(nodeStats)
         self.num_pp = self.num_acc - 1
@@ -82,6 +83,10 @@ class PartitioningProblem(ElementwiseProblem):
         self.num_layers = len(schedule)
 
         self.lgraph = lgraph
+
+        self.links = []
+        for link_conf in link_confs:
+            self.links.append(Link(link_conf))
 
         xu_pp = np.empty(self.num_pp)
         xu_pp.fill(self.num_layers)
@@ -105,6 +110,7 @@ class PartitioningProblem(ElementwiseProblem):
         latency = 0.0
         energy = 0.0
         throughput = 0.0
+        bandwidth = np.full((self.num_pp), np.inf)
 
         if not np.array_equal(np.sort(p[:self.num_pp-1]), p[:self.num_pp-1]):
             out["G"] = x[0]
@@ -134,10 +140,10 @@ class PartitioningProblem(ElementwiseProblem):
                 th_pp.append(self._zero_division(1.0, acc_latency))
                 last_pp = pp
 
-                link_l, link_e = self._get_link_metrics(successors)
-                th_pp.append(self._zero_division(1.0, link_l))
+                link_l, link_e, bandwidth[i-1] = self._get_link_metrics(i-1, successors)
                 latency += link_l
                 energy += link_e
+                th_pp.append(self._zero_division(1.0, link_l))
 
                 if pp == p[self.num_pp - 1]:
                     acc = p[i+1] - 1
@@ -151,7 +157,7 @@ class PartitioningProblem(ElementwiseProblem):
 
             throughput = min(th_pp) * -1
 
-        out["F"] = [latency, energy, throughput]
+        out["F"] = [latency, energy, throughput] + list(bandwidth)
 
     def _get_layer_latency(self, acc : int, idx : int) -> float:
         layer_name = self.schedule[idx-1]
@@ -174,7 +180,7 @@ class PartitioningProblem(ElementwiseProblem):
     def _zero_division(self, a : float, b : float) -> float:
         return a / b if b else np.inf
 
-    def _get_link_metrics(self, successors : list) -> (float, float):
+    def _get_link_metrics(self, link_idx : int, successors : list) -> (float, float, float):
         layers = []
         for layer in np.unique(successors):
             layers += list(self.lgraph.get_Graph().predecessors(layer))
@@ -182,6 +188,8 @@ class PartitioningProblem(ElementwiseProblem):
 
         data_sizes = [np.prod(layer["output_size"]) for layer in self.lgraph.model_tree if layer.get("name") in layers]
 
-        print(np.sum(data_sizes))
+        if len(self.links) == 1:
+            return self.links[0].eval(np.sum(data_sizes))
+        else:
+            return self.links[link_idx].eval(np.sum(data_sizes))
 
-        return 0, 0

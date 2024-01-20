@@ -50,7 +50,6 @@ components:
         algorithm: linear-pruned
         live-status: false
         num-threads: 8
-        optimization-metrics: [energy, delay]
         timeout: 0
         victory-condition: 100
   - id: 1
@@ -67,7 +66,7 @@ components:
     max_memory_size: 600000000
     timeloop:
       accelerator: simba_like
-      frequency: 500000000
+      frequency: 200000000
       layer: conv2d
       mapper:
         algorithm: linear-pruned

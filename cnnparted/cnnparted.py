@@ -8,7 +8,7 @@ import sys
 import os
 import json
 import importlib
-from framework import DNNAnalyzer, NodeThread,LinkComputationThread, Evaluator , QuantizationEvaluator, GraphAnalyzer
+from framework import DNNAnalyzer, NodeThread, Link, Evaluator , QuantizationEvaluator, GraphAnalyzer
 
 MODEL_FOLDER = "workloads"
 
@@ -84,7 +84,7 @@ def main():
         nodeStats[id] = stats
 
     nsga2 = NSGA2_Optimizer(ga, nodeStats, link_components)
-    objective = conf_helper.get_optimization_objectives(node_components,link_components)
+    objective = conf_helper.get_optimization_objectives(node_components, link_components)
     nsga2.optimize(objective)
 
     # dnn = DNNAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']), conf_helper)#,node_components,link_components ,constraints)
