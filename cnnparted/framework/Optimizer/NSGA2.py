@@ -20,17 +20,17 @@ from ..link.Link import Link
 
 class NSGA2_Optimizer(Optimizer):
     def __init__(self, ga : GraphAnalyzer, nodeStats : dict, link_components : list, progress : bool) -> None:
-        nodes = len(ga.schedules[0])
-        self.num_gen = 100 * nodes #10 time node size
-        self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
-
         self.lgraph = ga.graph
         self.schedules = ga.schedules
         self.nodeStats = nodeStats
-
         self.link_confs = link_components
-
         self.progress = progress
+        nodes = len(ga.schedules[0])
+
+        self.num_gen = self.pop_size = 1
+        if len(nodeStats.keys()) > 1:
+            self.num_gen = 100 * nodes
+            self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
 
 
     def optimize(self, optimization_objectives):
@@ -112,7 +112,6 @@ class PartitioningProblem(ElementwiseProblem):
         self.nodeStats = nodeStats
         self.num_acc = len(nodeStats)
         self.num_pp = self.num_acc - 1
-        assert self.num_acc > 1, "Only one accelerator found"
 
         n_var = self.num_pp * 2 + 1 ## Number of max. partitioning points + device ID
 
@@ -126,16 +125,16 @@ class PartitioningProblem(ElementwiseProblem):
             self.links.append(Link(link_conf))
 
         xu_pp = np.empty(self.num_pp)
-        xu_pp.fill(self.num_layers)
+        xu_pp.fill(self.num_layers + 0.49)
         xu_acc = np.empty(self.num_pp + 1)
-        xu_acc.fill(self.num_acc)
+        xu_acc.fill(self.num_acc + 0.49)
 
         xu = np.append(xu_pp, xu_acc)
 
         super().__init__(n_var=n_var,
                          n_obj=3,  ## latency and energy, add throughput?
                          n_constr=1,
-                         xl=1,
+                         xl=0.5,
                          xu=xu)
 
 
@@ -159,6 +158,7 @@ class PartitioningProblem(ElementwiseProblem):
             last_pp = 0
             th_pp = []
 
+            i = -1
             for i, pp in enumerate(p[0:self.num_pp], self.num_pp):
                 successors = []
                 successors.append(self.schedule[0])
@@ -182,15 +182,13 @@ class PartitioningProblem(ElementwiseProblem):
                 energy += link_e
                 th_pp.append(self._zero_division(1.0, link_l))
 
-                if pp == p[self.num_pp - 1]:
-                    acc = p[i+1] - 1
-                    acc_latency = 0.0
-                    for j in range(last_pp + 1, self.num_layers + 1):
-                        acc_latency += self._get_layer_latency(acc, j)
-                        latency += self._get_layer_latency(acc, j)
-                        energy += self._get_layer_energy(acc, j)
-
-                    th_pp.append(self._zero_division(1.0, acc_latency))
+            acc = p[i+1] - 1
+            acc_latency = 0.0
+            for j in range(last_pp + 1, self.num_layers + 1):
+                acc_latency += self._get_layer_latency(acc, j)
+                latency += self._get_layer_latency(acc, j)
+                energy += self._get_layer_energy(acc, j)
+            th_pp.append(self._zero_division(1.0, acc_latency))
 
             throughput = min(th_pp) * -1
 
@@ -218,6 +216,9 @@ class PartitioningProblem(ElementwiseProblem):
         return a / b if b else np.inf
 
     def _get_link_metrics(self, link_idx : int, successors : list) -> (float, float, float):
+        if len(self.links) == 0:
+            return 0, 0, 0
+
         layers = []
         for layer in np.unique(successors):
             layers += list(self.lgraph.get_Graph().predecessors(layer))

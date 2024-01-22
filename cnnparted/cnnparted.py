@@ -21,9 +21,9 @@ def main(args):
 
     nodeStats = node_evaluation(ga, node_components, args.run_name, args.show_progress)
 
-    nsga2 = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
+    optimizer = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
     objective = conf_helper.get_optimization_objectives(node_components, link_components)
-    nsga2.optimize(objective)
+    optimizer.optimize(objective)
 
 
 def setup_workload(run_name : str, model_settings: dict) -> tuple:
