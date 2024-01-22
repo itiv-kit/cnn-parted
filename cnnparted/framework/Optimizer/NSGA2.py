@@ -155,44 +155,49 @@ class PartitioningProblem(ElementwiseProblem):
         else:
             out["G"] = -x[0]
 
-            last_pp = 0
+            l_pp = []
+            e_pp = []
             th_pp = []
+            successors = []
+            successors.append(self.schedule[0])
 
             i = -1
+            last_pp = 0
             for i, pp in enumerate(p[0:self.num_pp], self.num_pp):
-                successors = []
-                successors.append(self.schedule[0])
-
-                acc = p[i] - 1
-                acc_latency = 0.0
-                for j in range(last_pp + 1, pp + 1):
-                    acc_latency += self._get_layer_latency(acc, j)
-                    latency += self._get_layer_latency(acc, j)
-                    energy += self._get_layer_energy(acc, j)
-
-                    layer = self.schedule[j-1]
-                    while layer in successors: successors.remove(layer)
-                    successors += [s for s in self.lgraph.get_successors(layer)]
-
-                th_pp.append(self._zero_division(1.0, acc_latency))
+                self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, th_pp, successors)
                 last_pp = pp
 
+                # evaluate link
                 link_l, link_e, bandwidth[i-1] = self._get_link_metrics(i-1, successors)
-                latency += link_l
-                energy += link_e
+                l_pp.append(link_l)
+                e_pp.append(link_e)
                 th_pp.append(self._zero_division(1.0, link_l))
 
-            acc = p[i+1] - 1
-            acc_latency = 0.0
-            for j in range(last_pp + 1, self.num_layers + 1):
-                acc_latency += self._get_layer_latency(acc, j)
-                latency += self._get_layer_latency(acc, j)
-                energy += self._get_layer_energy(acc, j)
-            th_pp.append(self._zero_division(1.0, acc_latency))
+            self._eval_partition(p[i+1], last_pp, self.num_layers, l_pp, e_pp, th_pp, successors)
 
+            latency = sum(l_pp)
+            energy = sum(e_pp)
             throughput = min(th_pp) * -1
 
         out["F"] = [latency, energy, throughput] + list(bandwidth)
+
+
+    def _eval_partition(self, acc : int, last_pp : int, pp : int, l_pp : list, e_pp : list, th_pp : list, successors : list) -> None:
+        acc -= 1
+        acc_latency = 0.0
+        acc_energy = 0.0
+        for j in range(last_pp + 1, pp + 1):
+            acc_latency += self._get_layer_latency(acc, j)
+            acc_energy += self._get_layer_energy(acc, j)
+
+            layer = self.schedule[j-1]
+            while layer in successors: successors.remove(layer)
+            successors += [s for s in self.lgraph.get_successors(layer)]
+
+        l_pp.append(acc_latency)
+        e_pp.append(acc_energy)
+        th_pp.append(self._zero_division(1.0, acc_latency))
+
 
     def _get_layer_latency(self, acc : int, idx : int) -> float:
         layer_name = self.schedule[idx-1]
