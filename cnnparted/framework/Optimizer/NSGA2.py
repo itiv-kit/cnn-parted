@@ -28,17 +28,20 @@ class NSGA2_Optimizer(Optimizer):
         self.progress = progress
         nodes = len(ga.schedules[0])
 
-        self.layer_params = self._set_layer_params(ga.get_conv2d_layers())
+        self.layer_params = self._set_layer_params(ga)
 
         self.num_gen = self.pop_size = 1
         if len(nodeStats.keys()) > 1:
             self.num_gen = 100 * nodes
             self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
 
-    def _set_layer_params(self, conv_layers : list) -> dict:
+    def _set_layer_params(self, ga : GraphAnalyzer) -> dict:
         params = {}
-        for layer  in conv_layers:
+        for layer in ga.get_conv2d_layers():
             params[layer['name']] = layer['conv_params']['weights']
+        for layer in ga.get_gemm_layers():
+            params[layer['name']] = layer['gemm_params']['weights']
+
         return params
 
     def optimize(self, optimization_objectives):
@@ -200,7 +203,7 @@ class PartitioningProblem(ElementwiseProblem):
             layer = self.schedule[j-1]
             acc_latency += self._get_layer_latency(acc, layer)
             acc_energy += self._get_layer_energy(acc, layer)
-            if 'Conv' in layer:
+            if layer in self.layer_params.keys():
                 part_l_params += self.layer_params[layer]
 
             while layer in successors: successors.remove(layer)

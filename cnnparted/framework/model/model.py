@@ -65,6 +65,9 @@ class TreeModel:
             elif node.op_type =='AveragePool':
                 pool_params = self._get_pool_params(node)
                 layer['pool_params'] = pool_params
+            elif node.op_type =='Gemm':
+                gemm_params = self._get_gemm_params(node)
+                layer['gemm_params'] = gemm_params
 
             output.append(layer)
 
@@ -87,6 +90,21 @@ class TreeModel:
             'kernel': attributes.get('kernel_shape'),
             'padding': attributes.get('pads'),
             'stride': attributes.get('strides')
+        }
+
+        return output
+
+    def _get_gemm_params(self,node):
+        matched_outputs = [output for output in node.output if output in self.output_sizes]
+        o_shape = [self.output_sizes[i] for i in matched_outputs]
+        matched_inputs = [input for input in node.input if input in self.output_sizes]
+        i_shape = [self.output_sizes[i] for i in matched_inputs]
+
+        if matched_outputs == [] and node.output[0] == "output":
+            o_shape = [self.out_layer['output_size']]
+
+        output = {
+            'weights': np.prod(i_shape + o_shape)
         }
 
         return output
