@@ -6,29 +6,15 @@ class LayersGraph:
         self.model_tree = model_tree
         self._graph = nx.DiGraph()
         self._create_layer_relationships()
-        # self.paths =  list(nx.all_simple_paths(self._graph, "input", "output"))
-        # self._sorted_partition_points =  self._sorted_common_nodes(
-        #      self._graph, self.paths
-        #  )
+        self.output_sizes = self._set_output_sizes()
 
     def get_Graph(self):
         return self._graph
 
-    def get_all_simple_paths(self, graph):
-        src, end = self._get_start_end_graph(graph)
-
-        paths = list(nx.all_simple_paths(graph, src, end))
-
-        return paths
-
-    # def get_all_simple_paths_eff(self, graph):
-    #     sorted_common_nodes=["input","Mul_3","Mul_5","Mul_7","Add_0","Mul_13","Mul_15",
-    #     "Add_1","Mul_23","Add_2","Add_3","Mul_33","Mul_35","Add_4","Mul_45","Add_6","Add_7"
-    #     ,"Add_8","output"]
-    #     _,_,paths = self._create_subgraphs(graph, sorted_common_nodes)
-    #     all_paths = self.stitch_paths(paths, "input", "output",sorted_common_nodes)
-    #     return all_paths
-
+    def _set_output_sizes(self) -> dict:
+        layer_names = [layer['name'] for layer in self.model_tree]
+        layer_outputs = [layer['output_size'] for layer in self.model_tree]
+        return {key: value for key, value in zip(layer_names, layer_outputs)}
 
     def stitch_paths(self, subgraph_paths, start_node, end_node, sorted_common_nodes):
     # The initial stitched paths are the paths in the first subgraph that start with the start_node

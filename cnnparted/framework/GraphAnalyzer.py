@@ -11,9 +11,7 @@ class GraphAnalyzer:
         self._tree = self._Tree_Model.get_Tree()
 
         self.graph = LayersGraph(self._tree)
-
         self.schedules = topo_sort_random_start_node(G=self.graph.get_Graph(), n=1, seed=0, as_ndarray=True, n_jobs=1, progress=progress)
-
         self.conv_layers = self.get_conv2d_layers()
 
     def get_conv2d_layers(self):

@@ -3,7 +3,7 @@ from pymoo.optimize import minimize
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
-from pymoo.operators.sampling.rnd import FloatRandomSampling #IntegerRandomSampling
+from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.factory import get_termination
 from pymoo.optimize import minimize
 from pymoo.core.problem import ElementwiseProblem
@@ -11,6 +11,7 @@ from .Optimizer import Optimizer
 import numpy as np
 
 import tqdm
+from copy import deepcopy
 from joblib import Parallel, delayed
 
 from ..GraphAnalyzer import GraphAnalyzer
@@ -27,15 +28,22 @@ class NSGA2_Optimizer(Optimizer):
         self.progress = progress
         nodes = len(ga.schedules[0])
 
+        self.layer_params = self._set_layer_params(ga.get_conv2d_layers())
+
         self.num_gen = self.pop_size = 1
         if len(nodeStats.keys()) > 1:
             self.num_gen = 100 * nodes
             self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
 
+    def _set_layer_params(self, conv_layers : list) -> dict:
+        params = {}
+        for layer  in conv_layers:
+            params[layer['name']] = layer['conv_params']['weights']
+        return params
 
     def optimize(self, optimization_objectives):
         sorts = Parallel(n_jobs=1, backend="multiprocessing")(
-            delayed(self._optimize_single)(s, self.lgraph, self.link_confs)
+            delayed(self._optimize_single)(s)
             for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
         )
 
@@ -45,9 +53,8 @@ class NSGA2_Optimizer(Optimizer):
                 if p[-1]:
                     print(p)
 
-
-    def _optimize_single(self, schedule : list, lgraph : LayersGraph, link_confs : list):
-        problem = PartitioningProblem(self.nodeStats, schedule, lgraph, link_confs)
+    def _optimize_single(self, schedule : list):
+        problem = PartitioningProblem(self.nodeStats, schedule, self.lgraph, self.layer_params, self.link_confs)
 
         algorithm = NSGA2(
             pop_size=self.pop_size,
@@ -87,7 +94,6 @@ class NSGA2_Optimizer(Optimizer):
 
         return data
 
-
     # https://stackoverflow.com/a/40239615
     def _is_pareto_efficient(self, costs : np.ndarray, return_mask : bool = True) -> np.ndarray:
         is_efficient = np.arange(costs.shape[0])
@@ -108,21 +114,22 @@ class NSGA2_Optimizer(Optimizer):
 
 
 class PartitioningProblem(ElementwiseProblem):
-    def __init__(self, nodeStats : dict, schedule : list, lgraph : LayersGraph, link_confs : list):
+    def __init__(self, nodeStats : dict, schedule : list, lgraph : LayersGraph, layer_params : dict, link_confs : list):
         self.nodeStats = nodeStats
         self.num_acc = len(nodeStats)
         self.num_pp = self.num_acc - 1
-
-        n_var = self.num_pp * 2 + 1 ## Number of max. partitioning points + device ID
-
         self.schedule = schedule
         self.num_layers = len(schedule)
-
         self.lgraph = lgraph
+        self.layer_params = layer_params
 
         self.links = []
         for link_conf in link_confs:
             self.links.append(Link(link_conf))
+
+
+        n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + device ID
+        n_obj = 3 + self.num_pp + self.num_acc # latency, energy, throughput + bandwidth + memory
 
         xu_pp = np.empty(self.num_pp)
         xu_pp.fill(self.num_layers + 0.49)
@@ -132,11 +139,10 @@ class PartitioningProblem(ElementwiseProblem):
         xu = np.append(xu_pp, xu_acc)
 
         super().__init__(n_var=n_var,
-                         n_obj=3,  ## latency and energy, add throughput?
+                         n_obj=n_obj,
                          n_constr=1,
                          xl=0.5,
                          xu=xu)
-
 
     def _evaluate(self, x, out, *args, **kwargs):
         p = []
@@ -147,6 +153,7 @@ class PartitioningProblem(ElementwiseProblem):
         energy = 0.0
         throughput = 0.0
         bandwidth = np.full((self.num_pp), np.inf)
+        mem = np.full((self.num_acc), np.inf)
 
         if not np.array_equal(np.sort(p[:self.num_pp-1]), p[:self.num_pp-1]):
             out["G"] = x[0]
@@ -164,7 +171,7 @@ class PartitioningProblem(ElementwiseProblem):
             i = -1
             last_pp = 0
             for i, pp in enumerate(p[0:self.num_pp], self.num_pp):
-                self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, th_pp, successors)
+                mem[i-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, th_pp, successors)
                 last_pp = pp
 
                 # evaluate link
@@ -173,45 +180,64 @@ class PartitioningProblem(ElementwiseProblem):
                 e_pp.append(link_e)
                 th_pp.append(self._zero_division(1.0, link_l))
 
-            self._eval_partition(p[i+1], last_pp, self.num_layers, l_pp, e_pp, th_pp, successors)
+            mem[i] = self._eval_partition(p[i+1], last_pp, self.num_layers, l_pp, e_pp, th_pp, successors)
 
             latency = sum(l_pp)
             energy = sum(e_pp)
             throughput = min(th_pp) * -1
 
-        out["F"] = [latency, energy, throughput] + list(bandwidth)
+        out["F"] = [latency, energy, throughput] + list(bandwidth) + list(mem)
 
-
-    def _eval_partition(self, acc : int, last_pp : int, pp : int, l_pp : list, e_pp : list, th_pp : list, successors : list) -> None:
+    def _eval_partition(self, acc : int, last_pp : int, pp : int, l_pp : list, e_pp : list, th_pp : list, successors : list) -> int:
         acc -= 1
         acc_latency = 0.0
         acc_energy = 0.0
-        for j in range(last_pp + 1, pp + 1):
-            acc_latency += self._get_layer_latency(acc, j)
-            acc_energy += self._get_layer_energy(acc, j)
+        part_l_params = 0
 
+        ls = {}
+        dmem = []
+        for j in range(last_pp + 1, pp + 1):
             layer = self.schedule[j-1]
+            acc_latency += self._get_layer_latency(acc, layer)
+            acc_energy += self._get_layer_energy(acc, layer)
+            if 'Conv' in layer:
+                part_l_params += self.layer_params[layer]
+
             while layer in successors: successors.remove(layer)
-            successors += [s for s in self.lgraph.get_successors(layer)]
+            layer_successors = [s for s in self.lgraph.get_successors(layer)]
+            successors += layer_successors
+
+            ifms = [] # Input Feature Maps
+            afms = [] # Active Feature Maps
+            for k in list(ls.keys()):
+                v = ls[k]
+                if layer in v:
+                    ifms.append(np.prod(self.lgraph.output_sizes[k]))
+                    ls[k].remove(layer)
+                elif v:
+                    afms.append(np.prod(self.lgraph.output_sizes[k]))
+                else:
+                    del ls[k]
+
+            ofm = np.prod(self.lgraph.output_sizes[layer]) # Output Feature Maps
+            dmem.append(sum([ofm] + ifms + afms))          # Feature Map Memory Consumption per layer
+
+            ls[layer] = deepcopy(layer_successors)
 
         l_pp.append(acc_latency)
         e_pp.append(acc_energy)
         th_pp.append(self._zero_division(1.0, acc_latency))
+        return part_l_params + max(dmem, default=0) # mem evaluation
 
-
-    def _get_layer_latency(self, acc : int, idx : int) -> float:
-        layer_name = self.schedule[idx-1]
+    def _get_layer_latency(self, acc : int, layer_name : str) -> float:
         acc = list(self.nodeStats.keys())[acc]
-
         if self.nodeStats[acc].get(layer_name):
             return float(self.nodeStats[acc][layer_name]['latency'])
         else:
             return 0
 
-    def _get_layer_energy(self, acc : int, idx : int) -> float:
-        layer_name = self.schedule[idx-1]
+    def _get_layer_energy(self, acc : int, layer_name : str) -> float:
         acc = list(self.nodeStats.keys())[acc]
-
         if self.nodeStats[acc].get(layer_name):
             return float(self.nodeStats[acc][layer_name]['energy'])
         else:
@@ -229,7 +255,7 @@ class PartitioningProblem(ElementwiseProblem):
             layers += list(self.lgraph.get_Graph().predecessors(layer))
         layers = np.unique([layer for layer in layers if layer not in successors])
 
-        data_sizes = [np.prod(layer["output_size"]) for layer in self.lgraph.model_tree if layer.get("name") in layers]
+        data_sizes = [np.prod(self.lgraph.output_sizes[layer]) for layer in layers]
 
         if len(self.links) == 1:
             return self.links[0].eval(np.sum(data_sizes))
