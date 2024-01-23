@@ -10,6 +10,8 @@ import numpy as np
 
 from typing import List, Optional, Union
 
+from copy import deepcopy
+
 
 def topo_sort_starting_node(
     G: nx.DiGraph, strating_node: int, seed: Optional[int] = None, as_ndarray: bool = False
@@ -143,7 +145,7 @@ def topo_sort_random_start_node(G, n: int = 1, seed: int = None, as_ndarray: boo
 
     starting_points = random.choices(list(G.nodes), k=n)
     sorts = Parallel(n_jobs=n_jobs, backend="multiprocessing")(
-        delayed(topo_sort_starting_node)(G, starting_point, seed=None, as_ndarray=as_ndarray)
+        delayed(topo_sort_starting_node)(deepcopy(G), starting_point, seed=None, as_ndarray=as_ndarray)
         for starting_point in tqdm.tqdm(starting_points, "Schedules", disable=(not progress))
     )
 

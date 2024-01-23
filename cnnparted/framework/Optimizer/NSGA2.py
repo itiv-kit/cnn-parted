@@ -15,18 +15,24 @@ from copy import deepcopy
 from joblib import Parallel, delayed
 
 from ..GraphAnalyzer import GraphAnalyzer
-from ..model.graph import LayersGraph
 from ..link.Link import Link
+from ..constants import NUM_JOBS
 
 
 class NSGA2_Optimizer(Optimizer):
     def __init__(self, ga : GraphAnalyzer, nodeStats : dict, link_components : list, progress : bool) -> None:
-        self.lgraph = ga.graph
         self.schedules = ga.schedules
         self.nodeStats = nodeStats
         self.link_confs = link_components
         self.progress = progress
         nodes = len(ga.schedules[0])
+
+        self.layer_dict = {}
+        for l in self.schedules[0]:
+            self.layer_dict[l] = {}
+            self.layer_dict[l]["predecessors"] = list(ga.graph.get_Graph().predecessors(l))
+            self.layer_dict[l]["successors"] = [s for s in ga.graph.get_successors(l)]
+            self.layer_dict[l]["output_size"] = ga.graph.output_sizes[l]
 
         self.layer_params = self._set_layer_params(ga)
 
@@ -45,19 +51,20 @@ class NSGA2_Optimizer(Optimizer):
         return params
 
     def optimize(self, optimization_objectives):
-        sorts = Parallel(n_jobs=1, backend="multiprocessing")(
+        sorts = Parallel(n_jobs=NUM_JOBS, backend="multiprocessing")(
             delayed(self._optimize_single)(s)
             for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
         )
 
         np.set_printoptions(precision=2)
+        print(sorts)
         for s in sorts:
             for p in s:
                 if p[-1]:
                     print(p)
 
     def _optimize_single(self, schedule : list):
-        problem = PartitioningProblem(self.nodeStats, schedule, self.lgraph, self.layer_params, self.link_confs)
+        problem = PartitioningProblem(self.nodeStats, schedule, self.layer_dict, self.layer_params, self.link_confs)
 
         algorithm = NSGA2(
             pop_size=self.pop_size,
@@ -86,7 +93,7 @@ class NSGA2_Optimizer(Optimizer):
             for ind in h.pop:
                 if ind.get("G") > 0:
                     continue
-                data.append(np.append(np.round(ind.get("X").tolist()), ind.get("F").tolist()))
+                data.append(np.append(np.round(ind.get("X").tolist()), np.abs(ind.get("F").tolist())))
         data = np.unique(data, axis=0)
 
         x_len = len(X[0])
@@ -117,13 +124,13 @@ class NSGA2_Optimizer(Optimizer):
 
 
 class PartitioningProblem(ElementwiseProblem):
-    def __init__(self, nodeStats : dict, schedule : list, lgraph : LayersGraph, layer_params : dict, link_confs : list):
+    def __init__(self, nodeStats : dict, schedule : list, layer_dict : dict, layer_params : dict, link_confs : list):
         self.nodeStats = nodeStats
         self.num_acc = len(nodeStats)
         self.num_pp = self.num_acc - 1
         self.schedule = schedule
         self.num_layers = len(schedule)
-        self.lgraph = lgraph
+        self.layer_dict = layer_dict
         self.layer_params = layer_params
 
         self.links = []
@@ -207,7 +214,7 @@ class PartitioningProblem(ElementwiseProblem):
                 part_l_params += self.layer_params[layer]
 
             while layer in successors: successors.remove(layer)
-            layer_successors = [s for s in self.lgraph.get_successors(layer)]
+            layer_successors = self.layer_dict[layer]["successors"]
             successors += layer_successors
 
             ifms = [] # Input Feature Maps
@@ -215,15 +222,15 @@ class PartitioningProblem(ElementwiseProblem):
             for k in list(ls.keys()):
                 v = ls[k]
                 if layer in v:
-                    ifms.append(np.prod(self.lgraph.output_sizes[k]))
+                    ifms.append(np.prod(self.layer_dict[k]["output_size"]))
                     ls[k].remove(layer)
                 elif v:
-                    afms.append(np.prod(self.lgraph.output_sizes[k]))
+                    afms.append(np.prod(self.layer_dict[k]["output_size"]))
                 else:
                     del ls[k]
 
-            ofm = np.prod(self.lgraph.output_sizes[layer]) # Output Feature Maps
-            dmem.append(sum([ofm] + ifms + afms))          # Feature Map Memory Consumption per layer
+            ofm = np.prod(self.layer_dict[layer]["output_size"]) # Output Feature Maps
+            dmem.append(sum([ofm] + ifms + afms))   # Feature Map Memory Consumption per layer
 
             ls[layer] = deepcopy(layer_successors)
 
@@ -255,10 +262,10 @@ class PartitioningProblem(ElementwiseProblem):
 
         layers = []
         for layer in np.unique(successors):
-            layers += list(self.lgraph.get_Graph().predecessors(layer))
+            layers += self.layer_dict[layer]["predecessors"]
         layers = np.unique([layer for layer in layers if layer not in successors])
 
-        data_sizes = [np.prod(self.lgraph.output_sizes[layer]) for layer in layers]
+        data_sizes = [np.prod(self.layer_dict[layer]["output_size"]) for layer in layers]
 
         if len(self.links) == 1:
             return self.links[0].eval(np.sum(data_sizes))
