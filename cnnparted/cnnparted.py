@@ -1,12 +1,14 @@
 #! /usr/bin/env python3
 import argparse
-from framework.Optimizer.NSGA2 import NSGA2_Optimizer
-from framework.helpers.ConfigHelper import ConfigHelper
 import torch
-from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 import os
 import subprocess
 import importlib
+import numpy as np
+
+from framework.Optimizer.NSGA2 import NSGA2_Optimizer
+from framework.helpers.ConfigHelper import ConfigHelper
+from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 from framework import NodeThread, GraphAnalyzer
 
 
@@ -23,8 +25,13 @@ def main(args):
 
     optimizer = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
     objective = conf_helper.get_optimization_objectives(node_components, link_components)
-    optimizer.optimize(objective)
+    sol = optimizer.optimize(objective)
 
+    np.set_printoptions(precision=2)
+    for s in sol:
+        for p in s:
+            if p[-1]:
+                print(p)
 
 def setup_workload(run_name : str, model_settings: dict) -> tuple:
     try:
