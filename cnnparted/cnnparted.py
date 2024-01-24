@@ -16,22 +16,22 @@ def main(args):
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
     node_components, link_components = conf_helper.get_system_components()
-
     accuracy_function = setup_workload(args.run_name, config['neural-network'])
 
     ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
 
-    nodeStats = node_evaluation(ga, node_components, args.run_name, args.show_progress)
-
-    optimizer = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
-    objective = conf_helper.get_optimization_objectives(node_components, link_components)
-    sol = optimizer.optimize(objective)
-
     np.set_printoptions(precision=2)
-    for s in sol:
-        for p in s:
-            if p[-1]:
-                print(p)
+    nodeStats = node_evaluation(ga, node_components, args.run_name, args.show_progress)
+    optimizer = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
+    sol = optimizer.optimize()
+
+    # for pareto, sched in sol.items():
+    #     for sd in sched:
+    #         print(sd)
+    for pareto, sched in sol.items():
+        print(pareto, len(sched))
+
+    # objective = conf_helper.get_optimization_objectives(node_components, link_components)
 
 def setup_workload(run_name : str, model_settings: dict) -> tuple:
     try:

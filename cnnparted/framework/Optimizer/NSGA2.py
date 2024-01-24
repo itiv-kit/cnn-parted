@@ -9,7 +9,7 @@ from pymoo.optimize import minimize
 import numpy as np
 import tqdm
 from joblib import Parallel, delayed
-
+from copy import deepcopy
 
 from .Optimizer import Optimizer
 from .PartitioningProblem import PartitioningProblem
@@ -39,6 +39,8 @@ class NSGA2_Optimizer(Optimizer):
             self.num_gen = 100 * nodes
             self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
 
+        self.results = {}
+
     def _set_layer_params(self, ga : GraphAnalyzer) -> dict:
         params = {}
         for layer in ga.get_conv2d_layers():
@@ -48,11 +50,38 @@ class NSGA2_Optimizer(Optimizer):
 
         return params
 
-    def optimize(self, optimization_objectives):
-        return Parallel(n_jobs=NUM_JOBS, backend="multiprocessing")(
+    def optimize(self) -> dict:
+        sorts = Parallel(n_jobs=NUM_JOBS, backend="multiprocessing")(
             delayed(self._optimize_single)(s)
             for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
         )
+
+        all_paretos = []
+        non_optimals = []
+        for i, sort in enumerate(sorts):
+            for res in sort:
+                if res[-1]:
+                    all_paretos.append(np.insert(res, 0, i)[:-1])
+                else:
+                    non_optimals.append(np.insert(res, 0, i)[:-1])
+
+        num_acc = len(self.nodeStats)
+        x_len = (num_acc - 1) * 2 + 1
+        comp_paretos = np.delete(all_paretos, np.s_[0:x_len+1], axis=1)
+        comp_paretos = np.delete(comp_paretos, np.s_[-num_acc:], axis=1) # memories not relevant for finding pareto points
+        paretos = self._is_pareto_efficient(comp_paretos)
+        paretos = np.expand_dims(paretos, 1)
+        all_paretos = np.hstack([all_paretos, paretos])
+
+        self.results["nondom"] = []
+        self.results["dom"] = non_optimals
+        for res in all_paretos:
+            if res[-1]:
+                self.results["nondom"].append(res[:-1])
+            else:
+                self.results["dom"].append(res[:-1])
+
+        return self.results
 
     def _optimize_single(self, schedule : list):
         problem = PartitioningProblem(self.nodeStats, schedule, self.layer_dict, self.layer_params, self.link_confs)
@@ -63,8 +92,7 @@ class NSGA2_Optimizer(Optimizer):
             sampling=FloatRandomSampling(),
             crossover=SBX(prob=0.9, eta=15),
             mutation=PM(eta=20),
-            eliminate_duplicates=True
-        )
+            eliminate_duplicates=True)
 
         res = minimize( problem,
                         algorithm,
@@ -72,7 +100,6 @@ class NSGA2_Optimizer(Optimizer):
                         seed=1,
                         save_history=True,
                         verbose=False)
-
         X = np.round(res.X)
         F = np.abs(res.F)
 

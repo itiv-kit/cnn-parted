@@ -1,3 +1,4 @@
+import numpy as np
 
 from .model.model import TreeModel
 from .model.graph import LayersGraph
@@ -13,6 +14,7 @@ class GraphAnalyzer:
 
         self.graph = LayersGraph(self._tree)
         self.schedules = topo_sort_random_start_node(G=self.graph.get_Graph(), n=NUM_TOPOS, seed=0, as_ndarray=True, progress=progress)
+        self.schedules = np.unique(self.schedules, axis=0)
         self.conv_layers = self.get_conv2d_layers()
 
     def get_conv2d_layers(self):
