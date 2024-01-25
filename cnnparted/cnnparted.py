@@ -5,6 +5,7 @@ import os
 import subprocess
 import importlib
 import numpy as np
+import pandas as pd
 
 from framework.Optimizer.NSGA2 import NSGA2_Optimizer
 from framework.helpers.ConfigHelper import ConfigHelper
@@ -23,11 +24,23 @@ def main(args):
     np.set_printoptions(precision=2)
     nodeStats = node_evaluation(ga, node_components, args.run_name, args.show_progress)
     optimizer = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
-    sol = optimizer.optimize()
+    fixed_sys = True # do not change order of accelerators if true
+    sol = optimizer.optimize(fixed_sys)
 
-    # for pareto, sched in sol.items():
-    #     for sd in sched:
-    #         print(sd)
+    ## Write File
+    num_acc = len(nodeStats)
+    rows = []
+    for pareto, sched in sol.items():
+        for sd in sched:
+            data = np.append(sd, pareto)
+            data[:2+num_acc] = data[:2+num_acc].astype(float).astype(int)
+            data[1] = ga.schedules[int(data[0])][int(data[1])-1]
+            rows.append(data)
+    df = pd.DataFrame(rows)
+    df.to_csv(args.run_name + "_" + "result.csv", header=False)
+    df = pd.DataFrame(ga.schedules)
+    df.to_csv(args.run_name + "_" + "schedules.csv", header=False)
+
     for pareto, sched in sol.items():
         print(pareto, len(sched))
 

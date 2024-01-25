@@ -6,11 +6,12 @@ from ..link.Link import Link
 
 
 class PartitioningProblem(ElementwiseProblem):
-    def __init__(self, nodeStats : dict, schedule : list, layer_dict : dict, layer_params : dict, link_confs : list):
+    def __init__(self, nodeStats : dict, schedule : list, fixed_sys : bool, layer_dict : dict, layer_params : dict, link_confs : list):
         self.nodeStats = nodeStats
         self.num_acc = len(nodeStats)
         self.num_pp = self.num_acc - 1
         self.schedule = schedule
+        self.fixed_sys = fixed_sys
         self.num_layers = len(schedule)
         self.layer_dict = layer_dict
         self.layer_params = layer_params
@@ -49,7 +50,9 @@ class PartitioningProblem(ElementwiseProblem):
 
         if not np.array_equal(np.sort(p[:self.num_pp-1]), p[:self.num_pp-1]):
             out["G"] = x[0]
-        elif np.unique(p[self.num_pp:]).size != np.asarray(p[self.num_pp:]).size:
+        elif np.unique(p[self.num_pp:]).size != np.asarray(p[self.num_pp:]).size:   # only use accelerator once
+            out["G"] = x[0]
+        elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_acc:]), p[-self.num_acc:]): # keep order of Accelerators
             out["G"] = x[0]
         else:
             out["G"] = -x[0]

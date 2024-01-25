@@ -50,9 +50,9 @@ class NSGA2_Optimizer(Optimizer):
 
         return params
 
-    def optimize(self) -> dict:
+    def optimize(self, fixed_sys : bool) -> dict:
         sorts = Parallel(n_jobs=NUM_JOBS, backend="multiprocessing")(
-            delayed(self._optimize_single)(s)
+            delayed(self._optimize_single)(s, fixed_sys)
             for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
         )
 
@@ -83,8 +83,8 @@ class NSGA2_Optimizer(Optimizer):
 
         return self.results
 
-    def _optimize_single(self, schedule : list):
-        problem = PartitioningProblem(self.nodeStats, schedule, self.layer_dict, self.layer_params, self.link_confs)
+    def _optimize_single(self, schedule : list, fixed_sys : bool) -> list:
+        problem = PartitioningProblem(self.nodeStats, schedule, fixed_sys, self.layer_dict, self.layer_params, self.link_confs)
 
         algorithm = NSGA2(
             pop_size=self.pop_size,
