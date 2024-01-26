@@ -10,7 +10,7 @@ neural-network:
 
 accuracy:
   device : "cuda"
-  bits: [16, 8]
+  bits: [16, 8] # eyeriss 16-bit, simba 8-bit
   calibration:
     samples: null # null sets samples to all
     file: './calibrations/googlenet_quant_calib.pkl'
@@ -54,14 +54,14 @@ components:
         timeout: 0
         victory-condition: 100
   - id: 1
-    max_out_size: 20000000
+    max_out_size: 150000000
     data_bit_width: 16
-    noi:
-      noi_mode: UCIe
-      width: 16
-      data_rate_Gbps: 4
-      latency_ns: 2 # including D2D Adapter and PHY
-      power_bit_pj: 0.5
+    ethernet:
+      cable_len_m: 5
+      eee_lmi_ratio: 0.1
+      eee_toff_ms: 0
+      enable_eee: false
+      eth_mode: BASE1000-T
     fps: 25
   - id: 2
     max_memory_size: 600000000

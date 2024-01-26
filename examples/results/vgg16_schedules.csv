@@ -1,0 +1,1 @@
+0,input,Conv_0,Relu_0,Conv_1,Relu_1,MaxPool_0,Conv_2,Relu_2,Conv_3,Relu_3,MaxPool_1,Conv_4,Relu_4,Conv_5,Relu_5,Conv_6,Relu_6,MaxPool_2,Conv_7,Relu_7,Conv_8,Relu_8,Conv_9,Relu_9,MaxPool_3,Conv_10,Relu_10,Conv_11,Relu_11,Conv_12,Relu_12,MaxPool_4,AveragePool_0,Flatten_0,Gemm_0,Relu_13,Gemm_1,Relu_14,Gemm_2,output
