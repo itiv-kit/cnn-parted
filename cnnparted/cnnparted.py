@@ -24,7 +24,7 @@ def main(args):
     ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
 
     # Step 2 - Layer Evaluation
-    nodeStats = node_evaluation(ga, node_components, args.run_name, args.show_progress)
+    nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)
 
     # Step 3 - Find pareto-front
     optimizer = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
@@ -69,7 +69,7 @@ def setup_workload(run_name : str, model_settings: dict) -> Callable:
         print()
         quit(1)
 
-def node_evaluation(ga : GraphAnalyzer, node_components : list, run_name : str, progress : bool) -> dict:
+def node_eval(ga : GraphAnalyzer, node_components : list, run_name : str, progress : bool) -> dict:
     nodeStats = {}
     node_threads = [
             NodeThread(component.get('id'), ga, component, run_name, progress)

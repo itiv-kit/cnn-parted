@@ -14,11 +14,9 @@ class TreeModel:
         self._model = onnx.load(self._model_path)
         onnx.checker.check_model(self._model)
         self._model = shape_inference.infer_shapes(self._model)
-        self._give_unique_node_names(self._model)
         self.output_sizes = self._get_output_sizes()
         self._layerTree = self._get_layers_data()
         onnx.save(self._model, os.path.join(MODEL_PATH, run_name, "new_model.onnx"))
-        # self._identity_model = self.model_helper.add_identity_layers(self._model)
 
     def get_torchModel(self):
         return self.model_helper.convert_to_pytorch(self._model)#,self.model_helper.convert_to_pytorch(self._identity_model)

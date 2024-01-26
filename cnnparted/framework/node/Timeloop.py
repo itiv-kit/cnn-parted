@@ -69,7 +69,7 @@ class Timeloop:
         if os.path.isfile(os.path.join(self.configs_dir, 'archs', (self.accname + '.cfg'))):
             self.type_cfg = '.cfg'
 
-        runname = layer.get('name') + self.accname
+        runname = layer.get('name')[1:]
         dirname = os.path.join(ROOT_DIR, self.runroot, runname)
         subprocess.check_call(['mkdir', '-p', dirname])
         os.chdir(dirname)
