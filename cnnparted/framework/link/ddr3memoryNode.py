@@ -2,7 +2,6 @@ from .MemoryModelInterface import MemoryModelInterface
 from .Ramulator import Ramulator
 from .Vampire import Vampire
 import csv
-import threading
 
 class DDR3Node(MemoryModelInterface):
     def __init__(self):

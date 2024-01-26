@@ -9,12 +9,11 @@ from pymoo.optimize import minimize
 import numpy as np
 import tqdm
 from joblib import Parallel, delayed
-from copy import deepcopy
 
 from .Optimizer import Optimizer
 from .PartitioningProblem import PartitioningProblem
-from ..GraphAnalyzer import GraphAnalyzer
-from ..constants import NUM_JOBS
+from framework import GraphAnalyzer
+from framework.constants import NUM_JOBS
 
 
 class NSGA2_Optimizer(Optimizer):

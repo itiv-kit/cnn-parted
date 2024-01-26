@@ -1,7 +1,6 @@
 from .MemoryModelInterface import MemoryModelInterface
 from framework.ModuleThreadInterface import ModuleThreadInterface
 from .ddr3memoryNode import DDR3Node
-from framework.helpers.ConfigHelper import ConfigHelper
 
 class MemoryNodeThread(ModuleThreadInterface):
 

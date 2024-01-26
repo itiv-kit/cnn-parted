@@ -11,6 +11,7 @@ class GraphAnalyzer:
         self.input_size = input_size
         self._Tree_Model = TreeModel(run_name, self.input_size)
         self._tree = self._Tree_Model.get_Tree()
+        self.torchmodel = self._Tree_Model.get_torchModel()
 
         self.graph = LayersGraph(self._tree)
         self.schedules = topo_sort_random_start_node(G=self.graph.get_Graph(), n=NUM_TOPOS, seed=0, as_ndarray=True, progress=progress)

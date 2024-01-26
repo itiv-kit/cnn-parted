@@ -65,7 +65,8 @@ setup(
             'onnxruntime-gpu',
             'traitlets',
             'pymoo',
-            'onnx2pytorch'
+            'onnx2pytorch',
+            'pandas'
             ],
       python_requires = '>=3.9',
       include_package_data = True,

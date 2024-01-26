@@ -6,11 +6,10 @@ import subprocess
 import importlib
 import numpy as np
 import pandas as pd
+from typing import Callable
 
-from framework.Optimizer.NSGA2 import NSGA2_Optimizer
-from framework.helpers.ConfigHelper import ConfigHelper
+from framework import ConfigHelper, NodeThread, GraphAnalyzer, NSGA2_Optimizer, QuantizationEvaluator
 from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
-from framework import NodeThread, GraphAnalyzer
 
 
 def main(args):
@@ -18,35 +17,34 @@ def main(args):
     config = conf_helper.get_config()
     node_components, link_components = conf_helper.get_system_components()
     accuracy_function = setup_workload(args.run_name, config['neural-network'])
+    num_pp = len(node_components) - 1
+    n_var = num_pp * 2 + 1
 
+    # Step 1 - Analysis
     ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
 
-    np.set_printoptions(precision=2)
+    # Step 2 - Layer Evaluation
     nodeStats = node_evaluation(ga, node_components, args.run_name, args.show_progress)
+
+    # Step 3 - Find pareto-front
     optimizer = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
-    fixed_sys = True # do not change order of accelerators if true
+    fixed_sys = True # do not change order of accelerators if true. TODO: add to config file
     sol = optimizer.optimize(fixed_sys)
 
-    ## Write File
-    num_acc = len(nodeStats)
-    rows = []
-    for pareto, sched in sol.items():
-        for sd in sched:
-            data = np.append(sd, pareto)
-            data[:2+num_acc] = data[:2+num_acc].astype(float).astype(int)
-            data[1] = ga.schedules[int(data[0])][int(data[1])-1]
-            rows.append(data)
-    df = pd.DataFrame(rows)
-    df.to_csv(args.run_name + "_" + "result.csv", header=False)
-    df = pd.DataFrame(ga.schedules)
-    df.to_csv(args.run_name + "_" + "schedules.csv", header=False)
+    # Step 4 - Accuracy Evaluation
+    quant = QuantizationEvaluator(ga.torchmodel, ga.input_size, config.get('accuracy'), args.show_progress)
+    quant.eval(sol["nondom"][:n_var+1], ga.schedules, accuracy_function)
 
+    # Step 5 - Find best partitioning point
+    # objective = conf_helper.get_optimization_objectives(node_components, link_components)
+
+    # Step 6 - Output exploration results
+    write_files(args.run_name, n_var, sol, ga.schedules)
     for pareto, sched in sol.items():
         print(pareto, len(sched))
 
-    # objective = conf_helper.get_optimization_objectives(node_components, link_components)
 
-def setup_workload(run_name : str, model_settings: dict) -> tuple:
+def setup_workload(run_name : str, model_settings: dict) -> Callable:
     try:
         model = importlib.import_module(
             f"{WORKLOAD_FOLDER}.{model_settings['name']}", package=__package__
@@ -71,7 +69,6 @@ def setup_workload(run_name : str, model_settings: dict) -> tuple:
         print()
         quit(1)
 
-
 def node_evaluation(ga : GraphAnalyzer, node_components : list, run_name : str, progress : bool) -> dict:
     nodeStats = {}
     node_threads = [
@@ -95,6 +92,21 @@ def node_evaluation(ga : GraphAnalyzer, node_components : list, run_name : str, 
 
     return nodeStats
 
+def write_files(run_name : str, n_var : int, results : dict, schedules : list) -> None:
+    rows = []
+    for pareto, sched in results.items():
+        for sd in sched:
+            data = np.append(sd, pareto)
+            data[:n_var+1] = data[:n_var+1].astype(float).astype(int)
+            data[1] = schedules[int(data[0])][int(data[1])-1]
+            rows.append(data)
+    df = pd.DataFrame(rows)
+    df.to_csv(run_name + "_" + "result.csv", header=False)
+    df = pd.DataFrame(schedules)
+    df.to_csv(run_name + "_" + "schedules.csv", header=False)
+
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
@@ -117,92 +129,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
+    np.set_printoptions(precision=2)
 
     main(args)
-
-
-
-    # dnn = DNNAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']), conf_helper)#,node_components,link_components ,constraints)
-
-    # if len(dnn.partpoints_filtered) == 0:
-    #     print("ERROR: No partitioning points found. Please check your system constraints: max_memory_size, max_out_size ")
-    #     quit(1)
-
-
-    # accStats = {}
-    # if args.accuracy:
-    #     if 'accuracy' in config.keys():
-    #         accEval = QuantizationEvaluator(dnn, config.get('accuracy'), node_components, accuracy_function, args.show_progress)
-    #         accStats = accEval.get_stats()
-
-    # objective = conf_helper.get_optimization_objectives(node_components,link_components)
-    # first_component_id = node_components[0]['id']
-
-    # nodeStats={}
-    # linkStats={}
-
-    # for i in range (0, args.num_runs):
-
-    #     node_threads = [
-    #             NodeThread(component.get('id'), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
-    #             for component in node_components
-    #         ]
-    #     link_threads = [LinkComputationThread(component.get('id'), dnn, component,False, args.run_name, args.show_progress)
-    #              for component in link_components
-
-    #         ]
-
-    #     for t in node_threads:
-    #         if not t.config.get("timeloop"):
-    #             t.start()
-
-    #     for t in link_threads:
-    #         t.start()
-
-    #     for t in node_threads:
-    #         if t.config.get("timeloop"): # run them simply on main thread
-    #             t.run()
-
-    #     for t in node_threads and link_threads:
-    #         if not t.config.get("timeloop"):
-    #             t.join()
-
-    #     for node_thread in node_threads:
-    #         id,stats = node_thread.getStats()
-    #         if id not in nodeStats:
-    #             nodeStats[id] = {}
-    #         nodeStats[id][i] = stats
-
-    #     for link_thread in  link_threads:
-    #         id,stats = link_thread.getStats()
-    #         if id not in linkStats:
-    #             linkStats[id] = {}
-    #         linkStats[id][i] = stats
-
-    # e = Evaluator(dnn, nodeStats, linkStats, accStats)
-    # e.print_sim_time()
-    # e.export_csv(args.run_name)
-
-    # nodes = e.get_all_layer_stats()
-
-    # if len(nodes) == 0:
-    #     print("No benificial partitioning point found: check the bandwidth and memory constraints: ")
-    #     sys.exit()
-
-
-    # nsga2 = NSGA2_Optimizer(nodes)
-    # optimizer,paretos = nsga2.optimize(objective)
-
-    # data = {
-    # "best partitioning Point": optimizer,
-    # "Paretos": [layer['layer'] for layer in paretos]
-    # }
-
-    # with open(args.run_name + '_optimals.json', 'w') as jsonfile:
-    #     json.dump(data, jsonfile, indent=4)
-
-    # print("best partitioning Point: ")
-    # print(optimizer)
-    # print("Paretos:")
-    # for layer in paretos:
-    #     print(layer['layer'])

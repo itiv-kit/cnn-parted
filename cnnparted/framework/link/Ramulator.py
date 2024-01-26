@@ -1,6 +1,5 @@
 import subprocess
 import random
-import struct
 import os
 from framework.constants import ROOT_DIR
 import subprocess

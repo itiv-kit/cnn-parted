@@ -1,9 +1,7 @@
 import threading
 import time
-import os
 
-from .GraphAnalyzer import GraphAnalyzer
-from framework.constants import ROOT_DIR
+from framework import GraphAnalyzer
 
 class ModuleThreadInterface(threading.Thread):
     def __init__(self, id : str, ga : GraphAnalyzer, config : dict, runname : str, progress : bool) -> None:
