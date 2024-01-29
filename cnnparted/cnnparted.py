@@ -33,7 +33,7 @@ def main(args):
 
     # Step 4 - Accuracy Evaluation
     quant = QuantizationEvaluator(ga.torchmodel, ga.input_size, config.get('accuracy'), args.show_progress)
-    quant.eval(sol["nondom"][:n_var+1], ga.schedules, accuracy_function)
+    quant.eval(sol["nondom"], n_var, ga.schedules, accuracy_function)
 
     # Step 5 - Find best partitioning point
     # objective = conf_helper.get_optimization_objectives(node_components, link_components)
