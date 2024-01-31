@@ -1,14 +1,13 @@
 import os
-import numpy as np
-
 import torch
 import torch.nn as nn
+
+import numpy as np
 
 from copy import deepcopy
 from tqdm import tqdm
 from typing import Callable
 
-from model_explorer.utils.data_loader_generator import DataLoaderGenerator
 from model_explorer.utils.setup import build_dataloader_generators
 
 from .quantizer import QuantizedModel
@@ -20,18 +19,19 @@ class QuantizationEvaluator():
         self.bits = config.get('bits')
         self.calib_conf = config.get('calibration')
         self.gpu_device = torch.device(config.get('device'))
+        self.progress = progress
 
         m = deepcopy(model)
         self.qmodel = QuantizedModel(m, self.gpu_device)
 
         dataloaders = build_dataloader_generators(config['datasets'])
-        self.calib_dataloader = dataloaders['calibrate']
-        self.train_dataloader = dataloaders['train']
-        self.val_dataloader = dataloaders['validation']
+        self.calib_dataloadergen = dataloaders['calibrate']
+        self.train_dataloadergen = dataloaders['train']
+        self.val_dataloadergen = dataloaders['validation']
 
         self.param_path = self.calib_conf.get('file')
         if not os.path.exists(self.param_path):
-            generate_calibration(model, self.calib_dataloader, True, self.param_path)
+            generate_calibration(model, self.calib_dataloadergen, True, self.param_path)
 
         self.train_epochs = config['retraining'].get('epochs')
 
@@ -39,7 +39,54 @@ class QuantizationEvaluator():
     def eval(self, partitions : list, n_var : int, schedules : list, accuracy_function : Callable) -> list:
         quants = self._gen_quant_list(partitions, n_var, schedules)
 
-        print(quants)
+        # Training
+        self.qmodel.bit_widths = np.ones(len(quants[0])) * max(self.bits)
+        self.qmodel.load_parameters_file(self.param_path)
+
+        criterion = torch.nn.CrossEntropyLoss()
+        optimizer = torch.optim.SGD(self.qmodel.base_model.parameters(), lr=0.0001)
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
+                                                            step_size=1,
+                                                            gamma=0.1)
+
+        self.qmodel.base_model.train()
+        for epoch_idx in range(self.train_epochs):
+            if self.progress:
+                pbar = tqdm(total=len(self.train_dataloadergen), ascii=True,
+                            desc="Epoch {} / {}".format(epoch_idx + 1, self.train_epochs),
+                            position=1)
+
+            running_loss = 0.0
+            train_dataloader = self.train_dataloadergen.get_dataloader()
+
+            for image, target, *_ in train_dataloader:
+                image, target = image.to(self.gpu_device), target.to(self.gpu_device)
+
+                optimizer.zero_grad()
+
+                with torch.set_grad_enabled(mode=True):
+                    self.qmodel.base_model.to(self.gpu_device)
+                    output = self.qmodel.base_model(image)
+                    loss = criterion(output, target)
+                    loss.backward()
+                    optimizer.step()
+
+                    running_loss += loss.item() * output.size(0)
+
+                    if self.progress:
+                        pbar.update(output.size(0))
+
+            lr_scheduler.step()
+
+            if self.progress:
+                pbar.close()
+
+        # Evaluation
+        for i, q in enumerate(quants):
+            self.qmodel.bit_widths = q
+            self.qmodel.base_model.eval()
+            acc = accuracy_function(self.qmodel.base_model, self.val_dataloadergen, progress=self.progress, title=f"Infere")
+            partitions[i] = np.append(partitions[i], acc.cpu().detach().numpy())
 
         return quants
 
@@ -67,4 +114,4 @@ class QuantizationEvaluator():
                     partition += 1
             quants.append(deepcopy(quant_list))
 
-        return np.unique(quants, axis=0)
+        return quants

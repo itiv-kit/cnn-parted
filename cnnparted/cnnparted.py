@@ -31,9 +31,11 @@ def main(args):
     fixed_sys = True # do not change order of accelerators if true. TODO: add to config file
     sol = optimizer.optimize(fixed_sys)
 
-    # Step 4 - Accuracy Evaluation
+    # Step 4 - Accuracy Evaluation (only non-dominated solutions)
     quant = QuantizationEvaluator(ga.torchmodel, ga.input_size, config.get('accuracy'), args.show_progress)
     quant.eval(sol["nondom"], n_var, ga.schedules, accuracy_function)
+    for i, p in enumerate(sol["dom"]): # achieving aligned csv file
+        sol["dom"][i] = np.append(p, float(0))
 
     # Step 5 - Find best partitioning point
     # objective = conf_helper.get_optimization_objectives(node_components, link_components)
