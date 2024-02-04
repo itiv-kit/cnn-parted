@@ -22,6 +22,7 @@ def main(args):
 
     # Step 1 - Analysis
     ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
+    ga.find_schedules()
 
     # Step 2 - Layer Evaluation
     nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)
@@ -104,10 +105,6 @@ def write_files(run_name : str, n_var : int, results : dict, schedules : list) -
             rows.append(data)
     df = pd.DataFrame(rows)
     df.to_csv(run_name + "_" + "result.csv", header=False)
-    df = pd.DataFrame(schedules)
-    df.to_csv(run_name + "_" + "schedules.csv", header=False)
-
-
 
 
 if __name__ == '__main__':
