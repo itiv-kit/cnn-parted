@@ -88,8 +88,8 @@ class NSGA2_Optimizer(Optimizer):
         all_paretos = np.hstack([all_paretos, paretos])
 
         self.results["nondom"] = []
-        self.results["dom"] = non_optimals
-        for res in all_paretos:
+        self.results["dom"] = list(np.abs(non_optimals))
+        for res in np.abs(all_paretos):
             if res[-1]:
                 self.results["nondom"].append(res[:-1])
             else:
@@ -115,7 +115,7 @@ class NSGA2_Optimizer(Optimizer):
                         save_history=True,
                         verbose=False)
         X = np.round(res.X)
-        F = np.abs(res.F)
+        F = res.F
 
         data = []
         for i in range(0, len(X)):
@@ -125,7 +125,7 @@ class NSGA2_Optimizer(Optimizer):
             for ind in h.pop:
                 if ind.get("G") > 0:
                     continue
-                data.append(np.append(np.round(ind.get("X").tolist()), np.abs(ind.get("F").tolist())))
+                data.append(np.append(np.round(ind.get("X").tolist()), ind.get("F").tolist()))
         data = np.unique(data, axis=0)
 
         x_len = len(X[0])

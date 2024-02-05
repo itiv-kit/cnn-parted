@@ -73,7 +73,7 @@ class PartitioningProblem(ElementwiseProblem):
                 link_l, link_e, bandwidth[i-1] = self._get_link_metrics(i-1, successors)
                 l_pp.append(link_l)
                 e_pp.append(link_e)
-                th_pp.append(self._zero_division(1.0, link_l))
+                th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
 
             mem[i] = self._eval_partition(p[i+1], last_pp, self.num_layers, l_pp, e_pp, th_pp, successors)
 
@@ -121,7 +121,7 @@ class PartitioningProblem(ElementwiseProblem):
 
         l_pp.append(acc_latency)
         e_pp.append(acc_energy)
-        th_pp.append(self._zero_division(1.0, acc_latency))
+        th_pp.append(self._zero_division(1000.0, acc_latency)) # FPS - latency in ms
         return part_l_params + max(dmem, default=0) # mem evaluation
 
     def _get_layer_latency(self, acc : int, layer_name : str) -> float:
