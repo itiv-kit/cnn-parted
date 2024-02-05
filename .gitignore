@@ -7,6 +7,7 @@
 onnx_models/
 run*
 *.csv
+*.npy
 timeloop-mapper.*
 !examples/results/*
 calibrations*

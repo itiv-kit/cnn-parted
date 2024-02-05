@@ -1,3 +1,7 @@
+import os
+import numpy as np
+import tqdm
+
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.optimize import minimize
 from pymoo.algorithms.moo.nsga2 import NSGA2
@@ -6,8 +10,7 @@ from pymoo.operators.mutation.pm import PM
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.factory import get_termination
 from pymoo.optimize import minimize
-import numpy as np
-import tqdm
+
 from joblib import Parallel, delayed
 
 from .Optimizer import Optimizer
@@ -18,6 +21,7 @@ from framework.constants import NUM_JOBS
 
 class NSGA2_Optimizer(Optimizer):
     def __init__(self, ga : GraphAnalyzer, nodeStats : dict, link_components : list, progress : bool) -> None:
+        self.run_name = ga.run_name
         self.schedules = ga.schedules
         self.nodeStats = nodeStats
         self.link_confs = link_components
@@ -50,19 +54,30 @@ class NSGA2_Optimizer(Optimizer):
         return params
 
     def optimize(self, fixed_sys : bool) -> dict:
-        sorts = Parallel(n_jobs=NUM_JOBS, backend="multiprocessing")(
-            delayed(self._optimize_single)(s, fixed_sys)
-            for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
-        )
-
         all_paretos = []
         non_optimals = []
-        for i, sort in enumerate(sorts):
-            for res in sort:
-                if res[-1]:
-                    all_paretos.append(np.insert(res, 0, i)[:-1])
-                else:
-                    non_optimals.append(np.insert(res, 0, i)[:-1])
+
+        fname_p_npy = self.run_name + "_" + "paretos.npy"
+        fname_n_npy = self.run_name + "_" + "non_optimals.npy"
+        if os.path.isfile(fname_p_npy) and os.path.isfile(fname_n_npy):
+            all_paretos = list(np.load(fname_p_npy))
+            non_optimals = list(np.load(fname_n_npy))
+        else:
+            sorts = Parallel(n_jobs=NUM_JOBS, backend="multiprocessing")(
+                delayed(self._optimize_single)(s, fixed_sys)
+                for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
+            )
+
+
+            for i, sort in enumerate(sorts):
+                for res in sort:
+                    if res[-1]:
+                        all_paretos.append(np.insert(res, 0, i)[:-1])
+                    else:
+                        non_optimals.append(np.insert(res, 0, i)[:-1])
+
+            np.save(fname_p_npy, all_paretos)
+            np.save(fname_n_npy, non_optimals)
 
         num_acc = len(self.nodeStats)
         x_len = (num_acc - 1) * 2 + 1
