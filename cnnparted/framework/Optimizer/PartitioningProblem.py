@@ -34,7 +34,7 @@ class PartitioningProblem(ElementwiseProblem):
         super().__init__(n_var=n_var,
                          n_obj=n_obj,
                          n_constr=1,
-                         xl=0.5,
+                         xl=0.51,
                          xu=xu)
 
     def _evaluate(self, x, out, *args, **kwargs):
