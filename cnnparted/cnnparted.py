@@ -101,6 +101,7 @@ def write_files(run_name : str, n_var : int, results : dict, schedules : list) -
     for pareto, sched in results.items():
         for sd in sched:
             data = np.append(sd, pareto)
+            data = data.astype('U256')
             data[:n_var+1] = data[:n_var+1].astype(float).astype(int)
             data[1] = schedules[int(data[0])][int(data[1])-1]
             rows.append(data)
