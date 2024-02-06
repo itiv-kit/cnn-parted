@@ -66,7 +66,8 @@ setup(
             'traitlets',
             'pymoo',
             'onnx2pytorch',
-            'pandas'
+            'pandas',
+            'joblib'
             ],
       python_requires = '>=3.9',
       include_package_data = True,

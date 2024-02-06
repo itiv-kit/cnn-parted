@@ -103,7 +103,8 @@ def write_files(run_name : str, n_var : int, results : dict, schedules : list) -
             data = np.append(sd, pareto)
             data = data.astype('U256')
             data[:n_var+1] = data[:n_var+1].astype(float).astype(int)
-            data[1] = schedules[int(data[0])][int(data[1])-1]
+            for i in range(1,int(n_var/2)+1):
+                data[i] = schedules[int(data[0])][int(data[i])-1]
             rows.append(data)
     df = pd.DataFrame(rows)
     df.to_csv(run_name + "_" + "result.csv", header=False)

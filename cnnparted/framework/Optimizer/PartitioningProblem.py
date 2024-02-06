@@ -48,9 +48,9 @@ class PartitioningProblem(ElementwiseProblem):
         bandwidth = np.full((self.num_pp), np.inf)
         mem = np.full((self.num_acc), np.inf)
 
-        if not np.array_equal(np.sort(p[:self.num_pp-1]), p[:self.num_pp-1]):
+        if not np.array_equal(np.sort(p[:self.num_pp]), p[:self.num_pp]): # keep order of partitioning points
             out["G"] = x[0]
-        elif np.unique(p[self.num_pp:]).size != np.asarray(p[self.num_pp:]).size:   # only use accelerator once
+        elif np.unique(p[-self.num_acc:]).size != np.asarray(p[-self.num_acc:]).size:   # only use accelerator once
             out["G"] = x[0]
         elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_acc:]), p[-self.num_acc:]): # keep order of Accelerators
             out["G"] = x[0]
@@ -66,16 +66,17 @@ class PartitioningProblem(ElementwiseProblem):
             i = -1
             last_pp = 0
             for i, pp in enumerate(p[0:self.num_pp], self.num_pp):
-                mem[i-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, th_pp, successors)
-                last_pp = pp
+                mem[i-self.num_pp] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, th_pp, successors)
 
                 # evaluate link
-                link_l, link_e, bandwidth[i-1] = self._get_link_metrics(i-1, successors)
+                link_l, link_e, bandwidth[i-self.num_pp] = self._get_link_metrics(i-self.num_pp, last_pp, pp, successors)
                 l_pp.append(link_l)
                 e_pp.append(link_e)
                 th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
 
-            mem[i] = self._eval_partition(p[i+1], last_pp, self.num_layers, l_pp, e_pp, th_pp, successors)
+                last_pp = pp
+
+            mem[i+1-self.num_pp] = self._eval_partition(p[i+1], last_pp, self.num_layers, l_pp, e_pp, th_pp, successors)
 
             latency = sum(l_pp)
             energy = sum(e_pp)
@@ -141,8 +142,8 @@ class PartitioningProblem(ElementwiseProblem):
     def _zero_division(self, a : float, b : float) -> float:
         return a / b if b else np.inf
 
-    def _get_link_metrics(self, link_idx : int, successors : list) -> (float, float, float):
-        if len(self.links) == 0:
+    def _get_link_metrics(self, link_idx : int, last_pp : int, pp : int, successors : list) -> (float, float, float):
+        if len(self.links) == 0 or last_pp == pp:
             return 0, 0, 0
 
         layers = []
