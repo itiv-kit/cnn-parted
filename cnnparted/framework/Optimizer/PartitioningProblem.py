@@ -64,7 +64,7 @@ class PartitioningProblem(ElementwiseProblem):
             successors.append(self.schedule[0])
 
             i = -1
-            last_pp = 0
+            last_pp = -1
             for i, pp in enumerate(p[0:self.num_pp], self.num_pp):
                 mem[i-self.num_pp] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, th_pp, successors)
 
