@@ -46,6 +46,9 @@ def main(args):
     write_files(args.run_name, n_var, sol, ga.schedules)
     for pareto, sched in sol.items():
         print(pareto, len(sched))
+    num_real_pp = [len(np.unique(np.append(sched[1:int(n_var/2)+1], [1, len(ga.schedules[0])]))) for sched in sol["nondom"]]
+    for i in range(2, max(num_real_pp)+1):
+        print(i-1, "Partition(s):", num_real_pp.count(i))
 
 
 def setup_workload(run_name : str, model_settings: dict) -> Callable:
