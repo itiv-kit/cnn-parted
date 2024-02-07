@@ -82,10 +82,10 @@ class NSGA2_Optimizer(Optimizer):
         num_acc = len(self.nodeStats)
         x_len = (num_acc - 1) * 2 + 1
         comp_paretos = np.delete(all_paretos, np.s_[0:x_len+1], axis=1)
-        comp_paretos = np.delete(comp_paretos, np.s_[-num_acc:], axis=1) # memories not relevant for finding pareto points
-        paretos = self._is_pareto_efficient(comp_paretos)
-        paretos = np.expand_dims(paretos, 1)
-        all_paretos = np.hstack([all_paretos, paretos])
+        bw_sums = np.sum(np.delete(np.delete(comp_paretos, np.s_[:num_acc-1], axis=1), np.s_[-num_acc:], axis=1), axis=1) # calc sum of bandwidths
+        comp_paretos = np.delete(comp_paretos, np.s_[-(num_acc*2-1):], axis=1) # memories not relevant for finding pareto points
+        comp_paretos = np.hstack([comp_paretos, np.expand_dims(bw_sums, 1)])
+        all_paretos = np.hstack([all_paretos, np.expand_dims(self._is_pareto_efficient(comp_paretos), 1)])
 
         self.results["nondom"] = []
         self.results["dom"] = list(np.abs(non_optimals))
