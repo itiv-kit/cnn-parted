@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from typing import Callable
 
-from framework import ConfigHelper, NodeThread, GraphAnalyzer, NSGA2_Optimizer, QuantizationEvaluator
+from framework import ConfigHelper, NodeThread, GraphAnalyzer, Partitioning_Optimizer, QuantizationEvaluator
 from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 
 
@@ -28,7 +28,7 @@ def main(args):
     nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)
 
     # Step 3 - Find pareto-front
-    optimizer = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
+    optimizer = Partitioning_Optimizer(ga, nodeStats, link_components, args.show_progress)
     fixed_sys = True # do not change order of accelerators if true. TODO: add to config file
     sol = optimizer.optimize(fixed_sys)
 

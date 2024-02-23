@@ -19,7 +19,7 @@ from framework import GraphAnalyzer
 from framework.constants import NUM_JOBS
 
 
-class NSGA2_Optimizer(Optimizer):
+class Partitioning_Optimizer(Optimizer):
     def __init__(self, ga : GraphAnalyzer, nodeStats : dict, link_components : list, progress : bool) -> None:
         self.run_name = ga.run_name
         self.schedules = ga.schedules
