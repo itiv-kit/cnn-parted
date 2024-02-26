@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from typing import Callable
 
-from framework import ConfigHelper, NodeThread, GraphAnalyzer, Partitioning_Optimizer, QuantizationEvaluator
+from framework import ConfigHelper, NodeThread, GraphAnalyzer, RobustnessOptimizer, PartitioningOptimizer, QuantizationEvaluator
 from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 
 
@@ -24,25 +24,29 @@ def main(args):
     ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
     ga.find_schedules()
 
-    # Step 2 - Layer Evaluation
+    # Step 2 - Robustness Analysis
+    robustnessAnalyzer = RobustnessOptimizer(ga.torchmodel, accuracy_function, config.get('accuracy'), args.show_progress)
+    print(robustnessAnalyzer.optimize())
+
+    # Step 3 - Layer Evaluation
     nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)
 
-    # Step 3 - Find pareto-front
-    optimizer = Partitioning_Optimizer(ga, nodeStats, link_components, args.show_progress)
+    # Step 4 - Find pareto-front
+    optimizer = PartitioningOptimizer(ga, nodeStats, link_components, args.show_progress)
     fixed_sys = True # do not change order of accelerators if true. TODO: add to config file
     sol = optimizer.optimize(fixed_sys)
 
-    # Step 4 - Accuracy Evaluation (only non-dominated solutions)
+    # Step 5 - Accuracy Evaluation (only non-dominated solutions)
     if args.accuracy:
         quant = QuantizationEvaluator(ga.torchmodel, ga.input_size, config.get('accuracy'), args.show_progress)
         quant.eval(sol["nondom"], n_var, ga.schedules, accuracy_function)
         for i, p in enumerate(sol["dom"]): # achieving aligned csv file
             sol["dom"][i] = np.append(p, float(0))
 
-    # Step 5 - Find best partitioning point
+    # Step 6 - Find best partitioning point
     # objective = conf_helper.get_optimization_objectives(node_components, link_components)
 
-    # Step 6 - Output exploration results
+    # Step 7 - Output exploration results
     write_files(args.run_name, n_var, sol, ga.schedules)
     for pareto, sched in sol.items():
         print(pareto, len(sched))

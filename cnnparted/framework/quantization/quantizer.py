@@ -117,6 +117,7 @@ class QuantizedModel(CustomModel):
             }
 
     def _create_quantized_model(self) -> None:
+        qmodules = {}
         for name, module in self.base_model.named_modules():
             if isinstance(module, torch_nn.Conv2d):
                 # The file /pytorch_quantization/nn/modules/_utils.py:L161 has
@@ -143,7 +144,10 @@ class QuantizedModel(CustomModel):
                 quant_conv.weight = module.weight
                 quant_conv.bias = module.bias
 
-                setattr(self.base_model, name, quant_conv)
+                qmodules[name] = quant_conv
+
+        for name, quant_conv in qmodules.items():
+            setattr(self.base_model, name, quant_conv)
 
         for name, module in self.base_model.named_modules():
             if isinstance(module, quant_nn.TensorQuantizer):

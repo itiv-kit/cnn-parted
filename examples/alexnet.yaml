@@ -12,7 +12,10 @@ neural-network:
   input-size: [ 1, 3, 227, 227 ]
 
 accuracy:
-  device : "cuda"
+  device: "cuda"
+  num_bits_upper_limit: 16
+  num_bits_lower_limit: 4
+  min_acc: 0.4
   bits: [16, 8] # eyeriss 16-bit, simba 8-bit
   calibration:
     samples: null # null sets samples to all
