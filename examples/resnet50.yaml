@@ -10,6 +10,11 @@ neural-network:
 accuracy:
   device : "cuda"
   bits: [16, 8] # eyeriss 16-bit, simba 8-bit
+  robustness:
+    pop_size: 32
+    num_gen: 64
+    bits: [4, 6, 8, 16]
+    min_acc: 0.8
   calibration:
     samples: null # null sets samples to all
     file: './calibrations/resnet50_quant_calib.pkl'

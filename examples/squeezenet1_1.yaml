@@ -13,9 +13,12 @@ neural-network:
 
 accuracy:
   device: "cuda"
-  num_bits_upper_limit: 16
-  num_bits_lower_limit: 4
-  min_acc: 0.65
+  bits: [16, 8] # eyeriss 16-bit, simba 8-bit
+  robustness:
+    pop_size: 32
+    num_gen: 64
+    bits: [4, 6, 8, 16]
+    min_acc: 0.67
   calibration:
     samples: null # null sets samples to all
     file: './calibrations/squeezenet1_1_quant_calib.pkl'

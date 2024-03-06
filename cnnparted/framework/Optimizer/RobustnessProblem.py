@@ -27,28 +27,26 @@ class RobustnessProblem(ElementwiseProblem):
         gpu_device = torch.device(config.get('device'))
         self.qmodel = QuantizedModel(m, gpu_device)
 
-        self.min_accuracy = config.get('min_acc')
+        rob_conf =  config.get('robustness')
+        self.min_accuracy = rob_conf.get('min_acc')
         n_constr = len(self.min_accuracy) if isinstance(self.min_accuracy, list) else 1
 
-        num_bits_upper_limit = config.get('num_bits_upper_limit')
-        num_bits_lower_limit = config.get('num_bits_lower_limit')
+        self.bits = rob_conf.get('bits')
+        assert (
+            min(self.bits) > 1
+        ), "The lower bound for the bit resolution has to be > 1. 1 bit resolution is not supported and produces NaN."
 
         super().__init__(
             n_var=self.qmodel.get_explorable_parameter_count(),
             n_constr=n_constr,  # accuracy constraint
             n_obj=2,  # accuracy and low bit num
-            xl=num_bits_lower_limit,
-            xu=num_bits_upper_limit,
+            xl=0,
+            xu=len(self.bits)-1,
             vtype=int,
             kwargs=kwargs
         )
 
-        assert (
-            num_bits_lower_limit > 1
-        ), "The lower bound for the bit resolution has to be > 1. 1 bit resolution is not supported and produces NaN."
-
-
-        dataloaders = build_dataloader_generators(config['datasets'])
+        dataloaders = build_dataloader_generators(config['datasets']) # maybe move to optimizer to enable history?
         calib_dataloadergen = dataloaders['calibrate']
         self.val_dataloadergen = dataloaders['validation']
 
@@ -66,7 +64,7 @@ class RobustnessProblem(ElementwiseProblem):
     def _evaluate(self, x, out, *args, **kwargs):
         layer_bit_nums = []
         for i in x:
-            layer_bit_nums.append(int(np.round(i)))
+            layer_bit_nums.append(self.bits[int(np.round(i))])
 
         self.qmodel.bit_widths = layer_bit_nums
         self.qmodel.base_model.eval()

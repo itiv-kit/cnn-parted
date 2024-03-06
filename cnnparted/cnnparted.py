@@ -26,7 +26,8 @@ def main(args):
 
     # Step 2 - Robustness Analysis
     robustnessAnalyzer = RobustnessOptimizer(ga.torchmodel, accuracy_function, config.get('accuracy'), args.show_progress)
-    print(robustnessAnalyzer.optimize())
+    df = pd.DataFrame(robustnessAnalyzer.optimize())
+    df.to_csv(args.run_name + "_" + "robustness.csv", header=False)
 
     # Step 3 - Layer Evaluation
     nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)

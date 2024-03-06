@@ -16,8 +16,8 @@ from .RobustnessProblem import RobustnessProblem
 
 class RobustnessOptimizer(Optimizer):
     def __init__(self, model : nn.Module, accuracy_function : Callable, config : dict, progress : bool):
-        self.pop_size = 4
-        self.num_gen = 8
+        self.pop_size = config.get('robustness').get('pop_size')
+        self.num_gen = config.get('robustness').get('num_gen')
         self.problem = RobustnessProblem(model, config, accuracy_function, progress)
 
     def optimize(self):
