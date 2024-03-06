@@ -14,6 +14,8 @@ class NodeThread(ModuleThreadInterface):
         else:
             self._run_generic(self.config)
 
+        self.stats["bits"] = self.config.get("bits")
+
     def _run_generic(self, config: dict) -> None:
         raise NotImplementedError
 

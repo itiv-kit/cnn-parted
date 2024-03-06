@@ -19,16 +19,13 @@ from .RobustnessProblem import RobustnessProblem
 class RobustnessOptimizer(Optimizer):
     def __init__(self, run_name : str, model : nn.Module, accuracy_function : Callable, config : dict, progress : bool):
         self.fname_csv = run_name + "_" + "robustness.csv"
-        if os.path.isfile(self.fname_csv):
-            self.run_optimize = False
-        else:
-            self.run_optimize = True
-            self.pop_size = config.get('robustness').get('pop_size')
-            self.num_gen = config.get('robustness').get('num_gen')
-            self.problem = RobustnessProblem(model, config, accuracy_function, progress)
+
+        self.pop_size = config.get('robustness').get('pop_size')
+        self.num_gen = config.get('robustness').get('num_gen')
+        self.problem = RobustnessProblem(model, config, accuracy_function, progress)
 
     def optimize(self):
-        if self.run_optimize:
+        if not os.path.isfile(self.fname_csv):
             algorithm = NSGA2(
                 pop_size=self.pop_size,
                 n_offsprings=self.pop_size,
@@ -56,4 +53,9 @@ class RobustnessOptimizer(Optimizer):
             df = pd.read_csv(self.fname_csv, header=None, index_col=0)
             data = df.to_numpy()
 
-        return data[np.argmax(data, axis=0)[-2]] # return configuration with max accuracy
+        constr = list(data[np.argmax(data, axis=0)[-2]])[:-3] # use configuration with max accuracy
+        constr_dict = {}
+        for i, name in enumerate(self.problem.qmodel.explorable_module_names):
+            constr_dict[name] = constr[i]
+
+        return constr_dict

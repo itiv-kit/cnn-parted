@@ -26,8 +26,7 @@ def main(args):
 
     # Step 2 - Robustness Analysis
     robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), args.show_progress)
-    q_const = robustnessAnalyzer.optimize()
-    print(q_const)
+    q_constr = robustnessAnalyzer.optimize()
 
     # Step 3 - Layer Evaluation
     nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)
@@ -35,7 +34,7 @@ def main(args):
     # Step 4 - Find pareto-front
     optimizer = PartitioningOptimizer(ga, nodeStats, link_components, args.show_progress)
     fixed_sys = True # do not change order of accelerators if true. TODO: add to config file
-    sol = optimizer.optimize(fixed_sys)
+    sol = optimizer.optimize(q_constr, fixed_sys)
 
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
     if args.accuracy:
