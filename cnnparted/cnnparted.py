@@ -25,9 +25,9 @@ def main(args):
     ga.find_schedules()
 
     # Step 2 - Robustness Analysis
-    robustnessAnalyzer = RobustnessOptimizer(ga.torchmodel, accuracy_function, config.get('accuracy'), args.show_progress)
-    df = pd.DataFrame(robustnessAnalyzer.optimize())
-    df.to_csv(args.run_name + "_" + "robustness.csv", header=False)
+    robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), args.show_progress)
+    q_const = robustnessAnalyzer.optimize()
+    print(q_const)
 
     # Step 3 - Layer Evaluation
     nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)
