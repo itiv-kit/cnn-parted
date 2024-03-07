@@ -15,14 +15,15 @@ from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 def main(args):
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
+    main_conf = config.get('general')
     node_components, link_components = conf_helper.get_system_components()
     accuracy_function = setup_workload(args.run_name, config['neural-network'])
-    num_pp = len(node_components) - 1
+    num_pp = main_conf.get('num_pp')
     n_var = num_pp * 2 + 1
 
     # Step 1 - Analysis
     ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
-    ga.find_schedules()
+    ga.find_schedules(main_conf.get('num_topos'))
 
     # Step 2 - Robustness Analysis
     robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), args.show_progress)
@@ -33,8 +34,7 @@ def main(args):
 
     # Step 4 - Find pareto-front
     optimizer = PartitioningOptimizer(ga, nodeStats, link_components, args.show_progress)
-    fixed_sys = True # do not change order of accelerators if true. TODO: add to config file
-    sol = optimizer.optimize(q_constr, fixed_sys)
+    sol = optimizer.optimize(num_pp, q_constr, main_conf.get('fixed_sys'), main_conf.get('num_jobs'))
 
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
     if args.accuracy:

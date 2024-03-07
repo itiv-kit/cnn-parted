@@ -1,19 +1,21 @@
-constraints:
-  max_out_size: 15000000 # must be link specific
-  max_memory_size: 2000000000
-  word_width: 16
-
-optimization-objectives:
-  component: 0
-  metric: latency
+general:
+  fixed_sys: True
+  num_pp: 1
+  num_topos: 1
+  num_jobs: 64
 
 neural-network:
   name: regnet_x_400mf
   input-size: [ 1, 3, 227, 227 ]
 
 accuracy:
-  device : "cuda"
+  device: "cuda"
   bits: [16, 8] # eyeriss 16-bit, simba 8-bit
+  robustness:
+    pop_size: 32
+    num_gen: 64
+    bits: [4, 6, 8, 16]
+    min_acc: 0.65
   calibration:
     samples: null # null sets samples to all
     file: './calibrations/regnet_x_400mf_quant_calib.pkl'
@@ -44,8 +46,8 @@ accuracy:
 
 components:
   - id: 0
+    bits: 16
     max_memory_size: 600000000
-    name: sensor #optional
     timeloop:
       accelerator: eyeriss_like
       frequency: 200000000
@@ -67,6 +69,7 @@ components:
       eth_mode: BASE1000-T
     fps: 25
   - id: 2
+    bits: 8
     max_memory_size: 600000000
     timeloop:
       accelerator: simba_like

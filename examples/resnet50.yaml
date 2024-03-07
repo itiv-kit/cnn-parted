@@ -1,14 +1,15 @@
-constraints: {max_out_size: 2000000,  max_memory_size: 60000000, word_width: 16}
-optimization-objectives:
-  component: 0
-  metric: latency
+general:
+  fixed_sys: True
+  num_pp: 1
+  num_topos: 1
+  num_jobs: 64
 
 neural-network:
   name: resnet50
   input-size: [ 1, 3, 224, 224 ]
 
 accuracy:
-  device : "cuda"
+  device: "cuda"
   bits: [16, 8] # eyeriss 16-bit, simba 8-bit
   robustness:
     pop_size: 32
@@ -45,8 +46,8 @@ accuracy:
 
 components:
   - id: 0
+    bits: 16
     max_memory_size: 600000000
-    name: sensor #optional
     timeloop:
       accelerator: eyeriss_like
       frequency: 200000000
@@ -68,6 +69,7 @@ components:
       eth_mode: BASE1000-T
     fps: 25
   - id: 2
+    bits: 8
     max_memory_size: 600000000
     timeloop:
       accelerator: simba_like

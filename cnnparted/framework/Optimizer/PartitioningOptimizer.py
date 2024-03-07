@@ -14,7 +14,6 @@ from joblib import Parallel, delayed
 from .Optimizer import Optimizer
 from .PartitioningProblem import PartitioningProblem
 from framework import GraphAnalyzer
-from framework.constants import NUM_JOBS
 
 
 class PartitioningOptimizer(Optimizer):
@@ -51,7 +50,7 @@ class PartitioningOptimizer(Optimizer):
 
         return params
 
-    def optimize(self, q_constr : dict, fixed_sys : bool) -> dict:
+    def optimize(self, num_pp, q_constr : dict, fixed_sys : bool, num_jobs : int) -> dict:
         all_paretos = []
         non_optimals = []
 
@@ -61,8 +60,8 @@ class PartitioningOptimizer(Optimizer):
             all_paretos = list(np.load(fname_p_npy))
             non_optimals = list(np.load(fname_n_npy))
         else:
-            sorts = Parallel(n_jobs=NUM_JOBS, backend="multiprocessing")(
-                delayed(self._optimize_single)(s, q_constr, fixed_sys)
+            sorts = Parallel(n_jobs=num_jobs, backend="multiprocessing")(
+                delayed(self._optimize_single)(num_pp, s, q_constr, fixed_sys)
                 for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
             )
 
@@ -95,8 +94,8 @@ class PartitioningOptimizer(Optimizer):
 
         return self.results
 
-    def _optimize_single(self, schedule : list, q_constr : dict, fixed_sys : bool) -> list:
-        problem = PartitioningProblem(self.nodeStats, schedule, q_constr, fixed_sys, self.layer_dict, self.layer_params, self.link_confs)
+    def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool) -> list:
+        problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, self.layer_dict, self.layer_params, self.link_confs)
 
         algorithm = NSGA2(
             pop_size=self.pop_size,

@@ -6,7 +6,6 @@ from .model.model import TreeModel
 from .model.graph import LayersGraph
 
 from .model.scheduling import topo_sort_random_start_node
-from .constants import NUM_TOPOS
 
 class GraphAnalyzer:
     def __init__(self, run_name : str, input_size : tuple, progress : bool) -> None:
@@ -20,13 +19,13 @@ class GraphAnalyzer:
         self.graph = LayersGraph(self._tree)
         self.conv_layers = self.get_conv2d_layers()
 
-    def find_schedules(self) -> list:
+    def find_schedules(self, num_topos : int) -> list:
         fname_csv = self.run_name + "_" + "schedules.csv"
         if os.path.isfile(fname_csv):
             df = pd.read_csv(fname_csv, header=None, index_col=0)
             self.schedules = df.values.tolist()
         else:
-            self.schedules = topo_sort_random_start_node(G=self.graph.get_Graph(), n=NUM_TOPOS, seed=0, as_ndarray=True, progress=self.progress)
+            self.schedules = topo_sort_random_start_node(G=self.graph.get_Graph(), n=num_topos, seed=0, as_ndarray=True, progress=self.progress)
             self.schedules = np.unique(self.schedules, axis=0)
             df = pd.DataFrame(self.schedules)
             df.to_csv(fname_csv, header=False)

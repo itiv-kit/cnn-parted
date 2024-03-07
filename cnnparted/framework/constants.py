@@ -11,7 +11,3 @@ WORKLOAD_FOLDER = "workloads"
 import torchvision.models as tvmodels
 import torchvision.models.segmentation as segmodels
 DNN_DICT = {**tvmodels.__dict__, **segmodels.__dict__}
-
-
-NUM_JOBS = 64
-NUM_TOPOS = 64

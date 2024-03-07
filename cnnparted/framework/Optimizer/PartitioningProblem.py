@@ -6,10 +6,10 @@ from ..link.Link import Link
 
 
 class PartitioningProblem(ElementwiseProblem):
-    def __init__(self, nodeStats : dict, schedule : list, q_constr : dict, fixed_sys : bool, layer_dict : dict, layer_params : dict, link_confs : list):
+    def __init__(self, num_pp : int, nodeStats : dict, schedule : list, q_constr : dict, fixed_sys : bool, layer_dict : dict, layer_params : dict, link_confs : list):
         self.nodeStats = nodeStats
         self.num_acc = len(nodeStats)
-        self.num_pp = self.num_acc - 1
+        self.num_pp = num_pp
         self.schedule = schedule
         self.q_constr = q_constr
         self.fixed_sys = fixed_sys
@@ -22,7 +22,7 @@ class PartitioningProblem(ElementwiseProblem):
             self.links.append(Link(link_conf))
 
         n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + device ID
-        n_obj = 3 + self.num_pp + self.num_acc # latency, energy, throughput + bandwidth + memory
+        n_obj = 3 + self.num_pp + (self.num_pp + 1) # latency, energy, throughput + bandwidth + memory
 
         xu_pp = np.empty(self.num_pp)
         xu_pp.fill(self.num_layers + 0.49)
@@ -36,7 +36,7 @@ class PartitioningProblem(ElementwiseProblem):
         valid = True
         latency = energy = throughput = 0.0
         bandwidth = np.full((self.num_pp), np.inf)
-        mem = np.full((self.num_acc), np.inf)
+        mem = np.full((self.num_pp + 1), np.inf)
 
         p = [int(np.round(i)) for i in x]
         if not np.array_equal(np.sort(p[:self.num_pp]), p[:self.num_pp]): # keep order of partitioning points
@@ -46,7 +46,9 @@ class PartitioningProblem(ElementwiseProblem):
         elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_acc:]), p[-self.num_acc:]): # keep order of Accelerators
             valid = False
         else:
-            l_pp = e_pp = th_pp = []
+            l_pp = []
+            e_pp = []
+            th_pp = []
             successors = [self.schedule[0]]
             i = last_pp = -1
             for i, pp in enumerate(p[0:self.num_pp], self.num_pp):
