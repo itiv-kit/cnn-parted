@@ -8,7 +8,7 @@ from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.optimize import minimize
-from pymoo.factory import get_termination
+from pymoo.termination import get_termination
 
 from typing import Callable
 
