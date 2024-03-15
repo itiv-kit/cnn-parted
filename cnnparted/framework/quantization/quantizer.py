@@ -10,13 +10,13 @@ from torch import nn as torch_nn
 from torch.utils.data import DataLoader
 from copy import deepcopy
 
+# import framework.quantization.qmodules as qmodules
 from pytorch_quantization import nn as quant_nn
 from pytorch_quantization import calib
 from pytorch_quantization import tensor_quant
 from pytorch_quantization.tensor_quant import QuantDescriptor
 
 from model_explorer.exploration.weighting_functions import bits_weighted_linear
-#from model_explorer.models.custom_model import CustomModel
 from .custom_model import CustomModel
 
 
@@ -117,7 +117,7 @@ class QuantizedModel(CustomModel):
             }
 
     def _create_quantized_model(self) -> None:
-        qmodules = {}
+        quant_modules = {}
         for name, module in self.base_model.named_modules():
             if isinstance(module, torch_nn.Conv2d):
                 # The file /pytorch_quantization/nn/modules/_utils.py:L161 has
@@ -144,9 +144,9 @@ class QuantizedModel(CustomModel):
                 quant_conv.weight = module.weight
                 quant_conv.bias = module.bias
 
-                qmodules[name] = quant_conv
+                quant_modules[name] = quant_conv
 
-        for name, quant_conv in qmodules.items():
+        for name, quant_conv in quant_modules.items():
             setattr(self.base_model, name, quant_conv)
 
         for name, module in self.base_model.named_modules():

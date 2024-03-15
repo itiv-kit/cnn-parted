@@ -19,15 +19,16 @@ def main(args):
     node_components, link_components = conf_helper.get_system_components()
     accuracy_function = setup_workload(args.run_name, config['neural-network'])
     num_pp = main_conf.get('num_pp')
-    n_var = num_pp * 2 + 1
 
     # Step 1 - Analysis
     ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
     ga.find_schedules(main_conf.get('num_topos'))
 
     # Step 2 - Robustness Analysis
-    robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), args.show_progress)
-    q_constr = robustnessAnalyzer.optimize()
+    q_constr = {}
+    if config.get('accuracy'):
+        robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), args.show_progress)
+        q_constr = robustnessAnalyzer.optimize()
 
     # Step 3 - Layer Evaluation
     nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)
@@ -37,7 +38,8 @@ def main(args):
     sol = optimizer.optimize(num_pp, q_constr, main_conf.get('fixed_sys'), main_conf.get('num_jobs'))
 
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
-    if args.accuracy:
+    n_var = num_pp * 2 + 1
+    if config.get('accuracy'):
         quant = QuantizationEvaluator(ga.torchmodel, ga.input_size, config.get('accuracy'), args.show_progress)
         quant.eval(sol["nondom"], n_var, ga.schedules, accuracy_function)
         for i, p in enumerate(sol["dom"]): # achieving aligned csv file
@@ -134,7 +136,6 @@ if __name__ == '__main__':
                         type=int,
                         default=1,
                         help='Number of runs')
-    parser.add_argument('--accuracy', action='store_true', default=False, help='Compute with accuracy')
     args = parser.parse_args()
 
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'

@@ -164,8 +164,8 @@ class Timeloop:
                 f.write(yaml.dump(config))
 
     def _load_accelerator_files(self, dir : str) -> list:
-        arch_fnames = os.path.join(dir, 'archs', (self.accname + '*'))
-        constraint_fname = os.path.join(dir, 'constraints', (self.accname + '*'))
+        arch_fnames = os.path.join(dir, 'archs', (self.accname + '_' + '*'))
+        constraint_fname = os.path.join(dir, 'constraints', (self.accname + '_' + '*'))
 
         input_fnames = [arch_fnames, constraint_fname]
         input_files = []
