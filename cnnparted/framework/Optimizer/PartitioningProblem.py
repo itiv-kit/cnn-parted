@@ -6,13 +6,14 @@ from ..link.Link import Link
 
 
 class PartitioningProblem(ElementwiseProblem):
-    def __init__(self, num_pp : int, nodeStats : dict, schedule : list, q_constr : dict, fixed_sys : bool, layer_dict : dict, layer_params : dict, link_confs : list):
+    def __init__(self, num_pp : int, nodeStats : dict, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool, layer_dict : dict, layer_params : dict, link_confs : list):
         self.nodeStats = nodeStats
         self.num_acc = len(nodeStats)
         self.num_pp = num_pp
         self.schedule = schedule
         self.q_constr = q_constr
         self.fixed_sys = fixed_sys
+        self.acc_once = acc_once
         self.num_layers = len(schedule)
         self.layer_dict = layer_dict
         self.layer_params = layer_params
@@ -41,7 +42,7 @@ class PartitioningProblem(ElementwiseProblem):
         p = [int(np.round(i)) for i in x]
         if not np.array_equal(np.sort(p[:self.num_pp]), p[:self.num_pp]): # keep order of partitioning points
             valid = False
-        elif np.unique(p[-self.num_acc:]).size != np.asarray(p[-self.num_acc:]).size:   # only use accelerator once
+        elif self.acc_once and np.unique(p[-self.num_acc:]).size != np.asarray(p[-self.num_acc:]).size:   # only use accelerator once
             valid = False
         elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_acc:]), p[-self.num_acc:]): # keep order of Accelerators
             valid = False

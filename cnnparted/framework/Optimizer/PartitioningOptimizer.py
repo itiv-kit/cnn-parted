@@ -37,7 +37,7 @@ class PartitioningOptimizer(Optimizer):
         self.num_gen = self.pop_size = 1
         if len(nodeStats.keys()) > 1:
             self.num_gen = 100 * nodes
-            self.pop_size = 50 if nodes > 100 else nodes//2 if nodes > 30 else 15 if nodes > 20 else nodes
+            self.pop_size = 50
 
         self.results = {}
 
@@ -50,7 +50,7 @@ class PartitioningOptimizer(Optimizer):
 
         return params
 
-    def optimize(self, num_pp, q_constr : dict, fixed_sys : bool, num_jobs : int) -> dict:
+    def optimize(self, num_pp, q_constr : dict, fixed_sys : bool, acc_once : bool, num_jobs : int) -> dict:
         all_paretos = []
         non_optimals = []
 
@@ -61,7 +61,7 @@ class PartitioningOptimizer(Optimizer):
             non_optimals = list(np.load(fname_n_npy))
         else:
             sorts = Parallel(n_jobs=num_jobs, backend="multiprocessing")(
-                delayed(self._optimize_single)(num_pp, s, q_constr, fixed_sys)
+                delayed(self._optimize_single)(num_pp, s, q_constr, fixed_sys, acc_once)
                 for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
             )
 
@@ -81,7 +81,8 @@ class PartitioningOptimizer(Optimizer):
         comp_paretos = np.delete(all_paretos, np.s_[0:x_len+1], axis=1)
         bw_sums = np.sum(np.delete(np.delete(comp_paretos, np.s_[:num_acc-1], axis=1), np.s_[-num_acc:], axis=1), axis=1) # calc sum of bandwidths
         comp_paretos = np.delete(comp_paretos, np.s_[-(num_acc*2-1):], axis=1) # memories not relevant for finding pareto points
-        comp_paretos = np.hstack([comp_paretos, np.expand_dims(bw_sums, 1)])
+        # comp_paretos = np.hstack([comp_paretos, np.expand_dims(bw_sums, 1)])
+        print(comp_paretos)
         all_paretos = np.hstack([all_paretos, np.expand_dims(self._is_pareto_efficient(comp_paretos), 1)])
 
         self.results["nondom"] = []
@@ -94,8 +95,8 @@ class PartitioningOptimizer(Optimizer):
 
         return self.results
 
-    def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool) -> list:
-        problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, self.layer_dict, self.layer_params, self.link_confs)
+    def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
+        problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, self.layer_params, self.link_confs)
 
         algorithm = NSGA2(
             pop_size=self.pop_size,

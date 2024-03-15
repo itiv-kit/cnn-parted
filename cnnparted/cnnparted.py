@@ -18,7 +18,6 @@ def main(args):
     main_conf = config.get('general')
     node_components, link_components = conf_helper.get_system_components()
     accuracy_function = setup_workload(args.run_name, config['neural-network'])
-    num_pp = main_conf.get('num_pp')
 
     # Step 1 - Analysis
     ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
@@ -34,8 +33,11 @@ def main(args):
     nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)
 
     # Step 4 - Find pareto-front
+    num_pp = main_conf.get('num_pp')
+    if num_pp == -1:
+        num_pp = len(nodeStats[list(nodeStats.keys())[0]]) - 1
     optimizer = PartitioningOptimizer(ga, nodeStats, link_components, args.show_progress)
-    sol = optimizer.optimize(num_pp, q_constr, main_conf.get('fixed_sys'), main_conf.get('num_jobs'))
+    sol = optimizer.optimize(num_pp, q_constr, main_conf.get('fixed_sys'), main_conf.get('acc_once'), main_conf.get('num_jobs'))
 
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
     n_var = num_pp * 2 + 1
