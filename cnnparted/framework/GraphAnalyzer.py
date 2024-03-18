@@ -31,6 +31,10 @@ class GraphAnalyzer:
             df.to_csv(fname_csv, header=False)
         return self.schedules
 
+    def get_timeloop_layers(self):
+        output = [layer for layer in self._tree if layer.get("op_type") == "Conv" or layer.get("op_type") == "Gemm"]
+        return output
+
     def get_conv2d_layers(self):
         output = [layer for layer in self._tree if layer.get("op_type") == "Conv"]
         return output

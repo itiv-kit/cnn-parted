@@ -100,8 +100,15 @@ class TreeModel:
 
         if matched_outputs == [] and node.output[0] == "output":
             o_shape = [self.out_layer['output_size']]
+        if matched_inputs == [] and node.input[0]=="input":
+            c = self.in_layer['output_size'][1]
+        else :
+            c = i_shape[0][1]
 
         output = {
+            'n': o_shape[0][0],
+            'm': o_shape[0][1],
+            'c': c,
             'weights': np.prod(i_shape + o_shape)
         }
 
@@ -131,7 +138,7 @@ class TreeModel:
         if matched_inputs == [] and node.input[0]=="input":
             c = self.in_layer['output_size'][1]
         else :
-            c= i_shape[0][1]
+            c = i_shape[0][1]
 
         ofms    = o_shape[0][0]*o_shape[0][1]*o_shape[0][2]*o_shape[0][3]
         weights = o_shape[0][1]*c*attributes['kernel_shape'][0]*attributes['kernel_shape'][1]

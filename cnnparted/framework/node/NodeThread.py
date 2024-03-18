@@ -22,13 +22,13 @@ class NodeThread(ModuleThreadInterface):
     def _run_timeloop(self, config: dict) -> None:
         runroot = self.runname + "_" + config["accelerator"]
         config["run_root"] = runroot
-        fname_csv = runroot + "_convlayers.csv"
+        fname_csv = runroot + "_tl_layers.csv"
 
         if os.path.isfile(fname_csv):
             self.stats = self._read_layer_csv(fname_csv)
             return
 
-        layers = self.ga.get_conv2d_layers()
+        layers = self.ga.get_timeloop_layers()
         tl = Timeloop(config)
         tl.run(layers, self.progress)
 
