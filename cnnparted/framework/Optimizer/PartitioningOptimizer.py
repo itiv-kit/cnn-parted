@@ -111,10 +111,11 @@ class PartitioningOptimizer(Optimizer):
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
         problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, self.layer_params, self.link_confs)
 
+        initial_x = np.concatenate((np.arange(1, num_pp+1), np.arange(1, num_pp+2) % len(self.nodeStats) + 1))
         algorithm = NSGA2(
             pop_size=self.pop_size,
             n_offsprings=self.pop_size,
-            sampling=FloatRandomSampling(),
+            sampling=initial_x,
             crossover=SBX(prob=0.9, eta=15),
             mutation=PM(eta=20),
             eliminate_duplicates=True)
