@@ -117,8 +117,11 @@ def write_files(run_name : str, n_var : int, results : dict, schedules : list) -
             for i in range(1,int(n_var/2)+1):
                 data[i] = schedules[int(data[0])][int(data[i])-1]
             rows.append(data)
+        if pareto == "nondom":
+            df = pd.DataFrame(rows)
+            df.to_csv(run_name + "_" + "result_nondom.csv", header=False)
     df = pd.DataFrame(rows)
-    df.to_csv(run_name + "_" + "result.csv", header=False)
+    df.to_csv(run_name + "_" + "result_all.csv", header=False)
 
 
 if __name__ == '__main__':
