@@ -36,8 +36,8 @@ def main(args):
     num_pp = main_conf.get('num_pp')
     if num_pp == -1:
         num_pp = len(nodeStats[list(nodeStats.keys())[0]]) - 1
-    optimizer = PartitioningOptimizer(ga, nodeStats, link_components, args.show_progress)
-    sol = optimizer.optimize(num_pp, q_constr, main_conf.get('fixed_sys'), main_conf.get('acc_once'), main_conf.get('num_jobs'))
+    optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.show_progress)
+    sol = optimizer.optimize(q_constr, main_conf.get('fixed_sys'), main_conf.get('acc_once'), main_conf.get('optimization'), main_conf.get('num_jobs'))
 
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
     n_var = num_pp * 2 + 1
