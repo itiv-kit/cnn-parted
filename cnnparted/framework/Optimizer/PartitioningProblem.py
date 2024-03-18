@@ -23,7 +23,7 @@ class PartitioningProblem(ElementwiseProblem):
             self.links.append(Link(link_conf))
 
         n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + device ID
-        n_obj = 3 + self.num_pp + (self.num_pp + 1) # latency, energy, throughput + bandwidth + memory
+        n_obj = 5 # + self.num_pp #+ (self.num_pp + 1) # latency, energy, throughput + bandwidth + memory
 
         xu_pp = np.empty(self.num_pp)
         xu_pp.fill(self.num_layers + 0.49)
@@ -35,7 +35,7 @@ class PartitioningProblem(ElementwiseProblem):
 
     def _evaluate(self, x, out, *args, **kwargs):
         valid = True
-        latency = energy = throughput = 0.0
+        latency = energy = throughput = link_latency = link_energy = 0.0
         bandwidth = np.full((self.num_pp), np.inf)
         mem = np.full((self.num_pp + 1), np.inf)
 
@@ -49,6 +49,8 @@ class PartitioningProblem(ElementwiseProblem):
         else:
             l_pp = []
             e_pp = []
+            l_pp_link = []
+            e_pp_link = []
             th_pp = []
             successors = [self.schedule[0]]
             i = last_pp = last_acc = -1
@@ -64,8 +66,8 @@ class PartitioningProblem(ElementwiseProblem):
                     link_e = 0
                     bandwidth[i-self.num_pp] = 0
 
-                l_pp.append(link_l)
-                e_pp.append(link_e)
+                l_pp_link.append(link_l)
+                e_pp_link.append(link_e)
                 th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
 
                 if last_pp != pp:
@@ -76,11 +78,13 @@ class PartitioningProblem(ElementwiseProblem):
             v, mem[i+1-self.num_pp] = self._eval_partition(p[i+1], last_pp, self.num_layers, l_pp, e_pp, th_pp, successors)
             valid &= v
 
-            latency = sum(l_pp)
-            energy = sum(e_pp)
+            link_latency = sum(l_pp_link)
+            link_energy = sum(e_pp_link)
+            latency = sum(l_pp) + link_latency
+            energy = sum(e_pp) + link_energy
             throughput = min(th_pp) * -1
 
-        out["F"] = [latency, energy, throughput] + list(bandwidth) + list(mem)
+        out["F"] = [latency, energy, throughput, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
         if valid:
             out["G"] = -x[0]
