@@ -51,18 +51,27 @@ class PartitioningProblem(ElementwiseProblem):
             e_pp = []
             th_pp = []
             successors = [self.schedule[0]]
-            i = last_pp = -1
+            i = last_pp = last_acc = -1
             for i, pp in enumerate(p[0:self.num_pp], self.num_pp):
                 v, mem[i-self.num_pp] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, th_pp, successors)
                 valid &= v
 
                 # evaluate link
-                link_l, link_e, bandwidth[i-self.num_pp] = self._get_link_metrics(i-self.num_pp, last_pp, pp, successors)
+                if last_pp != pp and last_acc != p[i] and last_acc != -1:
+                    link_l, link_e, bandwidth[i-self.num_pp] = self._get_link_metrics(i-self.num_pp, successors)
+                else:
+                    link_l = 0
+                    link_e = 0
+                    bandwidth[i-self.num_pp] = 0
+
                 l_pp.append(link_l)
                 e_pp.append(link_e)
                 th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
 
-                last_pp = pp
+                if last_pp != pp:
+                    last_pp = pp
+                    if last_pp != 1: # if last_pp not input
+                        last_acc = p[i]
 
             v, mem[i+1-self.num_pp] = self._eval_partition(p[i+1], last_pp, self.num_layers, l_pp, e_pp, th_pp, successors)
             valid &= v
@@ -145,8 +154,8 @@ class PartitioningProblem(ElementwiseProblem):
     def _zero_division(self, a : float, b : float) -> float:
         return a / b if b else np.inf
 
-    def _get_link_metrics(self, link_idx : int, last_pp : int, pp : int, successors : list) -> tuple[float, float, float]:
-        if len(self.links) == 0 or last_pp == pp:
+    def _get_link_metrics(self, link_idx : int, successors : list) -> tuple[float, float, float]:
+        if len(self.links) == 0:
             return 0, 0, 0
 
         layers = []
