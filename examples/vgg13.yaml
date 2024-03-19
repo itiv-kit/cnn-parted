@@ -1,0 +1,87 @@
+general:
+  fixed_sys: False
+  acc_once: False
+  num_pp: -1
+  num_topos: 1
+  num_jobs: 64
+  optimization: edp
+
+neural-network:
+  name: vgg13
+  input-size: [ 128, 3, 32, 32 ]
+
+components:
+  - id: 0
+    bits: 16
+    max_memory_size: 600000000
+    timeloop:
+      accelerator: eyeriss_like1
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+  - id: 1
+    max_out_size: 20000000
+    data_bit_width: 8
+    noi:
+      noi_mode: UCIe
+      width: 16
+      data_rate_Gbps: 4
+      latency_ns: 2 # including D2D Adapter and PHY
+      power_bit_pj: 0.5
+    fps: 25
+  - id: 2
+    bits: 8
+    max_memory_size: 600000000
+    timeloop:
+      accelerator: eyeriss_like2
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+  - id: 3
+    bits: 8
+    max_memory_size: 600000000
+    timeloop:
+      accelerator: eyeriss_like3
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+  - id: 4
+    bits: 8
+    max_memory_size: 600000000
+    timeloop:
+      accelerator: eyeriss_like4
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
