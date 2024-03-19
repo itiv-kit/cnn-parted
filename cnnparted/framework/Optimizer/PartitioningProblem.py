@@ -35,6 +35,7 @@ class PartitioningProblem(ElementwiseProblem):
 
     def _evaluate(self, x, out, *args, **kwargs):
         valid = True
+        num_real_pp = 1
         latency = energy = throughput = link_latency = link_energy = 0.0
         bandwidth = np.full((self.num_pp), np.inf)
         mem = np.full((self.num_pp + 1), np.inf)
@@ -61,6 +62,7 @@ class PartitioningProblem(ElementwiseProblem):
                 # evaluate link
                 if last_pp != pp and last_acc != p[i] and last_acc != -1:
                     link_l, link_e, bandwidth[i-self.num_pp] = self._get_link_metrics(i-self.num_pp, successors)
+                    num_real_pp += 1
                 else:
                     link_l = 0
                     link_e = 0
@@ -87,9 +89,9 @@ class PartitioningProblem(ElementwiseProblem):
         out["F"] = [latency, energy, throughput, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
         if valid:
-            out["G"] = -x[0]
+            out["G"] = -num_real_pp
         else:
-            out["G"] = x[0]
+            out["G"] = num_real_pp
 
     def _eval_partition(self, acc : int, last_pp : int, pp : int, l_pp : list, e_pp : list, th_pp : list, successors : list) -> tuple[bool, int]:
         valid = True

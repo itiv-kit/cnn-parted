@@ -54,9 +54,9 @@ def main(args):
     write_files(args.run_name, n_var, sol, ga.schedules)
     for pareto, sched in sol.items():
         print(pareto, len(sched))
-    num_real_pp = [len(np.unique(np.append(sched[1:int(n_var/2)+1], [1, len(ga.schedules[0])]))) for sched in sol["nondom"]]
-    for i in range(2, max(num_real_pp)+1):
-        print(i-1, "Partition(s):", num_real_pp.count(i))
+    num_real_pp = [int(sched[1]) for sched in sol["nondom"]]
+    for i in range(1, max(num_real_pp)+1):
+        print(i, "Partition(s):", num_real_pp.count(i))
 
 
 def setup_workload(run_name : str, model_settings: dict) -> Callable:
@@ -113,8 +113,8 @@ def write_files(run_name : str, n_var : int, results : dict, schedules : list) -
         for sd in sched:
             data = np.append(sd, pareto)
             data = data.astype('U256')
-            data[:n_var+1] = data[:n_var+1].astype(float).astype(int)
-            for i in range(1,int(n_var/2)+1):
+            data[:n_var+2] = data[:n_var+2].astype(float).astype(int)
+            for i in range(2,int(n_var/2)+2):
                 data[i] = schedules[int(data[0])][int(data[i])-1]
             rows.append(data)
         if pareto == "nondom":

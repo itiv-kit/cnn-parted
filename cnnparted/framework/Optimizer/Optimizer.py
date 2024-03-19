@@ -13,20 +13,21 @@ class Optimizer():
 
         X = np.round(res.X)
         F = res.F
+        G = res.G
 
         data = []
         for i in range(0, len(X)):
-            data.append(np.append(X[i], F[i]))
+            data.append(np.append(G[i], np.append(X[i], F[i])))
 
         for h in res.history or []:
             for ind in h.pop:
                 if ind.get("G") > 0:
                     continue
-                data.append(np.append(np.round(ind.get("X").tolist()), ind.get("F").tolist()))
+                data.append(np.append(ind.get("G").tolist(), np.append(np.round(ind.get("X").tolist()), ind.get("F").tolist())))
         data = np.unique(data, axis=0)
 
         x_len = len(X[0])
-        comp_hist = np.delete(data, np.s_[0:x_len], axis=1)
+        comp_hist = np.delete(data, np.s_[0:x_len+1], axis=1)
         paretos = self._is_pareto_efficient(comp_hist)
         paretos = np.expand_dims(paretos, 1)
         data = np.hstack([data, paretos])
