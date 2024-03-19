@@ -1,12 +1,14 @@
 general:
-  fixed_sys: True
-  num_pp: 1
+  fixed_sys: False
+  acc_once: False
+  num_pp: -1
   num_topos: 1
   num_jobs: 64
+  optimization: edp
 
 neural-network:
   name: fcnresnet50
-  input-size: [ 1, 3, 224, 224 ]
+  input-size: [ 1, 3, 520, 692 ]
 
 accuracy:
   device: "cuda"
@@ -49,35 +51,73 @@ components:
     bits: 16
     max_memory_size: 600000000
     timeloop:
-      accelerator: eyeriss_like
+      accelerator: eyeriss_like1
       frequency: 200000000
       layer: conv2d
       mapper:
-        algorithm: linear-pruned
+        algorithm: random-pruned
         live-status: false
+        max-permutations-per-if-visit: 16
         num-threads: 8
-        timeout: 0
-        victory-condition: 100
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
   - id: 1
-    max_out_size: 150000000
-    data_bit_width: 16
-    ethernet:
-      cable_len_m: 5
-      eee_lmi_ratio: 0.1
-      eee_toff_ms: 0
-      enable_eee: false
-      eth_mode: BASE1000-T
+    max_out_size: 20000000
+    data_bit_width: 8
+    noi:
+      noi_mode: UCIe
+      width: 16
+      data_rate_Gbps: 4
+      latency_ns: 2 # including D2D Adapter and PHY
+      power_bit_pj: 0.5
     fps: 25
   - id: 2
     bits: 8
     max_memory_size: 600000000
     timeloop:
-      accelerator: simba_like
+      accelerator: eyeriss_like2
       frequency: 200000000
       layer: conv2d
       mapper:
-        algorithm: linear-pruned
+        algorithm: random-pruned
         live-status: false
+        max-permutations-per-if-visit: 16
         num-threads: 8
-        timeout: 0
-        victory-condition: 100
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+  - id: 3
+    bits: 8
+    max_memory_size: 600000000
+    timeloop:
+      accelerator: eyeriss_like3
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+  - id: 4
+    bits: 8
+    max_memory_size: 600000000
+    timeloop:
+      accelerator: eyeriss_like4
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500

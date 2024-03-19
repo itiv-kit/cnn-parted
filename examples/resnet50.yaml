@@ -1,8 +1,10 @@
 general:
+  acc_once: True
   fixed_sys: True
   num_pp: 1
   num_topos: 1
   num_jobs: 64
+  optimization: edp
 
 neural-network:
   name: resnet50
@@ -53,11 +55,14 @@ components:
       frequency: 200000000
       layer: conv2d
       mapper:
-        algorithm: linear-pruned
+        algorithm: random-pruned
         live-status: false
+        max-permutations-per-if-visit: 16
         num-threads: 8
-        timeout: 0
-        victory-condition: 100
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
   - id: 1
     max_out_size: 150000000
     data_bit_width: 16
@@ -76,8 +81,11 @@ components:
       frequency: 200000000
       layer: conv2d
       mapper:
-        algorithm: linear-pruned
+        algorithm: random-pruned
         live-status: false
+        max-permutations-per-if-visit: 16
         num-threads: 8
-        timeout: 0
-        victory-condition: 100
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
