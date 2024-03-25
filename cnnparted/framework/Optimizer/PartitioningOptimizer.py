@@ -51,7 +51,12 @@ class PartitioningOptimizer(Optimizer):
 
         return params
 
-    def optimize(self, q_constr : dict, fixed_sys : bool, acc_once : bool, opt : str, num_jobs : int) -> dict:
+    def optimize(self, q_constr : dict, conf : dict) -> tuple[int, int, dict]:
+        fixed_sys = conf.get('fixed_sys')
+        acc_once = conf.get('acc_once')
+        opt = conf.get('optimization')
+        num_jobs = conf.get('num_jobs')
+
         all_paretos = []
         non_optimals = []
 
@@ -77,8 +82,9 @@ class PartitioningOptimizer(Optimizer):
             np.save(fname_p_npy, all_paretos)
             np.save(fname_n_npy, non_optimals)
 
+        g_len = 1 + (self.num_pp + 1) + self.num_pp
         x_len = (self.num_pp) * 2 + 1
-        comp_paretos = np.delete(all_paretos, np.s_[0:x_len+2], axis=1)
+        comp_paretos = np.delete(all_paretos, np.s_[0:g_len+x_len+1], axis=1)
         if opt == 'edp':
             comp_paretos = self._pareto_edp(comp_paretos)
         else:
@@ -94,7 +100,7 @@ class PartitioningOptimizer(Optimizer):
             else:
                 self.results["dom"].append(res[:-1])
 
-        return self.results
+        return g_len, x_len, self.results
 
     def _pareto_edp(self, comp_paretos : np.ndarray) -> np.ndarray:
         comp_paretos = np.delete(comp_paretos, np.s_[2:], axis=1)

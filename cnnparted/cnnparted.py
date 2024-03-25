@@ -37,10 +37,9 @@ def main(args):
     if num_pp == -1:
         num_pp = len(nodeStats[list(nodeStats.keys())[0]]) - 1
     optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.show_progress)
-    sol = optimizer.optimize(q_constr, main_conf.get('fixed_sys'), main_conf.get('acc_once'), main_conf.get('optimization'), main_conf.get('num_jobs'))
+    n_constr, n_var, sol = optimizer.optimize(q_constr, main_conf)
 
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
-    n_var = num_pp * 2 + 1
     if config.get('accuracy'):
         quant = QuantizationEvaluator(ga.torchmodel, ga.input_size, config.get('accuracy'), args.show_progress)
         quant.eval(sol["nondom"], n_var, ga.schedules, accuracy_function)
@@ -51,7 +50,7 @@ def main(args):
     # objective = conf_helper.get_optimization_objectives(node_components, link_components)
 
     # Step 7 - Output exploration results
-    write_files(args.run_name, n_var, sol, ga.schedules)
+    write_files(args.run_name, n_constr, n_var, sol, ga.schedules)
     for pareto, sched in sol.items():
         print(pareto, len(sched))
     num_real_pp = [int(sched[1]) for sched in sol["nondom"]]
@@ -107,14 +106,15 @@ def node_eval(ga : GraphAnalyzer, node_components : list, run_name : str, progre
 
     return nodeStats
 
-def write_files(run_name : str, n_var : int, results : dict, schedules : list) -> None:
+def write_files(run_name : str, n_constr : int, n_var : int, results : dict, schedules : list) -> None:
     rows = []
     for pareto, sched in results.items():
         for sd in sched:
             data = np.append(sd, pareto)
             data = data.astype('U256')
-            data[:n_var+2] = data[:n_var+2].astype(float).astype(int)
-            for i in range(2,int(n_var/2)+2):
+            data[0:2] = data[0:2].astype(float).astype(int)
+            data[n_constr+1:n_constr+n_var+1] = data[n_constr+1:n_constr+n_var+1].astype(float).astype(int)
+            for i in range(n_constr+1,int(n_var/2)+n_constr+1):
                 data[i] = schedules[int(data[0])][int(data[i])-1]
             rows.append(data)
         if pareto == "nondom":

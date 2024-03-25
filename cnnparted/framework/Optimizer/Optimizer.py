@@ -21,13 +21,14 @@ class Optimizer():
 
         for h in res.history or []:
             for ind in h.pop:
-                if ind.get("G") > 0:
+                if ind.get("G")[0] > 0:
                     continue
                 data.append(np.append(ind.get("G").tolist(), np.append(np.round(ind.get("X").tolist()), ind.get("F").tolist())))
         data = np.unique(data, axis=0)
 
+        g_len = len(G[0])
         x_len = len(X[0])
-        comp_hist = np.delete(data, np.s_[0:x_len+1], axis=1)
+        comp_hist = np.delete(data, np.s_[0:x_len+g_len], axis=1)
         paretos = self._is_pareto_efficient(comp_hist)
         paretos = np.expand_dims(paretos, 1)
         data = np.hstack([data, paretos])

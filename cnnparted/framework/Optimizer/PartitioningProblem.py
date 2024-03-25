@@ -22,8 +22,9 @@ class PartitioningProblem(ElementwiseProblem):
         for link_conf in link_confs:
             self.links.append(Link(link_conf))
 
-        n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + device ID
-        n_obj = 5 # + self.num_pp #+ (self.num_pp + 1) # latency, energy, throughput + bandwidth + memory
+        n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + device IDs
+        n_obj = 5 # latency, energy, throughput + link latency + link energy
+        n_constr = 1 + (self.num_pp + 1) + self.num_pp # num_real_pp + latency per partition + latency per link
 
         xu_pp = np.empty(self.num_pp)
         xu_pp.fill(self.num_layers + 0.49)
@@ -31,11 +32,16 @@ class PartitioningProblem(ElementwiseProblem):
         xu_acc.fill(self.num_acc + 0.49)
         xu = np.append(xu_pp, xu_acc)
 
-        super().__init__(n_var=n_var, n_obj=n_obj, n_constr=1, xl=0.51, xu=xu)
+        super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=0.51, xu=xu)
 
     def _evaluate(self, x, out, *args, **kwargs):
         valid = True
         num_real_pp = 1
+        l_pp = []
+        e_pp = []
+        l_pp_link = []
+        e_pp_link = []
+
         latency = energy = throughput = link_latency = link_energy = 0.0
         bandwidth = np.full((self.num_pp), np.inf)
         mem = np.full((self.num_pp + 1), np.inf)
@@ -48,10 +54,6 @@ class PartitioningProblem(ElementwiseProblem):
         elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_acc:]), p[-self.num_acc:]): # keep order of Accelerators
             valid = False
         else:
-            l_pp = []
-            e_pp = []
-            l_pp_link = []
-            e_pp_link = []
             th_pp = []
             successors = [self.schedule[0]]
             i = last_pp = last_acc = -1
@@ -89,9 +91,9 @@ class PartitioningProblem(ElementwiseProblem):
         out["F"] = [latency, energy, throughput, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
         if valid:
-            out["G"] = -num_real_pp
+            out["G"] = [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in l_pp_link]
         else:
-            out["G"] = num_real_pp
+            out["G"] = [num_real_pp] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp)]
 
     def _eval_partition(self, acc : int, last_pp : int, pp : int, l_pp : list, e_pp : list, th_pp : list, successors : list) -> tuple[bool, int]:
         valid = True
