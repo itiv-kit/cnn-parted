@@ -65,7 +65,7 @@ setup(
             'onnxruntime-gpu',
             'traitlets',
             'pymoo',
-            'onnx2pytorch',
+            'onnx2torch',
             'pandas',
             'joblib'
             ],

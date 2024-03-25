@@ -1,6 +1,6 @@
 import onnx
 from onnx import helper as onnx_helper
-from onnx2pytorch import ConvertModel
+from onnx2torch import convert
 from copy import deepcopy
 
 class modelHelper:
@@ -38,7 +38,7 @@ class modelHelper:
         onnx.save(model, output_path)
 
     def convert_to_pytorch(self,model):
-        """Convert ONNX model to PyTorch model using onnx2pytorch."""
+        """Convert ONNX model to PyTorch model using onnx2torch."""
         # Assuming self.model is the loaded ONNX model
-        pytorch_model = ConvertModel(model,experimental=True)
+        pytorch_model = convert(model)
         return pytorch_model

@@ -8,18 +8,19 @@ from .modelHelper import modelHelper
 
 class TreeModel:
     def __init__(self, run_name, input_size):
-        self._model_path = os.path.join(MODEL_PATH, run_name, "model.onnx")
+        _model_path = os.path.join(MODEL_PATH, run_name, "model.onnx")
         self.input_size = input_size
         self.model_helper = modelHelper()
-        self._model = onnx.load(self._model_path)
+        self._model = onnx.load(_model_path)
         onnx.checker.check_model(self._model)
         self._model = shape_inference.infer_shapes(self._model)
         self.output_sizes = self._get_output_sizes()
         self._layerTree = self._get_layers_data()
-        onnx.save(self._model, os.path.join(MODEL_PATH, run_name, "new_model.onnx"))
+        self.new_model_path = os.path.join(MODEL_PATH, run_name, "new_model.onnx")
+        onnx.save(self._model, self.new_model_path)
 
     def get_torchModel(self):
-        return self.model_helper.convert_to_pytorch(self._model)#,self.model_helper.convert_to_pytorch(self._identity_model)
+        return self.model_helper.convert_to_pytorch(self.new_model_path)
 
     def get_Tree(self):
         return self._layerTree
