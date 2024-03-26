@@ -24,7 +24,7 @@ def main(args):
     ga.find_schedules(main_conf.get('num_topos'))
 
     # Step 2 - Robustness Analysis
-    q_constr = {}
+    q_constr = {'min_bits': main_conf.get('min_bits') or 0}
     if config.get('accuracy'):
         robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), args.show_progress)
         q_constr = robustnessAnalyzer.optimize()

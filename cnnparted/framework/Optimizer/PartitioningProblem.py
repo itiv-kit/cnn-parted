@@ -24,7 +24,7 @@ class PartitioningProblem(ElementwiseProblem):
 
         n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + device IDs
         n_obj = 5 # latency, energy, throughput + link latency + link energy
-        n_constr = 1 + (self.num_pp + 1) + (self.num_pp + 1) # num_real_pp + latency per partition + latency per link
+        n_constr = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_real_pp + latency/energy per partition + latency/energy per link
 
         xu_pp = np.empty(self.num_pp)
         xu_pp.fill(self.num_layers + 0.49)
@@ -103,9 +103,9 @@ class PartitioningProblem(ElementwiseProblem):
         out["F"] = [latency, energy, throughput, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
         if valid:
-            out["G"] = [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in l_pp_link]
+            out["G"] = [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in e_pp] + [i * (-1) for i in l_pp_link] + [i * (-1) for i in e_pp_link]
         else:
-            out["G"] = [1] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)]
+            out["G"] = [1] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)]
 
     def _eval_partition(self, acc : int, last_pp : int, pp : int, l_pp : list, e_pp : list, successors : list) -> tuple[bool, int]:
         valid = True
@@ -168,7 +168,10 @@ class PartitioningProblem(ElementwiseProblem):
             return True
         acc = list(self.nodeStats.keys())[acc]
         bit_width = self.nodeStats[acc].get("bits")
-        return bit_width >= max([self.q_constr[x] for x in self.q_constr.keys() if layer_name in x], default=0)
+        if len(self.q_constr.keys()) > 1:
+            return bit_width >= max([self.q_constr[x] for x in self.q_constr.keys() if layer_name in x], default=0)
+        else:
+            return bit_width >= self.q_constr['min_bits']
 
     def _zero_division(self, a : float, b : float) -> float:
         return a / b if b else np.inf

@@ -82,7 +82,7 @@ class PartitioningOptimizer(Optimizer):
             np.save(fname_p_npy, all_paretos)
             np.save(fname_n_npy, non_optimals)
 
-        g_len = 1 + (self.num_pp + 1) + (self.num_pp + 1)
+        g_len = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
         x_len = (self.num_pp) * 2 + 1
         comp_paretos = np.delete(all_paretos, np.s_[0:g_len+x_len+1], axis=1)
         if opt == 'edp':
