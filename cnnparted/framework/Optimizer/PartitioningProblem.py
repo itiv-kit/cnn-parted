@@ -170,10 +170,8 @@ class PartitioningProblem(ElementwiseProblem):
             return True
         acc = list(self.nodeStats.keys())[acc]
         bit_width = self.nodeStats[acc].get("bits")
-        if len(self.q_constr.keys()) > 1:
-            return bit_width >= max([self.q_constr[x] for x in self.q_constr.keys() if layer_name in x], default=0)
-        else:
-            return bit_width >= self.q_constr['min_bits']
+        return bit_width >= max([self.q_constr[x] for x in self.q_constr.keys() if layer_name in x], default=0)
+
 
     def _zero_division(self, a : float, b : float) -> float:
         return a / b if b else np.inf
