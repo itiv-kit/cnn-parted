@@ -107,6 +107,6 @@ vgg16_cifar100 = partial(_vgg16_cifar, num_classes=100)
 vgg19_cifar10 = partial(_vgg19_cifar, num_classes=10)
 vgg19_cifar100 = partial(_vgg19_cifar, num_classes=100)
 
-model = vgg16_cifar100()
+model = vgg11_cifar10()
 
 accuracy_function = compute_classification_accuracy

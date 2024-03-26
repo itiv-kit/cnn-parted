@@ -5,14 +5,51 @@ general:
   num_topos: 1
   num_jobs: 64
   optimization: edp
+  min_bits: 5
 
 neural-network:
   name: resnet18
   input-size: [ 128, 3, 32, 32 ]
 
+# accuracy:
+#   device: "cuda"
+#   bits: [16, 8] # eyeriss 16-bit, simba 8-bit
+#   robustness:
+#     pop_size: 32
+#     num_gen: 64
+#     bits: [4, 6, 8, 16]
+#     min_acc: 0.8
+#   calibration:
+#     samples: null # null sets samples to all
+#     file: './calibrations/resnet18_quant_calib.pkl'
+#   retraining:
+#     epochs: 2
+#   datasets:
+#     calibrate:
+#       type: imagenet
+#       kind: 'imagefolder'
+#       path: '/tools/datasets/imagenet/val_images'
+#       sample_limit: null # number of validation dataset samples to test for each individual
+#       batch_size: 64
+#       randomize: False
+#     validation:
+#       type: imagenet
+#       kind: 'imagefolder'
+#       path: '/tools/datasets/imagenet/val_images'
+#       sample_limit: 8192 # number of validation dataset samples to test for each individual
+#       batch_size: 256
+#       randomize: False
+#     train:
+#       type: imagenet
+#       kind: 'webdataset'
+#       path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
+#       total_samples: 1281167
+#       batch_size: 256
+#       sample_limit: null
+
 components:
   - id: 0
-    bits: 16
+    bits: 5
     max_memory_size: 600000000
     timeloop:
       accelerator: eyeriss_like1
@@ -38,7 +75,7 @@ components:
       power_bit_pj: 0.5
     fps: 25
   - id: 2
-    bits: 8
+    bits: 6
     max_memory_size: 600000000
     timeloop:
       accelerator: eyeriss_like2
@@ -54,7 +91,7 @@ components:
         timeout: 15000
         victory-condition: 500
   - id: 3
-    bits: 8
+    bits: 7
     max_memory_size: 600000000
     timeloop:
       accelerator: eyeriss_like3
