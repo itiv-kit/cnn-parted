@@ -24,7 +24,7 @@ class PartitioningProblem(ElementwiseProblem):
 
         n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + device IDs
         n_obj = 5 # latency, energy, throughput + link latency + link energy
-        n_constr = 1 + (self.num_pp + 1) + self.num_pp # num_real_pp + latency per partition + latency per link
+        n_constr = 1 + (self.num_pp + 1) + (self.num_pp + 1) # num_real_pp + latency per partition + latency per link
 
         xu_pp = np.empty(self.num_pp)
         xu_pp.fill(self.num_layers + 0.49)
@@ -36,17 +36,18 @@ class PartitioningProblem(ElementwiseProblem):
 
     def _evaluate(self, x, out, *args, **kwargs):
         valid = True
-        num_real_pp = 1
+        num_real_pp = 0
+        curr_latency = 0.0 # used for throughput calculation
+
         l_pp = []
         e_pp = []
-        l_pp_link = []
-        e_pp_link = []
 
         latency = energy = throughput = link_latency = link_energy = 0.0
-        bandwidth = np.full((self.num_pp), np.inf)
+        bandwidth = np.full((self.num_pp + 1), np.inf)
         mem = np.full((self.num_pp + 1), np.inf)
 
         p = [int(np.round(i)) for i in x]
+        p.insert(self.num_pp, self.num_layers)
         if not np.array_equal(np.sort(p[:self.num_pp]), p[:self.num_pp]): # keep order of partitioning points
             valid = False
         elif self.acc_once and np.unique(p[-self.num_acc:]).size != np.asarray(p[-self.num_acc:]).size:   # only use accelerator once
@@ -55,32 +56,43 @@ class PartitioningProblem(ElementwiseProblem):
             valid = False
         else:
             th_pp = []
+            l_pp_link = []
+            e_pp_link = []
             successors = [self.schedule[0]]
             i = last_pp = last_acc = -1
-            for i, pp in enumerate(p[0:self.num_pp], self.num_pp):
-                v, mem[i-self.num_pp] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, th_pp, successors)
+            for i, pp in enumerate(p[0:self.num_pp+1], self.num_pp + 1):
+                v, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
                 valid &= v
 
                 # evaluate link
-                if last_pp != pp and last_acc != p[i] and last_acc != -1:
-                    link_l, link_e, bandwidth[i-self.num_pp] = self._get_link_metrics(i-self.num_pp, successors)
-                    num_real_pp += 1
-                else:
-                    link_l = 0
-                    link_e = 0
-                    bandwidth[i-self.num_pp] = 0
+                if last_pp != pp and last_acc != p[i]:
+                    if pp != self.num_layers and last_acc != -1:
+                        link_l, link_e, bandwidth[i-self.num_pp-1] = self._get_link_metrics(i-self.num_pp-1, successors)
+                        l_pp_link.append(link_l)
+                        e_pp_link.append(link_e)
+                        th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
+                    else:
+                        l_pp_link.append(0.0)
+                        e_pp_link.append(0.0)
+                        bandwidth[i-self.num_pp-1] = 0
 
-                l_pp_link.append(link_l)
-                e_pp_link.append(link_e)
-                th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
+                    if last_pp != 1:
+                        num_real_pp += 1
+                        if last_pp != -1:
+                            th_pp.append(self._zero_division(1000.0, sum(l_pp[:-1]) - curr_latency)) # FPS - latency in ms
+                            curr_latency = sum(l_pp[:-1])
+                else:
+                    l_pp_link.append(0.0)
+                    e_pp_link.append(0.0)
+                    bandwidth[i-self.num_pp-1] = 0
+
+                if pp == self.num_layers:
+                    th_pp.append(self._zero_division(1000.0, sum(l_pp) - curr_latency)) # FPS - latency in ms
 
                 if last_pp != pp:
                     last_pp = pp
                     if last_pp != 1: # if last_pp not input
                         last_acc = p[i]
-
-            v, mem[i+1-self.num_pp] = self._eval_partition(p[i+1], last_pp, self.num_layers, l_pp, e_pp, th_pp, successors)
-            valid &= v
 
             link_latency = sum(l_pp_link)
             link_energy = sum(e_pp_link)
@@ -93,9 +105,9 @@ class PartitioningProblem(ElementwiseProblem):
         if valid:
             out["G"] = [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in l_pp_link]
         else:
-            out["G"] = [num_real_pp] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp)]
+            out["G"] = [1] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)]
 
-    def _eval_partition(self, acc : int, last_pp : int, pp : int, l_pp : list, e_pp : list, th_pp : list, successors : list) -> tuple[bool, int]:
+    def _eval_partition(self, acc : int, last_pp : int, pp : int, l_pp : list, e_pp : list, successors : list) -> tuple[bool, int]:
         valid = True
         acc -= 1
         acc_latency = 0.0
@@ -135,7 +147,6 @@ class PartitioningProblem(ElementwiseProblem):
 
         l_pp.append(acc_latency)
         e_pp.append(acc_energy)
-        th_pp.append(self._zero_division(1000.0, acc_latency)) # FPS - latency in ms
         return valid, part_l_params + max(dmem, default=0) # mem evaluation
 
     def _get_layer_latency(self, acc : int, layer_name : str) -> float:
