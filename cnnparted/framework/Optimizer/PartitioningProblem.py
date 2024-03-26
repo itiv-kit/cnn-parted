@@ -1,6 +1,7 @@
 from pymoo.core.problem import ElementwiseProblem
 from copy import deepcopy
 import numpy as np
+from collections import deque, defaultdict
 
 from ..link.Link import Link
 
@@ -56,6 +57,7 @@ class PartitioningProblem(ElementwiseProblem):
             valid = False
         else:
             th_pp = []
+            part_latency = deque()
             l_pp_link = []
             e_pp_link = []
             successors = [self.schedule[0]]
@@ -79,7 +81,7 @@ class PartitioningProblem(ElementwiseProblem):
                     if last_pp != 1:
                         num_real_pp += 1
                         if last_pp != -1:
-                            th_pp.append(self._zero_division(1000.0, sum(l_pp[:-1]) - curr_latency)) # FPS - latency in ms
+                            part_latency.append([last_acc, sum(l_pp[:-1]) - curr_latency])
                             curr_latency = sum(l_pp[:-1])
                 else:
                     l_pp_link.append(0.0)
@@ -87,7 +89,7 @@ class PartitioningProblem(ElementwiseProblem):
                     bandwidth[i-self.num_pp-1] = 0
 
                 if pp == self.num_layers:
-                    th_pp.append(self._zero_division(1000.0, sum(l_pp) - curr_latency)) # FPS - latency in ms
+                    part_latency.append([last_acc, sum(l_pp) - curr_latency])
 
                 if last_pp != pp:
                     last_pp = pp
@@ -98,7 +100,7 @@ class PartitioningProblem(ElementwiseProblem):
             link_energy = sum(e_pp_link)
             latency = sum(l_pp) + link_latency
             energy = sum(e_pp) + link_energy
-            throughput = min(th_pp) * -1
+            throughput = self._get_throughput(th_pp, part_latency) * -1
 
         out["F"] = [latency, energy, throughput, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
@@ -191,3 +193,17 @@ class PartitioningProblem(ElementwiseProblem):
             return self.links[0].eval(np.sum(data_sizes))
         else:
             return self.links[link_idx].eval(np.sum(data_sizes))
+
+    def _get_throughput(self, th_pp : list, part_latency : deque) -> float:
+        acc_index = defaultdict(list)
+        for i, pair in enumerate(part_latency):
+            acc_index[pair[0]].append(i)
+
+        for _, indexes in acc_index.items():
+            acc_latency = 0.0
+            for i in range(min(indexes), max(indexes)+1):
+                acc_latency += part_latency[i][1]
+
+            th_pp.append(self._zero_division(1000.0, acc_latency))
+
+        return min(th_pp)
