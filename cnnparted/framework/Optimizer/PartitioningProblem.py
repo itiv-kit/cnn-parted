@@ -89,7 +89,7 @@ class PartitioningProblem(ElementwiseProblem):
                     bandwidth[i-self.num_pp-1] = 0
 
                 if pp == self.num_layers:
-                    part_latency.append([last_acc, sum(l_pp) - curr_latency])
+                    part_latency.append([p[i], sum(l_pp) - curr_latency])
 
                 if last_pp != pp:
                     last_pp = pp
