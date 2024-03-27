@@ -68,7 +68,7 @@ class PartitioningProblem(ElementwiseProblem):
 
                 # evaluate link
                 if last_pp != pp and last_acc != p[i]:
-                    if pp != self.num_layers and last_acc != -1:
+                    if last_acc != -1:
                         link_l, link_e, bandwidth[i-self.num_pp-1] = self._get_link_metrics(i-self.num_pp-1, successors)
                         l_pp_link.append(link_l)
                         e_pp_link.append(link_e)
