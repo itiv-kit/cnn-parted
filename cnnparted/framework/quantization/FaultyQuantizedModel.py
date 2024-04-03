@@ -1,5 +1,4 @@
 import torch
-import functools
 import numpy as np
 import pandas as pd
 
@@ -8,9 +7,8 @@ from tqdm import tqdm
 from torch import nn as torch_nn
 
 from torch.utils.data import DataLoader
-from copy import deepcopy
 
-# import framework.quantization.qmodules as qmodules
+import framework.quantization.FaultyQModules as qmodules
 from pytorch_quantization import nn as quant_nn
 from pytorch_quantization import calib
 from pytorch_quantization import tensor_quant
@@ -20,7 +18,7 @@ from model_explorer.exploration.weighting_functions import bits_weighted_linear
 from .CustomModel import CustomModel
 
 
-class QuantizedModel(CustomModel):
+class FaultyQuantizedModel(CustomModel):
     """The quantized model automatically replaces all Conv2d modules with
     quantizeable counterparts from the nvidia-quantization library.
     """
@@ -32,6 +30,10 @@ class QuantizedModel(CustomModel):
                  quantization_descriptor: QuantDescriptor = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR,
                  dram_analysis_file: str = "") -> None:
         super().__init__(base_model, device)
+
+        self._fault_rates = []
+        self.faulty_modules = []
+        self.faulty_module_names = []
 
         self._bit_widths = {}
         self.weighting_function = weighting_function
@@ -46,6 +48,25 @@ class QuantizedModel(CustomModel):
         # Energy Model ...
         if dram_analysis_file != "":
             self._build_energy_model(dram_analysis_file)
+
+    @property
+    def fault_rates(self):
+        return self._fault_rates
+
+    @fault_rates.setter
+    def fault_rates(self, new_fault_rates):
+        assert isinstance(new_fault_rates, list) or isinstance(
+            new_fault_rates,
+            np.ndarray), "fault_rates have to be a list or ndarray"
+        assert len(new_fault_rates) == len(
+            self.faulty_modules
+        ), "fault_rates list has to match the amount of quantization layers"
+
+        # Update Model ...
+        for i, module in enumerate(self.faulty_modules):
+            module.fault_rate = new_fault_rates[i]
+
+        self._fault_rates = new_fault_rates
 
     @property
     def bit_widths(self):
@@ -78,7 +99,7 @@ class QuantizedModel(CustomModel):
         i = 0
 
         for name, module in self.base_model.named_modules():
-            if isinstance(module, quant_nn.QuantConv2d):
+            if isinstance(module, qmodules.FaultyQConv2d):
                 w_bits = module._weight_quantizer.num_bits
                 i_bits = module._input_quantizer.num_bits
 
@@ -126,7 +147,7 @@ class QuantizedModel(CustomModel):
                 # quant_conv = quant_nn.QuantConv2d(**module.__dict__, quant_desc...=...)
                 bias_bool = module.bias is not None
 
-                quant_conv = quant_nn.QuantConv2d(
+                quant_conv = qmodules.FaultyQConv2d(
                     in_channels=module.in_channels,
                     out_channels=module.out_channels,
                     kernel_size=module.kernel_size,
@@ -150,6 +171,9 @@ class QuantizedModel(CustomModel):
             setattr(self.base_model, name, quant_conv)
 
         for name, module in self.base_model.named_modules():
+            if isinstance(module, qmodules.FaultyQConv2d):
+                self.faulty_module_names.append(name)
+                self.faulty_modules.append(module)
             if isinstance(module, quant_nn.TensorQuantizer):
                 self.explorable_module_names.append(name)
                 self.explorable_modules.append(module)

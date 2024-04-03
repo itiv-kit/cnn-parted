@@ -7,10 +7,9 @@ from copy import deepcopy
 
 from pymoo.core.problem import ElementwiseProblem
 
-from model_explorer.models.quantized_model import QuantizedModel
 from model_explorer.utils.setup import build_dataloader_generators
 
-from ..quantization.QuantizedModel import QuantizedModel
+from ..quantization.FaultyQuantizedModel import FaultyQuantizedModel
 from ..quantization.generate_calibration import generate_calibration
 
 
@@ -25,7 +24,7 @@ class RobustnessProblem(ElementwiseProblem):
     ):
         m = deepcopy(model)
         gpu_device = torch.device(config.get('device'))
-        self.qmodel = QuantizedModel(m, gpu_device)
+        self.qmodel = FaultyQuantizedModel(m, gpu_device)
 
         rob_conf =  config.get('robustness')
         self.min_accuracy = rob_conf.get('min_acc')
