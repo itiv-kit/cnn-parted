@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from typing import Callable
 
-from framework import ConfigHelper, NodeThread, GraphAnalyzer, PartitioningOptimizer, RobustnessOptimizer, QuantizationEvaluator
+from framework import ConfigHelper, NodeThread, GraphAnalyzer, PartitioningOptimizer, RobustnessOptimizer, AccuracyEvaluator
 from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 
 
@@ -41,7 +41,7 @@ def main(args):
 
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
     if config.get('accuracy'):
-        quant = QuantizationEvaluator(ga.torchmodel, nodeStats, config.get('accuracy'), args.show_progress)
+        quant = AccuracyEvaluator(ga.torchmodel, nodeStats, config.get('accuracy'), args.show_progress)
         quant.eval(sol["nondom"], n_constr, n_var, ga.schedules, accuracy_function)
         for i, p in enumerate(sol["dom"]): # achieving aligned csv file
             sol["dom"][i] = np.append(p, float(0))

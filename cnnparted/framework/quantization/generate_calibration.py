@@ -3,7 +3,7 @@ import os
 
 from model_explorer.utils.setup import setup_torch_device
 #from model_explorer.models.quantized_model import QuantizedModel
-from .quantizer import QuantizedModel
+from .QuantizedModel import QuantizedModel
 from model_explorer.utils.data_loader_generator import DataLoaderGenerator
 
 from pytorch_quantization.tensor_quant import QuantDescriptor

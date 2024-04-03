@@ -17,7 +17,7 @@ from pytorch_quantization import tensor_quant
 from pytorch_quantization.tensor_quant import QuantDescriptor
 
 from model_explorer.exploration.weighting_functions import bits_weighted_linear
-from .custom_model import CustomModel
+from .CustomModel import CustomModel
 
 
 class QuantizedModel(CustomModel):

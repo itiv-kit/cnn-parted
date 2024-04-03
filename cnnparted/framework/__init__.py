@@ -1,9 +1,9 @@
-__all__ = ['ConfigHelper', 'NodeThread', 'GraphAnalyzer', 'PartitioningOptimizer', 'RobustnessOptimizer', 'QuantizationEvaluator']
+__all__ = ['ConfigHelper', 'NodeThread', 'GraphAnalyzer', 'PartitioningOptimizer', 'RobustnessOptimizer', 'AccuracyEvaluator']
 
 from framework.helpers.ConfigHelper import ConfigHelper
 from framework.node.NodeThread import NodeThread
 from framework.GraphAnalyzer import GraphAnalyzer
-from framework.Optimizer.PartitioningOptimizer import PartitioningOptimizer
-from framework.Optimizer.RobustnessOptimizer import RobustnessOptimizer
-from framework.quantization.QuantizationEvaluator import QuantizationEvaluator
+from framework.optimizer.PartitioningOptimizer import PartitioningOptimizer
+from framework.optimizer.RobustnessOptimizer import RobustnessOptimizer
+from framework.quantization.AccuracyEvaluator import AccuracyEvaluator
 

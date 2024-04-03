@@ -10,11 +10,11 @@ from typing import Callable
 
 from model_explorer.utils.setup import build_dataloader_generators
 
-from .quantizer import QuantizedModel
+from .QuantizedModel import QuantizedModel
 from .generate_calibration import generate_calibration
 
 
-class QuantizationEvaluator():
+class AccuracyEvaluator():
     def __init__(self, model : nn.Module, nodeStats : dict, config : dict, progress : bool) -> None:
         self.bits = [nodeStats[acc].get("bits") for acc in nodeStats]
         self.calib_conf = config.get('calibration')
@@ -43,12 +43,6 @@ class QuantizationEvaluator():
         self.qmodel.bit_widths = np.ones(len(quants[0])) * max(self.bits)
         self.qmodel.load_parameters_file(self.param_path)
 
-        criterion = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.SGD(self.qmodel.base_model.parameters(), lr=0.0001)
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
-                                                            step_size=1,
-                                                            gamma=0.1)
-
         self.qmodel.base_model.train()
         for epoch_idx in range(self.train_epochs):
             if self.progress:
@@ -62,21 +56,21 @@ class QuantizationEvaluator():
             for image, target, *_ in train_dataloader:
                 image, target = image.to(self.gpu_device), target.to(self.gpu_device)
 
-                optimizer.zero_grad()
+                self.qmodel.optimizer.zero_grad()
 
                 with torch.set_grad_enabled(mode=True):
                     self.qmodel.base_model.to(self.gpu_device)
                     output = self.qmodel.base_model(image)
-                    loss = criterion(output, target)
+                    loss = self.qmodel.criterion(output, target)
                     loss.backward()
-                    optimizer.step()
+                    self.qmodel.optimizer.step()
 
                     running_loss += loss.item() * output.size(0)
 
                     if self.progress:
                         pbar.update(output.size(0))
 
-            lr_scheduler.step()
+            self.qmodel.lr_scheduler.step()
 
             if self.progress:
                 pbar.close()

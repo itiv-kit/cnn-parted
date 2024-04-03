@@ -10,7 +10,7 @@ from pymoo.core.problem import ElementwiseProblem
 from model_explorer.models.quantized_model import QuantizedModel
 from model_explorer.utils.setup import build_dataloader_generators
 
-from ..quantization.quantizer import QuantizedModel
+from ..quantization.QuantizedModel import QuantizedModel
 from ..quantization.generate_calibration import generate_calibration
 
 
