@@ -20,7 +20,7 @@ class TreeModel:
         onnx.save(self._model, self.new_model_path)
 
     def get_torchModel(self):
-        return self.model_helper.convert_to_pytorch(self.new_model_path)
+        return self.model_helper.convert_to_pytorch(self._model)
 
     def get_Tree(self):
         return self._layerTree

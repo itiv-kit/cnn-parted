@@ -12,7 +12,6 @@ neural-network:
 
 # accuracy:
 #   device: "cuda"
-#   bits: [16, 8] # eyeriss 16-bit, simba 8-bit
 #   robustness:
 #     pop_size: 32
 #     num_gen: 64

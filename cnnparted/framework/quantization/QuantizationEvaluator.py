@@ -15,8 +15,8 @@ from .generate_calibration import generate_calibration
 
 
 class QuantizationEvaluator():
-    def __init__(self, model : nn.Module, input_size : tuple, config : dict, progress : bool) -> None:
-        self.bits = config.get('bits')
+    def __init__(self, model : nn.Module, nodeStats : dict, config : dict, progress : bool) -> None:
+        self.bits = [nodeStats[acc].get("bits") for acc in nodeStats]
         self.calib_conf = config.get('calibration')
         self.gpu_device = torch.device(config.get('device'))
         self.progress = progress
@@ -36,8 +36,8 @@ class QuantizationEvaluator():
         self.train_epochs = config['retraining'].get('epochs')
 
 
-    def eval(self, partitions : list, n_var : int, schedules : list, accuracy_function : Callable) -> list:
-        quants = self._gen_quant_list(partitions, n_var, schedules)
+    def eval(self, sols : list, n_constr : int, n_var : int, schedules : list, accuracy_function : Callable) -> list:
+        quants = self._gen_quant_list(sols, n_constr, n_var, schedules)
 
         # Training
         self.qmodel.bit_widths = np.ones(len(quants[0])) * max(self.bits)
@@ -86,13 +86,11 @@ class QuantizationEvaluator():
             self.qmodel.bit_widths = q
             self.qmodel.base_model.eval()
             acc = accuracy_function(self.qmodel.base_model, self.val_dataloadergen, progress=self.progress, title=f"Infere")
-            partitions[i] = np.append(partitions[i], acc.cpu().detach().numpy())
+            sols[i] = np.append(sols[i], acc.cpu().detach().numpy())
 
         return quants
 
-    def _gen_quant_list(self, partitions : list, n_var : int, schedules : list) -> list:
-        num_pp = n_var / 2
-
+    def _gen_quant_list(self, sols : list, n_constr : int, n_var : int, schedules : list) -> list:
         layer_dict = {}
         quant_list = []
         for base_layer, _ in self.qmodel.base_model.named_modules():
@@ -104,13 +102,16 @@ class QuantizationEvaluator():
                         break
 
         quants = []
-        for part in partitions:
+        num_pp = n_var/2 - 1
+        for sol in sols:
+            mapping = sol[n_constr+1:n_var+n_constr+1]
             partition = 0
-            for layer in schedules[int(part[0])]:
+            for layer in schedules[int(sol[0])]:
+                acc = int(mapping[int(n_var/2)+partition])
                 if layer in layer_dict.keys():
-                    quant_list[layer_dict[layer]-1] = self.bits[partition] # input quantizer
-                    quant_list[layer_dict[layer]] = self.bits[partition]   # weight quantizer
-                if partition < num_pp and layer == schedules[int(part[0])][int(part[partition+1])-1]:
+                    quant_list[layer_dict[layer]-1] = self.bits[acc-1] # input quantizer
+                    quant_list[layer_dict[layer]] = self.bits[acc-1]   # weight quantizer
+                if partition < num_pp and layer == schedules[int(sol[0])][int(mapping[partition])-1]:
                     partition += 1
             quants.append(deepcopy(quant_list))
 
