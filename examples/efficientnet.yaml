@@ -48,7 +48,7 @@ accuracy:
 
 components:
   - id: 0
-    bits: 16
+    bits: 5
     max_memory_size: 600000000
     timeloop:
       accelerator: eyeriss_like1
@@ -74,7 +74,7 @@ components:
       power_bit_pj: 0.5
     fps: 25
   - id: 2
-    bits: 8
+    bits: 6
     max_memory_size: 600000000
     timeloop:
       accelerator: eyeriss_like2
@@ -90,7 +90,7 @@ components:
         timeout: 15000
         victory-condition: 500
   - id: 3
-    bits: 8
+    bits: 7
     max_memory_size: 600000000
     timeloop:
       accelerator: eyeriss_like3

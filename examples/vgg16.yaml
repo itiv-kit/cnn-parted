@@ -48,10 +48,10 @@ neural-network:
 
 components:
   - id: 0
-    bits: 6
+    bits: 5
     max_memory_size: 600000000
     timeloop:
-      accelerator: eyeriss_like2
+      accelerator: eyeriss_like1
       frequency: 200000000
       layer: conv2d
       mapper:
@@ -74,6 +74,22 @@ components:
       power_bit_pj: 0.5
     fps: 25
   - id: 2
+    bits: 6
+    max_memory_size: 600000000
+    timeloop:
+      accelerator: eyeriss_like2
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+  - id: 3
     bits: 7
     max_memory_size: 600000000
     timeloop:
@@ -89,7 +105,7 @@ components:
         - edp
         timeout: 15000
         victory-condition: 500
-  - id: 3
+  - id: 4
     bits: 8
     max_memory_size: 600000000
     timeloop:
