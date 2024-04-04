@@ -1,9 +1,9 @@
 general:
-  acc_once: True
-  fixed_sys: True
+  acc_once: False
+  fixed_sys: False
   num_pp: 1
   num_topos: 1
-  num_jobs: 64
+  num_jobs: 1
   optimization: edp
 
 neural-network:

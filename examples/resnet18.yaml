@@ -3,47 +3,47 @@ general:
   acc_once: False
   num_pp: -1
   num_topos: 1
-  num_jobs: 64
+  num_jobs: 1
   optimization: edp
 
 neural-network:
   name: resnet18
-  input-size: [ 128, 3, 32, 32 ]
+  input-size: [ 1, 3, 227, 227 ]
 
-# accuracy:
-#   device: "cuda"
-#   robustness:
-#     pop_size: 32
-#     num_gen: 64
-#     bits: [4, 6, 8, 16]
-#     min_acc: 0.8
-#   calibration:
-#     samples: null # null sets samples to all
-#     file: './calibrations/resnet18_quant_calib.pkl'
-#   retraining:
-#     epochs: 2
-#   datasets:
-#     calibrate:
-#       type: imagenet
-#       kind: 'imagefolder'
-#       path: '/tools/datasets/imagenet/val_images'
-#       sample_limit: null # number of validation dataset samples to test for each individual
-#       batch_size: 64
-#       randomize: False
-#     validation:
-#       type: imagenet
-#       kind: 'imagefolder'
-#       path: '/tools/datasets/imagenet/val_images'
-#       sample_limit: 8192 # number of validation dataset samples to test for each individual
-#       batch_size: 256
-#       randomize: False
-#     train:
-#       type: imagenet
-#       kind: 'webdataset'
-#       path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
-#       total_samples: 1281167
-#       batch_size: 256
-#       sample_limit: null
+accuracy:
+  device: "cuda"
+  robustness:
+    pop_size: 32
+    num_gen: 64
+    bits: [4, 6, 8, 16]
+    min_acc: 0.8
+  calibration:
+    samples: null # null sets samples to all
+    file: './calibrations/resnet18_quant_calib.pkl'
+  retraining:
+    epochs: 2
+  datasets:
+    calibrate:
+      type: imagenet
+      kind: 'imagefolder'
+      path: '/tools/datasets/imagenet/val_images'
+      sample_limit: null # number of validation dataset samples to test for each individual
+      batch_size: 64
+      randomize: False
+    validation:
+      type: imagenet
+      kind: 'imagefolder'
+      path: '/tools/datasets/imagenet/val_images'
+      sample_limit: 8192 # number of validation dataset samples to test for each individual
+      batch_size: 256
+      randomize: False
+    train:
+      type: imagenet
+      kind: 'webdataset'
+      path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
+      total_samples: 1281167
+      batch_size: 256
+      sample_limit: null
 
 components:
   - id: 0

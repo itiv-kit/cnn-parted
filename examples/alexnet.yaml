@@ -1,9 +1,9 @@
 general:
-  acc_once: True
-  fixed_sys: True
-  num_pp: 1
+  acc_once: False
+  fixed_sys: False
+  num_pp: -1
   num_topos: 1
-  num_jobs: 64
+  num_jobs: 1
   optimization: edp
 
 neural-network:
@@ -48,7 +48,7 @@ accuracy:
 components:
   - id: 0
     bits: 16
-    fault_rates: [1e-4, 1e-4] # input, weight
+    fault_rates: [0, 0] # input, weight
     max_memory_size: 600000000
     timeloop:
       accelerator: eyeriss_like
@@ -75,7 +75,7 @@ components:
     fps: 25
   - id: 2
     bits: 8
-    fault_rates: [1e-7, 1e-6] # input, weight
+    fault_rates: [1e-7, 1e-8] # input, weight
     max_memory_size: 600000000
     timeloop:
       accelerator: simba_like

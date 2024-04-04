@@ -3,12 +3,12 @@ general:
   acc_once: False
   num_pp: -1
   num_topos: 1
-  num_jobs: 64
+  num_jobs: 1
   optimization: edp
 
 neural-network:
-  name: mobilenet
-  input-size: [ 128, 3, 32, 32 ]
+  name: mobilenetv3
+  input-size: [ 1, 3, 227, 227 ]
 
 accuracy:
   device: "cuda"
@@ -19,7 +19,7 @@ accuracy:
     min_acc: 0.8
   calibration:
     samples: null # null sets samples to all
-    file: './calibrations/mobilenet_quant_calib.pkl'
+    file: './calibrations/mobilenetv3_large_quant_calib.pkl'
   retraining:
     epochs: 2
   datasets:
