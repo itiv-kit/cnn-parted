@@ -2,6 +2,7 @@
 import argparse
 import torch
 import os
+import sys
 import subprocess
 import importlib
 import numpy as np
@@ -154,4 +155,12 @@ if __name__ == '__main__':
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
     np.set_printoptions(precision=2)
 
-    main(args)
+    try:
+        main(args)
+    except KeyboardInterrupt:
+        print('Interrupted')
+        try:
+            sys.exit(130)
+        except SystemExit:
+            os._exit(130)
+
