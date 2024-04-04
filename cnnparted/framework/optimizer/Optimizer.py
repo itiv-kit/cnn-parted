@@ -8,10 +8,10 @@ class Optimizer():
 
     def _get_paretos_int(self, res : Result) -> list:
         if res.F is None:
-            print("No solutions found for the given constraints.")
-            return
+            print("### [Optimizer] No solutions found for the given constraints! ###")
+            quit()
 
-        X = np.round(res.X)
+        X = res.X
         F = res.F
         G = res.G
 
@@ -19,11 +19,12 @@ class Optimizer():
         for i in range(0, len(X)):
             data.append(np.append(G[i], np.append(X[i], F[i])))
 
-        for h in res.history or []:
-            for ind in h.pop:
-                if ind.get("G")[0] > 0:
-                    continue
-                data.append(np.append(ind.get("G").tolist(), np.append(np.round(ind.get("X").tolist()), ind.get("F").tolist())))
+        if res.history is not None:
+            for h in res.history:
+                for ind in h.pop:
+                    if ind.get("G")[0] > 0:
+                        continue
+                    data.append(np.append(ind.get("G").tolist(), np.append(ind.get("X").tolist(), ind.get("F").tolist())))
         data = np.unique(data, axis=0)
 
         g_len = len(G[0])

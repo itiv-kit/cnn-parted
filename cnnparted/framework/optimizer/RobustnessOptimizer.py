@@ -6,6 +6,7 @@ import pandas as pd
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
+from pymoo.operators.repair.rounding import RoundingRepair
 from pymoo.operators.sampling.rnd import FloatRandomSampling
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
@@ -30,8 +31,8 @@ class RobustnessOptimizer(Optimizer):
                 pop_size=self.pop_size,
                 n_offsprings=self.pop_size,
                 sampling=FloatRandomSampling(),
-                crossover=SBX(prob=0.9, eta=5),
-                mutation=PM(prob=0.9, eta=10),
+                crossover=SBX(prob=0.9, eta=5, repair=RoundingRepair()),
+                mutation=PM(prob=0.9, eta=10, repair=RoundingRepair()),
                 eliminate_duplicates=True)
 
             res = minimize( self.problem,
@@ -47,7 +48,7 @@ class RobustnessOptimizer(Optimizer):
                 print()
                 quit()
 
-            df = pd.DataFrame(np.round(res.X)).replace(to_replace=range(0,len(self.problem.bits)), value=self.problem.bits)
+            df = pd.DataFrame(res.X).replace(to_replace=range(0,len(self.problem.bits)), value=self.problem.bits)
             res.X = df.to_numpy()
 
             data = self._get_paretos_int(res)

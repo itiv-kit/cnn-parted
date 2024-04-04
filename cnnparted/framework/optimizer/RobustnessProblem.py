@@ -63,7 +63,7 @@ class RobustnessProblem(ElementwiseProblem):
     def _evaluate(self, x, out, *args, **kwargs):
         layer_bit_nums = []
         for i in x:
-            layer_bit_nums.append(self.bits[int(np.round(i))])
+            layer_bit_nums.append(self.bits[i])
 
         self.qmodel.bit_widths = layer_bit_nums
         self.qmodel.base_model.eval()

@@ -28,14 +28,14 @@ class PartitioningProblem(ElementwiseProblem):
         n_constr = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_real_pp + latency/energy per partition + latency/energy per link
 
         xu_pp = np.empty(self.num_pp)
-        xu_pp.fill(self.num_layers + 0.49)
+        xu_pp.fill(self.num_layers)
         xu_acc = np.empty(self.num_pp + 1)
-        xu_acc.fill(self.num_acc + 0.49)
+        xu_acc.fill(self.num_acc)
         xu = np.append(xu_pp, xu_acc)
 
-        super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=0.51, xu=xu)
+        super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=1, xu=xu)
 
-    def _evaluate(self, x, out, *args, **kwargs):
+    def _evaluate(self, x : np.ndarray, out : dict, *args, **kwargs) -> None:
         valid = True
         num_real_pp = 0
         curr_latency = 0.0 # used for throughput calculation
@@ -47,13 +47,13 @@ class PartitioningProblem(ElementwiseProblem):
         bandwidth = np.full((self.num_pp + 1), np.inf)
         mem = np.full((self.num_pp + 1), np.inf)
 
-        p = [int(np.round(i)) for i in x]
+        p : list = x.tolist()
         p.insert(self.num_pp, self.num_layers)
         if not np.array_equal(np.sort(p[:self.num_pp]), p[:self.num_pp]): # keep order of partitioning points
             valid = False
-        elif self.acc_once and np.unique(p[-self.num_acc:]).size != np.asarray(p[-self.num_acc:]).size:   # only use accelerator once
+        elif self.acc_once and np.unique(p[-self.num_pp-1:]).size != np.asarray(p[-self.num_pp-1:]).size:   # only use accelerator once
             valid = False
-        elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_acc:]), p[-self.num_acc:]): # keep order of Accelerators
+        elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_pp-1:]), p[-self.num_pp-1:]): # keep order of Accelerators
             valid = False
         else:
             th_pp = []

@@ -4,8 +4,7 @@ import tqdm
 
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
-from pymoo.operators.mutation.pm import PM
-from pymoo.operators.sampling.rnd import FloatRandomSampling
+from pymoo.operators.repair.rounding import RoundingRepair
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 
@@ -13,6 +12,7 @@ from joblib import Parallel, delayed
 
 from .Optimizer import Optimizer
 from .PartitioningProblem import PartitioningProblem
+from .PartitioningMutation import PartitioningMutation
 from framework import GraphAnalyzer
 
 
@@ -38,7 +38,7 @@ class PartitioningOptimizer(Optimizer):
         self.num_gen = self.pop_size = 1
         if len(nodeStats.keys()) > 1:
             self.num_gen = 100 * nodes
-            self.pop_size = 50
+            self.pop_size = 100
 
         self.results = {}
 
@@ -71,13 +71,13 @@ class PartitioningOptimizer(Optimizer):
                 for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
             )
 
-
             for i, sort in enumerate(sorts):
-                for res in sort or []:
-                    if res[-1]:
-                        all_paretos.append(np.insert(res, 0, i)[:-1])
-                    else:
-                        non_optimals.append(np.insert(res, 0, i)[:-1])
+                if sort is not None:
+                    for res in sort:
+                        if res[-1]:
+                            all_paretos.append(np.insert(res, 0, i)[:-1])
+                        else:
+                            non_optimals.append(np.insert(res, 0, i)[:-1])
 
             np.save(fname_p_npy, all_paretos)
             np.save(fname_n_npy, non_optimals)
@@ -117,13 +117,13 @@ class PartitioningOptimizer(Optimizer):
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
         problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, self.layer_params, self.link_confs)
 
-        initial_x = np.concatenate((np.arange(1, num_pp+1), np.arange(1, num_pp+2) % len(self.nodeStats) + 1))
+        initial_x = np.concatenate((np.arange(1, num_pp+1), np.arange(0, num_pp+1) % len(self.nodeStats) + 1))
         algorithm = NSGA2(
             pop_size=self.pop_size,
             n_offsprings=self.pop_size,
             sampling=initial_x,
-            crossover=SBX(prob=0.9, eta=15),
-            mutation=PM(eta=20),
+            crossover=SBX(prob=0.9, eta=15, repair=RoundingRepair()),
+            mutation=PartitioningMutation(len(schedule), prob=0.6),
             eliminate_duplicates=True)
 
         res = minimize( problem,
