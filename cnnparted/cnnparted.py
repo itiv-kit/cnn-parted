@@ -51,11 +51,19 @@ def main(args):
 
     # Step 7 - Output exploration results
     write_files(args.run_name, n_constr, n_var, sol, ga.schedules)
+    sols = 0
     for pareto, sched in sol.items():
         print(pareto, len(sched))
-    num_real_pp = [int(sched[1]) for sched in sol["nondom"]]
-    for i in range(1, max(num_real_pp)+1):
-        print(i, "Partition(s):", num_real_pp.count(i))
+        sols += len(sched)
+
+    if sols > 0:
+        num_real_pp = [int(sched[1]) for sched in sol["nondom"]]
+        for i in range(1, max(num_real_pp)+1):
+            print(i, "Partition(s):", num_real_pp.count(i))
+    else:
+        print()
+        print("### [CNNParted] No valid partitioning found! ###")
+        print()
 
 
 def setup_workload(run_name : str, model_settings: dict) -> Callable:

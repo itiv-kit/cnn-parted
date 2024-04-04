@@ -41,11 +41,18 @@ class RobustnessOptimizer(Optimizer):
                             save_history=False,
                             verbose=False)
 
+            if not res.X:
+                print()
+                print("### [RobustnessOptimizer] No valid bitwidth combination found! ###")
+                print()
+                quit()
+
             df = pd.DataFrame(np.round(res.X)).replace(to_replace=range(0,len(self.problem.bits)), value=self.problem.bits)
             res.X = df.to_numpy()
 
             data = self._get_paretos_int(res)
             data = np.abs(data)
+            data = np.delete(data, np.s_[0], axis=1) # delete G column
 
             df = pd.DataFrame(data)
             df.to_csv(self.fname_csv, header=False)

@@ -15,7 +15,7 @@ class NodeThread(ModuleThreadInterface):
             self._run_generic(self.config)
 
         self.stats["bits"] = self.config.get("bits") or 8
-        self.stats["fault_rates"] = [float(i) for i in self.config.get("fault_rates")]  or [0.0, 0.0]
+        self.stats["fault_rates"] = [float(i) for i in self.config.get("fault_rates") or [0.0, 0.0]]
 
     def _run_generic(self, config: dict) -> None:
         raise NotImplementedError

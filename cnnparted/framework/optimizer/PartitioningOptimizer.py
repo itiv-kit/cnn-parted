@@ -73,7 +73,7 @@ class PartitioningOptimizer(Optimizer):
 
 
             for i, sort in enumerate(sorts):
-                for res in sort:
+                for res in sort or []:
                     if res[-1]:
                         all_paretos.append(np.insert(res, 0, i)[:-1])
                     else:
@@ -84,21 +84,22 @@ class PartitioningOptimizer(Optimizer):
 
         g_len = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
         x_len = (self.num_pp) * 2 + 1
-        comp_paretos = np.delete(all_paretos, np.s_[0:g_len+x_len+1], axis=1)
-        if opt == 'edp':
-            comp_paretos = self._pareto_edp(comp_paretos)
-        else:
-            comp_paretos = self._pareto_all(comp_paretos)
-
-        all_paretos = np.hstack([all_paretos, np.expand_dims(self._is_pareto_efficient(comp_paretos), 1)])
 
         self.results["nondom"] = []
         self.results["dom"] = list(np.abs(non_optimals))
-        for res in np.abs(all_paretos):
-            if res[-1]:
-                self.results["nondom"].append(res[:-1])
+        if all_paretos:
+            comp_paretos = np.delete(all_paretos, np.s_[0:g_len+x_len+1], axis=1)
+            if opt == 'edp':
+                comp_paretos = self._pareto_edp(comp_paretos)
             else:
-                self.results["dom"].append(res[:-1])
+                comp_paretos = self._pareto_all(comp_paretos)
+
+            all_paretos = np.hstack([all_paretos, np.expand_dims(self._is_pareto_efficient(comp_paretos), 1)])
+            for res in np.abs(all_paretos):
+                if res[-1]:
+                    self.results["nondom"].append(res[:-1])
+                else:
+                    self.results["dom"].append(res[:-1])
 
         return g_len, x_len, self.results
 

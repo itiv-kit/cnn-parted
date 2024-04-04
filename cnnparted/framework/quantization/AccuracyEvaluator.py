@@ -38,6 +38,9 @@ class AccuracyEvaluator():
 
 
     def eval(self, sols : list, n_constr : int, n_var : int, schedules : list, accuracy_function : Callable) -> list:
+        if not sols:
+            return []
+
         quants = self._gen_quant_list(sols, n_constr, n_var, schedules)
         fault_rates = self._gen_fault_rate_list(sols, n_constr, n_var, schedules)
 
