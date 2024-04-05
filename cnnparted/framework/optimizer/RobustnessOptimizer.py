@@ -7,7 +7,7 @@ from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
 from pymoo.operators.repair.rounding import RoundingRepair
-from pymoo.operators.sampling.rnd import FloatRandomSampling
+from pymoo.operators.sampling.rnd import IntegerRandomSampling
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 
@@ -30,7 +30,7 @@ class RobustnessOptimizer(Optimizer):
             algorithm = NSGA2(
                 pop_size=self.pop_size,
                 n_offsprings=self.pop_size,
-                sampling=FloatRandomSampling(),
+                sampling=IntegerRandomSampling(),
                 crossover=SBX(prob=0.9, eta=5, repair=RoundingRepair()),
                 mutation=PM(prob=0.9, eta=10, repair=RoundingRepair()),
                 eliminate_duplicates=True)
