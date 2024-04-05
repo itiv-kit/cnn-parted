@@ -52,7 +52,7 @@ class RobustnessProblem(ElementwiseProblem):
         calib_conf = config.get('calibration')
         calibration_file = calib_conf.get('file')
         if not os.path.exists(calibration_file):
-            generate_calibration(model, calib_dataloadergen, True, calibration_file)
+            generate_calibration(model, calib_dataloadergen, True, calibration_file, gpu_device)
 
         self.qmodel.load_parameters_file(calibration_file)
 
