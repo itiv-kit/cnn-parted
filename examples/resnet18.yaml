@@ -14,8 +14,10 @@ accuracy:
   device: "cuda"
   robustness:
     pop_size: 32
-    num_gen: 64
+    num_gen: 8
     bits: [4, 6, 8, 16]
+    sample_limit_steps: [1024, 2048, 8196]
+    sample_limit_generation_schedule: [2, 4, 6]
     min_acc: 0.8
   calibration:
     samples: null # null sets samples to all
@@ -27,8 +29,8 @@ accuracy:
       type: imagenet
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
-      sample_limit: null # number of validation dataset samples to test for each individual
-      batch_size: 64
+      sample_limit: 8196 # number of validation dataset samples to test for each individual
+      batch_size: 128
       randomize: False
     validation:
       type: imagenet

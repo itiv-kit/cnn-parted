@@ -17,6 +17,7 @@ class RobustnessProblem(ElementwiseProblem):
     def __init__(
         self,
         model: nn.Module,
+        start_sample_limit: int,
         config : dict,
         accuracy_function: callable,
         progress: bool,
@@ -45,7 +46,12 @@ class RobustnessProblem(ElementwiseProblem):
             kwargs=kwargs
         )
 
-        dataloaders = build_dataloader_generators(config['datasets']) # maybe move to optimizer to enable history?
+        # Set sample limit dynamically
+        self.sample_limit = start_sample_limit
+        self.dataset_config = deepcopy(config['datasets'])
+        self.dataset_config['validation']['sample_limit'] = self.sample_limit
+
+        dataloaders = build_dataloader_generators(self.dataset_config) # maybe move to optimizer to enable history?
         calib_dataloadergen = dataloaders['calibrate']
         self.val_dataloadergen = dataloaders['validation']
 
@@ -59,6 +65,10 @@ class RobustnessProblem(ElementwiseProblem):
         self.accuracy_function = accuracy_function
         self.progress = progress
 
+    def update_sample_limit(self, limit):
+        self.dataset_config['validation']['sample_limit'] = limit
+        dataloaders = build_dataloader_generators(self.dataset_config) # maybe move to optimizer to enable history?
+        self.val_dataloadergen = dataloaders['validation']
 
     def _evaluate(self, x, out, *args, **kwargs):
         layer_bit_nums = []

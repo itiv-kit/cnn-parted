@@ -10,6 +10,7 @@ from pymoo.operators.repair.rounding import RoundingRepair
 from pymoo.operators.sampling.rnd import IntegerRandomSampling
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
+from pymoo.core.callback import Callback
 
 from typing import Callable
 
@@ -17,13 +18,31 @@ from .Optimizer import Optimizer
 from .RobustnessProblem import RobustnessProblem
 
 
+class RobustnessOptimizerCallback(Callback):
+    def __init__(self, schedule: list, steps: list) -> None:
+        super().__init__()
+        assert len(schedule) == len(steps)
+        self.schedule = schedule
+        self.steps = steps
+
+    def _update(self, algorithm: NSGA2):
+        print(f"Reached generation {algorithm.n_iter}")
+        if algorithm.n_iter in self.schedule:
+            new_sample_limit = self.steps[self.schedule.index(algorithm.n_iter)]
+            print(f"\tUpdating sample limit to {new_sample_limit}")
+            algorithm.problem.update_sample_limit(new_sample_limit)
+
+
 class RobustnessOptimizer(Optimizer):
     def __init__(self, run_name : str, model : nn.Module, accuracy_function : Callable, config : dict, progress : bool):
         self.fname_csv = run_name + "_" + "robustness.csv"
 
+        self.sample_limit_schedule = config.get('robustness').get('sample_limit_generation_schedule')
+        self.sample_limit_steps = config.get('robustness').get('sample_limit_steps')
+
         self.pop_size = config.get('robustness').get('pop_size')
         self.num_gen = config.get('robustness').get('num_gen')
-        self.problem = RobustnessProblem(model, config, accuracy_function, progress)
+        self.problem = RobustnessProblem(model, self.sample_limit_steps[0], config, accuracy_function, progress)
 
     def optimize(self):
         if not os.path.isfile(self.fname_csv):
@@ -35,11 +54,13 @@ class RobustnessOptimizer(Optimizer):
                 mutation=PM(prob=0.9, eta=10, repair=RoundingRepair()),
                 eliminate_duplicates=True)
 
+            callback = RobustnessOptimizerCallback(self.sample_limit_schedule, self.sample_limit_steps)
             res = minimize( self.problem,
                             algorithm,
                             termination=get_termination('n_gen',self.num_gen),
                             seed=1,
                             save_history=False,
+                            callback=callback,
                             verbose=False)
 
             if not res.X:
