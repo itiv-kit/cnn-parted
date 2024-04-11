@@ -26,6 +26,7 @@ class FaultyQuantizedModel(CustomModel):
     def __init__(self,
                  base_model: torch_nn.Module,
                  device: torch.device,
+                 same_bit_for_weight_and_input = False,
                  weighting_function: callable = bits_weighted_linear,
                  quantization_descriptor: QuantDescriptor = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR,
                  dram_analysis_file: str = "") -> None:
@@ -36,6 +37,7 @@ class FaultyQuantizedModel(CustomModel):
         self.faulty_module_names = []
 
         self._bit_widths = {}
+        self.same_bit_for_weight_and_input = same_bit_for_weight_and_input
         self.weighting_function = weighting_function
         self.quantization_descriptor = quantization_descriptor
 
@@ -78,17 +80,26 @@ class FaultyQuantizedModel(CustomModel):
             new_bit_widths,
             np.ndarray), "bit_width have to be a list or ndarray"
         assert len(new_bit_widths) == len(
-            self.explorable_modules
-        ), "bit_width list has to match the amount of quantization layers"
+            self.get_explorable_layer_count()
+        ), "bit_width list has to match the amount of quantizable layers"
 
         # Update Model ...
-        for i, module in enumerate(self.explorable_modules):
-            module.num_bits = new_bit_widths[i]
+        if self.same_bit_for_weight_and_input:
+            for i in len(self.input_quantizers):
+                self.input_quantizers[i].num_bits = new_bit_widths[i]
+                self.weight_quantizers[i].num_bits = new_bit_widths[i]
+        else:
+            for i, module in enumerate(self.explorable_modules):
+                module.num_bits = new_bit_widths[i]
 
         self._bit_widths = new_bit_widths
 
     def get_explorable_parameter_count(self) -> int:
-        return len(self.explorable_modules)
+        if self.same_bit_for_weight_and_input:
+            assert len(self.input_quantizers) == len(self.weight_quantizers)
+            return len(self.input_quantizers)
+        else:
+            return len(self.explorable_modules)
 
     def get_bit_weighted(self) -> int:
         return self.weighting_function(self.explorable_modules,

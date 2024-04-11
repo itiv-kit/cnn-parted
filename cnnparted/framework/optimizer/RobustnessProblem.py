@@ -25,7 +25,7 @@ class RobustnessProblem(ElementwiseProblem):
     ):
         m = deepcopy(model)
         gpu_device = torch.device(config.get('device'))
-        self.qmodel = FaultyQuantizedModel(m, gpu_device)
+        self.qmodel = FaultyQuantizedModel(m, gpu_device, same_bit_for_weight_and_input=True)
 
         rob_conf =  config.get('robustness')
         self.min_accuracy = rob_conf.get('min_acc')
