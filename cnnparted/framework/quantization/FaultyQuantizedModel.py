@@ -79,13 +79,12 @@ class FaultyQuantizedModel(CustomModel):
         assert isinstance(new_bit_widths, list) or isinstance(
             new_bit_widths,
             np.ndarray), "bit_width have to be a list or ndarray"
-        assert len(new_bit_widths) == len(
-            self.get_explorable_layer_count()
-        ), "bit_width list has to match the amount of quantizable layers"
+        assert len(new_bit_widths) == self.get_explorable_parameter_count(
+            ), "bit_width list has to match the amount of quantizable layers"
 
         # Update Model ...
         if self.same_bit_for_weight_and_input:
-            for i in len(self.input_quantizers):
+            for i in range(len(self.input_quantizers)):
                 self.input_quantizers[i].num_bits = new_bit_widths[i]
                 self.weight_quantizers[i].num_bits = new_bit_widths[i]
         else:
