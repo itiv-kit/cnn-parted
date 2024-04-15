@@ -63,7 +63,7 @@ class RobustnessOptimizer(Optimizer):
                             callback=callback,
                             verbose=False)
 
-            if not res.X:
+            if res.X.size == 0:
                 print()
                 print("### [RobustnessOptimizer] No valid bitwidth combination found! ###")
                 print()
@@ -85,6 +85,6 @@ class RobustnessOptimizer(Optimizer):
         constr = list(data[np.argmin(data, axis=0)[-3]])[:-3] # use configuration with min bit width sum
         constr_dict = {}
         for i, name in enumerate(self.problem.qmodel.explorable_module_names):
-            constr_dict[name] = constr[i]
+            constr_dict[name] = constr[int(i/2)]
 
         return constr_dict
