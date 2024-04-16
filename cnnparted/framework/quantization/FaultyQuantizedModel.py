@@ -19,8 +19,8 @@ from .CustomModel import CustomModel
 
 
 class FaultyQuantizedModel(CustomModel):
-    """The quantized model automatically replaces all Conv2d modules with
-    quantizeable counterparts from the nvidia-quantization library.
+    """The quantized model automatically replaces all Conv2d and Linear modules
+    with quantizeable counterparts from the nvidia-quantization library.
     """
 
     def __init__(self,
@@ -109,6 +109,7 @@ class FaultyQuantizedModel(CustomModel):
         i = 0
 
         for name, module in self.base_model.named_modules():
+            # FIXME: This part for now only looks at Conv2D not any Linear Layers
             if isinstance(module, qmodules.FaultyQConv2d):
                 w_bits = module._weight_quantizer.num_bits
                 i_bits = module._input_quantizer.num_bits
@@ -176,12 +177,25 @@ class FaultyQuantizedModel(CustomModel):
                 quant_conv.bias = module.bias
 
                 quant_modules[name] = quant_conv
+            elif isinstance(module, torch_nn.Linear):
+                bias_bool = module.bias is not None
+
+                quant_linear = qmodules.FaultyQLinear(
+                    in_features=module.in_features,
+                    out_features=module.out_features,
+                    bias=bias_bool
+                )
+
+                quant_linear.weight = module.weight
+                quant_linear.bias = module.bias
+
+                quant_modules[name] = quant_linear
 
         for name, quant_conv in quant_modules.items():
             setattr(self.base_model, name, quant_conv)
 
         for name, module in self.base_model.named_modules():
-            if isinstance(module, qmodules.FaultyQConv2d):
+            if isinstance(module, qmodules.FaultyQConv2d) or isinstance(module, qmodules.FaultyQLinear):
                 self.faulty_module_names.append(name)
                 self.faulty_modules.append(module)
             if isinstance(module, quant_nn.TensorQuantizer):
