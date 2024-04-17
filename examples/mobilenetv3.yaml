@@ -4,22 +4,20 @@ general:
   num_pp: -1
   num_topos: 1
   num_jobs: 1
-  optimization: edp
+  optimization: all
 
 neural-network:
   name: mobilenetv3
   input-size: [ 1, 3, 227, 227 ]
 
 accuracy:
-  device: "cuda"
   robustness:
     pop_size: 32
-    num_gen: 64
+    num_gen: 20
     bits: [4, 6, 8, 16]
+    sample_limit_steps: [1024, 2048, 4096, 8196]
+    sample_limit_generation_schedule: [1, 6, 12, 15]
     min_acc: 0.8
-  calibration:
-    samples: null # null sets samples to all
-    file: './calibrations/mobilenetv3_large_quant_calib.pkl'
   retraining:
     epochs: 2
   datasets:
@@ -27,9 +25,10 @@ accuracy:
       type: imagenet
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
-      sample_limit: null # number of validation dataset samples to test for each individual
+      sample_limit: 8192
       batch_size: 64
       randomize: False
+      file: './calibrations/mobilenetv3_large_quant_calib.pkl'
     validation:
       type: imagenet
       kind: 'imagefolder'

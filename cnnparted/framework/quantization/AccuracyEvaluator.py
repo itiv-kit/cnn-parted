@@ -29,7 +29,7 @@ class AccuracyEvaluator():
         self.train_dataloadergen = dataloaders['train']
         self.val_dataloadergen = dataloaders['validation']
 
-        self.param_path = self.calib_conf.get('file')
+        self.param_path = config.get('datasets').get('calibrate').get('file')
         if not os.path.exists(self.param_path):
             generate_calibration(model, self.calib_dataloadergen, True, self.param_path)
 

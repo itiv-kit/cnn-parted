@@ -56,7 +56,7 @@ class RobustnessProblem(ElementwiseProblem):
         calib_dataloadergen = dataloaders['calibrate']
         self.val_dataloadergen = dataloaders['validation']
 
-        calib_conf = config.get('calibration')
+        calib_conf = self.dataset_config.get('calibrate')
         calibration_file = calib_conf.get('file')
         if not os.path.exists(calibration_file):
             generate_calibration(model, calib_dataloadergen, True, calibration_file, self.gpu_device)
