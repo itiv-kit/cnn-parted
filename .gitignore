@@ -12,6 +12,7 @@ timeloop-mapper.*
 !examples/results/*
 calibrations*
 *.onnx
+*.pt
 
 #visualization outputs
 _visualizations/
