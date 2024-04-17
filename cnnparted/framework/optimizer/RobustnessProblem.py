@@ -17,16 +17,18 @@ class RobustnessProblem(ElementwiseProblem):
     def __init__(
         self,
         model: nn.Module,
+        start_sample_limit: int,
         config : dict,
+        device : str,
         accuracy_function: callable,
         progress: bool,
         **kwargs,
     ):
         m = deepcopy(model)
-        gpu_device = torch.device(config.get('device'))
-        self.qmodel = FaultyQuantizedModel(m, gpu_device)
+        self.gpu_device = torch.device(device)
+        self.qmodel = FaultyQuantizedModel(m, self.gpu_device, same_bit_for_weight_and_input=True)
 
-        rob_conf =  config.get('robustness')
+        rob_conf = config.get('robustness')
         self.min_accuracy = rob_conf.get('min_acc')
         n_constr = len(self.min_accuracy) if isinstance(self.min_accuracy, list) else 1
 
@@ -45,20 +47,29 @@ class RobustnessProblem(ElementwiseProblem):
             kwargs=kwargs
         )
 
-        dataloaders = build_dataloader_generators(config['datasets']) # maybe move to optimizer to enable history?
+        # Set sample limit dynamically
+        self.sample_limit = start_sample_limit
+        self.dataset_config = deepcopy(config['datasets'])
+        self.dataset_config['validation']['sample_limit'] = self.sample_limit
+
+        dataloaders = build_dataloader_generators(self.dataset_config) # maybe move to optimizer to enable history?
         calib_dataloadergen = dataloaders['calibrate']
         self.val_dataloadergen = dataloaders['validation']
 
-        calib_conf = config.get('calibration')
+        calib_conf = self.dataset_config.get('calibrate')
         calibration_file = calib_conf.get('file')
         if not os.path.exists(calibration_file):
-            generate_calibration(model, calib_dataloadergen, True, calibration_file, gpu_device)
+            generate_calibration(model, calib_dataloadergen, True, calibration_file, self.gpu_device)
 
         self.qmodel.load_parameters_file(calibration_file)
 
         self.accuracy_function = accuracy_function
         self.progress = progress
 
+    def update_sample_limit(self, limit):
+        self.dataset_config['validation']['sample_limit'] = limit
+        dataloaders = build_dataloader_generators(self.dataset_config) # maybe move to optimizer to enable history?
+        self.val_dataloadergen = dataloaders['validation']
 
     def _evaluate(self, x, out, *args, **kwargs):
         layer_bit_nums = []
@@ -69,8 +80,9 @@ class RobustnessProblem(ElementwiseProblem):
         self.qmodel.base_model.eval()
 
         accuracy_result = self.accuracy_function(
-            self.qmodel.base_model,
+            self.qmodel.base_model.to(self.gpu_device),
             self.val_dataloadergen,
+            dev_string=self.gpu_device,
             progress=self.progress,
             title=f"Infere"
         )

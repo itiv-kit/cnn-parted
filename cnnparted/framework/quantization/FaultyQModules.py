@@ -3,6 +3,7 @@ import torch.nn.functional as F
 from torch.nn.modules.utils import _pair
 
 from pytorch_quantization.nn.modules.quant_conv import QuantConv2d
+from pytorch_quantization.nn.modules.quant_linear import QuantLinear
 from pytorch_quantization import tensor_quant
 
 class FaultyQConv2d(QuantConv2d):
@@ -53,3 +54,11 @@ class FaultyQConv2d(QuantConv2d):
                               self.groups)
 
         return output
+
+
+class FaultyQLinear(QuantLinear):
+    def __init__(self, in_features, out_features, bias=True, **kwargs):
+        super().__init__(in_features, out_features, bias, **kwargs)
+
+    def forward(self, input):
+        return super().forward(input)

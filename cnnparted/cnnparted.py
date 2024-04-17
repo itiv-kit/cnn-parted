@@ -27,7 +27,7 @@ def main(args):
     # Step 2 - Robustness Analysis
     q_constr = {}
     if config.get('accuracy'):
-        robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), args.show_progress)
+        robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), args.device, args.show_progress)
         q_constr = robustnessAnalyzer.optimize()
 
     # Step 3 - Layer Evaluation
@@ -42,7 +42,7 @@ def main(args):
 
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
     if config.get('accuracy'):
-        quant = AccuracyEvaluator(ga.torchmodel, nodeStats, config.get('accuracy'), args.show_progress)
+        quant = AccuracyEvaluator(ga.torchmodel, nodeStats, config.get('accuracy'), args.device, args.show_progress)
         quant.eval(sol["nondom"], n_constr, n_var, ga.schedules, accuracy_function)
         for i, p in enumerate(sol["dom"]): # achieving aligned csv file
             sol["dom"][i] = np.append(p, float(0))
@@ -150,6 +150,11 @@ if __name__ == '__main__':
                         type=int,
                         default=1,
                         help='Number of runs')
+    parser.add_argument('-d',
+                        '--device',
+                        type=str,
+                        default='cpu',
+                        help='Device, e.g. cuda')
     args = parser.parse_args()
 
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'

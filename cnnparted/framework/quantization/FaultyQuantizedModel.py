@@ -19,13 +19,14 @@ from .CustomModel import CustomModel
 
 
 class FaultyQuantizedModel(CustomModel):
-    """The quantized model automatically replaces all Conv2d modules with
-    quantizeable counterparts from the nvidia-quantization library.
+    """The quantized model automatically replaces all Conv2d and Linear modules
+    with quantizeable counterparts from the nvidia-quantization library.
     """
 
     def __init__(self,
                  base_model: torch_nn.Module,
                  device: torch.device,
+                 same_bit_for_weight_and_input = False,
                  weighting_function: callable = bits_weighted_linear,
                  quantization_descriptor: QuantDescriptor = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR,
                  dram_analysis_file: str = "") -> None:
@@ -36,6 +37,7 @@ class FaultyQuantizedModel(CustomModel):
         self.faulty_module_names = []
 
         self._bit_widths = {}
+        self.same_bit_for_weight_and_input = same_bit_for_weight_and_input
         self.weighting_function = weighting_function
         self.quantization_descriptor = quantization_descriptor
 
@@ -77,18 +79,26 @@ class FaultyQuantizedModel(CustomModel):
         assert isinstance(new_bit_widths, list) or isinstance(
             new_bit_widths,
             np.ndarray), "bit_width have to be a list or ndarray"
-        assert len(new_bit_widths) == len(
-            self.explorable_modules
-        ), "bit_width list has to match the amount of quantization layers"
+        assert len(new_bit_widths) == self.get_explorable_parameter_count(
+            ), "bit_width list has to match the amount of quantizable layers"
 
         # Update Model ...
-        for i, module in enumerate(self.explorable_modules):
-            module.num_bits = new_bit_widths[i]
+        if self.same_bit_for_weight_and_input:
+            for i in range(len(self.input_quantizers)):
+                self.input_quantizers[i].num_bits = new_bit_widths[i]
+                self.weight_quantizers[i].num_bits = new_bit_widths[i]
+        else:
+            for i, module in enumerate(self.explorable_modules):
+                module.num_bits = new_bit_widths[i]
 
         self._bit_widths = new_bit_widths
 
     def get_explorable_parameter_count(self) -> int:
-        return len(self.explorable_modules)
+        if self.same_bit_for_weight_and_input:
+            assert len(self.input_quantizers) == len(self.weight_quantizers)
+            return len(self.input_quantizers)
+        else:
+            return len(self.explorable_modules)
 
     def get_bit_weighted(self) -> int:
         return self.weighting_function(self.explorable_modules,
@@ -99,6 +109,7 @@ class FaultyQuantizedModel(CustomModel):
         i = 0
 
         for name, module in self.base_model.named_modules():
+            # FIXME: This part for now only looks at Conv2D not any Linear Layers
             if isinstance(module, qmodules.FaultyQConv2d):
                 w_bits = module._weight_quantizer.num_bits
                 i_bits = module._input_quantizer.num_bits
@@ -166,12 +177,25 @@ class FaultyQuantizedModel(CustomModel):
                 quant_conv.bias = module.bias
 
                 quant_modules[name] = quant_conv
+            elif isinstance(module, torch_nn.Linear):
+                bias_bool = module.bias is not None
+
+                quant_linear = qmodules.FaultyQLinear(
+                    in_features=module.in_features,
+                    out_features=module.out_features,
+                    bias=bias_bool
+                )
+
+                quant_linear.weight = module.weight
+                quant_linear.bias = module.bias
+
+                quant_modules[name] = quant_linear
 
         for name, quant_conv in quant_modules.items():
             setattr(self.base_model, name, quant_conv)
 
         for name, module in self.base_model.named_modules():
-            if isinstance(module, qmodules.FaultyQConv2d):
+            if isinstance(module, qmodules.FaultyQConv2d) or isinstance(module, qmodules.FaultyQLinear):
                 self.faulty_module_names.append(name)
                 self.faulty_modules.append(module)
             if isinstance(module, quant_nn.TensorQuantizer):

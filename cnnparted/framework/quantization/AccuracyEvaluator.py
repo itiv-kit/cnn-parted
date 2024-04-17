@@ -15,11 +15,10 @@ from .generate_calibration import generate_calibration
 
 
 class AccuracyEvaluator():
-    def __init__(self, model : nn.Module, nodeStats : dict, config : dict, progress : bool) -> None:
+    def __init__(self, model : nn.Module, nodeStats : dict, config : dict, device : str, progress : bool) -> None:
         self.bits = [nodeStats[acc].get("bits") for acc in nodeStats]
         self.fault_rates = [nodeStats[acc].get("fault_rates") for acc in nodeStats]
-        self.calib_conf = config.get('calibration')
-        self.gpu_device = torch.device(config.get('device'))
+        self.gpu_device = torch.device(device)
         self.progress = progress
 
         m = deepcopy(model)
@@ -30,7 +29,7 @@ class AccuracyEvaluator():
         self.train_dataloadergen = dataloaders['train']
         self.val_dataloadergen = dataloaders['validation']
 
-        self.param_path = self.calib_conf.get('file')
+        self.param_path = config.get('datasets').get('calibrate').get('file')
         if not os.path.exists(self.param_path):
             generate_calibration(model, self.calib_dataloadergen, True, self.param_path)
 

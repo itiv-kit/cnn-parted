@@ -91,8 +91,6 @@ class PartitioningOptimizer(Optimizer):
             comp_paretos = np.delete(all_paretos, np.s_[0:g_len+x_len+1], axis=1)
             if opt == 'edp':
                 comp_paretos = self._pareto_edp(comp_paretos)
-            else:
-                comp_paretos = self._pareto_all(comp_paretos)
 
             all_paretos = np.hstack([all_paretos, np.expand_dims(self._is_pareto_efficient(comp_paretos), 1)])
             for res in np.abs(all_paretos):
@@ -107,12 +105,6 @@ class PartitioningOptimizer(Optimizer):
         comp_paretos = np.delete(comp_paretos, np.s_[2:], axis=1)
         comp_paretos = np.hstack([comp_paretos, np.expand_dims(np.prod(comp_paretos, axis=1), 1)])
         return comp_paretos
-
-    def _pareto_all(self, comp_paretos : np.ndarray) -> np.ndarray:
-        # TODO: Test
-        bw_sums = np.sum(np.delete(np.delete(comp_paretos, np.s_[:self.num_pp-2], axis=1), np.s_[-self.num_pp:], axis=1), axis=1) # calc sum of bandwidths
-        comp_paretos = np.delete(comp_paretos, np.s_[-(self.num_pp*2-1):], axis=1) # memories not relevant for finding pareto points
-        comp_paretos = np.hstack([comp_paretos, np.expand_dims(bw_sums, 1)])
 
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
         problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, self.layer_params, self.link_confs)
