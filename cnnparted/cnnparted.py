@@ -14,6 +14,12 @@ from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 
 
 def main(args):
+    if args.cuda:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.cid)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    else:
+        device = "cpu"
+
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
     main_conf = config.get('general')
@@ -21,28 +27,28 @@ def main(args):
     accuracy_function = setup_workload(args.run_name, config['neural-network'])
 
     # Step 1 - Analysis
-    ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
+    ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.p)
     ga.find_schedules(main_conf.get('num_topos'))
 
     # Step 2 - Robustness Analysis
     q_constr = {}
     if config.get('accuracy'):
-        robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), args.device, args.show_progress)
+        robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), device, args.p)
         q_constr = robustnessAnalyzer.optimize()
 
     # Step 3 - Layer Evaluation
-    nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)
+    nodeStats = node_eval(ga, node_components, args.run_name, args.p)
 
     # Step 4 - Find pareto-front
     num_pp = main_conf.get('num_pp')
     if num_pp == -1:
         num_pp = len(nodeStats[list(nodeStats.keys())[0]]) - 1
-    optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.show_progress)
+    optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.p)
     n_constr, n_var, sol = optimizer.optimize(q_constr, main_conf)
 
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
     if config.get('accuracy'):
-        quant = AccuracyEvaluator(ga.torchmodel, nodeStats, config.get('accuracy'), args.device, args.show_progress)
+        quant = AccuracyEvaluator(ga.torchmodel, nodeStats, config.get('accuracy'), device, args.p)
         quant.eval(sol["nondom"], n_constr, n_var, ga.schedules, accuracy_function)
         for i, p in enumerate(sol["dom"]): # achieving aligned csv file
             sol["dom"][i] = np.append(p, float(0))
@@ -142,7 +148,6 @@ if __name__ == '__main__':
                         default='run',
                         help='Name of run')
     parser.add_argument('-p',
-                        '--show-progress',
                         action='store_true',
                         help='Show progress of run')
     parser.add_argument('-n',
@@ -150,11 +155,14 @@ if __name__ == '__main__':
                         type=int,
                         default=1,
                         help='Number of runs')
-    parser.add_argument('-d',
-                        '--device',
-                        type=str,
-                        default='cpu',
-                        help='Device, e.g. cuda')
+    parser.add_argument('--cuda',
+                        action='store_true',
+                        help='Use CUDA')
+
+    parser.add_argument('--cid',
+                        type=int,
+                        default=0,
+                        help='CUDA ID')
     args = parser.parse_args()
 
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'

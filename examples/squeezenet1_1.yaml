@@ -19,7 +19,7 @@ accuracy:
     sample_limit_generation_schedule: [1, 6, 12, 15]
     min_acc: 0.67
   retraining:
-    epochs: 2
+    epochs: 0
   datasets:
     calibrate:
       type: imagenet

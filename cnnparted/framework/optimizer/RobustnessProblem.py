@@ -82,7 +82,6 @@ class RobustnessProblem(ElementwiseProblem):
         accuracy_result = self.accuracy_function(
             self.qmodel.base_model.to(self.gpu_device),
             self.val_dataloadergen,
-            dev_string=self.gpu_device,
             progress=self.progress,
             title=f"Infere"
         )

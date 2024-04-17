@@ -21,7 +21,7 @@ accuracy:
   calibration:
     samples: null # null sets samples to all
   retraining:
-    epochs: 2
+    epochs: 0
   datasets:
     calibrate:
       type: imagenet
