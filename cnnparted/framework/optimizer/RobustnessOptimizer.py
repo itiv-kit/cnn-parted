@@ -34,7 +34,7 @@ class RobustnessOptimizerCallback(Callback):
 
 
 class RobustnessOptimizer(Optimizer):
-    def __init__(self, run_name: str, model: nn.Module, accuracy_function: Callable, config: dict, progress: bool):
+    def __init__(self, run_name: str, model: nn.Module, accuracy_function: Callable, config: dict, device : str, progress: bool):
         self.fname_csv = run_name + "_" + "robustness.csv"
 
         self.sample_limit_schedule = config.get('robustness').get('sample_limit_generation_schedule')
@@ -42,7 +42,7 @@ class RobustnessOptimizer(Optimizer):
 
         self.pop_size = config.get('robustness').get('pop_size')
         self.num_gen = config.get('robustness').get('num_gen')
-        self.problem = RobustnessProblem(model, self.sample_limit_steps[0], config, accuracy_function, progress)
+        self.problem = RobustnessProblem(model, self.sample_limit_steps[0], config, device, accuracy_function, progress)
 
     def optimize(self):
         if not os.path.isfile(self.fname_csv):

@@ -19,13 +19,14 @@ class RobustnessProblem(ElementwiseProblem):
         model: nn.Module,
         start_sample_limit: int,
         config : dict,
+        device : str,
         accuracy_function: callable,
         progress: bool,
         **kwargs,
     ):
         m = deepcopy(model)
-        gpu_device = torch.device(config.get('device'))
-        self.qmodel = FaultyQuantizedModel(m, gpu_device, same_bit_for_weight_and_input=True)
+        self.gpu_device = torch.device(device)
+        self.qmodel = FaultyQuantizedModel(m, self.gpu_device, same_bit_for_weight_and_input=True)
 
         rob_conf = config.get('robustness')
         self.min_accuracy = rob_conf.get('min_acc')
@@ -58,7 +59,7 @@ class RobustnessProblem(ElementwiseProblem):
         calib_conf = config.get('calibration')
         calibration_file = calib_conf.get('file')
         if not os.path.exists(calibration_file):
-            generate_calibration(model, calib_dataloadergen, True, calibration_file, gpu_device)
+            generate_calibration(model, calib_dataloadergen, True, calibration_file, self.gpu_device)
 
         self.qmodel.load_parameters_file(calibration_file)
 
@@ -79,8 +80,9 @@ class RobustnessProblem(ElementwiseProblem):
         self.qmodel.base_model.eval()
 
         accuracy_result = self.accuracy_function(
-            self.qmodel.base_model,
+            self.qmodel.base_model.to(self.gpu_device),
             self.val_dataloadergen,
+            dev_string=self.gpu_device,
             progress=self.progress,
             title=f"Infere"
         )
