@@ -1,0 +1,208 @@
+compound_components:
+  classes:
+  - actions:
+    - arguments:
+        address_delta: 0..n_banks
+        data_delta: 0..1
+      name: write
+      subcomponents:
+      - actions:
+        - arguments:
+            address_delta: address_delta
+            data_delta: data_delta
+          name: write
+        name: storage
+      - actions:
+        - name: count
+        name: address_generators[0]
+      - actions:
+        - name: idle
+        name: address_generators[1]
+    - arguments:
+        address_delta: 0..n_banks
+        data_delta: 0..1
+      name: read
+      subcomponents:
+      - actions:
+        - arguments:
+            address_delta: address_delta
+            data_delta: data_delta
+          name: read
+        name: storage
+      - actions:
+        - name: add
+        name: address_generators[1]
+      - actions:
+        - name: idle
+        name: address_generators[0]
+    - name: idle
+      subcomponents:
+      - actions:
+        - name: idle
+        name: storage
+      - actions:
+        - name: idle
+        name: address_generators[0..1]
+    attributes:
+      memory_depth: 12
+      memory_width: 16
+      n_banks: 1
+      n_buffets: 1
+      n_rdwr_ports: 2
+      technology: 45nm
+    name: smartbuffer_SRAM
+    subcomponents:
+    - attributes:
+        depth: memory_depth
+        n_banks: n_banks
+        n_rdwr_ports: n_rdwr_ports
+        technology: technology
+        width: memory_width
+      class: SRAM
+      name: storage
+    - attributes:
+        technology: technology
+        width: log(memory_depth)
+      class: intadder
+      name: address_generators[0..1]
+  - actions:
+    - arguments:
+        address_delta: 0..n_banks
+        data_delta: 0..1
+      name: write
+      subcomponents:
+      - actions:
+        - arguments:
+            address_delta: address_delta
+            data_delta: data_delta
+          name: write
+        name: storage
+      - actions:
+        - name: count
+        name: address_generators[0]
+      - actions:
+        - name: idle
+        name: address_generators[1]
+    - arguments:
+        address_delta: 0..n_banks
+        data_delta: 0..1
+      name: read
+      subcomponents:
+      - actions:
+        - arguments:
+            address_delta: address_delta
+            data_delta: data_delta
+          name: read
+        name: storage
+      - actions:
+        - name: add
+        name: address_generators[1]
+      - actions:
+        - name: idle
+        name: address_generators[0]
+    - name: idle
+      subcomponents:
+      - actions:
+        - name: idle
+        name: storage
+      - actions:
+        - name: idle
+        name: address_generators[0..1]
+    attributes:
+      memory_depth: 12
+      memory_width: 16
+      n_banks: 1
+      n_buffets: 1
+      n_rdwr_ports: 2
+      technology: 45nm
+    name: smartbuffer_SRAM
+    subcomponents:
+    - attributes:
+        depth: memory_depth
+        n_banks: n_banks
+        n_rdwr_ports: n_rdwr_ports
+        technology: technology
+        width: memory_width
+      class: SRAM
+      name: storage
+    - attributes:
+        technology: technology
+        width: log(memory_depth)
+      class: intadder
+      name: address_generators[0..1]
+  version: 0.4
+
+architecture:
+  subtree:
+  - local:
+    - attributes:
+        block-size: 4
+        type: "LPDDR4"
+        width: 64
+        word-bits: 16
+      class: "DRAM"
+      name: "DRAM"
+    name: "system"
+    subtree:
+    - attributes:
+        technology: "45nm"
+      local:
+      - attributes:
+          block-size: 4
+          memory_depth: 108000
+          memory_width: 64
+          n_banks: 32
+          read_bandwidth: 16
+          word-bits: 16
+          write_bandwidth: 16
+        class: "smartbuffer_SRAM"
+        name: "shared_glb"
+      - attributes:
+          block-size: 1
+          depth: 16
+          meshX: 25
+          width: 6
+          word-bits: 6
+        class: "regfile"
+        name: "DummyBuffer[0..24]"
+      name: "eyeriss"
+      subtree:
+      - local:
+        - attributes:
+            block-size: 1
+            memory_depth: 64
+            memory_width: 6
+            meshX: 25
+            read_bandwidth: 2
+            word-bits: 6
+            write_bandwidth: 2
+          class: "smartbuffer_RF"
+          name: "ifmap_spad"
+        - attributes:
+            block-size: 1
+            memory_depth: 256
+            memory_width: 6
+            meshX: 25
+            read_bandwidth: 2
+            word-bits: 6
+            write_bandwidth: 2
+          class: "smartbuffer_RF"
+          name: "weights_spad"
+        - attributes:
+            block-size: 1
+            memory_depth: 32
+            memory_width: 6
+            meshX: 25
+            read_bandwidth: 2
+            update_fifo_depth: 2
+            word-bits: 6
+            write_bandwidth: 2
+          class: "smartbuffer_RF"
+          name: "psum_spad"
+        - attributes:
+            datawidth: 6
+            meshX: 25
+          class: "intmac"
+          name: "mac"
+        name: "PE[0..299]"
+  version: 0.4

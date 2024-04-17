@@ -118,19 +118,28 @@ class Timeloop:
                 f.write(yaml.dump(config))
 
     def _get_timeloop_params(self, config: dict, layer: dict) -> list:
-
-        conv_params = layer.get('conv_params')
-        q = conv_params.get('q')
-        p = conv_params.get('p')
-        c = conv_params.get('c')  # input channels
-        n = conv_params.get('n')  # input batch_size
-        m = conv_params.get('m')
-        s = conv_params.get('s')
-        r = conv_params.get('r')
-        wpad = conv_params.get('wpad')
-        hpad = conv_params.get('hpad')
-        wstride = conv_params.get('wstride')
-        hstride = conv_params.get('hstride')
+        if layer.get('conv_params'):
+            conv_params = layer.get('conv_params')
+            q = conv_params.get('q')
+            p = conv_params.get('p')
+            c = conv_params.get('c')  # input channels
+            n = conv_params.get('n')  # input batch_size
+            m = conv_params.get('m')
+            s = conv_params.get('s')
+            r = conv_params.get('r')
+            wstride = conv_params.get('wstride')
+            hstride = conv_params.get('hstride')
+        else:
+            gemm_params = layer.get('gemm_params')
+            c = gemm_params.get('c')
+            n = gemm_params.get('n')
+            m = gemm_params.get('m')
+            q = 1
+            p = 1
+            s = 1
+            r = 1
+            wstride = 1
+            hstride = 1
 
 
         config['problem']['instance']['R'] = r
@@ -164,8 +173,8 @@ class Timeloop:
                 f.write(yaml.dump(config))
 
     def _load_accelerator_files(self, dir : str) -> list:
-        arch_fnames = os.path.join(dir, 'archs', (self.accname + '*'))
-        constraint_fname = os.path.join(dir, 'constraints', (self.accname + '*'))
+        arch_fnames = os.path.join(dir, 'archs', (self.accname + '.yaml'))
+        constraint_fname = os.path.join(dir, 'constraints', (self.accname + '_' + '*'))
 
         input_fnames = [arch_fnames, constraint_fname]
         input_files = []

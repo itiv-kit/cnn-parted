@@ -2,53 +2,69 @@
 import argparse
 import torch
 import os
+import sys
 import subprocess
 import importlib
 import numpy as np
 import pandas as pd
 from typing import Callable
 
-from framework import ConfigHelper, NodeThread, GraphAnalyzer, NSGA2_Optimizer, QuantizationEvaluator
+from framework import ConfigHelper, NodeThread, GraphAnalyzer, PartitioningOptimizer, RobustnessOptimizer, AccuracyEvaluator
 from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 
 
 def main(args):
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
+    main_conf = config.get('general')
     node_components, link_components = conf_helper.get_system_components()
     accuracy_function = setup_workload(args.run_name, config['neural-network'])
-    num_pp = len(node_components) - 1
-    n_var = num_pp * 2 + 1
 
     # Step 1 - Analysis
     ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.show_progress)
-    ga.find_schedules()
+    ga.find_schedules(main_conf.get('num_topos'))
 
-    # Step 2 - Layer Evaluation
+    # Step 2 - Robustness Analysis
+    q_constr = {}
+    if config.get('accuracy'):
+        robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), args.device, args.show_progress)
+        q_constr = robustnessAnalyzer.optimize()
+
+    # Step 3 - Layer Evaluation
     nodeStats = node_eval(ga, node_components, args.run_name, args.show_progress)
 
-    # Step 3 - Find pareto-front
-    optimizer = NSGA2_Optimizer(ga, nodeStats, link_components, args.show_progress)
-    fixed_sys = True # do not change order of accelerators if true. TODO: add to config file
-    sol = optimizer.optimize(fixed_sys)
+    # Step 4 - Find pareto-front
+    num_pp = main_conf.get('num_pp')
+    if num_pp == -1:
+        num_pp = len(nodeStats[list(nodeStats.keys())[0]]) - 1
+    optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.show_progress)
+    n_constr, n_var, sol = optimizer.optimize(q_constr, main_conf)
 
-    # Step 4 - Accuracy Evaluation (only non-dominated solutions)
-    if args.accuracy:
-        quant = QuantizationEvaluator(ga.torchmodel, ga.input_size, config.get('accuracy'), args.show_progress)
-        quant.eval(sol["nondom"], n_var, ga.schedules, accuracy_function)
+    # Step 5 - Accuracy Evaluation (only non-dominated solutions)
+    if config.get('accuracy'):
+        quant = AccuracyEvaluator(ga.torchmodel, nodeStats, config.get('accuracy'), args.device, args.show_progress)
+        quant.eval(sol["nondom"], n_constr, n_var, ga.schedules, accuracy_function)
         for i, p in enumerate(sol["dom"]): # achieving aligned csv file
             sol["dom"][i] = np.append(p, float(0))
 
-    # Step 5 - Find best partitioning point
+    # Step 6 - Find best partitioning point
     # objective = conf_helper.get_optimization_objectives(node_components, link_components)
 
-    # Step 6 - Output exploration results
-    write_files(args.run_name, n_var, sol, ga.schedules)
+    # Step 7 - Output exploration results
+    write_files(args.run_name, n_constr, n_var, sol, ga.schedules)
+    sols = 0
     for pareto, sched in sol.items():
         print(pareto, len(sched))
-    num_real_pp = [len(np.unique(np.append(sched[1:int(n_var/2)+1], [1, len(ga.schedules[0])]))) for sched in sol["nondom"]]
-    for i in range(2, max(num_real_pp)+1):
-        print(i-1, "Partition(s):", num_real_pp.count(i))
+        sols += len(sched)
+
+    if sols > 0:
+        num_real_pp = [int(sched[1]) for sched in sol["nondom"]]
+        for i in range(1, max(num_real_pp)+1):
+            print(i, "Partition(s):", num_real_pp.count(i))
+    else:
+        print()
+        print("### [CNNParted] No valid partitioning found! ###")
+        print()
 
 
 def setup_workload(run_name : str, model_settings: dict) -> Callable:
@@ -99,18 +115,22 @@ def node_eval(ga : GraphAnalyzer, node_components : list, run_name : str, progre
 
     return nodeStats
 
-def write_files(run_name : str, n_var : int, results : dict, schedules : list) -> None:
+def write_files(run_name : str, n_constr : int, n_var : int, results : dict, schedules : list) -> None:
     rows = []
     for pareto, sched in results.items():
         for sd in sched:
             data = np.append(sd, pareto)
             data = data.astype('U256')
-            data[:n_var+1] = data[:n_var+1].astype(float).astype(int)
-            for i in range(1,int(n_var/2)+1):
+            data[0:2] = data[0:2].astype(float).astype(int)
+            data[n_constr+1:n_constr+n_var+1] = data[n_constr+1:n_constr+n_var+1].astype(float).astype(int)
+            for i in range(n_constr+1,int(n_var/2)+n_constr+1):
                 data[i] = schedules[int(data[0])][int(data[i])-1]
             rows.append(data)
+        if pareto == "nondom":
+            df = pd.DataFrame(rows)
+            df.to_csv(run_name + "_" + "result_nondom.csv", header=False)
     df = pd.DataFrame(rows)
-    df.to_csv(run_name + "_" + "result.csv", header=False)
+    df.to_csv(run_name + "_" + "result_all.csv", header=False)
 
 
 if __name__ == '__main__':
@@ -130,10 +150,22 @@ if __name__ == '__main__':
                         type=int,
                         default=1,
                         help='Number of runs')
-    parser.add_argument('--accuracy', action='store_true', default=False, help='Compute with accuracy')
+    parser.add_argument('-d',
+                        '--device',
+                        type=str,
+                        default='cpu',
+                        help='Device, e.g. cuda')
     args = parser.parse_args()
 
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
     np.set_printoptions(precision=2)
 
-    main(args)
+    try:
+        main(args)
+    except KeyboardInterrupt:
+        print('Interrupted')
+        try:
+            sys.exit(130)
+        except SystemExit:
+            os._exit(130)
+

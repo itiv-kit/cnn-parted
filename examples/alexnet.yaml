@@ -1,32 +1,34 @@
-constraints:
-  max_out_size: 15000000 # must be link specific
-  max_memory_size: 2000000000
-  word_width: 16
-
-optimization-objectives:
-  component: 0
-  metric: latency
+general:
+  fixed_sys: False
+  acc_once: False
+  num_pp: -1
+  num_topos: 1
+  num_jobs: 1
+  optimization: all
 
 neural-network:
   name: alexnet
   input-size: [ 1, 3, 227, 227 ]
 
 accuracy:
-  device : "cuda"
-  bits: [16, 8] # eyeriss 16-bit, simba 8-bit
-  calibration:
-    samples: null # null sets samples to all
-    file: './calibrations/alexnet_quant_calib.pkl'
+  robustness:
+    pop_size: 32
+    num_gen: 20
+    bits: [4, 6, 8, 16]
+    sample_limit_steps: [1024, 2048, 4096, 8196]
+    sample_limit_generation_schedule: [1, 6, 12, 15]
+    min_acc: 0.65
   retraining:
-    epochs: 2
+    epochs: 0
   datasets:
     calibrate:
       type: imagenet
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
-      sample_limit: null # number of validation dataset samples to test for each individual
-      batch_size: 64
+      sample_limit: 8192
+      batch_size: 128
       randomize: False
+      file: './calibrations/alexnet_quant_calib.pkl'
     validation:
       type: imagenet
       kind: 'imagefolder'
@@ -39,23 +41,27 @@ accuracy:
       kind: 'webdataset'
       path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
       total_samples: 1281167
-      batch_size: 512
+      batch_size: 256
       sample_limit: null
 
 components:
   - id: 0
+    bits: 16
+    fault_rates: [0, 0] # input, weight
     max_memory_size: 600000000
-    name: sensor #optional
     timeloop:
       accelerator: eyeriss_like
       frequency: 200000000
       layer: conv2d
       mapper:
-        algorithm: linear-pruned
+        algorithm: random-pruned
         live-status: false
+        max-permutations-per-if-visit: 16
         num-threads: 8
-        timeout: 0
-        victory-condition: 100
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
   - id: 1
     max_out_size: 150000000
     data_bit_width: 16
@@ -67,14 +73,19 @@ components:
       eth_mode: BASE1000-T
     fps: 25
   - id: 2
+    bits: 8
+    fault_rates: [0, 0] # input, weight
     max_memory_size: 600000000
     timeloop:
       accelerator: simba_like
       frequency: 200000000
       layer: conv2d
       mapper:
-        algorithm: linear-pruned
+        algorithm: random-pruned
         live-status: false
+        max-permutations-per-if-visit: 16
         num-threads: 8
-        timeout: 0
-        victory-condition: 100
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
