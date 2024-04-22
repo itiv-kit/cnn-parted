@@ -63,7 +63,7 @@ class RobustnessOptimizer(Optimizer):
                            callback=callback,
                            verbose=False)
 
-            if res.X.size == 0:
+            if not isinstance(res.X, np.ndarray):
                 print()
                 print("### [RobustnessOptimizer] No valid bitwidth combination found! ###")
                 print()

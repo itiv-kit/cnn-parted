@@ -12,12 +12,12 @@ neural-network:
 
 accuracy:
   robustness:
-    pop_size: 32
-    num_gen: 20
+    pop_size: 64
+    num_gen: 25
     bits: [4, 6, 8, 16]
     sample_limit_steps: [1024, 2048, 4096, 8196]
     sample_limit_generation_schedule: [1, 6, 12, 15]
-    min_acc: 0.8
+    min_acc: 0.68
   calibration:
     samples: null # null sets samples to all
   retraining:

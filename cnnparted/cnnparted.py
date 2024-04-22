@@ -158,7 +158,6 @@ if __name__ == '__main__':
     parser.add_argument('--cuda',
                         action='store_true',
                         help='Use CUDA')
-
     parser.add_argument('--cid',
                         type=int,
                         default=0,
