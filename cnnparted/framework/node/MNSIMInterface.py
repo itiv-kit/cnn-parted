@@ -89,14 +89,32 @@ class MNSIMInterface(TrainTestInterface):
         for l in layers:
             op_type = l.get('op_type')
             lyr = None
-            if op_type == "Conv":
+            #linqiushi modified
+            # if op_type == "Conv":
+            #     conv_params = l.get('conv_params')
+            #     ich = conv_params.get('c')
+            #     och = conv_params.get('m')
+            #     krl = conv_params.get('r')
+            #     pad = conv_params.get('wpad')
+            #     srd = conv_params.get('wstride')
+            #     lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd}
+            # we hope  the Conv layer could include the "depthwise"
+            # if depthwise==True we will add the depthwise-conv, 
+            # if depthwise==False we will add the normal conv
+            if op_type =='Conv':
                 conv_params = l.get('conv_params')
                 ich = conv_params.get('c')
                 och = conv_params.get('m')
                 krl = conv_params.get('r')
                 pad = conv_params.get('wpad')
                 srd = conv_params.get('wstride')
-                lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd}
+                depthwise=  conv_params.get('depthwise')
+                if depthwise==True:
+                    lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd,'depthwise':'separable'}
+                else:
+                    lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd}
+            #linqiushi above
+            
             elif op_type == "MaxPool":
                 pool_params = l.get('pool_params')
                 krl = pool_params.get('kernel')[0]
@@ -123,6 +141,17 @@ class MNSIMInterface(TrainTestInterface):
                 lyr = {'type': 'fc', 'in_features': input_size[1], 'out_features': num_classes}
             elif op_type == "Concat":
                 lyr = {'type': 'concat'}
+            #linqiushi modified
+            # 1.We hope the op_type include the element_multiply,which is new added in the MNSIM
+            # 2.We hope the op_type include the Sigmoid,which is new added in the MNSIM
+            # 3.We hope the op_type include the Swish,which is new added in the MNSIM
+            elif op_type =='element_multiply':
+                lyr={'type':'element_multiply'}
+            elif op_type =='Sigmoid':
+                lyr={'type':'Sigmoid'}
+            elif op_type =='Swish':
+                lyr={'type':'Swish'}
+            #linqiushi above
             elif op_type == 1: # DNN input/output
                 continue
             else:
@@ -137,8 +166,9 @@ class MNSIMInterface(TrainTestInterface):
                     input_idx.append(self._find_rel_layer_idx(layers, l_idx, i))
             if len(input_idx) != 0:
                 lyr['input_index'] = sorted(input_idx, reverse=True)
-
+           
             lyr['name'] = l.get('name')
+           
             layer_config_list.append(lyr)
 
         for i in range(len(layer_config_list)):
@@ -176,7 +206,12 @@ class MNSIMInterface(TrainTestInterface):
             self.stats[layer[0][0].get('name')] = {}
             self.stats[layer[0][0].get('name')]["latency"] = latency / 1e6 # ns -> ms
             self.stats[layer[0][0].get('name')]["energy"] = energy / 1e6 # nJ -> mJ
-
+    #linqiushi modified
+    #calculating the real ADC bit supported by pim using the formula mentioned before
+    #return an integer list
+    def pim_realADCbit(self):
+        return self.net.calculate_equal_bit()
+    #linqiushi above
 
 def add_weight_noise(conf_path : str, weight : dict, layers : list, showProgress : bool = False):
     SimConfig_path = ROOT_DIR + conf_path
@@ -206,3 +241,16 @@ def add_weight_noise(conf_path : str, weight : dict, layers : list, showProgress
             pbar.update(1)
 
     return weight
+#linqiushi modified
+# We hope to append the method to evaluate pim in MNSIM, which is comparative with def add_weight_noise
+# This method includes the exchange of vectors between the MNSIM and the digital accelerator
+# We write the accu_eval_pim() to receive the tensors given by digital accelerator and give back the evaluated tensors
+# This function should be run multiple times in one accuracy evaluation solution
+# Could you please give the tensors produced by digital accelerator according to this function?
+#tensor_list represents all the tensors in one solution
+def accu_eval_pim(input:input,layer_start:start_num,layer_end:end_num,tensor_list:tensor_list):
+    #the CNNParted_set_weights_forward is in MNSIM/Interface/network.py
+    tensor_list,output=CNNParted_set_weights_forward(input,tensor_list_CNNParted,start_num,end_num)
+    return tensor_list,output
+    
+#linqiushi above
