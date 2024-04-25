@@ -1,4 +1,3 @@
-from framework.constants import DNN_DICT
 import yaml
 
 class ConfigHelper:

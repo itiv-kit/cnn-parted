@@ -14,8 +14,8 @@ from pymoo.core.callback import Callback
 
 from typing import Callable
 
-from .Optimizer import Optimizer
-from .RobustnessProblem import RobustnessProblem
+from framework.optimizer.Optimizer import Optimizer
+from framework.optimizer.RobustnessProblem import RobustnessProblem
 
 
 class RobustnessOptimizerCallback(Callback):

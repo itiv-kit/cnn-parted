@@ -1,6 +1,6 @@
-from .MemoryModelInterface import MemoryModelInterface
-from .Ramulator import Ramulator
-from .Vampire import Vampire
+from framework.link.MemoryModelInterface import MemoryModelInterface
+from framework.link.Ramulator import Ramulator
+from framework.link.Vampire import Vampire
 import csv
 
 class DDR3Node(MemoryModelInterface):

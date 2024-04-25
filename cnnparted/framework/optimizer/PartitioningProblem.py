@@ -3,7 +3,7 @@ from copy import deepcopy
 import numpy as np
 from collections import deque, defaultdict
 
-from ..link.Link import Link
+from framework.link.Link import Link
 
 
 class PartitioningProblem(ElementwiseProblem):

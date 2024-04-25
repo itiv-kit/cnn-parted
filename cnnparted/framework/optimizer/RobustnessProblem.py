@@ -1,7 +1,6 @@
 import os
 import torch
 import torch.nn as nn
-import numpy as np
 
 from copy import deepcopy
 
@@ -9,8 +8,8 @@ from pymoo.core.problem import ElementwiseProblem
 
 from model_explorer.utils.setup import build_dataloader_generators
 
-from ..quantization.FaultyQuantizedModel import FaultyQuantizedModel
-from ..quantization.generate_calibration import generate_calibration
+from framework.quantization.FaultyQuantizedModel import FaultyQuantizedModel
+from framework.quantization.generate_calibration import generate_calibration
 
 
 class RobustnessProblem(ElementwiseProblem):

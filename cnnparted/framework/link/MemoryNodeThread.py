@@ -1,6 +1,6 @@
-from .MemoryModelInterface import MemoryModelInterface
+from framework.link.MemoryModelInterface import MemoryModelInterface
 from framework.ModuleThreadInterface import ModuleThreadInterface
-from .ddr3memoryNode import DDR3Node
+from framework.link.ddr3memoryNode import DDR3Node
 
 class MemoryNodeThread(ModuleThreadInterface):
 

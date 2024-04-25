@@ -10,8 +10,8 @@ from typing import Callable
 
 from model_explorer.utils.setup import build_dataloader_generators
 
-from .FaultyQuantizedModel import FaultyQuantizedModel
-from .generate_calibration import generate_calibration
+from framework.quantization.FaultyQuantizedModel import FaultyQuantizedModel
+from framework.quantization.generate_calibration import generate_calibration
 
 
 class AccuracyEvaluator():

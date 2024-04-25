@@ -1,4 +1,4 @@
-from .LinkModelInterface import LinkModelInterface
+from framework.link.LinkModelInterface import LinkModelInterface
 import math
 
 class EthernetLink(LinkModelInterface):

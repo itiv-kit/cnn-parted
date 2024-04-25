@@ -1,4 +1,4 @@
-from .LinkModelInterface import LinkModelInterface
+from framework.link.LinkModelInterface import LinkModelInterface
 
 class NoILink(LinkModelInterface):
   NoI_modes = [

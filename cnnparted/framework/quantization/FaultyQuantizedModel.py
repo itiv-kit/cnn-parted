@@ -15,7 +15,7 @@ from pytorch_quantization import tensor_quant
 from pytorch_quantization.tensor_quant import QuantDescriptor
 
 from model_explorer.exploration.weighting_functions import bits_weighted_linear
-from .CustomModel import CustomModel
+from framework.quantization.CustomModel import CustomModel
 
 
 class FaultyQuantizedModel(CustomModel):

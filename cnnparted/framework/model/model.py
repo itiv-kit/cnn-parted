@@ -3,7 +3,7 @@ import onnx
 from onnx import shape_inference
 import numpy as np
 from framework.constants import MODEL_PATH
-from .modelHelper import modelHelper
+from framework.model.modelHelper import modelHelper
 
 
 class TreeModel:

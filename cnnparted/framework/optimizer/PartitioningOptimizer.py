@@ -10,9 +10,9 @@ from pymoo.termination import get_termination
 
 from joblib import Parallel, delayed
 
-from .Optimizer import Optimizer
-from .PartitioningProblem import PartitioningProblem
-from .PartitioningMutation import PartitioningMutation
+from framework.optimizer.Optimizer import Optimizer
+from framework.optimizer.PartitioningProblem import PartitioningProblem
+from framework.optimizer.PartitioningMutation import PartitioningMutation
 from framework import GraphAnalyzer
 
 

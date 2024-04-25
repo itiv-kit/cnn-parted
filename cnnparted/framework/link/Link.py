@@ -1,7 +1,7 @@
 from framework.link.LinkModelInterface import LinkModelInterface
 
-from .EthernetLink import EthernetLink
-from .NetworkOnInterposer import NoILink
+from framework.link.EthernetLink import EthernetLink
+from framework.link.NetworkOnInterposer import NoILink
 
 class Link():
     def __init__(self, config):

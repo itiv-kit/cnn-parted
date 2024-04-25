@@ -2,10 +2,10 @@ import os
 import numpy as np
 import pandas as pd
 
-from .model.model import TreeModel
-from .model.graph import LayersGraph
+from framework.model.model import TreeModel
+from framework.model.graph import LayersGraph
 
-from .model.scheduling import topo_sort_random_start_node
+from framework.model.scheduling import topo_sort_random_start_node
 
 class GraphAnalyzer:
     def __init__(self, run_name : str, input_size : tuple, progress : bool) -> None:
