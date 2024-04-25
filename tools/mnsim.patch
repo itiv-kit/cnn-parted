@@ -76,7 +76,7 @@ index 3e7da17..3aa04f2 100644
 @@ -337,6 +338,12 @@ class ViewLayer(nn.Module):
      def forward(self, x):
          return x.view(x.size(0), -1)
- 
+
 +class ConcatLayer(nn.Module):
 +    def __init__(self):
 +        super(ConcatLayer, self).__init__()

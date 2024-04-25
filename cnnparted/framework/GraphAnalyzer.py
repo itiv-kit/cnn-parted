@@ -35,6 +35,9 @@ class GraphAnalyzer:
         output = [layer for layer in self._tree if layer.get("op_type") == "Conv" or layer.get("op_type") == "Gemm"]
         return output
 
+    def get_mnsim_layers(self):
+        return self._tree
+
     def get_conv2d_layers(self):
         output = [layer for layer in self._tree if layer.get("op_type") == "Conv"]
         return output

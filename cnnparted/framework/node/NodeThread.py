@@ -1,8 +1,9 @@
-from framework.ModuleThreadInterface import ModuleThreadInterface
-from .Timeloop import Timeloop
 import os
 import csv
 
+from framework.ModuleThreadInterface import ModuleThreadInterface
+from framework.node.Timeloop import Timeloop
+from framework.node.MNSIMInterface import MNSIMInterface
 
 class NodeThread(ModuleThreadInterface):
     def _eval(self) -> None:
@@ -11,6 +12,8 @@ class NodeThread(ModuleThreadInterface):
 
         if self.config.get("timeloop"):
             self._run_timeloop(self.config["timeloop"])
+        elif self.config.get("mnsim"):
+            self._run_mnsim(self.config["mnsim"])
         else:
             self._run_generic(self.config)
 
@@ -19,6 +22,22 @@ class NodeThread(ModuleThreadInterface):
 
     def _run_generic(self, config: dict) -> None:
         raise NotImplementedError
+
+    def _run_mnsim(self, config: dict) -> None:
+        runroot = self.runname + "_" + config["accelerator"]
+        fname_csv = runroot + "_mnsim_layers.csv"
+
+        if os.path.isfile(fname_csv):
+            self.stats = self._read_layer_csv(fname_csv)
+            return
+
+        layers = self.ga.get_mnsim_layers()
+        mn = MNSIMInterface(layers, config, self.ga.input_size)
+        mn.run()
+
+        self.stats = mn.stats
+        self._write_layer_csv(fname_csv)
+
 
     def _run_timeloop(self, config: dict) -> None:
         runroot = self.runname + "_" + config["accelerator"]
@@ -36,6 +55,7 @@ class NodeThread(ModuleThreadInterface):
         self.stats = tl.stats
 
         self._write_layer_csv(fname_csv)
+
 
     def _read_layer_csv(self, filename: str) -> dict:
         stats = {}
