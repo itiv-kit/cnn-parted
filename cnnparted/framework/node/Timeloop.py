@@ -4,6 +4,7 @@ import subprocess
 import libconf
 import yaml
 import glob
+import re
 import tqdm
 
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
@@ -61,6 +62,7 @@ class Timeloop:
             self.stats[layer_name] = {}
             self.stats[layer_name]["latency"] = output["latency_ms"]
             self.stats[layer_name]["energy"] = output["energy_mJ"]
+            self.stats[layer_name]["area"] = output["area_mm2"]
 
     def _run_single(self,
             layer : dict,
@@ -198,10 +200,34 @@ class Timeloop:
                     cf.write(f.read())
                     cf.write('\n')
 
-    def _parse_stats(self, filename : str) -> dict:
-        output = parse_timeloop_stats(filename)
+    def _parse_area_stats(self, filename : str) -> float:
+        area = 0.0
+        with open(filename, "r") as f:
+            area_stats = yaml.load(f, Loader = yaml.SafeLoader)
+            for comp in area_stats['ART']['tables']:
+                single_area = float(comp['area'])
+
+                elements_regex = re.compile(r'(\d)..(\d\d?\d?)')
+                num_elements = 1
+                pos = 0
+                while 1:
+                    res = elements_regex.search(comp['name'], pos=pos)
+                    if res is not None:
+                        num_elements *= int(res.group(2)) + int(res.group(1)) + 1
+                        pos = res.span(2)[-1]
+                    else:
+                        break
+
+                area += num_elements * single_area
+
+        return area
+
+    def _parse_stats(self, dirname : str) -> dict:
+        output = parse_timeloop_stats(dirname)
+        area = self._parse_area_stats(os.path.join(dirname, self.output_file_names[8])) # *.ART.yaml
 
         output["energy_mJ"] = output["energy_pJ"] / 1e9
         output["latency_ms"] = output["cycles"] / self.freq * 1e3
+        output["area_mm2"] = area / 1e6
 
         return output

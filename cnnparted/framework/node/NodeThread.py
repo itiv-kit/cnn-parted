@@ -67,6 +67,7 @@ class NodeThread(ModuleThreadInterface):
                 stats[layer_name] = {}
                 stats[layer_name]['latency'] = row['Latency [ms]']
                 stats[layer_name]['energy'] = row['Energy [mJ]']
+                stats[layer_name]['area'] = row['Area [mm2]']
 
         return stats
 
@@ -78,6 +79,7 @@ class NodeThread(ModuleThreadInterface):
                 "Layer",
                 "Latency [ms]",
                 "Energy [mJ]",
+                'Area [mm2]'
             ]
             writer.writerow(header)
             row_num = 1
@@ -88,6 +90,7 @@ class NodeThread(ModuleThreadInterface):
                         l,
                         str(self.stats[l]["latency"]),
                         str(self.stats[l]["energy"]),
+                        str(self.stats[l]["area"])
                     ]
                     writer.writerow(row)
                     row_num += 1
