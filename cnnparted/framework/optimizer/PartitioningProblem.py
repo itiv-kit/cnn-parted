@@ -24,7 +24,7 @@ class PartitioningProblem(ElementwiseProblem):
             self.links.append(Link(link_conf))
 
         n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + device IDs
-        n_obj = 5 # latency, energy, throughput + link latency + link energy
+        n_obj = 6 # latency, energy, throughput, area + link latency + link energy
         n_constr = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_real_pp + latency/energy per partition + latency/energy per link
 
         xu_pp = np.empty(self.num_pp)
@@ -43,7 +43,7 @@ class PartitioningProblem(ElementwiseProblem):
         l_pp = []
         e_pp = []
 
-        latency = energy = throughput = link_latency = link_energy = 0.0
+        latency = energy = throughput = area = link_latency = link_energy = 0.0
         bandwidth = np.full((self.num_pp + 1), np.inf)
         mem = np.full((self.num_pp + 1), np.inf)
 
@@ -101,8 +101,9 @@ class PartitioningProblem(ElementwiseProblem):
             latency = sum(l_pp) + link_latency
             energy = sum(e_pp) + link_energy
             throughput = self._get_throughput(th_pp, part_latency) * -1
+            area = self._get_area(part_latency)
 
-        out["F"] = [latency, energy, throughput, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
+        out["F"] = [latency, energy, throughput, area, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
         if valid:
             out["G"] = [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in e_pp] + [i * (-1) for i in l_pp_link] + [i * (-1) for i in e_pp_link]
@@ -205,3 +206,18 @@ class PartitioningProblem(ElementwiseProblem):
             th_pp.append(self._zero_division(1000.0, acc_latency))
 
         return min(th_pp)
+
+    def _get_area(self, part_latency : deque) -> float:
+        acc_list = []
+        for pair in part_latency:
+            if pair[1] > 0:
+                acc_list.append(pair[0])
+
+        acc_list = set(acc_list)
+        area = 0.0
+        for i in acc_list:
+            acc = list(self.nodeStats.keys())[i-1]
+            first_layer = list(self.nodeStats[acc].keys())[0]
+            area += float(self.nodeStats[acc][first_layer]['area'])
+
+        return area
