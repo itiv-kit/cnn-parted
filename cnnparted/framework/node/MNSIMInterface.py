@@ -13,6 +13,7 @@ from MNSIM.Interface.network import NetworkGraph
 from MNSIM.Interface.interface import TrainTestInterface
 from MNSIM.Latency_Model.Model_latency import Model_latency
 from MNSIM.Energy_Model.Model_energy import Model_energy
+from MNSIM.Area_Model.Model_area import Model_area
 
 from pytorch_quantization import tensor_quant
 
@@ -197,15 +198,19 @@ class MNSIMInterface(TrainTestInterface):
         struct_file = self.get_structure()
         mod_l = Model_latency(struct_file, self.SimConfig)
         mod_e = Model_energy(struct_file, self.SimConfig)
+        mod_a = Model_area(struct_file,self.SimConfig)
         mod_l.calculate_model_latency()
-
+        area_list=mod_a.area_output_CNNParted()
         for idx, layer in enumerate(struct_file):
-            latency = (max(mod_l.finish_time[idx]) - max(mod_l.finish_time[idx - 1])) if idx > 0 else max(mod_l.finish_time[idx])
+            input_l=mod_l.NetStruct[idx][0][0]['Inputindex']
+            final_idx=list(map(int, input_l))
+            latency = (max(mod_l.finish_time[idx]) - max(mod_l.finish_time[idx+final_idx[0]])) if idx > 0 else max(mod_l.finish_time[idx])
             energy = mod_e.arch_energy[idx]
-
+            area=area_list[idx]
             self.stats[layer[0][0].get('name')] = {}
             self.stats[layer[0][0].get('name')]["latency"] = latency / 1e6 # ns -> ms
             self.stats[layer[0][0].get('name')]["energy"] = energy / 1e6 # nJ -> mJ
+            self.stats[layer[0][0].get('name')]["area"] = area / 1e3 # um^2 -> mm^2
     #linqiushi modified
     #calculating the real ADC bit supported by pim using the formula mentioned before
     #return an integer list
