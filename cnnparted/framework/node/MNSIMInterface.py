@@ -13,7 +13,7 @@ from MNSIM.Interface.network import NetworkGraph
 from MNSIM.Interface.interface import TrainTestInterface
 from MNSIM.Latency_Model.Model_latency import Model_latency
 from MNSIM.Energy_Model.Model_energy import Model_energy
-from MNSIM.Area_Model.Model_area import Model_area
+from MNSIM.Area_Model.Model_Area import Model_area
 
 from pytorch_quantization import tensor_quant
 
@@ -32,9 +32,13 @@ class MNSIMInterface(TrainTestInterface):
         self.xbar_row = xbar_size[0]
         self.xbar_column = xbar_size[1]
         self.hardware_config['xbar_size'] = xbar_size[0]
-        # xbar bit
-        self.xbar_bit = int(xbar_config.get('Device level', 'Device_Level'))
-        self.hardware_config['weight_bit'] = math.floor(math.log2(self.xbar_bit))
+        self.hardware_config['type'] = int(xbar_config.get('Process element level', 'PIM_Type'))
+        self.hardware_config['xbar_polarity'] = int(xbar_config.get('Process element level', 'Xbar_Polarity'))
+        self.hardware_config['DAC_num'] = int(xbar_config.get('Process element level', 'DAC_Num'))
+        # device bit
+        self.device_bit = int(xbar_config.get('Device level', 'Device_Level'))
+        self.hardware_config['weight_bit'] = math.floor(math.log2(self.device_bit))
+            # weight_bit means the weight bitwidth stored in one memory device
         # input bit and ADC bit
         ADC_choice = int(xbar_config.get('Interface level', 'ADC_Choice'))
         DAC_choice = int(xbar_config.get('Interface level', 'DAC_Choice'))
@@ -50,7 +54,9 @@ class MNSIMInterface(TrainTestInterface):
             4: 6,  # reference: Area-Efficient 1GS/s 6b SAR ADC with Charge-Injection-Cell-Based DAC
             5: 8,  # ASPDAC1
             6: 6,  # ASPDAC2
-            7: 4  # ASPDAC3
+            7: 4,  # ASPDAC3
+            8: 1,
+            9: 6
         }
         DAC_precision_dict = {
             -1: temp_DAC_bit,
@@ -59,19 +65,21 @@ class MNSIMInterface(TrainTestInterface):
             3: 3,  # 3-bit
             4: 4,  # 4-bit
             5: 6,  # 6-bit
-            6: 8  # 8-bit
+            6: 8,  # 8-bit
+            7: 1
         }
         self.input_bit = DAC_precision_dict[DAC_choice]
-        self.quantize_bit = ADC_precision_dict[ADC_choice]
+        self.ADC_quantize_bit = ADC_precision_dict[ADC_choice]
+
         self.hardware_config['input_bit'] = self.input_bit
-        self.hardware_config['quantize_bit'] = self.quantize_bit
+        self.hardware_config['ADC_quantize_bit'] = self.ADC_quantize_bit
         # group num
         self.pe_group_num = int(xbar_config.get('Process element level', 'Group_Num'))
         self.tile_size = list(map(int, xbar_config.get('Tile level', 'PE_Num').split(',')))
         self.tile_row = self.tile_size[0]
         self.tile_column = self.tile_size[1]
 
-        self.net = self._get_net(layers)
+        self.net = self._get_net(layers, self.hardware_config)
 
         self.stats = {}
 
@@ -100,7 +108,7 @@ class MNSIMInterface(TrainTestInterface):
             #     srd = conv_params.get('wstride')
             #     lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd}
             # we hope  the Conv layer could include the "depthwise"
-            # if depthwise==True we will add the depthwise-conv, 
+            # if depthwise==True we will add the depthwise-conv,
             # if depthwise==False we will add the normal conv
             if op_type =='Conv':
                 conv_params = l.get('conv_params')
@@ -115,7 +123,7 @@ class MNSIMInterface(TrainTestInterface):
                 else:
                     lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd}
             #linqiushi above
-            
+
             elif op_type == "MaxPool":
                 pool_params = l.get('pool_params')
                 krl = pool_params.get('kernel')[0]
@@ -167,9 +175,9 @@ class MNSIMInterface(TrainTestInterface):
                     input_idx.append(self._find_rel_layer_idx(layers, l_idx, i))
             if len(input_idx) != 0:
                 lyr['input_index'] = sorted(input_idx, reverse=True)
-           
+
             lyr['name'] = l.get('name')
-           
+
             layer_config_list.append(lyr)
 
         for i in range(len(layer_config_list)):
@@ -210,7 +218,7 @@ class MNSIMInterface(TrainTestInterface):
             self.stats[layer[0][0].get('name')] = {}
             self.stats[layer[0][0].get('name')]["latency"] = latency / 1e6 # ns -> ms
             self.stats[layer[0][0].get('name')]["energy"] = energy / 1e6 # nJ -> mJ
-            self.stats[layer[0][0].get('name')]["area"] = area / 1e3 # um^2 -> mm^2
+            self.stats[layer[0][0].get('name')]["area"] = area / 1e6 # um^2 -> mm^2
     #linqiushi modified
     #calculating the real ADC bit supported by pim using the formula mentioned before
     #return an integer list
@@ -253,9 +261,9 @@ def add_weight_noise(conf_path : str, weight : dict, layers : list, showProgress
 # This function should be run multiple times in one accuracy evaluation solution
 # Could you please give the tensors produced by digital accelerator according to this function?
 #tensor_list represents all the tensors in one solution
-def accu_eval_pim(input:input,layer_start:start_num,layer_end:end_num,tensor_list:tensor_list):
-    #the CNNParted_set_weights_forward is in MNSIM/Interface/network.py
-    tensor_list,output=CNNParted_set_weights_forward(input,tensor_list_CNNParted,start_num,end_num)
-    return tensor_list,output
-    
+# def accu_eval_pim(input:input,layer_start:start_num,layer_end:end_num,tensor_list:tensor_list):
+#     #the CNNParted_set_weights_forward is in MNSIM/Interface/network.py
+#     tensor_list,output=CNNParted_set_weights_forward(input,tensor_list_CNNParted,start_num,end_num)
+#     return tensor_list,output
+
 #linqiushi above
