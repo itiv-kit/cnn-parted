@@ -20,7 +20,9 @@ class NodeThread(ModuleThreadInterface):
             self._run_generic(self.config)
             self.stats["type"] = 'generic'
 
-        self.stats["bits"] = self.config.get("bits") or 8 ################## mnsim.pim_realADCbit ##################
+        if 'bits' not in self.stats:
+            self.stats["bits"] = self.config.get("bits") or 8
+
         self.stats["fault_rates"] = [float(i) for i in self.config.get("fault_rates") or [0.0, 0.0]]
 
     def _run_generic(self, config: dict) -> None:
@@ -30,17 +32,17 @@ class NodeThread(ModuleThreadInterface):
         runroot = self.runname + "_" + config["accelerator"]
         fname_csv = runroot + "_mnsim_layers.csv"
 
-        if os.path.isfile(fname_csv):
-            self.stats = self._read_layer_csv(fname_csv)
-            return
-
         layers = self.ga.get_mnsim_layers()
         mn = MNSIMInterface(layers, config, self.ga.input_size)
-        mn.run()
 
-        self.stats = mn.stats
-        self._write_layer_csv(fname_csv)
+        if os.path.isfile(fname_csv):
+            self.stats = self._read_layer_csv(fname_csv)
+        else:
+            mn.run()
+            self.stats = mn.stats
+            self._write_layer_csv(fname_csv)
 
+        self.stats['bits'] = mn.pim_realADCbit()
 
     def _run_timeloop(self, config: dict) -> None:
         runroot = self.runname + "_" + config["accelerator"]

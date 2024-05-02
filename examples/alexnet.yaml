@@ -47,7 +47,7 @@ accuracy:
 components:
   - id: 0
     bits: 16
-    fault_rates: [1e-8, 1e-8] # input, weight
+    fault_rates: [0, 0] # input, weight
     max_memory_size: 600000000
     timeloop:
       accelerator: eyeriss_like
@@ -73,8 +73,7 @@ components:
       eth_mode: BASE1000-T
     fps: 25
   - id: 2
-    bits: 8
-    fault_rates: [1e-6, 1e-6] # input, weight
+    fault_rates: [1e-4, 1e-4] # input, weight
     max_memory_size: 600000000
     mnsim:
       accelerator: test # accelerator name
