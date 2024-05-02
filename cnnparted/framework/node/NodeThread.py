@@ -12,12 +12,15 @@ class NodeThread(ModuleThreadInterface):
 
         if self.config.get("timeloop"):
             self._run_timeloop(self.config["timeloop"])
+            self.stats["type"] = 'tl'
         elif self.config.get("mnsim"):
             self._run_mnsim(self.config["mnsim"])
+            self.stats["type"] = 'mnsim'
         else:
             self._run_generic(self.config)
+            self.stats["type"] = 'generic'
 
-        self.stats["bits"] = self.config.get("bits") or 8
+        self.stats["bits"] = self.config.get("bits") or 8 ################## mnsim.pim_realADCbit ##################
         self.stats["fault_rates"] = [float(i) for i in self.config.get("fault_rates") or [0.0, 0.0]]
 
     def _run_generic(self, config: dict) -> None:

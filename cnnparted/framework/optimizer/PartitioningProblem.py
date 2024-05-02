@@ -81,7 +81,7 @@ class PartitioningProblem(ElementwiseProblem):
                     if last_pp != 1:
                         num_real_pp += 1
                         if last_pp != -1:
-                            part_latency.append([last_acc, sum(l_pp[:-1]) - curr_latency])
+                            part_latency.append([last_acc, sum(l_pp[:-1]) - curr_latency, last_pp, pp])
                             curr_latency = sum(l_pp[:-1])
                 else:
                     l_pp_link.append(0.0)
@@ -89,7 +89,7 @@ class PartitioningProblem(ElementwiseProblem):
                     bandwidth[i-self.num_pp-1] = 0
 
                 if pp == self.num_layers:
-                    part_latency.append([p[i], sum(l_pp) - curr_latency])
+                    part_latency.append([p[i], sum(l_pp) - curr_latency, last_pp, pp])
 
                 if last_pp != pp:
                     last_pp = pp
@@ -195,8 +195,8 @@ class PartitioningProblem(ElementwiseProblem):
 
     def _get_throughput(self, th_pp : list, part_latency : deque) -> float:
         acc_index = defaultdict(list)
-        for i, pair in enumerate(part_latency):
-            acc_index[pair[0]].append(i)
+        for i, tup in enumerate(part_latency):
+            acc_index[tup[0]].append(i)
 
         for _, indexes in acc_index.items():
             acc_latency = 0.0
@@ -208,16 +208,19 @@ class PartitioningProblem(ElementwiseProblem):
         return min(th_pp)
 
     def _get_area(self, part_latency : deque) -> float:
-        acc_list = []
-        for pair in part_latency:
-            if pair[1] > 0:
-                acc_list.append(pair[0])
-
-        acc_list = set(acc_list)
         area = 0.0
-        for i in acc_list:
-            acc = list(self.nodeStats.keys())[i-1]
-            first_layer = list(self.nodeStats[acc].keys())[0]
-            area += float(self.nodeStats[acc][first_layer]['area'])
+
+        for tup in part_latency:
+            if tup[1] == 0:
+                continue
+
+            acc = [*self.nodeStats][tup[0]-1]
+            if self.nodeStats[acc]['type'] == 'mnsim':
+                for l in self.schedule[tup[2]-1:tup[3]-1]:
+                    if l in [*self.nodeStats[acc]]:
+                        area += float(self.nodeStats[acc][l]['area'])
+            else: # timeloop
+                first_layer = [*self.nodeStats[acc]][0]
+                area += float(self.nodeStats[acc][first_layer]['area'])
 
         return area
