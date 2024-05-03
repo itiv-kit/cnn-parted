@@ -44,40 +44,40 @@ class AccuracyEvaluator():
         fault_rates = self._gen_fault_rate_list(sols, n_constr, n_var, schedules)
 
         # Training
-        self.qmodel.bit_widths = np.ones(len(quants[0])) * max(self.bits)
-        self.qmodel.load_parameters_file(self.param_path)
+        # self.qmodel.bit_widths = np.ones(len(quants[0])) * max(self.bits)
+        # self.qmodel.load_parameters_file(self.param_path)
 
-        self.qmodel.base_model.train()
-        for epoch_idx in range(self.train_epochs):
-            if self.progress:
-                pbar = tqdm(total=len(self.train_dataloadergen), ascii=True,
-                            desc="Epoch {} / {}".format(epoch_idx + 1, self.train_epochs),
-                            position=1)
+        # self.qmodel.base_model.train()
+        # for epoch_idx in range(self.train_epochs):
+        #     if self.progress:
+        #         pbar = tqdm(total=len(self.train_dataloadergen), ascii=True,
+        #                     desc="Epoch {} / {}".format(epoch_idx + 1, self.train_epochs),
+        #                     position=1)
 
-            running_loss = 0.0
-            train_dataloader = self.train_dataloadergen.get_dataloader()
+        #     running_loss = 0.0
+        #     train_dataloader = self.train_dataloadergen.get_dataloader()
 
-            for image, target, *_ in train_dataloader:
-                image, target = image.to(self.gpu_device), target.to(self.gpu_device)
+        #     for image, target, *_ in train_dataloader:
+        #         image, target = image.to(self.gpu_device), target.to(self.gpu_device)
 
-                self.qmodel.optimizer.zero_grad()
+        #         self.qmodel.optimizer.zero_grad()
 
-                with torch.set_grad_enabled(mode=True):
-                    self.qmodel.base_model.to(self.gpu_device)
-                    output = self.qmodel.base_model(image)
-                    loss = self.qmodel.criterion(output, target)
-                    loss.backward()
-                    self.qmodel.optimizer.step()
+        #         with torch.set_grad_enabled(mode=True):
+        #             self.qmodel.base_model.to(self.gpu_device)
+        #             output = self.qmodel.base_model(image)
+        #             loss = self.qmodel.criterion(output, target)
+        #             loss.backward()
+        #             self.qmodel.optimizer.step()
 
-                    running_loss += loss.item() * output.size(0)
+        #             running_loss += loss.item() * output.size(0)
 
-                    if self.progress:
-                        pbar.update(output.size(0))
+        #             if self.progress:
+        #                 pbar.update(output.size(0))
 
-            self.qmodel.lr_scheduler.step()
+        #     self.qmodel.lr_scheduler.step()
 
-            if self.progress:
-                pbar.close()
+        #     if self.progress:
+        #         pbar.close()
 
         # Evaluation
         for i, q in enumerate(quants):
@@ -95,7 +95,7 @@ class AccuracyEvaluator():
         for base_layer in self.qmodel.explorable_module_names:
             quant_list.append(self.bits[0])
             for l in schedules[0]:
-                if l in base_layer and l != 'input':
+                if l in base_layer and l != 'input' and l != 'output':
                     layer_dict[l] = len(quant_list) - 1
                     break
 
@@ -107,10 +107,16 @@ class AccuracyEvaluator():
             for layer in schedules[int(sol[0])]:
                 acc = int(mapping[int(n_var/2)+partition])
                 if layer in layer_dict.keys():
-                    quant_list[layer_dict[layer]-1] = self.bits[acc-1] # input quantizer
-                    quant_list[layer_dict[layer]] = self.bits[acc-1]   # weight quantizer
-                if partition < num_pp and layer == schedules[int(sol[0])][int(mapping[partition])-1]:
-                    partition += 1
+                    if isinstance(self.bits[acc-1], int):
+                        bits = self.bits[acc-1]
+                    else:
+                        assert(isinstance(self.bits[acc-1], dict))
+                        bits = self.bits[acc-1][layer]
+                    quant_list[layer_dict[layer]-1] = bits # input quantizer
+                    quant_list[layer_dict[layer]] = bits   # weight quantizer
+                if partition < num_pp:
+                    while layer == schedules[int(sol[0])][int(mapping[partition])-1]:
+                        partition += 1
             quants.append(deepcopy(quant_list))
 
         return quants
