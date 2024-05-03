@@ -57,6 +57,7 @@ class PartitioningProblem(ElementwiseProblem):
             valid = False
         else:
             th_pp = []
+            partitions = []
             part_latency = deque()
             l_pp_link = []
             e_pp_link = []
@@ -65,6 +66,8 @@ class PartitioningProblem(ElementwiseProblem):
             for i, pp in enumerate(p[0:self.num_pp+1], self.num_pp + 1):
                 v, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
                 valid &= v
+
+                partitions.append([p[i], last_pp, pp])
 
                 # evaluate link
                 if last_pp != pp and last_acc != p[i]:
@@ -81,7 +84,7 @@ class PartitioningProblem(ElementwiseProblem):
                     if last_pp != 1:
                         num_real_pp += 1
                         if last_pp != -1:
-                            part_latency.append([last_acc, sum(l_pp[:-1]) - curr_latency, last_pp, pp])
+                            part_latency.append([last_acc, sum(l_pp[:-1]) - curr_latency])
                             curr_latency = sum(l_pp[:-1])
                 else:
                     l_pp_link.append(0.0)
@@ -89,7 +92,7 @@ class PartitioningProblem(ElementwiseProblem):
                     bandwidth[i-self.num_pp-1] = 0
 
                 if pp == self.num_layers:
-                    part_latency.append([p[i], sum(l_pp) - curr_latency, last_pp, pp])
+                    part_latency.append([p[i], sum(l_pp) - curr_latency])
 
                 if last_pp != pp:
                     last_pp = pp
@@ -101,7 +104,7 @@ class PartitioningProblem(ElementwiseProblem):
             latency = sum(l_pp) + link_latency
             energy = sum(e_pp) + link_energy
             throughput = self._get_throughput(th_pp, part_latency) * -1
-            area = self._get_area(part_latency)
+            area = self._get_area(partitions)
 
         out["F"] = [latency, energy, throughput, area, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
@@ -214,20 +217,26 @@ class PartitioningProblem(ElementwiseProblem):
 
         return min(th_pp)
 
-    def _get_area(self, part_latency : deque) -> float:
+    def _get_area(self, partitions : list) -> float:
+        parts = {}
+        for acc in range(self.num_acc):
+            parts[acc] = []
+        for p in partitions:
+            parts[p[0]-1].append(p[1:])
+
         area = 0.0
-
-        for tup in part_latency:
-            if tup[1] == 0:
-                continue
-
-            acc = [*self.nodeStats][tup[0]-1]
+        for key in parts.keys():
+            acc = [*self.nodeStats][key]
             if self.nodeStats[acc]['type'] == 'mnsim':
-                for l in self.schedule[tup[2]-1:tup[3]-1]:
-                    if l in [*self.nodeStats[acc]]:
-                        area += float(self.nodeStats[acc][l]['area'])
+                for part in parts[key]:
+                    for l in self.schedule[part[0]:part[1]]:
+                        if l in [*self.nodeStats[acc]]:
+                            area += float(self.nodeStats[acc][l]['area'])
             else: # timeloop
-                first_layer = [*self.nodeStats[acc]][0]
-                area += float(self.nodeStats[acc][first_layer]['area'])
+                for part in parts[key]:
+                    if part[0] != part[1]:
+                        first_layer = [*self.nodeStats[acc]][0]
+                        area += float(self.nodeStats[acc][first_layer]['area'])
+                        break
 
         return area
