@@ -73,7 +73,7 @@ components:
       eth_mode: BASE1000-T
     fps: 25
   - id: 2
-    fault_rates: [1e-4, 1e-4] # input, weight
+    fault_rates: [0, 1e-3] # input, weight
     max_memory_size: 600000000
     mnsim:
       accelerator: test # accelerator name
