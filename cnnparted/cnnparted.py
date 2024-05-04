@@ -42,7 +42,7 @@ def main(args):
     # Step 4 - Find pareto-front
     num_pp = main_conf.get('num_pp')
     if num_pp == -1:
-        num_pp = len(nodeStats[list(nodeStats.keys())[0]]) - 1
+        num_pp = len(nodeStats[list(nodeStats.keys())[0]]) - 4
     optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.p)
     n_constr, n_var, sol = optimizer.optimize(q_constr, main_conf)
 

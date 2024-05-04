@@ -27,11 +27,7 @@ class PartitioningProblem(ElementwiseProblem):
         n_obj = 6 # latency, energy, throughput, area + link latency + link energy
         n_constr = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_real_pp + latency/energy per partition + latency/energy per link
 
-        xu_pp = np.empty(self.num_pp)
-        xu_pp.fill(self.num_layers)
-        xu_acc = np.empty(self.num_pp + 1)
-        xu_acc.fill(self.num_acc)
-        xu = np.append(xu_pp, xu_acc)
+        xu = self.num_acc * self.num_layers - 1
 
         super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=1, xu=xu)
 
@@ -48,7 +44,11 @@ class PartitioningProblem(ElementwiseProblem):
         mem = np.full((self.num_pp + 1), np.inf)
 
         p : list = x.tolist()
-        p.insert(self.num_pp, self.num_layers)
+        p[0:self.num_pp] = np.divide(p[0:self.num_pp], self.num_acc)
+        p[self.num_pp:] = np.divide(p[self.num_pp:], self.num_layers)
+        p = np.floor(p).astype(int) + 1
+        p = np.insert(p, self.num_pp, self.num_layers)
+
         if not np.array_equal(np.sort(p[:self.num_pp]), p[:self.num_pp]): # keep order of partitioning points
             valid = False
         elif self.acc_once and np.unique(p[-self.num_pp-1:]).size != np.asarray(p[-self.num_pp-1:]).size:   # only use accelerator once

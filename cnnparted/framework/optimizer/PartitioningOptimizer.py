@@ -4,6 +4,7 @@ import tqdm
 
 from pymoo.algorithms.moo.nsga2 import NSGA2
 from pymoo.operators.crossover.sbx import SBX
+from pymoo.operators.mutation.pm import PM
 from pymoo.operators.repair.rounding import RoundingRepair
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
@@ -37,7 +38,7 @@ class PartitioningOptimizer(Optimizer):
 
         self.num_gen = self.pop_size = 1
         if len(nodeStats.keys()) > 1:
-            self.num_gen = 100 * nodes
+            self.num_gen = 500 * nodes
             self.pop_size = 100
 
         self.results = {}
@@ -59,6 +60,8 @@ class PartitioningOptimizer(Optimizer):
 
         all_paretos = []
         non_optimals = []
+        g_len = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
+        x_len = (self.num_pp) * 2 + 1
 
         fname_p_npy = self.run_name + "_" + "paretos.npy"
         fname_n_npy = self.run_name + "_" + "non_optimals.npy"
@@ -71,9 +74,14 @@ class PartitioningOptimizer(Optimizer):
                 for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
             )
 
+            num_acc = len(self.nodeStats)
+            num_layers = len(self.schedules[0])
             for i, sort in enumerate(sorts):
                 if sort is not None:
                     for res in sort:
+                        res[g_len:g_len+self.num_pp] = np.divide(res[g_len:g_len+self.num_pp], num_acc)
+                        res[g_len+self.num_pp:g_len+x_len] = np.divide(res[g_len+self.num_pp:g_len+x_len], num_layers)
+                        res[g_len:g_len+x_len] = np.floor(res[g_len:g_len+x_len]).astype(int) + 1
                         if res[-1]:
                             all_paretos.append(np.insert(res, 0, i)[:-1])
                         else:
@@ -81,9 +89,6 @@ class PartitioningOptimizer(Optimizer):
 
             np.save(fname_p_npy, all_paretos)
             np.save(fname_n_npy, non_optimals)
-
-        g_len = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
-        x_len = (self.num_pp) * 2 + 1
 
         self.results["nondom"] = []
         self.results["dom"] = list(np.abs(non_optimals))
@@ -115,7 +120,7 @@ class PartitioningOptimizer(Optimizer):
             n_offsprings=self.pop_size,
             sampling=initial_x,
             crossover=SBX(prob=0.9, eta=15, repair=RoundingRepair()),
-            mutation=PartitioningMutation(len(schedule), prob=0.6),
+            mutation=PM(prob=0.9, eta=10, repair=RoundingRepair()),
             eliminate_duplicates=True)
 
         res = minimize( problem,
