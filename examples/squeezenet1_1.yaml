@@ -63,18 +63,17 @@ components:
         timeout: 15000
         victory-condition: 500
   - id: 1
-    max_out_size: 150000000
-    data_bit_width: 16
-    ethernet:
-      cable_len_m: 5
-      eee_lmi_ratio: 0.1
-      eee_toff_ms: 0
-      enable_eee: false
-      eth_mode: BASE1000-T
+    max_out_size: 20000000
+    data_bit_width: 8
+    noi:
+      noi_mode: UCIe
+      width: 16
+      data_rate_Gbps: 4
+      latency_ns: 2 # including D2D Adapter and PHY
+      power_bit_pj: 0.5
     fps: 25
   - id: 2
     bits: 8
-    fault_rates: [0, 0] # input, weight
     max_memory_size: 600000000
     timeloop:
       accelerator: simba_like
@@ -89,3 +88,27 @@ components:
         - edp
         timeout: 15000
         victory-condition: 500
+  - id: 3
+    fault_rates: [0, 1e-4] # input, weight
+    max_memory_size: 600000000
+    mnsim:
+      accelerator: MRAM128 # accelerator name
+      conf_path: '/configs/mnsim_configs/MRAM128.ini'
+  - id: 4
+    fault_rates: [0, 1e-4] # input, weight
+    max_memory_size: 600000000
+    mnsim:
+      accelerator: MRAM256 # accelerator name
+      conf_path: '/configs/mnsim_configs/MRAM256.ini'
+  - id: 5
+    fault_rates: [0, 1e-4] # input, weight
+    max_memory_size: 600000000
+    mnsim:
+      accelerator: RRAM256 # accelerator name
+      conf_path: '/configs/mnsim_configs/RRAM256.ini'
+  - id: 6
+    fault_rates: [0, 1e-4] # input, weight
+    max_memory_size: 600000000
+    mnsim:
+      accelerator: RRAM128 # accelerator name
+      conf_path: '/configs/mnsim_configs/RRAM128.ini'
