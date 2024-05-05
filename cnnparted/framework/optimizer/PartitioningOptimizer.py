@@ -87,6 +87,9 @@ class PartitioningOptimizer(Optimizer):
                         else:
                             non_optimals.append(np.insert(res, 0, i)[:-1])
 
+                        all_paretos = list(set(all_paretos))
+                        non_optimals = list(set(non_optimals))
+
             np.save(fname_p_npy, all_paretos)
             np.save(fname_n_npy, non_optimals)
 
@@ -114,7 +117,9 @@ class PartitioningOptimizer(Optimizer):
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
         problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, self.layer_params, self.link_confs)
 
-        initial_x = np.concatenate((np.arange(1, num_pp+1), np.arange(0, num_pp+1) % len(self.nodeStats) + 1))
+        num_acc = len(self.nodeStats)
+        num_layers = len(schedule)
+        initial_x = np.array(np.arange(1, num_acc*num_layers, num_acc*num_layers/num_pp).tolist() + np.arange(1, num_acc*num_layers, num_acc*num_layers/(num_pp+1)).tolist())
         algorithm = NSGA2(
             pop_size=self.pop_size,
             n_offsprings=self.pop_size,
