@@ -66,8 +66,8 @@ class PartitioningOptimizer(Optimizer):
         fname_p_npy = self.run_name + "_" + "paretos.npy"
         fname_n_npy = self.run_name + "_" + "non_optimals.npy"
         if os.path.isfile(fname_p_npy) and os.path.isfile(fname_n_npy):
-            all_paretos = list(np.load(fname_p_npy))
-            non_optimals = list(np.load(fname_n_npy))
+            all_paretos = np.load(fname_p_npy)
+            non_optimals = np.load(fname_n_npy)
         else:
             sorts = Parallel(n_jobs=num_jobs, backend="multiprocessing")(
                 delayed(self._optimize_single)(self.num_pp, s, q_constr, fixed_sys, acc_once)
@@ -83,19 +83,19 @@ class PartitioningOptimizer(Optimizer):
                         res[g_len+self.num_pp:g_len+x_len] = np.divide(res[g_len+self.num_pp:g_len+x_len], num_layers)
                         res[g_len:g_len+x_len] = np.floor(res[g_len:g_len+x_len]).astype(int) + 1
                         if res[-1]:
-                            all_paretos.append(np.insert(res, 0, i)[:-1])
+                            all_paretos.append(np.insert(res, 0, i)[:-1]) # insert schedule ID and append to list
                         else:
-                            non_optimals.append(np.insert(res, 0, i)[:-1])
+                            non_optimals.append(np.insert(res, 0, i)[:-1]) # insert schedule ID and append to list
 
-                        all_paretos = list(set(all_paretos))
-                        non_optimals = list(set(non_optimals))
+            all_paretos = np.unique(all_paretos, axis=0)
+            non_optimals = np.unique(non_optimals, axis=0)
 
             np.save(fname_p_npy, all_paretos)
             np.save(fname_n_npy, non_optimals)
 
         self.results["nondom"] = []
         self.results["dom"] = list(np.abs(non_optimals))
-        if all_paretos:
+        if all_paretos.size:
             comp_paretos = np.delete(all_paretos, np.s_[0:g_len+x_len+1], axis=1)
             if opt == 'edp':
                 comp_paretos = self._pareto_edp(comp_paretos)
