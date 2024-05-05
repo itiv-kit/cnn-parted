@@ -125,7 +125,7 @@ class PartitioningOptimizer(Optimizer):
 
         num_acc = len(self.nodeStats)
         num_layers = len(schedule)
-        initial_x = np.array(np.arange(1, num_acc*num_layers, num_acc*num_layers/num_pp).tolist() + np.arange(1, num_acc*num_layers, num_acc*num_layers/(num_pp+1)).tolist())
+        initial_x = np.array(np.arange(1, num_acc*num_layers, num_acc*num_layers/num_pp).tolist() + np.ones(num_pp+1).tolist())
         algorithm = NSGA2(
             pop_size=self.pop_size,
             n_offsprings=self.pop_size,
