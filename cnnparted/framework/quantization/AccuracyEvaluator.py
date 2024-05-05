@@ -80,12 +80,42 @@ class AccuracyEvaluator():
         #         pbar.close()
 
         # Evaluation
+        bits_lut = []
+        fault_lut = []
+        acc_lut = {}
         for i, q in enumerate(quants):
             self.qmodel.bit_widths = q
             self.qmodel.fault_rates = fault_rates[i]
-            self.qmodel.base_model.eval()
-            acc = accuracy_function(self.qmodel.base_model, self.val_dataloadergen, progress=self.progress, title=f"Infere")
-            sols[i] = np.append(sols[i], acc.cpu().detach().numpy())
+
+            acc = None
+            if self.qmodel.bit_widths in bits_lut and self.qmodel.fault_rates in fault_lut:
+                idx_b = bits_lut.index(self.qmodel.bit_widths)
+                idx_f = fault_lut.index(self.qmodel.fault_rates)
+
+                if (idx_b, idx_f) in [*acc_lut]:
+                    acc = acc_lut[(idx_b, idx_f)]
+                    print("[AccuracyEvaluator] Skipping inference cause of duplicate")
+            if acc == None:
+                self.qmodel.base_model.eval()
+                acc = accuracy_function(self.qmodel.base_model, self.val_dataloadergen, progress=self.progress, title=f"Infere")
+                acc = acc.cpu().detach().numpy()
+
+                # store to avoid duplicate evaluations
+                if self.qmodel.bit_widths in bits_lut:
+                    idx_b = bits_lut.index(self.qmodel.bit_widths)
+                else:
+                    bits_lut.append(self.qmodel.bit_widths)
+                    idx_b = len(bits_lut) - 1
+
+                if self.qmodel.fault_rates in fault_lut:
+                    idx_f = fault_lut.index(self.qmodel.fault_rates)
+                else:
+                    fault_lut.append(self.qmodel.fault_rates)
+                    idx_f = len(fault_lut) - 1
+
+                acc_lut[(idx_b, idx_f)] = acc
+
+            sols[i] = np.append(sols[i], acc)
 
         return quants
 
