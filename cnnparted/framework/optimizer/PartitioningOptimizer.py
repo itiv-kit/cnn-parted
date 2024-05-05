@@ -99,6 +99,8 @@ class PartitioningOptimizer(Optimizer):
             comp_paretos = np.delete(all_paretos, np.s_[0:g_len+x_len+1], axis=1)
             if opt == 'edp':
                 comp_paretos = self._pareto_edp(comp_paretos)
+            elif opt == 'ppa':
+                comp_paretos = self._pareto_ppa(comp_paretos)
 
             all_paretos = np.hstack([all_paretos, np.expand_dims(self._is_pareto_efficient(comp_paretos), 1)])
             for res in np.abs(all_paretos):
@@ -110,8 +112,12 @@ class PartitioningOptimizer(Optimizer):
         return g_len, x_len, self.results
 
     def _pareto_edp(self, comp_paretos : np.ndarray) -> np.ndarray:
-        comp_paretos = np.delete(comp_paretos, np.s_[2:], axis=1)
+        comp_paretos = np.delete(comp_paretos, np.s_[2:], axis=1) # only consider latency and energy
         comp_paretos = np.hstack([comp_paretos, np.expand_dims(np.prod(comp_paretos, axis=1), 1)])
+        return comp_paretos
+
+    def _pareto_ppa(self, comp_paretos : np.ndarray) -> np.ndarray:
+        comp_paretos = np.delete(comp_paretos, np.s_[-2:], axis=1) # remove link metrics
         return comp_paretos
 
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
