@@ -180,7 +180,7 @@ class PartitioningProblem(ElementwiseProblem):
         else:
             assert(isinstance(bit_width, dict))
             if layer_name in bit_width:
-                return bit_width[layer_name] >= max([self.q_constr[x] for x in self.q_constr.keys() if layer_name in x], default=0)
+                return bit_width[layer_name] / 2 >= max([self.q_constr[x] for x in self.q_constr.keys() if layer_name in x], default=0)
             else:
                 return True
 
