@@ -92,23 +92,17 @@ components:
     fault_rates: [0, 1e-4] # input, weight
     max_memory_size: 600000000
     mnsim:
-      accelerator: MRAM128 # accelerator name
-      conf_path: '/configs/mnsim_configs/MRAM128.ini'
+      accelerator: MRAM_area # accelerator name
+      conf_path: '/configs/mnsim_configs/MRAM_area.ini'
   - id: 4
     fault_rates: [0, 1e-4] # input, weight
     max_memory_size: 600000000
     mnsim:
-      accelerator: MRAM256 # accelerator name
-      conf_path: '/configs/mnsim_configs/MRAM256.ini'
+      accelerator: MRAM_lat # accelerator name
+      conf_path: '/configs/mnsim_configs/MRAM_lat.ini'
   - id: 5
     fault_rates: [0, 1e-4] # input, weight
     max_memory_size: 600000000
     mnsim:
-      accelerator: RRAM256 # accelerator name
-      conf_path: '/configs/mnsim_configs/RRAM256.ini'
-  - id: 6
-    fault_rates: [0, 1e-4] # input, weight
-    max_memory_size: 600000000
-    mnsim:
-      accelerator: RRAM128 # accelerator name
-      conf_path: '/configs/mnsim_configs/RRAM128.ini'
+      accelerator: RRAM_acc # accelerator name
+      conf_path: '/configs/mnsim_configs/RRAM_acc.ini'
