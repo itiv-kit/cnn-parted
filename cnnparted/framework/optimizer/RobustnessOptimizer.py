@@ -82,7 +82,7 @@ class RobustnessOptimizer(Optimizer):
             df = pd.read_csv(self.fname_csv, header=None, index_col=0)
             data = df.to_numpy()
 
-        constr = list(data[np.argmin(data, axis=0)[-3]])[:-3] # use configuration with min bit width sum
+        constr = list(data[np.argmax(data, axis=0)[-2]])[:-3] # use configuration with max acc
         constr_dict = {}
         for i, name in enumerate(self.problem.qmodel.explorable_module_names):
             constr_dict[name] = constr[int(i/2)]
