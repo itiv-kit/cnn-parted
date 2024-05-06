@@ -118,6 +118,7 @@ class PartitioningOptimizer(Optimizer):
 
     def _pareto_ppa(self, comp_paretos : np.ndarray) -> np.ndarray:
         comp_paretos = np.delete(comp_paretos, np.s_[-2:], axis=1) # remove link metrics
+        comp_paretos = np.delete(comp_paretos, np.s_[-2], axis=1) # remove throughput metric
         return comp_paretos
 
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
