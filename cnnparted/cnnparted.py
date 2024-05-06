@@ -46,6 +46,11 @@ def main(args):
     optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.p)
     n_constr, n_var, sol = optimizer.optimize(q_constr, main_conf)
 
+    print("Found: ")
+    for pareto, sched in sol.items():
+        print(pareto, len(sched))
+
+    print("Evaluating accuracy...")
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
     if config.get('accuracy'):
         quant = AccuracyEvaluator(ga.torchmodel, nodeStats, config.get('accuracy'), device, args.p)
