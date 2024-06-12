@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from numpy.random import default_rng
 import tqdm
 
 from pymoo.algorithms.moo.nsga2 import NSGA2
@@ -13,7 +14,6 @@ from joblib import Parallel, delayed
 
 from framework.optimizer.Optimizer import Optimizer
 from framework.optimizer.PartitioningProblem import PartitioningProblem
-from framework.optimizer.PartitioningMutation import PartitioningMutation
 from framework import GraphAnalyzer
 
 
@@ -121,12 +121,27 @@ class PartitioningOptimizer(Optimizer):
         comp_paretos = np.delete(comp_paretos, np.s_[-2], axis=1) # remove throughput metric
         return comp_paretos
 
+    def _gen_initial_x(self, num_layers, num_pp, fixed_sys, acc_once):
+        num_acc = len(self.nodeStats)
+        samples = []
+
+        while len(samples) < self.pop_size:
+            pps = np.sort(np.random.randint(1, num_layers+1, size=num_pp)).tolist()
+            rng = default_rng()
+            accs = rng.choice(num_acc, size=num_pp+1, replace=not acc_once) + 1
+            if fixed_sys:
+                accs = np.sort(accs)
+
+            if pps + accs.tolist() not in samples:
+                samples.append(pps + accs.tolist())
+
+        return np.array(samples)
+
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
         problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, self.layer_params, self.link_confs)
 
-        num_acc = len(self.nodeStats)
         num_layers = len(schedule)
-        initial_x = np.array(np.arange(1, num_acc*num_layers, num_acc*num_layers/num_pp).tolist() + np.ones(num_pp+1).tolist())
+        initial_x = self._gen_initial_x(num_layers, num_pp, fixed_sys, acc_once)
         algorithm = NSGA2(
             pop_size=self.pop_size,
             n_offsprings=self.pop_size,
