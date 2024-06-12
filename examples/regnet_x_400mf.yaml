@@ -1,32 +1,34 @@
-constraints:
-  max_out_size: 15000000 # must be link specific
-  max_memory_size: 2000000000
-  word_width: 16
-
-optimization-objectives:
-  component: 0
-  metric: latency
+general:
+  fixed_sys: False
+  acc_once: False
+  num_pp: -1
+  num_topos: 1
+  num_jobs: 1
+  optimization: all
 
 neural-network:
   name: regnet_x_400mf
   input-size: [ 1, 3, 227, 227 ]
 
 accuracy:
-  device : "cuda"
-  bits: [16, 8]
-  calibration:
-    samples: null # null sets samples to all
-    file: './calibrations/regnet_x_400mf_quant_calib.pkl'
+  robustness:
+    pop_size: 64
+    num_gen: 30
+    bits: [4, 6, 8, 16]
+    sample_limit_steps: [1024, 2048, 4096, 8196]
+    sample_limit_generation_schedule: [1, 6, 12, 15]
+    min_acc: 0.6
   retraining:
-    epochs: 2
+    epochs: 0
   datasets:
     calibrate:
       type: imagenet
       kind: 'imagefolder'
       path: '/tools/datasets/imagenet/val_images'
-      sample_limit: null # number of validation dataset samples to test for each individual
+      sample_limit: 8192
       batch_size: 64
       randomize: False
+      file: './calibrations/regnet_x_400mf_quant_calib.pkl'
     validation:
       type: imagenet
       kind: 'imagefolder'
@@ -43,30 +45,47 @@ accuracy:
       sample_limit: null
 
 components:
-  - id: 2
-    max_memory_size: 3000000000
-    name: sensor #optional
-    mnsim:
-      conf_path: '/configs/mnsim_configs/SimConfig.ini'
-  - id: 1
-    max_out_size: 20000000
-    data_bit_width: 8
-    noi:
-      noi_mode: UCIe
-      width: 16
-      data_rate_Gbps: 4
-      latency_ns: 2 # including D2D Adapter and PHY
-      power_bit_pj: 0.5
-    fps: 25
   - id: 0
-    max_memory_size: 3000000000
+    bits: 16
+    fault_rates: [0, 0] # input, weight
+    max_memory_size: 600000000
     timeloop:
-      accelerator: simba_like
-      frequency: 500000000
+      accelerator: eyeriss_like
+      frequency: 200000000
       layer: conv2d
       mapper:
-        algorithm: linear-pruned
+        algorithm: random-pruned
         live-status: false
+        max-permutations-per-if-visit: 16
         num-threads: 8
-        timeout: 0
-        victory-condition: 100
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+  - id: 1
+    max_out_size: 150000000
+    data_bit_width: 16
+    ethernet:
+      cable_len_m: 5
+      eee_lmi_ratio: 0.1
+      eee_toff_ms: 0
+      enable_eee: false
+      eth_mode: BASE1000-T
+    fps: 25
+  - id: 2
+    bits: 8
+    fault_rates: [0, 0] # input, weight
+    max_memory_size: 600000000
+    timeloop:
+      accelerator: simba_like
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500

@@ -4,6 +4,8 @@ import subprocess
 import libconf
 import yaml
 import glob
+import re
+import tqdm
 
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
@@ -48,22 +50,19 @@ class Timeloop:
         self.freq = tl_config['frequency']
         self.mapper_cfg = {} if not tl_config.get('mapper') else tl_config['mapper']
         self.type_cfg = '.yaml'
-        self.runroot = tl_config['run_root']
+        self.runroot = 'run_' + tl_config['run_root']
 
         self.stats = {}
 
     def run(self, layers : dict, progress : bool = False):
-        for layer in layers:
+        for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
             layer_name = layer.get("name")
             output = self._run_single(layer)
 
             self.stats[layer_name] = {}
             self.stats[layer_name]["latency"] = output["latency_ms"]
             self.stats[layer_name]["energy"] = output["energy_mJ"]
-
-            if progress:
-                layer_i = layers.index(layer) + 1
-                print("Finished", layer_i, "/", len(layers), self.prob_name, "layers")
+            self.stats[layer_name]["area"] = output["area_mm2"]
 
     def _run_single(self,
             layer : dict,
@@ -72,7 +71,7 @@ class Timeloop:
         if os.path.isfile(os.path.join(self.configs_dir, 'archs', (self.accname + '.cfg'))):
             self.type_cfg = '.cfg'
 
-        runname = layer.get('name') + self.accname
+        runname = layer.get('name')[1:]
         dirname = os.path.join(ROOT_DIR, self.runroot, runname)
         subprocess.check_call(['mkdir', '-p', dirname])
         os.chdir(dirname)
@@ -121,19 +120,28 @@ class Timeloop:
                 f.write(yaml.dump(config))
 
     def _get_timeloop_params(self, config: dict, layer: dict) -> list:
-
-        conv_params = layer.get('conv_params')
-        q = conv_params.get('q')
-        p = conv_params.get('p')
-        c = conv_params.get('c')  # input channels
-        n = conv_params.get('n')  # input batch_size
-        m = conv_params.get('m')
-        s = conv_params.get('s')
-        r = conv_params.get('r')
-        wpad = conv_params.get('wpad')
-        hpad = conv_params.get('hpad')
-        wstride = conv_params.get('wstride')
-        hstride = conv_params.get('hstride')
+        if layer.get('conv_params'):
+            conv_params = layer.get('conv_params')
+            q = conv_params.get('q')
+            p = conv_params.get('p')
+            c = conv_params.get('c')  # input channels
+            n = conv_params.get('n')  # input batch_size
+            m = conv_params.get('m')
+            s = conv_params.get('s')
+            r = conv_params.get('r')
+            wstride = conv_params.get('wstride')
+            hstride = conv_params.get('hstride')
+        else:
+            gemm_params = layer.get('gemm_params')
+            c = gemm_params.get('c')
+            n = gemm_params.get('n')
+            m = gemm_params.get('m')
+            q = 1
+            p = 1
+            s = 1
+            r = 1
+            wstride = 1
+            hstride = 1
 
 
         config['problem']['instance']['R'] = r
@@ -167,8 +175,8 @@ class Timeloop:
                 f.write(yaml.dump(config))
 
     def _load_accelerator_files(self, dir : str) -> list:
-        arch_fnames = os.path.join(dir, 'archs', (self.accname + '*'))
-        constraint_fname = os.path.join(dir, 'constraints', (self.accname + '*'))
+        arch_fnames = os.path.join(dir, 'archs', (self.accname + '.yaml'))
+        constraint_fname = os.path.join(dir, 'constraints', (self.accname + '_' + '*'))
 
         input_fnames = [arch_fnames, constraint_fname]
         input_files = []
@@ -192,10 +200,34 @@ class Timeloop:
                     cf.write(f.read())
                     cf.write('\n')
 
-    def _parse_stats(self, filename : str) -> dict:
-        output = parse_timeloop_stats(filename)
+    def _parse_area_stats(self, filename : str) -> float:
+        area = 0.0
+        with open(filename, "r") as f:
+            area_stats = yaml.load(f, Loader = yaml.SafeLoader)
+            for comp in area_stats['ART']['tables']:
+                single_area = float(comp['area'])
+
+                elements_regex = re.compile(r'(\d)..(\d\d?\d?)')
+                num_elements = 1
+                pos = 0
+                while 1:
+                    res = elements_regex.search(comp['name'], pos=pos)
+                    if res is not None:
+                        num_elements *= int(res.group(2)) + int(res.group(1)) + 1
+                        pos = res.span(2)[-1]
+                    else:
+                        break
+
+                area += num_elements * single_area
+
+        return area
+
+    def _parse_stats(self, dirname : str) -> dict:
+        output = parse_timeloop_stats(dirname)
+        area = self._parse_area_stats(os.path.join(dirname, self.output_file_names[8])) # *.ART.yaml
 
         output["energy_mJ"] = output["energy_pJ"] / 1e9
         output["latency_ms"] = output["cycles"] / self.freq * 1e3
+        output["area_mm2"] = area / 1e6
 
         return output

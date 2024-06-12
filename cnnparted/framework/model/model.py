@@ -1,27 +1,26 @@
+import os
 import onnx
 from onnx import shape_inference
 import numpy as np
-from framework.constants import NEW_MODEL_PATH
-from .modelHelper import modelHelper
+from framework.constants import MODEL_PATH
+from framework.model.modelHelper import modelHelper
 
 
 class TreeModel:
-    def __init__(self, model_path,input_size):
-        self._model_path = model_path
+    def __init__(self, run_name, input_size):
+        _model_path = os.path.join(MODEL_PATH, run_name, "model.onnx")
         self.input_size = input_size
         self.model_helper = modelHelper()
-        self._model = onnx.load(self._model_path)
+        self._model = onnx.load(_model_path)
         onnx.checker.check_model(self._model)
         self._model = shape_inference.infer_shapes(self._model)
-        self._give_unique_node_names(self._model)
         self.output_sizes = self._get_output_sizes()
         self._layerTree = self._get_layers_data()
-        onnx.save(self._model,NEW_MODEL_PATH)
-        #self.model_helper.save_model(NEW_MODEL_PATH)
-        self._identity_model = self.model_helper.add_identity_layers(self._model)
+        self.new_model_path = os.path.join(MODEL_PATH, run_name, "new_model.onnx")
+        onnx.save(self._model, self.new_model_path)
 
-    def get_torchModels(self):
-        return self.model_helper.convert_to_pytorch(self._model),self.model_helper.convert_to_pytorch(self._identity_model)
+    def get_torchModel(self):
+        return self.model_helper.convert_to_pytorch(self._model)
 
     def get_Tree(self):
         return self._layerTree
@@ -56,7 +55,6 @@ class TreeModel:
                 layer["output_size"] = self.out_layer['output_size']
                 layer['output'] = self.out_layer['name']
 
-            output.append(layer)
             if node.op_type =='Conv':
                 conv_params = self._get_conv_params(node)
                 layer['conv_params'] = conv_params
@@ -66,7 +64,11 @@ class TreeModel:
             elif node.op_type =='AveragePool':
                 pool_params = self._get_pool_params(node)
                 layer['pool_params'] = pool_params
+            elif node.op_type =='Gemm':
+                gemm_params = self._get_gemm_params(node)
+                layer['gemm_params'] = gemm_params
 
+            output.append(layer)
 
         output.append(self.out_layer)
         self._create_layer_relationships(output)
@@ -87,6 +89,28 @@ class TreeModel:
             'kernel': attributes.get('kernel_shape'),
             'padding': attributes.get('pads'),
             'stride': attributes.get('strides')
+        }
+
+        return output
+
+    def _get_gemm_params(self,node):
+        matched_outputs = [output for output in node.output if output in self.output_sizes]
+        o_shape = [self.output_sizes[i] for i in matched_outputs]
+        matched_inputs = [input for input in node.input if input in self.output_sizes]
+        i_shape = [self.output_sizes[i] for i in matched_inputs]
+
+        if matched_outputs == [] and node.output[0] == "output":
+            o_shape = [self.out_layer['output_size']]
+        if matched_inputs == [] and node.input[0]=="input":
+            c = self.in_layer['output_size'][1]
+        else :
+            c = i_shape[0][1]
+
+        output = {
+            'n': o_shape[0][0],
+            'm': o_shape[0][1],
+            'c': c,
+            'weights': np.prod(i_shape + o_shape)
         }
 
         return output
@@ -115,7 +139,7 @@ class TreeModel:
         if matched_inputs == [] and node.input[0]=="input":
             c = self.in_layer['output_size'][1]
         else :
-            c= i_shape[0][1]
+            c = i_shape[0][1]
 
         ofms    = o_shape[0][0]*o_shape[0][1]*o_shape[0][2]*o_shape[0][3]
         weights = o_shape[0][1]*c*attributes['kernel_shape'][0]*attributes['kernel_shape'][1]

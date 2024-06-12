@@ -14,18 +14,18 @@ problem:
   shape:
     coefficients:
     - default: 1
-      name: Wstride
-    - default: 1
-      name: Hstride
+      name: Hdilation
     - default: 1
       name: Wdilation
     - default: 1
-      name: Hdilation
+      name: Hstride
+    - default: 1
+      name: Wstride
     data-spaces:
     - name: Weights
       projection:
-      - - - C
       - - - M
+      - - - C
       - - - R
       - - - S
     - name: Inputs

@@ -1,0 +1,12 @@
+No.;Layer;Latency [ms];Energy [mJ]
+1;/features/features.0/Conv;1.54587;0.7980998052866091
+2;/features/features.3/Conv;12.25824;3.985236392094536
+3;/features/features.6/Conv;12.04224;3.205287420448827
+4;/features/features.8/Conv;24.08448;6.530013880129976
+5;/features/features.11/Conv;12.04224;3.896596456077016
+6;/features/features.13/Conv;24.08448;7.413422456652332
+7;/features/features.16/Conv;6.88128;1.8622019409395252
+8;/features/features.18/Conv;6.88128;1.8622019409395252
+9;/classifier/classifier.0/Gemm;2.00704;13.425676931380456
+10;/classifier/classifier.3/Gemm;0.32768;2.19253307307489
+11;/classifier/classifier.6/Gemm;0.08192;0.5363308537475211

@@ -1,0 +1,108 @@
+general:
+  fixed_sys: False
+  acc_once: False
+  num_pp: -1
+  num_topos: 1
+  num_jobs: 1
+  optimization: ppa
+
+neural-network:
+  name: resnet34
+  input-size: [ 1, 3, 227, 227 ]
+
+accuracy:
+  robustness:
+    pop_size: 32
+    num_gen: 20
+    bits: [4, 6, 8, 16]
+    sample_limit_steps: [1024, 2048, 4096, 8196]
+    sample_limit_generation_schedule: [1, 6, 12, 15]
+    min_acc: 0.65
+  retraining:
+    epochs: 0
+  datasets:
+    calibrate:
+      type: imagenet
+      kind: 'imagefolder'
+      path: '/tools/datasets/imagenet/val_images'
+      sample_limit: 8192
+      batch_size: 64
+      randomize: False
+      file: './calibrations/resnet34_quant_calib.pkl'
+    validation:
+      type: imagenet
+      kind: 'imagefolder'
+      path: '/tools/datasets/imagenet/val_images'
+      sample_limit: 8192 # number of validation dataset samples to test for each individual
+      batch_size: 256
+      randomize: False
+    train:
+      type: imagenet
+      kind: 'webdataset'
+      path: '/tools/datasets/imagenet/train/imagenet-train-{0000..0136}.tar'
+      total_samples: 1281167
+      batch_size: 256
+      sample_limit: null
+
+components:
+  - id: 0
+    bits: 16
+    fault_rates: [0, 0] # input, weight
+    max_memory_size: 600000000
+    timeloop:
+      accelerator: eyeriss_like
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+  - id: 1
+    max_out_size: 20000000
+    data_bit_width: 8
+    noi:
+      noi_mode: UCIe
+      width: 16
+      data_rate_Gbps: 4
+      latency_ns: 2 # including D2D Adapter and PHY
+      power_bit_pj: 0.5
+    fps: 25
+  - id: 2
+    bits: 8
+    max_memory_size: 600000000
+    timeloop:
+      accelerator: simba_like
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+  - id: 3
+    fault_rates: [0, 1e-4] # input, weight
+    max_memory_size: 600000000
+    mnsim:
+      accelerator: MRAM_area # accelerator name
+      conf_path: '/configs/mnsim_configs/MRAM_area.ini'
+  - id: 4
+    fault_rates: [0, 1e-4] # input, weight
+    max_memory_size: 600000000
+    mnsim:
+      accelerator: MRAM_lat # accelerator name
+      conf_path: '/configs/mnsim_configs/MRAM_lat.ini'
+  - id: 5
+    fault_rates: [0, 1e-4] # input, weight
+    max_memory_size: 600000000
+    mnsim:
+      accelerator: RRAM_acc # accelerator name
+      conf_path: '/configs/mnsim_configs/RRAM_acc.ini'

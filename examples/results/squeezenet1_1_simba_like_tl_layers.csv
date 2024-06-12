@@ -1,0 +1,27 @@
+No.;Layer;Latency [ms];Energy [mJ]
+1;/features/features.0/Conv;0.5746049999999999;0.1933985374578181
+2;/features/features.3/squeeze/Conv;0.06272;0.03407469494659859
+3;/features/features.3/expand1x1/Conv;0.06272;0.03328869982339859
+4;/features/features.3/expand3x3/Conv;0.56448;0.1476851173434673
+5;/features/features.4/squeeze/Conv;0.12544;0.06545852445831718
+6;/features/features.4/expand1x1/Conv;0.06272;0.03328869982339859
+7;/features/features.4/expand3x3/Conv;0.56448;0.1476851173434673
+8;/features/features.6/squeeze/Conv;0.06272;0.024846760142186126
+9;/features/features.6/expand1x1/Conv;0.06272;0.024404534174607435
+10;/features/features.6/expand3x3/Conv;0.56448;0.14560475808831516
+11;/features/features.7/squeeze/Conv;0.12544;0.04834808756693226
+12;/features/features.7/expand1x1/Conv;0.06272;0.024404534174607435
+13;/features/features.7/expand3x3/Conv;0.56448;0.14560475808831516
+14;/features/features.9/squeeze/Conv;0.04704;0.016616250434952764
+15;/features/features.9/expand1x1/Conv;0.03528;0.014878903678259699
+16;/features/features.9/expand3x3/Conv;0.31752;0.08444268360175115
+17;/features/features.10/squeeze/Conv;0.07056;0.025180461971029147
+18;/features/features.10/expand1x1/Conv;0.03528;0.014878903678259699
+19;/features/features.10/expand3x3/Conv;0.31752;0.08444268360175115
+20;/features/features.11/squeeze/Conv;0.09408;0.030711429882225524
+21;/features/features.11/expand1x1/Conv;0.06272;0.02096482383199035
+22;/features/features.11/expand3x3/Conv;0.56448;0.15273797374882733
+23;/features/features.12/squeeze/Conv;0.12544;0.0407243343900607
+24;/features/features.12/expand1x1/Conv;0.06272;0.02096482383199035
+25;/features/features.12/expand3x3/Conv;0.56448;0.15273797374882733
+26;/classifier/classifier.1/Conv;1.96;0.6614855397286693

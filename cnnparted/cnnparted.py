@@ -1,43 +1,158 @@
 #! /usr/bin/env python3
 import argparse
-from framework import DNNAnalyzer, NodeThread,  Evaluator
-from framework.Optimizer.NSGA2 import NSGA2_Optimizer
-from framework.helpers.ConfigHelper import ConfigHelper
 import torch
-from framework.constants import MODEL_PATH
-import sys
 import os
-import json
+import sys
+import subprocess
 import importlib
-from framework import DNNAnalyzer, NodeThread,LinkComputationThread, Evaluator , QuantizationEvaluator
-MODEL_FOLDER = "workloads"
+import numpy as np
+import pandas as pd
+from typing import Callable
 
-def setup_workload(model_settings: dict) -> tuple:
-    model = importlib.import_module(
-        f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
-    ).model
+from framework import ConfigHelper, NodeThread, GraphAnalyzer, PartitioningOptimizer, RobustnessOptimizer, AccuracyEvaluator
+from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 
-    accuracy_function = importlib.import_module(
-        f"{MODEL_FOLDER}.{model_settings['name']}", package=__package__
-    ).accuracy_function
 
-    input_size= model_settings['input-size']
+def main(args):
+    if args.cuda:
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.cid)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    else:
+        device = "cpu"
 
-    x = torch.randn(input_size)
-    torch.onnx.export(model, x, MODEL_PATH, verbose=False, input_names=['input'], output_names=['output'])
+    conf_helper = ConfigHelper(args.conf_file_path)
+    config = conf_helper.get_config()
+    main_conf = config.get('general')
+    node_components, link_components = conf_helper.get_system_components()
+    accuracy_function = setup_workload(args.run_name, config['neural-network'])
 
-    return model, accuracy_function
+    # Step 1 - Analysis
+    ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.p)
+    ga.find_schedules(main_conf.get('num_topos'))
 
-def main():
+    # Step 2 - Robustness Analysis
+    q_constr = {}
+    if config.get('accuracy'):
+        robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), device, args.p)
+        q_constr = robustnessAnalyzer.optimize()
+
+    # Step 3 - Layer Evaluation
+    nodeStats = node_eval(ga, node_components, args.run_name, args.p)
+
+    # Step 4 - Find pareto-front
+    num_pp = main_conf.get('num_pp')
+    if num_pp == -1:
+        num_pp = len(nodeStats[list(nodeStats.keys())[0]]) - 4
+    optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.p)
+    n_constr, n_var, sol = optimizer.optimize(q_constr, main_conf)
+
+    print("Found: ")
+    for pareto, sched in sol.items():
+        print(pareto, len(sched))
+
+    print("Evaluating accuracy...")
+    # Step 5 - Accuracy Evaluation (only non-dominated solutions)
+    if config.get('accuracy'):
+        quant = AccuracyEvaluator(ga.torchmodel, nodeStats, config.get('accuracy'), device, args.p)
+        quant.eval(sol["nondom"], n_constr, n_var, ga.schedules, accuracy_function)
+        for i, p in enumerate(sol["dom"]): # achieving aligned csv file
+            sol["dom"][i] = np.append(p, float(0))
+
+    # Step 6 - Find best partitioning point
+    # objective = conf_helper.get_optimization_objectives(node_components, link_components)
+
+    # Step 7 - Output exploration results
+    write_files(args.run_name, n_constr, n_var, sol, ga.schedules)
+    sols = 0
+    for pareto, sched in sol.items():
+        print(pareto, len(sched))
+        sols += len(sched)
+
+    if sols > 0:
+        num_real_pp = [int(sched[1]) for sched in sol["nondom"]]
+        for i in range(1, max(num_real_pp)+1):
+            print(i, "Partition(s):", num_real_pp.count(i))
+    else:
+        print()
+        print("### [CNNParted] No valid partitioning found! ###")
+        print()
+
+
+def setup_workload(run_name : str, model_settings: dict) -> Callable:
+    try:
+        model = importlib.import_module(
+            f"{WORKLOAD_FOLDER}.{model_settings['name']}", package=__package__
+        ).model
+
+        accuracy_function = importlib.import_module(
+            f"{WORKLOAD_FOLDER}.{model_settings['name']}", package=__package__
+        ).accuracy_function
+
+        input_size= model_settings['input-size']
+
+        x = torch.randn(input_size)
+        subprocess.check_call(['mkdir', '-p', os.path.join(MODEL_PATH, run_name)])
+        filename = os.path.join(MODEL_PATH, run_name, "model.onnx")
+        torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
+
+        return accuracy_function
+
+    except KeyError:
+        print()
+        print('\033[1m' + 'Workload not available' + '\033[0m')
+        print()
+        quit(1)
+
+def node_eval(ga : GraphAnalyzer, node_components : list, run_name : str, progress : bool) -> dict:
+    nodeStats = {}
+    node_threads = [
+            NodeThread(component.get('id'), ga, component, run_name, progress)
+            for component in node_components
+        ]
+
+    for t in node_threads:
+        if not t.config.get("timeloop"):
+            t.start()
+
+    for t in node_threads:
+        if t.config.get("timeloop"): # run them simply on main thread
+            t.run()
+        else:
+            t.join()
+
+    for node_thread in node_threads:
+        id,stats = node_thread.getStats()
+        nodeStats[id] = stats
+
+    return nodeStats
+
+def write_files(run_name : str, n_constr : int, n_var : int, results : dict, schedules : list) -> None:
+    rows = []
+    for pareto, sched in results.items():
+        for sd in sched:
+            data = np.append(sd, pareto)
+            data = data.astype('U256')
+            data[0:2] = data[0:2].astype(float).astype(int)
+            data[n_constr+1:n_constr+n_var+1] = data[n_constr+1:n_constr+n_var+1].astype(float).astype(int)
+            for i in range(n_constr+1,int(n_var/2)+n_constr+1):
+                data[i] = schedules[int(data[0])][int(data[i])-1]
+            rows.append(data)
+        if pareto == "nondom":
+            df = pd.DataFrame(rows)
+            df.to_csv(run_name + "_" + "result_nondom.csv", header=False)
+    df = pd.DataFrame(rows)
+    df.to_csv(run_name + "_" + "result_all.csv", header=False)
+
+
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Explore partition point metrics for DNNs')
+    description='Explore partition point metrics for DNNs')
     parser.add_argument('conf_file_path', help='Path to config file')
     parser.add_argument('run_name',
                         type=str,
                         default='run',
                         help='Name of run')
     parser.add_argument('-p',
-                        '--show-progress',
                         action='store_true',
                         help='Show progress of run')
     parser.add_argument('-n',
@@ -45,108 +160,24 @@ def main():
                         type=int,
                         default=1,
                         help='Number of runs')
-    parser.add_argument('--accuracy', action='store_true', default=False, help='Compute with accuracy')
+    parser.add_argument('--cuda',
+                        action='store_true',
+                        help='Use CUDA')
+    parser.add_argument('--cid',
+                        type=int,
+                        default=0,
+                        help='CUDA ID')
     args = parser.parse_args()
+
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
-    conf_helper = ConfigHelper(args.conf_file_path)
-    config = conf_helper.get_config()
-    node_components,link_components = conf_helper.get_system_components()
-
-
+    np.set_printoptions(precision=2)
 
     try:
-        model, accuracy_function = setup_workload(config['neural-network'])
-    except KeyError:
-        print()
-        print('\033[1m' + 'Workload not available' + '\033[0m')
-        print()
-        quit(1)
+        main(args)
+    except KeyboardInterrupt:
+        print('Interrupted')
+        try:
+            sys.exit(130)
+        except SystemExit:
+            os._exit(130)
 
-    dnn = DNNAnalyzer(MODEL_PATH, tuple(config['neural-network']['input-size']), conf_helper)#,node_components,link_components ,constraints)
-
-    if len(dnn.partpoints_filtered) == 0:
-        print("ERROR: No partitioning points found. Please check your system constraints: max_memory_size, max_out_size ")
-        quit(1)
-
-
-    accStats = {}
-    if args.accuracy:
-        if 'accuracy' in config.keys():
-            accEval = QuantizationEvaluator(dnn, config.get('accuracy'), node_components, accuracy_function, args.show_progress)
-            accStats = accEval.get_stats()
-
-    objective = conf_helper.get_optimization_objectives(node_components,link_components)
-    first_component_id = node_components[0]['id']
-
-    nodeStats={}
-    linkStats={}
-
-    for i in range (0, args.num_runs):
-
-        node_threads = [
-                NodeThread(component.get('id'), dnn, component,component['id'] != first_component_id, args.run_name, args.show_progress)
-                for component in node_components
-            ]
-        link_threads = [LinkComputationThread(component.get('id'), dnn, component,False, args.run_name, args.show_progress)
-                 for component in link_components
-
-            ]
-
-        for t in node_threads:
-            if not t.config.get("timeloop"):
-                t.start()
-
-        for t in link_threads:
-            t.start()
-
-        for t in node_threads:
-            if t.config.get("timeloop"): # run them simply on main thread
-                t.run()
-
-        for t in node_threads and link_threads:
-            if not t.config.get("timeloop"):
-                t.join()
-
-        for node_thread in node_threads:
-            id,stats = node_thread.getStats()
-            if id not in nodeStats:
-                nodeStats[id] = {}
-            nodeStats[id][i] = stats
-
-        for link_thread in  link_threads:
-            id,stats = link_thread.getStats()
-            if id not in linkStats:
-                linkStats[id] = {}
-            linkStats[id][i] = stats
-
-    e = Evaluator(dnn, nodeStats, linkStats, accStats)
-    e.print_sim_time()
-    e.export_csv(args.run_name)
-
-    nodes = e.get_all_layer_stats()
-
-    if len(nodes) == 0:
-        print("No benificial partitioning point found: check the bandwidth and memory constraints: ")
-        sys.exit()
-
-
-    nsga2 = NSGA2_Optimizer(nodes)
-    optimizer,paretos = nsga2.optimize(objective)
-
-    data = {
-    "best partitioning Point": optimizer,
-    "Paretos": [layer['layer'] for layer in paretos]
-    }
-
-    with open(args.run_name + '_optimals.json', 'w') as jsonfile:
-        json.dump(data, jsonfile, indent=4)
-
-    print("best partitioning Point: ")
-    print(optimizer)
-    print("Paretos:")
-    for layer in paretos:
-        print(layer['layer'])
-
-
-if __name__ == '__main__':
-    main()
