@@ -2,6 +2,7 @@ from framework.link.LinkModelInterface import LinkModelInterface
 
 from framework.link.EthernetLink import EthernetLink
 from framework.link.NetworkOnInterposer import NoILink
+from framework.link.BLELink import BLELink, BLE_PHY
 
 class Link():
     def __init__(self, config):
@@ -20,6 +21,11 @@ class Link():
             conf = self.config['noi']
             self.link = NoILink(conf['noi_mode'], conf['width'], conf['data_rate_Gbps'],
                            conf['latency_ns'], conf['power_bit_pj'])
+        elif self.config.get('ble'):
+            conf = self.config['ble']
+            self.link = BLELink(mtu=conf['mtu'], ppci=conf['ppci'], ci=conf['ci'],
+                           dle=conf['dle'], phy=BLE_PHY[conf['phy']],
+                           tx_pow_cons=conf['tx_pow_cons'], ber=conf['ber'])
         else:
             raise NotImplementedError
 
