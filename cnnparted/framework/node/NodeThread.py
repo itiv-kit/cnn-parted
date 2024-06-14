@@ -45,9 +45,10 @@ class NodeThread(ModuleThreadInterface):
         self.stats['bits'] = mn.pim_realADCbit()
 
     def _run_timeloop(self, config: dict) -> None:
-        runroot = self.runname + "_" + config["accelerator"]
+        #runroot = self.runname + "_" + config["accelerator"]
+        runroot = os.path.join(self.work_dir, "system_evaluation", config["accelerator"])
         config["run_root"] = runroot
-        fname_csv = runroot + "_tl_layers.csv"
+        fname_csv = os.path.join(self.work_dir, self.runname + "_" + config["accelerator"] + "_tl_layers.csv") #runroot + "_tl_layers.csv"
 
         if os.path.isfile(fname_csv):
             self.stats = self._read_layer_csv(fname_csv)

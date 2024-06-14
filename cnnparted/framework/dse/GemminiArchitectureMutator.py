@@ -1,18 +1,18 @@
 import copy
+from math import sqrt
 import pathlib
 import yaml
 
-from architecture_mutator import ArchitectureMutator
-#from framework.constants import ROOT_DIR
+from framework.dse.ArchitectureMutator import ArchitectureMutator, ArchitectureConfig
 
-class GemminiConfig:
-    def is_pow_2(self, n):
+class GemminiConfig(ArchitectureConfig):
+    def _is_pow_2(self, n):
         return (n & (n-1) == 0) and n != 0
 
 
-    def __init__(self, mesh_dim, tile_dim, spad_size, acc_size, enable_checks=True):
+    def __init__(self, mesh_dim, spad_size, acc_size, enable_checks=True):
         self.mesh_dim = mesh_dim
-        self.tile_dim = tile_dim
+        self.tile_dim = 1 #const for now
         self.dim = self.mesh_dim * self.tile_dim
 
         self.data_w = 8 #Width of input data in bit
@@ -34,10 +34,10 @@ class GemminiConfig:
 
         #Check if given configuration is valid
         if enable_checks:
-            assert self.is_pow_2(self.spad_bank_rows), "each SRAM bank must have a power-of-2 rows, to simplify address calculations"
+            assert self._is_pow_2(self.spad_bank_rows), "each SRAM bank must have a power-of-2 rows, to simplify address calculations"
             assert self.spad_bank_rows % (self.dim) == 0, "the number of rows in a bank must be a multiple of the dimensions of the systolic array"
             assert self.dim >= 2, "the systolic array must have a dimension of at least 2"
-            assert self.is_pow_2(self.dim), "the systolic array's dimensions must be powers of 2"
+            assert self._is_pow_2(self.dim), "the systolic array's dimensions must be powers of 2"
             assert self.acc_bank_rows % (self.dim) == 0, "the number of rows in an accumulator bank must be a multiple of the dimensions of the systolic array"
             assert ((self.spad_rows/self.dim) - 2) >= (self.acc_rows/self.dim), "the number os usable scratchpad tiles must be greater than or equal the number of total accumulator tiles"
 
@@ -45,12 +45,13 @@ class GemminiConfig:
         return f"GemminiConfig(dim={self.dim}, spad={self.spad_size}kB, acc={self.acc_size}kB)"
 
 
-class GemminiArchMutator(ArchitectureMutator):
+class GemminiArchitectureMutator(ArchitectureMutator):
+
     def __init__(self, cfg):
         self.cfg = cfg
-        #self.tl_configs_dir = pathlib.Path(ROOT_DIR, 'configs', 'tl_configs') #TODO
-        self.tl_configs_dir = "/home/rh8588/Dokumente/git/cnn-parted/configs/tl_configs"
-        search_space_constraints = cfg["dse"]["constraints"]
+        self.tl_in_configs_dir = cfg["tl_in_configs_dir"]
+        self.tl_out_configs_dir = ""
+        search_space_constraints = cfg["constraints"]
 
         #Boundaries of scratchpad sizes
         self.min_spad_size = search_space_constraints.get("min_spad_size", 128)
@@ -64,7 +65,8 @@ class GemminiArchMutator(ArchitectureMutator):
         self.acc_sizes = []
     
         # Mesh dim parameters
-        self.mesh_dims = search_space_constraints.get("mesh_dim", [8, 16, 32])
+        self.mesh_dim_max = search_space_constraints.get("mesh_dim_min", 32)
+        self.mesh_dims = [2**x for x in range(2, int(sqrt(self.mesh_dim_max))+1) ]
 
         # Tile dim parameters
         self.tile_dims = search_space_constraints.get("tile_dim", [1])
@@ -77,7 +79,7 @@ class GemminiArchMutator(ArchitectureMutator):
 
         self.design_space = []
         self.config: GemminiConfig = None
-        self.search_space_exhausted = False
+        self.design_space_exhausted = False
 
         # Generate valid configuration
         self.generate_design_space() 
@@ -128,23 +130,23 @@ class GemminiArchMutator(ArchitectureMutator):
                     acc_bank_rows_max = int(((spad_size*1024*8)//(spad_width) - 2*dim) / self.acc_banks)
                     acc_sizes = self._calc_valid_mem_sizes(dim, self.acc_banks, acc_width, self.min_acc_size, self.max_acc_size, rows_max=acc_bank_rows_max)
                     for acc_size in acc_sizes:
-                        self.design_space.append(copy.copy(GemminiConfig(mesh_dim, tile_dim, spad_size, acc_size) )) 
+                        self.design_space.append(copy.copy(GemminiConfig(mesh_dim, spad_size, acc_size) )) 
 
     def mutate_arch_constraints(self):
         # no arch constraints for Gemmini-like config
         pass
     
     def mutate_map_constraints(self):
-        base_map_constraints = pathlib.Path(self.tl_configs_dir, "constraints", "gemmini_like_map_constraints.yaml")
-        constraints_out = pathlib.Path(self.cfg["work_dir"]["tl_configs"], "gemmini_like_map_constraints.yaml")
+        base_map_constraints = pathlib.Path(self.tl_in_configs_dir, "constraints", "gemmini_like_map_constraints.yaml")
+        constraints_out = pathlib.Path(self.tl_out_configs_dir, "constraints", "gemmini_like_map_constraints.yaml")
         with open(base_map_constraints, "r") as f:
             constraints = yaml.safe_load(f)
 
         accumulator = constraints["mapspace_constraints"][5]        
         scratchpad  = constraints["mapspace_constraints"][7]        
 
-        accumulator["factors"] = f"R=1 S=1 P=1 Q=1 C<={self.config.dim} K=1 N=1"
-        scratchpad["factors"] = f"R=1 S=1 P=1 Q=1 N=1 C=1 K<={self.config.dim}"
+        accumulator["factors"] = f"R=1 S=1 P=1 Q=1 C<={self.config.dim} M=1 N=1"
+        scratchpad["factors"] = f"R=1 S=1 P=1 Q=1 N=1 C=1 M<={self.config.dim}"
 
         with open(constraints_out, "w") as f:
             y = yaml.safe_dump(constraints, sort_keys=False)
@@ -152,8 +154,8 @@ class GemminiArchMutator(ArchitectureMutator):
 
 
     def mutate_arch(self):
-        base_arch = pathlib.Path(self.tl_configs_dir, "archs", "gemmini_like.yaml")
-        arch_out = pathlib.Path(self.cfg["work_dir"]["tl_configs"], "gemmini_like.yaml")
+        base_arch = pathlib.Path(self.tl_in_configs_dir, "archs", "gemmini_like.yaml")
+        arch_out = pathlib.Path(self.tl_out_configs_dir, "archs", "gemmini_like.yaml")
         with open(base_arch, "r") as f:
             arch = yaml.safe_load(f)
 
@@ -179,7 +181,7 @@ class GemminiArchMutator(ArchitectureMutator):
         accumulator["attributes"]["instances"] = self.config.dim
         accumulator["attributes"]["n_banks"] = self.config.acc_banks
 
-        pe_rows["name"] = f"PERows[0..{self.config.dim}]"
+        pe_rows["name"] = f"PERows[0..{self.config.dim-1}]"
         registers["attributes"]["width"] = self.config.data_w
         registers["attributes"]["instances"] = self.config.dim*self.config.dim
 
@@ -201,9 +203,9 @@ class GemminiArchMutator(ArchitectureMutator):
             self.mutate_map_constraints()
             # Check if there are any configs left to simulate
             if not self.design_space:
-                self.search_space_exhausted=True
+                self.design_space_exhausted=True
         except IndexError:
-            self.search_space_exhausted = True
+            self.design_space_exhausted = True
             self.config = None
 
         return self.config
@@ -211,9 +213,7 @@ class GemminiArchMutator(ArchitectureMutator):
 
 if __name__ == "__main__":
     #Setup helper classes
-    constraints = {"mesh_dim": [16,32],
-                "tile_dim": [1], 
-                "cache_size": [1024],
+    constraints = {"mesh_dim_max": 32,
                 "min_spad_size": 512,
                 "max_spad_size": 1024,
                 "min_acc_size": 256,
@@ -221,10 +221,10 @@ if __name__ == "__main__":
     cfg = {"dse": {"constraints": None}, "work_dir": {"tl_configs": None}}
     cfg["dse"]["constraints"] = constraints
     cfg["work_dir"]["tl_configs"] = "/home/rh8588/Dokumente/git/cnn-parted/cnnparted/framework/dse/my_work_dir"
-    generator = GemminiArchMutator(cfg)
+    generator = GemminiArchitectureMutator(cfg)
     generator.run()
 
-    print("Generated Gemmini Config:") #TODO Fix ME PLS
+    print("Generated Gemmini Config:")
     print("  Mesh Dim: ", generator.config.mesh_dim)
     print("  Tile Dim: ", generator.config.tile_dim)
     print("  Array Dim: ", generator.config.mesh_dim*generator.config.tile_dim)

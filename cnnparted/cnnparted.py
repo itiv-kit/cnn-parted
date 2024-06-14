@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 import argparse
+import tempfile
+import shutil
 import torch
 import os
 import sys
@@ -10,7 +12,7 @@ import pandas as pd
 from typing import Callable
 
 from framework import ConfigHelper, NodeThread, GraphAnalyzer, PartitioningOptimizer, RobustnessOptimizer, AccuracyEvaluator
-from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
+from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 
 def main(args):
@@ -23,21 +25,30 @@ def main(args):
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
     main_conf = config.get('general')
+    if work_dir_str := main_conf.get('work_dir'):
+        work_dir = work_dir_str
+        if os.path.isdir(work_dir):
+            shutil.rmtree(work_dir, ignore_errors=True)
+        os.mkdir(work_dir)
+    else:
+        work_dir_tmp = tempfile.TemporaryDirectory(dir=ROOT_DIR)
+        work_dir = work_dir_tmp.name.split(os.path.sep)[-1]
+
     node_components, link_components = conf_helper.get_system_components()
     accuracy_function = setup_workload(args.run_name, config['neural-network'])
 
     # Step 1 - Analysis
-    ga = GraphAnalyzer(args.run_name, tuple(config['neural-network']['input-size']), args.p)
+    ga = GraphAnalyzer(work_dir, args.run_name, tuple(config['neural-network']['input-size']), args.p)
     ga.find_schedules(main_conf.get('num_topos'))
 
     # Step 2 - Robustness Analysis
     q_constr = {}
     if config.get('accuracy'):
-        robustnessAnalyzer = RobustnessOptimizer(args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), device, args.p)
+        robustnessAnalyzer = RobustnessOptimizer(work_dir, args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), device, args.p)
         q_constr = robustnessAnalyzer.optimize()
 
     # Step 3 - Layer Evaluation
-    nodeStats = node_eval(ga, node_components, args.run_name, args.p)
+    nodeStats = node_eval(ga, node_components, work_dir, args.run_name, args.p)
 
     # Step 4 - Find pareto-front
     num_pp = main_conf.get('num_pp')
@@ -62,7 +73,7 @@ def main(args):
     # objective = conf_helper.get_optimization_objectives(node_components, link_components)
 
     # Step 7 - Output exploration results
-    write_files(args.run_name, n_constr, n_var, sol, ga.schedules)
+    write_files(work_dir, args.run_name, n_constr, n_var, sol, ga.schedules)
     sols = 0
     for pareto, sched in sol.items():
         print(pareto, len(sched))
@@ -103,10 +114,10 @@ def setup_workload(run_name : str, model_settings: dict) -> Callable:
         print()
         quit(1)
 
-def node_eval(ga : GraphAnalyzer, node_components : list, run_name : str, progress : bool) -> dict:
+def node_eval(ga : GraphAnalyzer, node_components : list, work_dir: str, run_name : str, progress : bool) -> dict:
     nodeStats = {}
     node_threads = [
-            NodeThread(component.get('id'), ga, component, run_name, progress)
+            NodeThread(component.get('id'), ga, component, work_dir, run_name, progress)
             for component in node_components
         ]
 
@@ -126,7 +137,7 @@ def node_eval(ga : GraphAnalyzer, node_components : list, run_name : str, progre
 
     return nodeStats
 
-def write_files(run_name : str, n_constr : int, n_var : int, results : dict, schedules : list) -> None:
+def write_files(work_dir: str, run_name : str, n_constr : int, n_var : int, results : dict, schedules : list) -> None:
     rows = []
     for pareto, sched in results.items():
         for sd in sched:
@@ -139,9 +150,9 @@ def write_files(run_name : str, n_constr : int, n_var : int, results : dict, sch
             rows.append(data)
         if pareto == "nondom":
             df = pd.DataFrame(rows)
-            df.to_csv(run_name + "_" + "result_nondom.csv", header=False)
+            df.to_csv(work_dir + run_name + "_" + "result_nondom.csv", header=False)
     df = pd.DataFrame(rows)
-    df.to_csv(run_name + "_" + "result_all.csv", header=False)
+    df.to_csv(work_dir + run_name + "_" + "result_all.csv", header=False)
 
 
 if __name__ == '__main__':

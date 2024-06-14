@@ -29,22 +29,22 @@ mapspace_constraints:
     bypass: []
   - target: Registers
     type: temporal
-    factors: R=1 S=1 P=1 Q=1 C=1 K=1 N=1
-    permutation: PQRSCKN
+    factors: R=1 S=1 P=1 Q=1 C=1 M=1 N=1
+    permutation: PQRSCMN
   - target: Accumulator
     type: spatial
-    factors: R=1 S=1 P=1 Q=1 C<=16 K=1 N=1
-    permutation: QKC
+    factors: R=1 S=1 P=1 Q=1 C<=16 M=1 N=1
+    permutation: QMC
   - target: Accumulator
     type: temporal
-    permutation: QPNCSRK
+    permutation: QPNCSRM
   - target: Scratchpad
     type: spatial
-    factors: R=1 S=1 P=1 Q=1 N=1 C=1 K<=16
+    factors: R=1 S=1 P=1 Q=1 N=1 C=1 M<=16
   - target: Scratchpad
     type: temporal
-    factors: R=1 S=1 P=1 Q=1 C=1 K=1 N=1
+    factors: R=1 S=1 P=1 Q=1 C=1 M=1 N=1
   - target: DRAM
     type: temporal
-    permutation: CSRKQPN
+    permutation: CSRMQPN
 

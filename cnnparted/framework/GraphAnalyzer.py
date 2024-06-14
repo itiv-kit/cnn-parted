@@ -8,7 +8,8 @@ from framework.model.graph import LayersGraph
 from framework.model.scheduling import topo_sort_random_start_node
 
 class GraphAnalyzer:
-    def __init__(self, run_name : str, input_size : tuple, progress : bool) -> None:
+    def __init__(self, work_dir: str, run_name : str, input_size : tuple, progress : bool) -> None:
+        self.work_dir = work_dir
         self.run_name = run_name
         self.input_size = input_size
         self.progress = progress
@@ -20,7 +21,7 @@ class GraphAnalyzer:
         self.conv_layers = self.get_conv2d_layers()
 
     def find_schedules(self, num_topos : int) -> list:
-        fname_csv = self.run_name + "_" + "schedules.csv"
+        fname_csv = os.path.join(self.work_dir, self.run_name + "_" + "schedules.csv")
         if os.path.isfile(fname_csv):
             df = pd.read_csv(fname_csv, header=None, index_col=0)
             self.schedules = df.values.tolist()
