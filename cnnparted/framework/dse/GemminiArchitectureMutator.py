@@ -48,9 +48,7 @@ class GemminiConfig(ArchitectureConfig):
 class GemminiArchitectureMutator(ArchitectureMutator):
 
     def __init__(self, cfg):
-        self.cfg = cfg
-        self.tl_in_configs_dir = cfg["tl_in_configs_dir"]
-        self.tl_out_configs_dir = ""
+        super().__init__(cfg)
         search_space_constraints = cfg["constraints"]
 
         #Boundaries of scratchpad sizes
@@ -76,10 +74,6 @@ class GemminiArchitectureMutator(ArchitectureMutator):
 
         self.spad_data_width = 8
         self.acc_data_width = 32
-
-        self.design_space = []
-        self.config: GemminiConfig = None
-        self.design_space_exhausted = False
 
         # Generate valid configuration
         self.generate_design_space() 
@@ -193,22 +187,8 @@ class GemminiArchitectureMutator(ArchitectureMutator):
             f.write(y)
 
 
-
     def run(self):
-        # Check if there are still more results
-        try:
-            self.config = self.design_space.pop()
-            self.mutate_arch()
-            self.mutate_arch_constraints()
-            self.mutate_map_constraints()
-            # Check if there are any configs left to simulate
-            if not self.design_space:
-                self.design_space_exhausted=True
-        except IndexError:
-            self.design_space_exhausted = True
-            self.config = None
-
-        return self.config
+        return super().run()
 
 
 if __name__ == "__main__":

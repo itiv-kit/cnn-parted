@@ -12,7 +12,7 @@ from typing import Dict
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
-from framework.dse.ArchitectureMutator import ArchitectureMutator, ArchitectureConfig
+from framework.helpers.Visualizer import plotEdpPerConfigPerLayer
 
 class Timeloop:
     # Output file names.
@@ -96,6 +96,7 @@ class Timeloop:
             
             # Decide which designs to further evaluate
             # Rough pruning based on EDP
+            plotEdpPerConfigPerLayer(stats)
             self.stats = self._prune_accelerator_designs(stats, 5)["design0"] #TODO Fix to be able to pass other designs
         else:
             for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
