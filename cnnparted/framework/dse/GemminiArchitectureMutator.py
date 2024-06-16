@@ -168,16 +168,16 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         macc = pe_rows["local"][1]
 
         scratchpad["attributes"]["depth"] = self.config.spad_rows
-        scratchpad["attributes"]["width"] = self.config.dim
+        scratchpad["attributes"]["width"] = self.config.dim * self.config.data_w
         scratchpad["attributes"]["entries"] = self.config.spad_rows * self.config.dim
         scratchpad["attributes"]["n_banks"] = self.config.spad_banks
-        scratchpad["attributes"]["word-bits"] = self.config.data_w
+        #scratchpad["attributes"]["word-bits"] = self.config.data_w
 
         pe_cols["name"] = f"PECols[0..{self.config.dim-1}]"
 
         accumulator["attributes"]["entries"] = self.config.acc_rows
         accumulator["attributes"]["depth"] = self.config.acc_rows
-        accumulator["attributes"]["width"] = self.config.acc_w
+        accumulator["attributes"]["width"] = self.config.acc_w #in bit
         accumulator["attributes"]["instances"] = self.config.dim
         accumulator["attributes"]["n_banks"] = self.config.acc_banks
 
@@ -186,7 +186,7 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         registers["attributes"]["instances"] = self.config.dim*self.config.dim
 
         macc["attributes"]["datawidth"] = self.config.data_w
-        macc["attributes"]["word-bits"] = self.config.data_w
+        #macc["attributes"]["word-bits"] = self.config.data_w
 
         with open(arch_out, "w") as f:
             y = yaml.safe_dump(arch, sort_keys=False)

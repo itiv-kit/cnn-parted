@@ -124,8 +124,10 @@ class PartitioningProblem(ElementwiseProblem):
         dmem = []
         for j in range(last_pp + 1, pp + 1):
             layer = self.schedule[j-1]
-            acc_latency += self._get_layer_latency(acc, layer)
+            #could be called for diff designs, then use best
+            acc_latency += self._get_layer_latency(acc, layer)  #acc is an id, for dse additional parameter for different designs
             acc_energy += self._get_layer_energy(acc, layer)
+
             valid &= self._check_layer_bitwidth(acc, layer)
             if layer in self.layer_params.keys():
                 part_l_params += self.layer_params[layer]

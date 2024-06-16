@@ -7,6 +7,7 @@ import yaml
 import glob
 import re
 import tqdm
+from typing import Dict
 
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
@@ -56,6 +57,7 @@ class Timeloop:
         self.tl_cfg = tl_config
         self.stats = {}
 
+        self.mutator = None
         if self.dse_config:
             mutator_cfg = self.dse_config
             mutator_cfg["tl_in_configs_dir"] = self.configs_dir
@@ -67,6 +69,7 @@ class Timeloop:
 
     def run(self, layers : dict, progress : bool = False):
         if self.mutator is not None:
+            stats = {}
             i = 0
             while not self.mutator.design_space_exhausted:
                 self.runroot = os.path.join(self.runroot, "design"+str(i))
@@ -78,28 +81,33 @@ class Timeloop:
 
                 self.mutator.tl_out_configs_dir = tl_design_dir
                 _ = self.mutator.run()
+                stats[f"design"+str(i)] = {}
 
                 for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
                     layer_name = layer.get("name") + "design" + str(i)
-                    output = self._run_single_dse(layer, tl_files_path=tl_design_dir)
+                    output = self._run_single(layer, tl_files_path=tl_design_dir)
 
-                    self.stats[layer_name] = {}
-                    self.stats[layer_name]["latency"] = output["latency_ms"]
-                    self.stats[layer_name]["energy"] = output["energy_mJ"]
-                    self.stats[layer_name]["area"] = output["area_mm2"]
+                    stats[f"design"+str(i)][layer_name] = {}
+                    stats[f"design"+str(i)][layer_name]["latency"] = output["latency_ms"]
+                    stats[f"design"+str(i)][layer_name]["energy"] = output["energy_mJ"]
+                    stats[f"design"+str(i)][layer_name]["area"] = output["area_mm2"]
                 self.runroot = os.path.join(*self.runroot.split(os.path.sep)[:-1]) # this removes 'designI' from path
                 i += 1
+            
+            # Decide which designs to further evaluate
+            # Rough pruning based on EDP
+            self.stats = self._prune_accelerator_designs(stats, 5)["design0"] #TODO Fix to be able to pass other designs
         else:
             for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
                 layer_name = layer.get("name")
-                output = self._run_single(layer, arch_mutator=None)
+                output = self._run_single(layer, tl_files_path=None)
 
                 self.stats[layer_name] = {}
                 self.stats[layer_name]["latency"] = output["latency_ms"]
                 self.stats[layer_name]["energy"] = output["energy_mJ"]
                 self.stats[layer_name]["area"] = output["area_mm2"]
 
-    def _run_single_dse(self,
+    def _run_single(self,
             layer : dict,
             logfile : str = 'timeloop.log',
             tl_files_path: str = None
@@ -115,10 +123,8 @@ class Timeloop:
         prob_name = self.prob_name
         map_fname = os.path.join(self.configs_dir, 'mapper', ('template'+self.type_cfg))
         nmap_fname = os.path.join(dirname, ('mapper'+self.type_cfg))
-
         prob_fname = os.path.join(self.configs_dir, 'probs', prob_name+self.type_cfg)
         nprob_fname = os.path.join(dirname, prob_name+self.type_cfg)
-        
         configfile_path  = os.path.join(dirname, (self.accname+self.type_cfg))
         logfile_path = os.path.join(dirname, logfile)
 
@@ -145,43 +151,32 @@ class Timeloop:
         os.chdir(ROOT_DIR)
         return self._parse_stats(dirname)
 
-    def _run_single(self,
-            layer : dict,
-            logfile : str = 'timeloop.log',
-        ) -> dict:
-        if os.path.isfile(os.path.join(self.configs_dir, 'archs', (self.accname + '.cfg'))):
-            self.type_cfg = '.cfg'
+    def _prune_accelerator_designs(self, stats: Dict, n_designs_keep: int):
+        stats_list = []
+        for design, layers in stats.items():
+            stat_tmp = {}
+            stat_tmp["tag"] = design
+            energy = 0
+            latency = 0
+            for layer_name, stat in layers.items():
+                energy += stat["energy"]
+                latency += stat["latency"]
+                stat_tmp[layer_name] = stat
 
-        runname = layer.get('name')[1:]
-        dirname = os.path.join(ROOT_DIR, self.runroot, runname)
-        subprocess.check_call(['mkdir', '-p', dirname])
-        os.chdir(dirname)
+            stat_tmp["edp"] = energy*latency
+            stats_list.append(stat_tmp)
 
-        prob_name = self.prob_name
-        map_fname = os.path.join(self.configs_dir, 'mapper', ('template'+self.type_cfg))
-        nmap_fname = os.path.join(dirname, ('mapper'+self.type_cfg))
-        prob_fname = os.path.join(self.configs_dir, 'probs', prob_name+self.type_cfg)
-        nprob_fname = os.path.join(dirname, prob_name+self.type_cfg)
-        configfile_path  = os.path.join(dirname, (self.accname+self.type_cfg))
-        logfile_path = os.path.join(dirname, logfile)
+        n_designs_keep = min(len(stats_list), n_designs_keep)
+        stats_list = sorted(stats_list, key=lambda stat: stat["edp"])
 
-        if self.mapper_cfg:
-            self._rewrite_mapper_cfg(map_fname, nmap_fname)
-        else:
-            subprocess.check_call(['cp', map_fname, nmap_fname])
+        for stat in stats_list:
+            stats[stat["tag"]]["edp"] = stat["edp"]
 
-        self._rewrite_workload_bounds(prob_fname, nprob_fname, layer)
-        self._exportConfig(self.configs_dir, nprob_fname, nmap_fname, configfile_path)
+        #Remove sub-optimal designs from stats
+        for stat in stats_list[n_designs_keep:]:
+            stats.pop(stat["tag"])
 
-        with open(logfile_path, "w") as outfile:
-            status = subprocess.call([self.exec_path, configfile_path], stdout = outfile, stderr = outfile)
-            if status != 0:
-                subprocess.check_call(['cat', logfile_path])
-                print('Did you remember to build timeloop and set up your environment properly?')
-                sys.exit(1)
-
-        os.chdir(ROOT_DIR)
-        return self._parse_stats(dirname)
+        return stats
 
 
     def _rewrite_mapper_cfg(self, src : str, dst : str) -> None:
@@ -256,7 +251,6 @@ class Timeloop:
                 f.write(yaml.dump(config))
 
     def _load_accelerator_files(self, dir : str) -> list:
-        #TODO: Change to modified files
         arch_fnames = os.path.join(dir, 'archs', (self.accname + '.yaml'))
         constraint_fname = os.path.join(dir, 'constraints', (self.accname + '_' + '*'))
 
