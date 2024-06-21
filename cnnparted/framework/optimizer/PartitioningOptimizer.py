@@ -74,12 +74,12 @@ class PartitioningOptimizer(Optimizer):
                 for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
             )
 
-            num_acc = len(self.nodeStats)
+            num_platforms = len(self.nodeStats)
             num_layers = len(self.schedules[0])
             for i, sort in enumerate(sorts):
                 if sort is not None:
                     for res in sort:
-                        res[g_len:g_len+self.num_pp] = np.divide(res[g_len:g_len+self.num_pp], num_acc)
+                        res[g_len:g_len+self.num_pp] = np.divide(res[g_len:g_len+self.num_pp], num_platforms)
                         res[g_len+self.num_pp:g_len+x_len] = np.divide(res[g_len+self.num_pp:g_len+x_len], num_layers)
                         res[g_len:g_len+x_len] = np.floor(res[g_len:g_len+x_len]).astype(int) + 1
                         if res[-1]:
@@ -124,9 +124,9 @@ class PartitioningOptimizer(Optimizer):
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
         problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, self.layer_params, self.link_confs)
 
-        num_acc = len(self.nodeStats)
+        num_platforms = len(self.nodeStats)
         num_layers = len(schedule)
-        initial_x = np.array(np.arange(1, num_acc*num_layers, num_acc*num_layers/num_pp).tolist() + np.ones(num_pp+1).tolist())
+        initial_x = np.array(np.arange(1, num_platforms*num_layers, num_platforms*num_layers/num_pp).tolist() + np.ones(num_pp+1).tolist())
         algorithm = NSGA2(
             pop_size=self.pop_size,
             n_offsprings=self.pop_size,

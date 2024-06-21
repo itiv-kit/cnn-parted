@@ -9,7 +9,7 @@ from framework.link.Link import Link
 class PartitioningProblem(ElementwiseProblem):
     def __init__(self, num_pp : int, nodeStats : dict, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool, layer_dict : dict, layer_params : dict, link_confs : list):
         self.nodeStats = nodeStats
-        self.num_acc = len(nodeStats)
+        self.num_platforms = len(nodeStats)
         self.num_pp = num_pp
         self.schedule = schedule
         self.q_constr = q_constr
@@ -27,7 +27,7 @@ class PartitioningProblem(ElementwiseProblem):
         n_obj = 6 # latency, energy, throughput, area + link latency + link energy
         n_constr = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_real_pp + latency/energy per partition + latency/energy per link
 
-        xu = self.num_acc * self.num_layers - 1
+        xu = self.num_platforms * self.num_layers - 1
 
         super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=1, xu=xu)
 
@@ -44,7 +44,7 @@ class PartitioningProblem(ElementwiseProblem):
         mem = np.full((self.num_pp + 1), np.inf)
 
         p : list = x.tolist()
-        p[0:self.num_pp] = np.divide(p[0:self.num_pp], self.num_acc)
+        p[0:self.num_pp] = np.divide(p[0:self.num_pp], self.num_platforms)
         p[self.num_pp:] = np.divide(p[self.num_pp:], self.num_layers)
         p = np.floor(p).astype(int) + 1
         p = np.insert(p, self.num_pp, self.num_layers)
@@ -221,7 +221,7 @@ class PartitioningProblem(ElementwiseProblem):
 
     def _get_area(self, partitions : list) -> float:
         parts = {}
-        for acc in range(self.num_acc):
+        for acc in range(self.num_platforms):
             parts[acc] = []
         for p in partitions:
             parts[p[0]-1].append(p[1:])

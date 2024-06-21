@@ -8,7 +8,7 @@ class PartitioningMutation(Mutation):
 
     def _do(self, problem, X, **kwargs):
         assert problem.nodeStats is not None
-        num_acc = len(problem.nodeStats)
+        num_platforms = len(problem.nodeStats)
 
         X = X.astype(object)
 
@@ -19,7 +19,7 @@ class PartitioningMutation(Mutation):
                 if j < (X.shape[1] / 2 - 1):
                     X[i, j] = np.random.randint(1, self.num_layers + 1)
                 else:
-                    X[i, j] = np.random.randint(1, num_acc + 1)
+                    X[i, j] = np.random.randint(1, num_platforms + 1)
 
         X = X.astype(int)
 
