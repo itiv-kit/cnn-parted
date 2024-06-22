@@ -1,5 +1,5 @@
 import copy
-from math import sqrt
+from math import log2
 import pathlib
 import yaml
 
@@ -63,8 +63,11 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         self.acc_sizes = []
     
         # Mesh dim parameters
-        self.mesh_dim_max = search_space_constraints.get("mesh_dim_min", 32)
-        self.mesh_dims = [2**x for x in range(2, int(sqrt(self.mesh_dim_max))+1) ]
+        self.mesh_dim_min = search_space_constraints.get("mesh_dim_min", 4)
+        self.mesh_dim_max = search_space_constraints.get("mesh_dim_max", 32)
+        _min = int(log2(self.mesh_dim_min))
+        _max = int(log2(self.mesh_dim_max))
+        self.mesh_dims = [2**x for x in range(_min, _max+1) ]
 
         # Tile dim parameters
         self.tile_dims = search_space_constraints.get("tile_dim", [1])
@@ -136,8 +139,8 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         with open(base_map_constraints, "r") as f:
             constraints = yaml.safe_load(f)
 
-        accumulator = constraints["mapspace_constraints"][5]        
-        scratchpad  = constraints["mapspace_constraints"][7]        
+        accumulator = constraints["mapspace_constraints"][5] #TODO Magic numbers        
+        scratchpad  = constraints["mapspace_constraints"][7] #TODO Magic numbers        
 
         accumulator["factors"] = f"R=1 S=1 P=1 Q=1 C<={self.config.dim} M=1 N=1"
         scratchpad["factors"] = f"R=1 S=1 P=1 Q=1 N=1 C=1 M<={self.config.dim}"
