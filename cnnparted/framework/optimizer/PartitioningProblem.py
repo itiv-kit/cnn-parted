@@ -64,36 +64,40 @@ class PartitioningProblem(ElementwiseProblem):
             successors = [self.schedule[0]]
             i = last_pp = last_acc = -1
             for i, pp in enumerate(p[0:self.num_pp+1], self.num_pp + 1):
+                # evaluate partition
                 v, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
                 valid &= v
 
-                partitions.append([p[i], last_pp, pp])
+                part_latency.append([p[i], sum(l_pp) - curr_latency])
+                curr_latency = sum(l_pp)
 
-                # evaluate link
-                if last_pp != pp and last_acc != p[i]:
-                    if last_acc != -1:
-                        link_l, link_e, bandwidth[i-self.num_pp-1] = self._get_link_metrics(i-self.num_pp-1, successors)
-                        l_pp_link.append(link_l)
-                        e_pp_link.append(link_e)
-                        th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
-                    else:
-                        l_pp_link.append(0.0)
-                        e_pp_link.append(0.0)
-                        bandwidth[i-self.num_pp-1] = 0
+                # FIXME: Add link evaluation
+                l_pp_link.append(0.0)
+                e_pp_link.append(0.0)
+                bandwidth[i-self.num_pp-1] = 0
 
-                    if last_pp != 1:
-                        num_real_pp += 1
-                        if last_pp != -1:
-                            part_latency.append([last_acc, sum(l_pp[:-1]) - curr_latency])
-                            curr_latency = sum(l_pp[:-1])
-                else:
-                    l_pp_link.append(0.0)
-                    e_pp_link.append(0.0)
-                    bandwidth[i-self.num_pp-1] = 0
+                # # evaluate link
+                # if last_pp != pp and last_acc != p[i]:
+                #     if successors != self.schedule[0]:
+                #         link_l, link_e, bandwidth[i-self.num_pp-1] = self._get_link_metrics(i-self.num_pp-1, successors)
+                #         l_pp_link.append(link_l)
+                #         e_pp_link.append(link_e)
+                #         th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
+                #     else:
+                #         l_pp_link.append(0.0)
+                #         e_pp_link.append(0.0)
+                #         bandwidth[i-self.num_pp-1] = 0
+                # else:
+                #     l_pp_link.append(0.0)
+                #     e_pp_link.append(0.0)
+                #     bandwidth[i-self.num_pp-1] = 0
 
-                if pp == self.num_layers:
-                    part_latency.append([p[i], sum(l_pp) - curr_latency])
 
+                # set number of real partitioning points
+                if last_pp != pp and last_pp != 1 and last_acc != p[i]:
+                    num_real_pp += 1
+
+                # update pp and acc
                 if last_pp != pp:
                     last_pp = pp
                     if last_pp != 1: # if last_pp not input
@@ -215,7 +219,7 @@ class PartitioningProblem(ElementwiseProblem):
 
             th_pp.append(self._zero_division(1000.0, acc_latency))
 
-        return min(th_pp)
+        return np.min(th_pp)
 
     def _get_area(self, partitions : list) -> float:
         parts = {}
