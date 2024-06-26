@@ -126,9 +126,10 @@ class PartitioningOptimizer(Optimizer):
         samples = []
 
         while len(samples) < self.pop_size:
-            pps = np.sort(np.random.randint(1, num_layers+1, size=num_pp)).tolist()
+            pps = np.random.randint(1, num_layers+1, size=num_pp) * num_acc
+            pps = np.sort(pps).tolist()
             rng = default_rng()
-            accs = rng.choice(num_acc, size=num_pp+1, replace=not acc_once) + 1
+            accs = (rng.choice(num_acc, size=num_pp+1, replace=not acc_once)) * num_layers
             if fixed_sys:
                 accs = np.sort(accs)
 
