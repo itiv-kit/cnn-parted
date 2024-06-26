@@ -36,8 +36,8 @@ class PartitioningOptimizer(Optimizer):
 
         self.layer_params = self._set_layer_params(ga)
 
-        self.num_gen = self.pop_size = 1
-        if len(nodeStats.keys()) > 1:
+        self.num_gen = self.pop_size = 2
+        if len(nodeStats.keys()) > 1 and num_pp > 0:
             self.num_gen = 50 * nodes
             self.pop_size = 50 if nodes>100 else nodes//2 if nodes>30 else 15 if nodes>20 else nodes
 
