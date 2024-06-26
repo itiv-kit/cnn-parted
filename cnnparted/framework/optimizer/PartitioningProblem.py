@@ -34,7 +34,6 @@ class PartitioningProblem(ElementwiseProblem):
     def _evaluate(self, x : np.ndarray, out : dict, *args, **kwargs) -> None:
         valid = True
         num_real_pp = 0
-        curr_latency = 0.0 # used for throughput calculation
 
         l_pp = []
         e_pp = []
@@ -67,37 +66,19 @@ class PartitioningProblem(ElementwiseProblem):
                 # evaluate partition
                 v, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
                 valid &= v
+                part_latency.append([p[i], l_pp[-1]]) # required for throughput calculation
 
-                part_latency.append([p[i], sum(l_pp) - curr_latency])
-                curr_latency = sum(l_pp)
+                # link evaluation
+                link_l, link_e, bandwidth[i-self.num_pp-1] = self._get_link_metrics(i-self.num_pp-1, pp, successors)
+                l_pp_link.append(link_l)
+                e_pp_link.append(link_e)
+                th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
 
-                # FIXME: Add link evaluation
-                l_pp_link.append(0.0)
-                e_pp_link.append(0.0)
-                bandwidth[i-self.num_pp-1] = 0
-
-                # # evaluate link
-                # if last_pp != pp and last_acc != p[i]:
-                #     if successors != self.schedule[0]:
-                #         link_l, link_e, bandwidth[i-self.num_pp-1] = self._get_link_metrics(i-self.num_pp-1, successors)
-                #         l_pp_link.append(link_l)
-                #         e_pp_link.append(link_e)
-                #         th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
-                #     else:
-                #         l_pp_link.append(0.0)
-                #         e_pp_link.append(0.0)
-                #         bandwidth[i-self.num_pp-1] = 0
-                # else:
-                #     l_pp_link.append(0.0)
-                #     e_pp_link.append(0.0)
-                #     bandwidth[i-self.num_pp-1] = 0
-
-
-                # set number of real partitioning points
-                if last_pp != pp and last_pp != 1 and last_acc != p[i]:
+                # # set number of real partitioning points
+                if last_acc != p[i] and l_pp[-1] != 0:
                     num_real_pp += 1
 
-                # update pp and acc
+                # update last pp and acc
                 if last_pp != pp:
                     last_pp = pp
                     if last_pp != 1: # if last_pp not input
@@ -191,14 +172,17 @@ class PartitioningProblem(ElementwiseProblem):
     def _zero_division(self, a : float, b : float) -> float:
         return a / b if b else np.inf
 
-    def _get_link_metrics(self, link_idx : int, successors : list) -> tuple[float, float, float]:
-        if len(self.links) == 0:
+    def _get_link_metrics(self, link_idx : int, pp : int, successors : list) -> tuple[float, float, float]:
+        if len(self.links) == 0 or successors == []:
             return 0, 0, 0
 
         layers = []
         for layer in np.unique(successors):
             layers += self.layer_dict[layer]["predecessors"]
         layers = np.unique([layer for layer in layers if layer not in successors])
+
+        # Only consider already executed layers
+        layers = np.unique([layer for layer in layers if layer in list(self.layer_dict.keys())[:pp]])
 
         data_sizes = [np.prod(self.layer_dict[layer]["output_size"]) for layer in layers]
 
