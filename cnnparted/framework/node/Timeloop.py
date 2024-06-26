@@ -1,3 +1,4 @@
+from copy import deepcopy
 import importlib
 import os
 import sys
@@ -12,7 +13,7 @@ from typing import Dict
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
-from framework.helpers.Visualizer import plotEdpPerConfigPerLayer
+from framework.helpers.Visualizer import plotMetricPerConfigPerLayer
 
 class Timeloop:
     # Output file names.
@@ -55,7 +56,7 @@ class Timeloop:
         self.runroot = tl_config['run_root']
         self.dse_config = tl_config.get('dse', None)
         self.tl_cfg = tl_config
-        self.stats = {}
+        self.stats = []
 
         self.mutator = None
         if self.dse_config:
@@ -91,22 +92,31 @@ class Timeloop:
                     stats[f"design"+str(i)][layer_name]["latency"] = output["latency_ms"]
                     stats[f"design"+str(i)][layer_name]["energy"] = output["energy_mJ"]
                     stats[f"design"+str(i)][layer_name]["area"] = output["area_mm2"]
+                    stats[f"design"+str(i)][layer_name]["edap"] = output["latency_ms"]*output["energy_mJ"]*output["area_mm2"]
                 self.runroot = os.path.join(*self.runroot.split(os.path.sep)[:-1]) # this removes 'designI' from path
                 i += 1
             
             # Decide which designs to further evaluate
-            # Rough pruning based on EDP
-            plotEdpPerConfigPerLayer(stats)
-            self.stats = self._prune_accelerator_designs(stats, 5)["design0"] #TODO Fix to be able to pass other designs
+            # Rough pruning based on EAP
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edp")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density")
+            # after prune, stats is still a dict
+            pruned_stats = self._prune_accelerator_designs(deepcopy(stats), 5)
+            self.stats = [d for d in pruned_stats.values()]
         else:
+            stats = {"design0": {}}
             for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
                 layer_name = layer.get("name")
                 output = self._run_single(layer, tl_files_path=None)
 
-                self.stats[layer_name] = {}
-                self.stats[layer_name]["latency"] = output["latency_ms"]
-                self.stats[layer_name]["energy"] = output["energy_mJ"]
-                self.stats[layer_name]["area"] = output["area_mm2"]
+                stats["design0"][layer_name] = {}
+                stats["design0"][layer_name]["latency"] = output["latency_ms"]
+                stats["design0"][layer_name]["energy"] = output["energy_mJ"]
+                stats["design0"][layer_name]["area"] = output["area_mm2"]
+                stats["design0"][layer_name]["edap"] = output["latency_ms"]*output["energy_mJ"]*output["area_mm2"]
+
+            self.stats = [d for d in stats.values()]
 
     def _run_single(self,
             layer : dict,
@@ -153,6 +163,9 @@ class Timeloop:
         return self._parse_stats(dirname)
 
     def _prune_accelerator_designs(self, stats: Dict, n_designs_keep: int):
+        if len(stats) < n_designs_keep:
+            return stats
+
         stats_list = []
         for design, layers in stats.items():
             stat_tmp = {}
@@ -164,14 +177,11 @@ class Timeloop:
                 latency += stat["latency"]
                 stat_tmp[layer_name] = stat
 
-            stat_tmp["edp"] = energy*latency
+            stat_tmp["edap"] = energy*latency*stat["area"]
             stats_list.append(stat_tmp)
 
         n_designs_keep = min(len(stats_list), n_designs_keep)
-        stats_list = sorted(stats_list, key=lambda stat: stat["edp"])
-
-        for stat in stats_list:
-            stats[stat["tag"]]["edp"] = stat["edp"]
+        stats_list = sorted(stats_list, key=lambda stat: stat["edap"])
 
         #Remove sub-optimal designs from stats
         for stat in stats_list[n_designs_keep:]:

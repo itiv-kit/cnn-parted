@@ -5,7 +5,7 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: all
-  work_dir: work_dir_dse
+  work_dir: work_dir_dse_2
 
 neural-network:
   name: googlenet
@@ -54,11 +54,12 @@ components:
       accelerator: gemmini_like
       dse:
         constraints:
-          mesh_dim_max: 64
-          min_spad_size: 512
+          mesh_dim_min: 8
+          mesh_dim_max: 32
+          min_spad_size: 256
           max_spad_size: 1024
-          min_acc_size: 256
-          max_acc_size: 2048
+          min_acc_size: 128
+          max_acc_size: 1024
         mutator: GemminiArchitectureMutator
       frequency: 200000000
       layer: conv2d

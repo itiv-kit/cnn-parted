@@ -23,9 +23,9 @@ class PartitioningProblem(ElementwiseProblem):
         for link_conf in link_confs:
             self.links.append(Link(link_conf))
 
-        n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + device IDs
+        n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + platform IDs
         n_obj = 6 # latency, energy, throughput, area + link latency + link energy
-        n_constr = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_real_pp + latency/energy per partition + latency/energy per link
+        n_constr = (self.num_pp + 1) + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_accelerator_platforms + num_real_pp + latency/energy per partition + latency/energy per link
 
         xu = self.num_platforms * self.num_layers - 1
 
@@ -56,22 +56,26 @@ class PartitioningProblem(ElementwiseProblem):
         elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_pp-1:]), p[-self.num_pp-1:]): # keep order of Accelerators
             valid = False
         else:
+            #breakpoint()
+            design_id = [] #should be list of len num_platform - num_links
             th_pp = []
             partitions = []
             part_latency = deque()
             l_pp_link = []
             e_pp_link = []
             successors = [self.schedule[0]]
-            i = last_pp = last_acc = -1
+            i = last_pp = last_platform = -1
             for i, pp in enumerate(p[0:self.num_pp+1], self.num_pp + 1):
-                v, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
+                #breakpoint()
+                v, optimal_design_id, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
                 valid &= v
 
+                design_id.append(optimal_design_id)
                 partitions.append([p[i], last_pp, pp])
 
                 # evaluate link
-                if last_pp != pp and last_acc != p[i]:
-                    if last_acc != -1:
+                if last_pp != pp and last_platform != p[i]:
+                    if last_platform != -1:
                         link_l, link_e, bandwidth[i-self.num_pp-1] = self._get_link_metrics(i-self.num_pp-1, successors)
                         l_pp_link.append(link_l)
                         e_pp_link.append(link_e)
@@ -84,7 +88,7 @@ class PartitioningProblem(ElementwiseProblem):
                     if last_pp != 1:
                         num_real_pp += 1
                         if last_pp != -1:
-                            part_latency.append([last_acc, sum(l_pp[:-1]) - curr_latency])
+                            part_latency.append([last_platform, sum(l_pp[:-1]) - curr_latency])
                             curr_latency = sum(l_pp[:-1])
                 else:
                     l_pp_link.append(0.0)
@@ -97,7 +101,7 @@ class PartitioningProblem(ElementwiseProblem):
                 if last_pp != pp:
                     last_pp = pp
                     if last_pp != 1: # if last_pp not input
-                        last_acc = p[i]
+                        last_platform = p[i]
 
             link_latency = sum(l_pp_link)
             link_energy = sum(e_pp_link)
@@ -109,26 +113,39 @@ class PartitioningProblem(ElementwiseProblem):
         out["F"] = [latency, energy, throughput, area, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
         if valid:
-            out["G"] = [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in e_pp] + [i * (-1) for i in l_pp_link] + [i * (-1) for i in e_pp_link]
+            out["G"] = [i * (-1) for i in design_id] + [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in e_pp] + [i * (-1) for i in l_pp_link] + [i * (-1) for i in e_pp_link]
         else:
-            out["G"] = [1] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)]
+            out["G"] = [i for i in range(self.num_pp+1)] + [1] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)]
 
-    def _eval_partition(self, acc : int, last_pp : int, pp : int, l_pp : list, e_pp : list, successors : list) -> tuple[bool, int]:
-        valid = True
-        acc -= 1
-        acc_latency = 0.0
-        acc_energy = 0.0
-        part_l_params = 0
+    def _eval_partition(self, platform : int, last_pp : int, pp : int, l_pp : list, e_pp : list, successors : list) -> tuple[bool, int]:
+        #platform -= 1
 
-        ls = {}
-        dmem = []
+        platform = list(self.nodeStats.keys())[platform-1]
+        platform_area_per_design = platform_latency_per_design = platform_energy_per_design = np.zeros(len(self.nodeStats[platform]["eval"]))
+
+        for design_id, _ in enumerate(self.nodeStats[platform]["eval"]):
+            valid = True
+            platform_latency = 0.0
+            platform_energy = 0.0
+            part_l_params = 0
+
+            ls = {}
+            dmem = []
+
+            for j in range(last_pp + 1, pp + 1):
+                layer = self.schedule[j-1]
+                #could be called for diff designs, then use best
+                platform_latency += self._get_layer_latency(platform, design_id, layer)  #platform is an id, for dse additional parameter for different designs
+                platform_energy += self._get_layer_energy(platform, design_id, layer)
+
+            #breakpoint()
+            platform_energy_per_design[design_id] = platform_energy
+            platform_latency_per_design[design_id] = platform_latency
+            platform_area_per_design[design_id] = self._get_area_platform(platform, design_id)
+        
+        # Check bit-width, analyze memory requirements and generate successors needed for link analysis
         for j in range(last_pp + 1, pp + 1):
-            layer = self.schedule[j-1]
-            #could be called for diff designs, then use best
-            acc_latency += self._get_layer_latency(acc, layer)  #acc is an id, for dse additional parameter for different designs
-            acc_energy += self._get_layer_energy(acc, layer)
-
-            valid &= self._check_layer_bitwidth(acc, layer)
+            valid &= self._check_layer_bitwidth(platform, layer)
             if layer in self.layer_params.keys():
                 part_l_params += self.layer_params[layer]
 
@@ -153,29 +170,30 @@ class PartitioningProblem(ElementwiseProblem):
 
             ls[layer] = deepcopy(layer_successors)
 
-        l_pp.append(acc_latency)
-        e_pp.append(acc_energy)
-        return valid, part_l_params + max(dmem, default=0) # mem evaluation
+        # Decide which design should be used here
+        platform_eap_per_design = platform_latency_per_design * platform_energy_per_design * platform_area_per_design
+        optimal_design_id = np.argmax(platform_eap_per_design)
 
-    def _get_layer_latency(self, acc : int, layer_name : str) -> float:
-        acc = list(self.nodeStats.keys())[acc]
-        if self.nodeStats[acc].get(layer_name):
-            return float(self.nodeStats[acc][layer_name]['latency'])
+        l_pp.append(platform_latency_per_design[optimal_design_id])
+        e_pp.append(platform_energy_per_design[optimal_design_id])
+        return valid, optimal_design_id, part_l_params + max(dmem, default=0) # mem evaluation
+
+    def _get_layer_latency(self, platform : int, design_id: int, layer_name : str) -> float:
+        if self.nodeStats[platform]["eval"][design_id].get(layer_name):
+            return float(self.nodeStats[platform]["eval"][design_id][layer_name]['latency'])
         else:
             return 0
 
-    def _get_layer_energy(self, acc : int, layer_name : str) -> float:
-        acc = list(self.nodeStats.keys())[acc]
-        if self.nodeStats[acc].get(layer_name):
-            return float(self.nodeStats[acc][layer_name]['energy'])
+    def _get_layer_energy(self, platform : int, design_id: int,  layer_name : str) -> float:
+        if self.nodeStats[platform]["eval"][design_id].get(layer_name):
+            return float(self.nodeStats[platform]["eval"][design_id][layer_name]['energy'])
         else:
             return 0
 
-    def _check_layer_bitwidth(self, acc : int, layer_name : str) -> bool:
+    def _check_layer_bitwidth(self, platform : int, layer_name : str) -> bool:
         if 'input' in layer_name or 'output' in layer_name:
             return True
-        acc = list(self.nodeStats.keys())[acc]
-        bit_width = self.nodeStats[acc].get("bits")
+        bit_width = self.nodeStats[platform].get("bits")
 
         if isinstance(bit_width, int):
             return bit_width >= max([self.q_constr[x] for x in self.q_constr.keys() if layer_name in x], default=0)
@@ -206,39 +224,44 @@ class PartitioningProblem(ElementwiseProblem):
             return self.links[link_idx].eval(np.sum(data_sizes))
 
     def _get_throughput(self, th_pp : list, part_latency : deque) -> float:
-        acc_index = defaultdict(list)
+        platform_index = defaultdict(list)
         for i, tup in enumerate(part_latency):
-            acc_index[tup[0]].append(i)
+            platform_index[tup[0]].append(i)
 
-        for _, indexes in acc_index.items():
-            acc_latency = 0.0
+        for _, indexes in platform_index.items():
+            platform_latency = 0.0
             for i in range(min(indexes), max(indexes)+1):
-                acc_latency += part_latency[i][1]
+                platform_latency += part_latency[i][1]
 
-            th_pp.append(self._zero_division(1000.0, acc_latency))
+            th_pp.append(self._zero_division(1000.0, platform_latency))
 
         return min(th_pp)
 
     def _get_area(self, partitions : list) -> float:
         parts = {}
-        for acc in range(self.num_platforms):
-            parts[acc] = []
+        for platform in range(self.num_platforms):
+            parts[platform] = []
         for p in partitions:
             parts[p[0]-1].append(p[1:])
 
         area = 0.0
         for key in parts.keys():
-            acc = [*self.nodeStats][key]
-            if self.nodeStats[acc]['type'] == 'mnsim':
+            platform = [*self.nodeStats][key]
+            if self.nodeStats[platform]['type'] == 'mnsim':
                 for part in parts[key]:
                     for l in self.schedule[part[0]:part[1]]:
-                        if l in [*self.nodeStats[acc]]:
-                            area += float(self.nodeStats[acc][l]['area'])
+                        if l in [*self.nodeStats[platform]]:
+                            area += float(self.nodeStats[platform][l]['area'])
             else: # timeloop
                 for part in parts[key]:
                     if part[0] != part[1]:
-                        first_layer = [*self.nodeStats[acc]][0]
-                        area += float(self.nodeStats[acc][first_layer]['area'])
+                        first_layer = [*self.nodeStats[platform]["eval"][0]][0]
+                        area += float(self.nodeStats[platform]["eval"][0][first_layer]['area']) #TODO This should be adapted to account for different designs
                         break
 
+        return area
+
+    def _get_area_platform(self, platform: int, design_id: int):
+        first_layer = [*self.nodeStats[platform]["eval"][design_id]][0]
+        area = float(self.nodeStats[platform]["eval"][design_id][first_layer]['area'])
         return area

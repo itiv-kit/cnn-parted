@@ -25,11 +25,12 @@ def main(args):
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
     main_conf = config.get('general')
+    keep_dir = main_conf.get('keep_dir', True)
     if work_dir_str := main_conf.get('work_dir'):
         work_dir = work_dir_str
-        if os.path.isdir(work_dir):
+        if os.path.isdir(work_dir) and not keep_dir:
             shutil.rmtree(work_dir, ignore_errors=True)
-        os.mkdir(work_dir)
+        os.makedirs(work_dir, exist_ok=True)
     else:
         work_dir_tmp = tempfile.TemporaryDirectory(dir=ROOT_DIR)
         work_dir = work_dir_tmp.name.split(os.path.sep)[-1]

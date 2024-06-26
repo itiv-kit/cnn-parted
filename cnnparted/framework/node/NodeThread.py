@@ -39,7 +39,7 @@ class NodeThread(ModuleThreadInterface):
             self.stats = self._read_layer_csv(fname_csv)
         else:
             mn.run()
-            self.stats = mn.stats
+            self.stats["eval"] = [mn.stats]
             self._write_layer_csv(fname_csv)
 
         self.stats['bits'] = mn.pim_realADCbit()
@@ -48,6 +48,7 @@ class NodeThread(ModuleThreadInterface):
         #runroot = self.runname + "_" + config["accelerator"]
         runroot = os.path.join(self.work_dir, "system_evaluation", config["accelerator"])
         config["run_root"] = runroot
+        config["work_dir"] = self.work_dir
         fname_csv = os.path.join(self.work_dir, self.runname + "_" + config["accelerator"] + "_tl_layers.csv") #runroot + "_tl_layers.csv"
 
         if os.path.isfile(fname_csv):
@@ -58,7 +59,7 @@ class NodeThread(ModuleThreadInterface):
         tl = Timeloop(config)
         tl.run(layers, self.progress)
 
-        self.stats = tl.stats
+        self.stats["eval"] = tl.stats
 
         self._write_layer_csv(fname_csv)
 
@@ -89,17 +90,18 @@ class NodeThread(ModuleThreadInterface):
             ]
             writer.writerow(header)
             row_num = 1
-            for l in self.stats.keys():
-                if isinstance(self.stats[l], dict):
-                    row = [
-                        row_num,
-                        l,
-                        str(self.stats[l]["latency"]),
-                        str(self.stats[l]["energy"]),
-                        str(self.stats[l]["area"])
-                    ]
-                    writer.writerow(row)
-                    row_num += 1
+            for design in self.stats["eval"]:
+                for layer in design.keys():
+                    if isinstance(design[layer], dict):
+                        row = [
+                            row_num,
+                            layer,
+                            str(design[layer]["latency"]),
+                            str(design[layer]["energy"]),
+                            str(design[layer]["area"])
+                        ]
+                        writer.writerow(row)
+                        row_num += 1
 
 
     def _remove_file(self,file_path):
