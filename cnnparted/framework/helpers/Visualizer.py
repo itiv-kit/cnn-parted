@@ -35,7 +35,6 @@ def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str):
 
         metric_per_design.append(metric_per_layer)
 
-    np.save("metric_per_design.npy", np.array(metric_per_design))
     plt.figure(dpi=1200)
     plt.xlabel("Layer Number")
     plt.ylabel(metric_str)

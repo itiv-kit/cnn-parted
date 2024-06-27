@@ -19,6 +19,7 @@ from framework import GraphAnalyzer
 
 class PartitioningOptimizer(Optimizer):
     def __init__(self, ga : GraphAnalyzer, num_pp : int, nodeStats : dict, link_components : list, progress : bool) -> None:
+        self.work_dir = ga.work_dir
         self.run_name = ga.run_name
         self.schedules = ga.schedules
         self.num_pp = num_pp
@@ -63,8 +64,8 @@ class PartitioningOptimizer(Optimizer):
         g_len = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
         x_len = (self.num_pp) * 2 + 1
 
-        fname_p_npy = self.run_name + "_" + "paretos.npy"
-        fname_n_npy = self.run_name + "_" + "non_optimals.npy"
+        fname_p_npy = os.path.join(self.work_dir, self.run_name + "_" + "paretos.npy")
+        fname_n_npy = os.path.join(self.work_dir, self.run_name + "_" + "non_optimals.npy")
         if os.path.isfile(fname_p_npy) and os.path.isfile(fname_n_npy):
             all_paretos = np.load(fname_p_npy)
             non_optimals = np.load(fname_n_npy)

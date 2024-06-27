@@ -82,7 +82,8 @@ class NodeThread(ModuleThreadInterface):
                 stats[layer_name]['energy'] = row['Energy [mJ]']
                 stats[layer_name]['area'] = row['Area [mm2]']
 
-        return stats
+        designs.append(stats)
+        return designs
 
     def _write_layer_csv(self, filename: str) -> None:
         with open(filename, "w", newline="") as f:
