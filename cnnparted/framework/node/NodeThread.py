@@ -52,7 +52,7 @@ class NodeThread(ModuleThreadInterface):
         fname_csv = os.path.join(self.work_dir, self.runname + "_" + config["accelerator"] + "_tl_layers.csv") #runroot + "_tl_layers.csv"
 
         if os.path.isfile(fname_csv):
-            self.stats = self._read_layer_csv(fname_csv)
+            self.stats["eval"] = self._read_layer_csv(fname_csv)
             return
 
         layers = self.ga.get_timeloop_layers()
@@ -65,11 +65,17 @@ class NodeThread(ModuleThreadInterface):
 
 
     def _read_layer_csv(self, filename: str) -> dict:
+        designs = []
         stats = {}
 
         with open(filename, 'r', newline="") as f:
             reader = csv.DictReader(f, delimiter=";")
+            current_design_tag = "design0"
             for row in reader:
+                if row["Design Tag"] != current_design_tag:
+                    current_design_tag = row["Design Tag"]
+                    designs.append(stats)
+                    stats = {}
                 layer_name = row['Layer']
                 stats[layer_name] = {}
                 stats[layer_name]['latency'] = row['Latency [ms]']
@@ -83,6 +89,7 @@ class NodeThread(ModuleThreadInterface):
             writer = csv.writer(f, delimiter=";")
             header = [
                 "No.",
+                "Design Tag",
                 "Layer",
                 "Latency [ms]",
                 "Energy [mJ]",
@@ -90,11 +97,12 @@ class NodeThread(ModuleThreadInterface):
             ]
             writer.writerow(header)
             row_num = 1
-            for design in self.stats["eval"]:
+            for i, design in enumerate(self.stats["eval"]):
                 for layer in design.keys():
                     if isinstance(design[layer], dict):
                         row = [
                             row_num,
+                            f"design{i}",
                             layer,
                             str(design[layer]["latency"]),
                             str(design[layer]["energy"]),
