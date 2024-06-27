@@ -118,10 +118,14 @@ class PartitioningProblem(ElementwiseProblem):
             out["G"] = [i for i in range(self.num_pp+1)] + [1] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)]
 
     def _eval_partition(self, platform : int, last_pp : int, pp : int, l_pp : list, e_pp : list, successors : list) -> tuple[bool, int]:
-        #platform -= 1
-
         platform = list(self.nodeStats.keys())[platform-1]
-        platform_area_per_design = platform_latency_per_design = platform_energy_per_design = np.zeros(len(self.nodeStats[platform]["eval"]))
+
+        area_per_design = []
+        latency_per_design = []
+        energy_per_design = []
+
+        platform_latency_per_design = []
+        platform_energy_per_design = []
 
         for design_id, _ in enumerate(self.nodeStats[platform]["eval"]):
             valid = True
@@ -132,17 +136,28 @@ class PartitioningProblem(ElementwiseProblem):
             ls = {}
             dmem = []
 
+            energy_per_layer = []
+            latency_per_layer = []
+
             for j in range(last_pp + 1, pp + 1):
                 layer = self.schedule[j-1]
                 #could be called for diff designs, then use best
-                platform_latency += self._get_layer_latency(platform, design_id, layer)  #platform is an id, for dse additional parameter for different designs
-                platform_energy += self._get_layer_energy(platform, design_id, layer)
+                layer_latency = self._get_layer_latency(platform, design_id, layer)
+                layer_energy = self._get_layer_energy(platform, design_id, layer)
 
-            #breakpoint()
-            platform_energy_per_design[design_id] = platform_energy
-            platform_latency_per_design[design_id] = platform_latency
-            platform_area_per_design[design_id] = self._get_area_platform(platform, design_id)
-        
+                latency_per_layer.append(layer_latency)
+                energy_per_layer.append(layer_energy)
+
+                platform_latency += layer_latency
+                platform_energy += layer_energy
+
+            latency_per_design.append(latency_per_layer)
+            energy_per_design.append(energy_per_layer)
+            area_per_design.append([self._get_area_platform(platform, design_id)])
+
+            platform_energy_per_design.append(platform_latency)
+            platform_latency_per_design.append(platform_latency)
+
         # Check bit-width, analyze memory requirements and generate successors needed for link analysis
         for j in range(last_pp + 1, pp + 1):
             valid &= self._check_layer_bitwidth(platform, layer)
@@ -170,9 +185,19 @@ class PartitioningProblem(ElementwiseProblem):
 
             ls[layer] = deepcopy(layer_successors)
 
-        # Decide which design should be used here
-        platform_eap_per_design = platform_latency_per_design * platform_energy_per_design * platform_area_per_design
-        optimal_design_id = np.argmax(platform_eap_per_design)
+        # Decide which design should be used
+        # The x_per_design arrays have this layout:
+        #  x | l0 | l1 | l2 | l3 |
+        # ------------------------
+        # d0 | ...| ...| ...| ...|
+        # d1 | ...| ...| ...| ...|
+        edp_per_design_per_layer = np.multiply(np.array(energy_per_design), np.array(latency_per_design))
+        edap_per_design_per_layer = np.multiply(edp_per_design_per_layer, np.array(area_per_design))
+
+    	# Use Energy-Delay-Area-Product as criterium for optimality
+        # edap_per_design is a column vector, each row has the EDAP for one design
+        edap_per_design = np.sum(edap_per_design_per_layer, axis=1)
+        optimal_design_id = np.argmax(edap_per_design)
 
         l_pp.append(platform_latency_per_design[optimal_design_id])
         e_pp.append(platform_energy_per_design[optimal_design_id])
