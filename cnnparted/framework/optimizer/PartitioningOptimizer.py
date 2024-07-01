@@ -61,7 +61,7 @@ class PartitioningOptimizer(Optimizer):
 
         all_paretos = []
         non_optimals = []
-        g_len = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
+        g_len = (self.num_pp + 1) + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
         x_len = (self.num_pp) * 2 + 1
 
         fname_p_npy = os.path.join(self.work_dir, self.run_name + "_" + "paretos.npy")

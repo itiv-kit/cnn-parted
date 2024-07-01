@@ -197,11 +197,16 @@ class PartitioningProblem(ElementwiseProblem):
     	# Use Energy-Delay-Area-Product as criterium for optimality
         # edap_per_design is a column vector, each row has the EDAP for one design
         edap_per_design = np.sum(edap_per_design_per_layer, axis=1)
-        optimal_design_id = np.argmax(edap_per_design)
+        optimal_design_id = self._get_tag_from_id(platform, np.argmax(edap_per_design))
 
         l_pp.append(platform_latency_per_design[optimal_design_id])
         e_pp.append(platform_energy_per_design[optimal_design_id])
         return valid, optimal_design_id, part_l_params + max(dmem, default=0) # mem evaluation
+
+    def _get_tag_from_id(self, platform: int, design_id: int):
+        tag: str = self.nodeStats[platform]["eval"][design_id]["tag"]
+        tag = tag.split("_")[-1]
+        return int(tag)
 
     def _get_layer_latency(self, platform : int, design_id: int, layer_name : str) -> float:
         if self.nodeStats[platform]["eval"][design_id].get(layer_name):
