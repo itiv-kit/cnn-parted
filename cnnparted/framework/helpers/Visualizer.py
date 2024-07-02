@@ -41,7 +41,7 @@ def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = 
         for i in range(len(metric_per_design)): 
             plt.plot(layer_idx, metric_per_design[i], label = labels[i], linestyle="dotted")
     elif type == "bar":
-        width = 1/len(metric_per_design)
+        width = (0.5)/len(metric_per_design)
         multiplier = 0
         for i in range(len(metric_per_design)):
             offset = width * multiplier

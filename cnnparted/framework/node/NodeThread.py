@@ -71,11 +71,14 @@ class NodeThread(ModuleThreadInterface):
         with open(filename, 'r', newline="") as f:
             reader = csv.DictReader(f, delimiter=";")
             current_design_tag = "design_0"
+            stats["layers"] = {}
+            stats["tag"] = current_design_tag
             for row in reader:
                 if row["Design Tag"] != current_design_tag:
                     current_design_tag = row["Design Tag"]
                     designs.append(stats)
-                    stats = {}
+                    stats["layers"] = {}
+                    stats["tag"] = current_design_tag
                 layer_name = row['Layer']
                 stats["layers"][layer_name] = {}
                 stats["layers"][layer_name]['latency'] = row['Latency [ms]']
@@ -104,7 +107,7 @@ class NodeThread(ModuleThreadInterface):
                     if isinstance(design["layers"][layer], dict):
                         row = [
                             row_num,
-                            f"design_{i}",
+                            design["tag"],
                             layer,
                             str(design["layers"][layer]["latency"]),
                             str(design["layers"][layer]["energy"]),

@@ -56,7 +56,6 @@ class PartitioningProblem(ElementwiseProblem):
         elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_pp-1:]), p[-self.num_pp-1:]): # keep order of Accelerators
             valid = False
         else:
-            #breakpoint()
             design_id = [] #should be list of len num_platform - num_links
             th_pp = []
             partitions = []
@@ -66,7 +65,6 @@ class PartitioningProblem(ElementwiseProblem):
             successors = [self.schedule[0]]
             i = last_pp = last_platform = -1
             for i, pp in enumerate(p[0:self.num_pp+1], self.num_pp + 1):
-                #breakpoint()
                 v, optimal_design_id, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
                 valid &= v
 
