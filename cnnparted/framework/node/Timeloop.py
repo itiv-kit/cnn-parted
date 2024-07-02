@@ -9,11 +9,13 @@ import glob
 import re
 import tqdm
 from typing import Dict
+import numpy as np
 
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
 from framework.helpers.Visualizer import plotMetricPerConfigPerLayer
+from framework.helpers.DesignMetrics import calc_metric
 
 class Timeloop:
     # Output file names.
@@ -108,7 +110,7 @@ class Timeloop:
             plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density")
             plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eda2p")
             # after prune, stats is still a dict
-            pruned_stats = self._prune_accelerator_designs(deepcopy(stats), 5)
+            pruned_stats = self._prune_accelerator_designs(deepcopy(stats), 2, "edap")
             for k, d in  pruned_stats.items():
                 d["tag"] = k
                 self.stats.append(d)
@@ -173,29 +175,45 @@ class Timeloop:
         os.chdir(ROOT_DIR)
         return self._parse_stats(dirname)
 
-    def _prune_accelerator_designs(self, stats: Dict, n_designs_keep: int):
-        if len(stats) < n_designs_keep:
+    def _prune_accelerator_designs(self, stats: Dict, top_k: int, metric: str):
+        # If there are less designs than top_k simply return the given list
+        if len(stats) <= top_k:
             return stats
 
-        stats_list = []
-        for design, layers in stats.items():
-            stat_tmp = {}
-            stat_tmp["tag"] = design
-            energy = 0
-            latency = 0
-            for layer_name, stat in layers.items():
-                energy += stat["energy"]
-                latency += stat["latency"]
-                stat_tmp[layer_name] = stat
+        # The metric_per_design array has this structure, with
+        # every cell holding EAP, EDP or some other metric:
+        #  x | l0 | l1 | l2 | l3 |
+        # ------------------------
+        # d0 | ...| ...| ...| ...|
+        # d1 | ...| ...| ...| ...|
+        metric_per_design = []
+        labels = []
 
-            stats_list.append(stat_tmp)
+        for tag, design in stats.items():
+            metric_per_layer = []
+            layers = design["layers"]
+            for key, layer in layers.items():
+                metric_per_layer.append(calc_metric(layer, metric))
 
-        n_designs_keep = min(len(stats_list), n_designs_keep)
-        stats_list = sorted(stats_list, key=lambda stat: stat["edap"])
+            labels.append(tag)
+            metric_per_design.append(metric_per_layer)
 
-        #Remove sub-optimal designs from stats
-        for stat in stats_list[n_designs_keep:]:
-            stats.pop(stat["tag"])
+        # Now, we need to find the top_k designs per layer
+        design_candidates = []
+        metric_per_design = np.array(metric_per_design)
+        for col in metric_per_design.T:
+            metric_for_layer = col.copy()
+            metric_for_layer = np.argsort(metric_for_layer)
+
+            for i in metric_for_layer[0:top_k]:
+                design_candidates.append(f"design_{i}")
+
+        design_candidates = np.unique(design_candidates) 
+
+        # Remove all designs that have not been found to be suitable design candidates
+        for tag, design in stats.items():
+            if tag not in design_candidates:
+                stats.pop(tag)
 
         return stats
 
