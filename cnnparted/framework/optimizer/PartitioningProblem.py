@@ -108,7 +108,7 @@ class PartitioningProblem(ElementwiseProblem):
             latency = sum(l_pp) + link_latency
             energy = sum(e_pp) + link_energy
             throughput = self._get_throughput(th_pp, part_latency) * -1
-            area = self._get_area(partitions)
+            area = self._get_area(partitions, design_id)
 
         out["F"] = [latency, energy, throughput, area, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
@@ -209,14 +209,14 @@ class PartitioningProblem(ElementwiseProblem):
         return int(tag)
 
     def _get_layer_latency(self, platform : int, design_id: int, layer_name : str) -> float:
-        if self.nodeStats[platform]["eval"][design_id].get(layer_name):
-            return float(self.nodeStats[platform]["eval"][design_id][layer_name]['latency'])
+        if self.nodeStats[platform]["eval"][design_id]["layers"].get(layer_name):
+            return float(self.nodeStats[platform]["eval"][design_id]["layers"][layer_name]['latency'])
         else:
             return 0
 
     def _get_layer_energy(self, platform : int, design_id: int,  layer_name : str) -> float:
-        if self.nodeStats[platform]["eval"][design_id].get(layer_name):
-            return float(self.nodeStats[platform]["eval"][design_id][layer_name]['energy'])
+        if self.nodeStats[platform]["eval"][design_id]["layers"].get(layer_name):
+            return float(self.nodeStats[platform]["eval"][design_id]["layers"][layer_name]['energy'])
         else:
             return 0
 
@@ -267,7 +267,7 @@ class PartitioningProblem(ElementwiseProblem):
 
         return min(th_pp)
 
-    def _get_area(self, partitions : list) -> float:
+    def _get_area(self, partitions : list, design_id: list) -> float:
         parts = {}
         for platform in range(self.num_platforms):
             parts[platform] = []
@@ -285,13 +285,13 @@ class PartitioningProblem(ElementwiseProblem):
             else: # timeloop
                 for part in parts[key]:
                     if part[0] != part[1]:
-                        first_layer = [*self.nodeStats[platform]["eval"][0]][0]
-                        area += float(self.nodeStats[platform]["eval"][0][first_layer]['area']) #TODO This should be adapted to account for different designs
+                        first_layer = [*self.nodeStats[platform]["eval"][0]["layers"]][0]
+                        area += float(self.nodeStats[platform]["eval"][0]["layers"][first_layer]['area']) #TODO This should be adapted to account for different designs
                         break
 
         return area
 
     def _get_area_platform(self, platform: int, design_id: int):
-        first_layer = [*self.nodeStats[platform]["eval"][design_id]][0]
-        area = float(self.nodeStats[platform]["eval"][design_id][first_layer]['area'])
+        first_layer = [*self.nodeStats[platform]["eval"][design_id]["layers"]][0]
+        area = float(self.nodeStats[platform]["eval"][design_id]["layers"][first_layer]['area'])
         return area

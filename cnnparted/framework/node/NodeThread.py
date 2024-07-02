@@ -70,17 +70,17 @@ class NodeThread(ModuleThreadInterface):
 
         with open(filename, 'r', newline="") as f:
             reader = csv.DictReader(f, delimiter=";")
-            current_design_tag = "design0"
+            current_design_tag = "design_0"
             for row in reader:
                 if row["Design Tag"] != current_design_tag:
                     current_design_tag = row["Design Tag"]
                     designs.append(stats)
                     stats = {}
                 layer_name = row['Layer']
-                stats[layer_name] = {}
-                stats[layer_name]['latency'] = row['Latency [ms]']
-                stats[layer_name]['energy'] = row['Energy [mJ]']
-                stats[layer_name]['area'] = row['Area [mm2]']
+                stats["layers"][layer_name] = {}
+                stats["layers"][layer_name]['latency'] = row['Latency [ms]']
+                stats["layers"][layer_name]['energy'] = row['Energy [mJ]']
+                stats["layers"][layer_name]['area'] = row['Area [mm2]']
 
         designs.append(stats)
         return designs
@@ -99,15 +99,16 @@ class NodeThread(ModuleThreadInterface):
             writer.writerow(header)
             row_num = 1
             for i, design in enumerate(self.stats["eval"]):
-                for layer in design.keys():
-                    if isinstance(design[layer], dict):
+                layers = design["layers"]
+                for layer in layers.keys():
+                    if isinstance(design["layers"][layer], dict):
                         row = [
                             row_num,
-                            f"design{i}",
+                            f"design_{i}",
                             layer,
-                            str(design[layer]["latency"]),
-                            str(design[layer]["energy"]),
-                            str(design[layer]["area"])
+                            str(design["layers"][layer]["latency"]),
+                            str(design["layers"][layer]["energy"]),
+                            str(design["layers"][layer]["area"])
                         ]
                         writer.writerow(row)
                         row_num += 1

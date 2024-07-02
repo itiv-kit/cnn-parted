@@ -81,42 +81,53 @@ class Timeloop:
                 os.makedirs(tl_design_dir_constraints)
 
                 self.mutator.tl_out_configs_dir = tl_design_dir
-                _ = self.mutator.run()
-                stats[f"design"+str(i)] = {}
+                design = self.mutator.run()
+                stats[f"design_{i}"] = {}
+                stats[f"design_{i}"]["layers"] = {}
+                stats[f"design_{i}"]["arch_config"] = design.get_config()
+                with open(os.path.join(self.runroot, "arch_config.yaml"), "w") as f:
+                    y = yaml.safe_dump(design.get_config(), sort_keys=False)
+                    f.write(y)
 
                 for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
                     layer_name = layer.get("name") + "design" + str(i)
                     output = self._run_single(layer, tl_files_path=tl_design_dir)
 
-                    stats[f"design"+str(i)][layer_name] = {}
-                    stats[f"design"+str(i)][layer_name]["latency"] = output["latency_ms"]
-                    stats[f"design"+str(i)][layer_name]["energy"] = output["energy_mJ"]
-                    stats[f"design"+str(i)][layer_name]["area"] = output["area_mm2"]
-                    stats[f"design"+str(i)][layer_name]["edap"] = output["latency_ms"]*output["energy_mJ"]*output["area_mm2"]
+                    stats[f"design_{i}"]["layers"][layer_name] = {}
+                    stats[f"design_{i}"]["layers"][layer_name]["latency"] = output["latency_ms"]
+                    stats[f"design_{i}"]["layers"][layer_name]["energy"] = output["energy_mJ"]
+                    stats[f"design_{i}"]["layers"][layer_name]["area"] = output["area_mm2"]
                 self.runroot = os.path.join(*self.runroot.split(os.path.sep)[:-1]) # this removes 'designI' from path
                 i += 1
             
             # Decide which designs to further evaluate
             # Rough pruning based on EAP
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap", type="bar")
             plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap")
             plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edp")
             plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eda2p")
             # after prune, stats is still a dict
             pruned_stats = self._prune_accelerator_designs(deepcopy(stats), 5)
-            self.stats = [d for d in pruned_stats.values()]
+            for k, d in  pruned_stats.items():
+                d["tag"] = k
+                self.stats.append(d)
         else:
-            stats = {"design0": {}}
+            stats = {"design_0": {}}
+            stats["design_0"]["layers"] = {}
+            #stats["0"]["design_params"] = ArchitectureConfig.from_yaml()
             for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
                 layer_name = layer.get("name")
                 output = self._run_single(layer, tl_files_path=None)
 
-                stats["design0"][layer_name] = {}
-                stats["design0"][layer_name]["latency"] = output["latency_ms"]
-                stats["design0"][layer_name]["energy"] = output["energy_mJ"]
-                stats["design0"][layer_name]["area"] = output["area_mm2"]
-                stats["design0"][layer_name]["edap"] = output["latency_ms"]*output["energy_mJ"]*output["area_mm2"]
+                stats["design_0"]["layers"][layer_name] = {}
+                stats["design_0"]["layers"][layer_name]["latency"] = output["latency_ms"]
+                stats["design_0"]["layers"][layer_name]["energy"] = output["energy_mJ"]
+                stats["design_0"]["layers"][layer_name]["area"] = output["area_mm2"]
 
-            self.stats = [d for d in stats.values()]
+            for k, d in stats.items():
+                d["tag"] = k
+                self.stats.append(d)
 
     def _run_single(self,
             layer : dict,
@@ -177,7 +188,6 @@ class Timeloop:
                 latency += stat["latency"]
                 stat_tmp[layer_name] = stat
 
-            stat_tmp["edap"] = energy*latency*stat["area"]
             stats_list.append(stat_tmp)
 
         n_designs_keep = min(len(stats_list), n_designs_keep)

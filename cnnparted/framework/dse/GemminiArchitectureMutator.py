@@ -44,6 +44,15 @@ class GemminiConfig(ArchitectureConfig):
     def __str__(self):
         return f"GemminiConfig(dim={self.dim}, spad={self.spad_size}kB, acc={self.acc_size}kB)"
 
+    def get_config(self):
+        cfg = {}
+        cfg["mesh_dim"] = self.mesh_dim
+        #cfg["tile_dim"] = self.tile_dim
+        cfg["acc_size"] = self.acc_size
+        cfg["spad_size"] = self.spad_size
+        return cfg
+    
+
 
 class GemminiArchitectureMutator(ArchitectureMutator):
 

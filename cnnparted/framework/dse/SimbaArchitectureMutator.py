@@ -33,6 +33,15 @@ class SimbaConfig(ArchitectureConfig):
         self.inbuf_size = inbuf_size
         self.inbuf_depth = int(inbuf_size*8*1024 // (self.word_bits*self.block_size_input_buf))
 
+    def get_config(self) -> Dict:
+        cfg = {}
+        cfg["num_pes"] = self.num_pes
+        cfg["lmacs"] = self.lmacs
+        cfg["wbuf_size"] = self.wbuf_size
+        cfg["accbuf_size"] = self.accbuf_size
+        cfg["globalbuf_size"] = self.globalbuf_size
+        cfg["inbuf_size"] = self.inbuf_size
+        return cfg
 
 
 class SimbaArchitectureMutator(ArchitectureMutator):
@@ -51,8 +60,8 @@ class SimbaArchitectureMutator(ArchitectureMutator):
         self.acc_bufs = 4
 
         #Compute elements
-        self.pe_nums = search_space_constraints.get("num_pes", [16])
-        self.lmac_nums = search_space_constraints.get("num_lmacs", [16])
+        self.pe_nums = search_space_constraints.get("num_pes", [16, 32])
+        self.lmac_nums = search_space_constraints.get("num_lmacs", [8, 16])
 
         #weight and accumulator buffers are in equal numbers
         self.buf_nums = 4
@@ -106,7 +115,7 @@ class SimbaArchitectureMutator(ArchitectureMutator):
             arch = yaml.safe_load(f)
 
         #Modify the arch parameters
-        arch["architecture"]["subtree"][0]["subtree"][0]["subtree"][0]["name"] = "PE[0..{}]".format(self.config.num_pes-1)
+        arch["architecture"]["subtree"][0]["subtree"][0]["subtree"][0]["name"] = f"PE[0..{self.config.num_pes-1}]"
         arch["architecture"]["subtree"][0]["subtree"][0]["local"][0]["attributes"]["memory_depth"] = self.config.globalbuf_depth
 
         pe_template = arch["architecture"]["subtree"][0]["subtree"][0]["subtree"][0]["local"]
@@ -119,7 +128,7 @@ class SimbaArchitectureMutator(ArchitectureMutator):
                 #component["name"] = "PEAccuBuffer[0..{}]".format(self.config.acc_bufs-1)
                 component["attributes"]["memory_depth"] = self.config.accbuf_depth
             elif "PEWeightRegs" in component["name"]:
-                pass
+                component["name"] = f"PEWeightRegs[0..{self.config.num_pes-1}]"
             elif "MAC" in component["name"]:
                 component["name"] = "MAC[0..{}]".format(self.config.lmacs-1)
             elif "PEInputBuffer" in component["name"]:
@@ -130,13 +139,13 @@ class SimbaArchitectureMutator(ArchitectureMutator):
             f.write(y)
 
     def mutate_arch_constraints(self):
-        base_arch_constraints = pathlib.Path(self.tl_in_configs_dir, "constraints", "eyeriss_like_map_constraints.yaml")
-        constraints_out = pathlib.Path(self.tl_out_configs_dir, "constraints", "eyeriss_like_map_constraints.yaml")
+        base_arch_constraints = pathlib.Path(self.tl_in_configs_dir, "constraints", "simba_like_arch_constraints.yaml")
+        constraints_out = pathlib.Path(self.tl_out_configs_dir, "constraints", "simba_like_arch_constraints.yaml")
         shutil.copy(base_arch_constraints, constraints_out)
     
     def mutate_map_constraints(self):
-        base_map_constraints = pathlib.Path(self.tl_in_configs_dir, "constraints", "eyeriss_like_map_constraints.yaml")
-        constraints_out = pathlib.Path(self.tl_out_configs_dir, "constraints", "eyeriss_like_map_constraints.yaml")
+        base_map_constraints = pathlib.Path(self.tl_in_configs_dir, "constraints", "simba_like_map_constraints.yaml")
+        constraints_out = pathlib.Path(self.tl_out_configs_dir, "constraints", "simba_like_map_constraints.yaml")
         shutil.copy(base_map_constraints, constraints_out)
 
     def run(self):
