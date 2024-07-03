@@ -102,15 +102,39 @@ class Timeloop:
                 self.runroot = os.path.join(*self.runroot.split(os.path.sep)[:-1]) # this removes 'designI' from path
                 i += 1
             
-            # Decide which designs to further evaluate
-            # Rough pruning based on EAP
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap", type="bar")
             plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap", scale="log", prefix="log_")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap", type="bar")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap", type="bar", scale="log", prefix="log_")
+
             plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edp")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edp", scale="log", prefix="log_")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edp", type="bar")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edp", type="bar", scale="log", prefix="log_")
+
             plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density", scale="log", prefix="log_")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density", type="bar")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density", type="bar", scale="log", prefix="log_")
+
             plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eda2p")
-            # after prune, stats is still a dict
-            pruned_stats = self._prune_accelerator_designs(deepcopy(stats), 2, "edap")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eda2p", scale="log", prefix="log_")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eda2p", type="bar")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eda2p", type="bar", scale="log", prefix="log_")
+
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "energy")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "energy", scale="log", prefix="log_")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "energy", type="bar")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "energy", type="bar", scale="log", prefix="log_")
+
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eap")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eap", scale="log", prefix="log_")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eap", type="bar")
+            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eap", type="bar", scale="log", prefix="log_")
+
+            # Decide which designs to further evaluate. After pruning, stats is still a dict
+            # Then, turn the dict into a list
+            pruned_stats = self._prune_accelerator_designs(deepcopy(stats), 100, "edap")
             for k, d in  pruned_stats.items():
                 d["tag"] = k
                 self.stats.append(d)
@@ -211,11 +235,8 @@ class Timeloop:
         design_candidates = np.unique(design_candidates) 
 
         # Remove all designs that have not been found to be suitable design candidates
-        for tag, design in stats.items():
-            if tag not in design_candidates:
-                stats.pop(tag)
-
-        return stats
+        pruned_stats = {tag: design for tag, design in stats.items() if tag in design_candidates}
+        return pruned_stats
 
 
     def _rewrite_mapper_cfg(self, src : str, dst : str) -> None:

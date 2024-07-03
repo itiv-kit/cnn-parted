@@ -56,7 +56,7 @@ class PartitioningProblem(ElementwiseProblem):
         elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_pp-1:]), p[-self.num_pp-1:]): # keep order of Accelerators
             valid = False
         else:
-            design_id = [] #should be list of len num_platform - num_links
+            design_id = {}
             th_pp = []
             partitions = []
             part_latency = deque()
@@ -68,7 +68,9 @@ class PartitioningProblem(ElementwiseProblem):
                 v, optimal_design_id, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
                 valid &= v
 
-                design_id.append(optimal_design_id)
+                current_platform = list(self.nodeStats.keys())[p[i]-1]
+                design_id[current_platform] = optimal_design_id
+                #design_id.append(optimal_design_id)
                 partitions.append([p[i], last_pp, pp])
 
                 # evaluate link
@@ -107,6 +109,7 @@ class PartitioningProblem(ElementwiseProblem):
             energy = sum(e_pp) + link_energy
             throughput = self._get_throughput(th_pp, part_latency) * -1
             area = self._get_area(partitions, design_id)
+            design_id = list(design_id.values())
 
         out["F"] = [latency, energy, throughput, area, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
@@ -190,11 +193,12 @@ class PartitioningProblem(ElementwiseProblem):
         # d0 | ...| ...| ...| ...|
         # d1 | ...| ...| ...| ...|
         edp_per_design_per_layer = np.multiply(np.array(energy_per_design), np.array(latency_per_design))
-        edap_per_design_per_layer = np.multiply(edp_per_design_per_layer, np.array(area_per_design))
+        #edap_per_design_per_layer = np.multiply(edp_per_design_per_layer, np.array(area_per_design))
 
     	# Use Energy-Delay-Area-Product as criterium for optimality
         # edap_per_design is a column vector, each row has the EDAP for one design
-        edap_per_design = np.sum(edap_per_design_per_layer, axis=1)
+        edap_per_design = np.multiply(np.sum(edp_per_design_per_layer, axis=1), np.array(area_per_design))
+        #edap_per_design = np.sum(edap_per_design_per_layer, axis=1)
         optimal_design_id = self._get_tag_from_id(platform, np.argmax(edap_per_design))
 
         l_pp.append(platform_latency_per_design[optimal_design_id])
@@ -274,17 +278,20 @@ class PartitioningProblem(ElementwiseProblem):
 
         area = 0.0
         for key in parts.keys():
-            platform = [*self.nodeStats][key]
+            #platform = [*self.nodeStats][key]
+            platform = list(self.nodeStats.keys())[key]
             if self.nodeStats[platform]['type'] == 'mnsim':
                 for part in parts[key]:
                     for l in self.schedule[part[0]:part[1]]:
                         if l in [*self.nodeStats[platform]]:
                             area += float(self.nodeStats[platform][l]['area'])
             else: # timeloop
+                #part: partition
                 for part in parts[key]:
-                    if part[0] != part[1]:
-                        first_layer = [*self.nodeStats[platform]["eval"][0]["layers"]][0]
-                        area += float(self.nodeStats[platform]["eval"][0]["layers"][first_layer]['area']) #TODO This should be adapted to account for different designs
+                    if part[0] != part[1]: #partitions stores [platform, layer_ids], here check if both partitions are executed on same platform
+                        id = design_id[platform]
+                        first_layer = [*self.nodeStats[platform]["eval"][id]["layers"]][0]
+                        area += float(self.nodeStats[platform]["eval"][id]["layers"][first_layer]['area'])
                         break
 
         return area

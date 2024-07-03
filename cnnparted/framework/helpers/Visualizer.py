@@ -2,10 +2,11 @@ import os
 import matplotlib.pyplot as plt
 from typing import Dict, List
 import numpy as np
+import pandas as pd
 
 from framework.helpers.DesignMetrics import calc_metric, get_metric_info
 
-def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = "line"):
+def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = "line", scale: str = "linear", prefix: str = ""):
     assert type in ["line", "bar"], "Currently only 'line' and 'bar' are supported as plot types"
 
     metric = metric.lower()
@@ -32,6 +33,7 @@ def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = 
     plt.figure(dpi=1200)
     plt.xlabel("Layer Number")
     plt.ylabel(metric_str)
+    plt.yscale(scale)
     plt.title(f"{metric_str} for all Designs by layer")
     plt.gca().set_prop_cycle(marker=["o", "+", "*", "s", "x", "d"], 
                             color=['#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02'])
@@ -41,13 +43,13 @@ def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = 
         for i in range(len(metric_per_design)): 
             plt.plot(layer_idx, metric_per_design[i], label = labels[i], linestyle="dotted")
     elif type == "bar":
-        width = (0.5)/len(metric_per_design)
-        multiplier = 0
-        for i in range(len(metric_per_design)):
-            offset = width * multiplier
-            plt.bar(layer_idx+offset, metric_per_design[i], width=width, label=labels[i])
-            multiplier += 1
+        data = np.array(metric_per_design).T
+        df = pd.DataFrame(data, columns=labels)
+        df.plot.bar(color=['#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02'])
 
     plt.legend()
-    plt.savefig(os.path.join(dir, metric+"_"+type+".png"))
+    
+    fname = prefix + metric + "_" + type + ".png"
+    plt.savefig(os.path.join(dir, fname))
+    plt.close()
     
