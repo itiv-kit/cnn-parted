@@ -151,9 +151,9 @@ def write_files(work_dir: str, run_name : str, n_constr : int, n_var : int, resu
             rows.append(data)
         if pareto == "nondom":
             df = pd.DataFrame(rows)
-            df.to_csv(work_dir + run_name + "_" + "result_nondom.csv", header=False)
+            df.to_csv( os.path.join(work_dir, run_name + "_" + "result_nondom.csv"), header=False)
     df = pd.DataFrame(rows)
-    df.to_csv(work_dir + run_name + "_" + "result_all.csv", header=False)
+    df.to_csv( os.path.join(work_dir, run_name + "_" + "result_all.csv"), header=False)
 
 
 if __name__ == '__main__':
