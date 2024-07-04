@@ -15,7 +15,7 @@ from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
 from framework.helpers.Visualizer import plotMetricPerConfigPerLayer
-from framework.helpers.DesignMetrics import calc_metric
+from framework.helpers.DesignMetrics import calc_metric, SUPPORTED_METRICS
 
 class Timeloop:
     # Output file names.
@@ -102,42 +102,10 @@ class Timeloop:
                 self.runroot = os.path.join(*self.runroot.split(os.path.sep)[:-1]) # this removes 'designI' from path
                 i += 1
             
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap", scale="log", prefix="log_")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap", type="bar")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edap", type="bar", scale="log", prefix="log_")
+            # Plot all metrics in all combinations of line/bar, scale/log
+            for m in SUPPORTED_METRICS:
+                self._plot_all_of_metric(stats, m)
 
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edp")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edp", scale="log", prefix="log_")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edp", type="bar")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "edp", type="bar", scale="log", prefix="log_")
-
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density", scale="log", prefix="log_")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density", type="bar")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "power_density", type="bar", scale="log", prefix="log_")
-
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eda2p")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eda2p", scale="log", prefix="log_")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eda2p", type="bar")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eda2p", type="bar", scale="log", prefix="log_")
-
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "energy")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "energy", scale="log", prefix="log_")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "energy", type="bar")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "energy", type="bar", scale="log", prefix="log_")
-
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eap")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eap", scale="log", prefix="log_")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eap", type="bar")
-            plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], "eap", type="bar", scale="log", prefix="log_")
-
-            # Decide which designs to further evaluate. After pruning, stats is still a dict
-            # Then, turn the dict into a list
-            pruned_stats = self._prune_accelerator_designs(deepcopy(stats), 100, "edap")
-            for k, d in  pruned_stats.items():
-                d["tag"] = k
-                self.stats.append(d)
         else:
             stats = {"design_0": {}}
             stats["design_0"]["layers"] = {}
@@ -151,9 +119,10 @@ class Timeloop:
                 stats["design_0"]["layers"][layer_name]["energy"] = output["energy_mJ"]
                 stats["design_0"]["layers"][layer_name]["area"] = output["area_mm2"]
 
-            for k, d in stats.items():
-                d["tag"] = k
-                self.stats.append(d)
+        # Add design tag to a dedicated key
+        for k, d in stats.items():
+            d["tag"] = k
+            self.stats.append(d)
 
     def _run_single(self,
             layer : dict,
@@ -199,45 +168,12 @@ class Timeloop:
         os.chdir(ROOT_DIR)
         return self._parse_stats(dirname)
 
-    def _prune_accelerator_designs(self, stats: Dict, top_k: int, metric: str):
-        # If there are less designs than top_k simply return the given list
-        if len(stats) <= top_k:
-            return stats
 
-        # The metric_per_design array has this structure, with
-        # every cell holding EAP, EDP or some other metric:
-        #  x | l0 | l1 | l2 | l3 |
-        # ------------------------
-        # d0 | ...| ...| ...| ...|
-        # d1 | ...| ...| ...| ...|
-        metric_per_design = []
-        labels = []
-
-        for tag, design in stats.items():
-            metric_per_layer = []
-            layers = design["layers"]
-            for key, layer in layers.items():
-                metric_per_layer.append(calc_metric(layer, metric))
-
-            labels.append(tag)
-            metric_per_design.append(metric_per_layer)
-
-        # Now, we need to find the top_k designs per layer
-        design_candidates = []
-        metric_per_design = np.array(metric_per_design)
-        for col in metric_per_design.T:
-            metric_for_layer = col.copy()
-            metric_for_layer = np.argsort(metric_for_layer)
-
-            for i in metric_for_layer[0:top_k]:
-                design_candidates.append(f"design_{i}")
-
-        design_candidates = np.unique(design_candidates) 
-
-        # Remove all designs that have not been found to be suitable design candidates
-        pruned_stats = {tag: design for tag, design in stats.items() if tag in design_candidates}
-        return pruned_stats
-
+    def _plot_all_of_metric(self, stats, metric: str):
+        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric)
+        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric, scale="log", prefix="log_")
+        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric, type="bar")
+        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric, type="bar", scale="log", prefix="log_")
 
     def _rewrite_mapper_cfg(self, src : str, dst : str) -> None:
         with open(src, "r") as f:
