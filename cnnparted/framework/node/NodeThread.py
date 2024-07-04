@@ -46,7 +46,7 @@ class NodeThread(ModuleThreadInterface):
 
     def _run_timeloop(self, config: dict) -> None:
         #runroot = self.runname + "_" + config["accelerator"]
-        runroot = os.path.join(self.work_dir, "system_evaluation", config["accelerator"])
+        runroot = os.path.join(self.work_dir, "system_evaluation", str(self.id)+"_"+config["accelerator"])
         config["run_root"] = runroot
         config["work_dir"] = self.work_dir
         fname_csv = os.path.join(self.work_dir, self.runname + "_" + config["accelerator"] + "_tl_layers.csv") #runroot + "_tl_layers.csv"
