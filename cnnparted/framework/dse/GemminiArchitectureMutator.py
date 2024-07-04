@@ -58,7 +58,8 @@ class GemminiArchitectureMutator(ArchitectureMutator):
 
     def __init__(self, cfg):
         super().__init__(cfg)
-        search_space_constraints = cfg["constraints"]
+        self.config: GemminiConfig = None
+        search_space_constraints = cfg.get("constraints", {})
 
         #Boundaries of scratchpad sizes
         self.min_spad_size = search_space_constraints.get("min_spad_size", 128)
@@ -177,6 +178,7 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         scratchpad["attributes"]["width"] = self.config.dim * self.config.data_w
         scratchpad["attributes"]["entries"] = self.config.spad_rows * self.config.dim
         scratchpad["attributes"]["n_banks"] = self.config.spad_banks
+        scratchpad["attributes"]["block_size"] = self.config.dim
         #scratchpad["attributes"]["word-bits"] = self.config.data_w
 
         pe_cols["name"] = f"PECols[0..{self.config.dim-1}]"
@@ -191,7 +193,7 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         registers["attributes"]["width"] = self.config.data_w
         registers["attributes"]["instances"] = self.config.dim*self.config.dim
 
-        macc["attributes"]["datawidth"] = self.config.data_w
+        #macc["attributes"]["datawidth"] = self.config.data_w
         #macc["attributes"]["word-bits"] = self.config.data_w
 
         with open(arch_out, "w") as f:

@@ -47,7 +47,8 @@ class SimbaConfig(ArchitectureConfig):
 class SimbaArchitectureMutator(ArchitectureMutator):
     def __init__(self, cfg: Dict):
         super().__init__(cfg)
-        search_space_constraints = cfg["constraints"]
+        self.config: SimbaConfig = None
+        search_space_constraints = cfg.get("constraints", {})
         
         #Constants related to memory width
         self.word_bits = 8
@@ -81,7 +82,7 @@ class SimbaArchitectureMutator(ArchitectureMutator):
         self.inbuf_sizes = self._calc_mem_sizes(self.min_inbuf_size, self.max_inbuf_size, self.block_size_input_buf*self.word_bits)
 
         # Generate valid configuration
-        self._construct_design_space() 
+        self.generate_design_space() 
 
     def _calc_mem_sizes(self, min_sz, max_sz, mem_width):
         n=1
@@ -99,7 +100,7 @@ class SimbaArchitectureMutator(ArchitectureMutator):
                 break
         return mem_sizes
 
-    def _construct_design_space(self):
+    def generate_design_space(self):
         for pes in self.pe_nums:
             for lmacs in self.lmac_nums:
                 for wbuf_size in self.wbuf_sizes:
@@ -115,24 +116,42 @@ class SimbaArchitectureMutator(ArchitectureMutator):
             arch = yaml.safe_load(f)
 
         #Modify the arch parameters
-        arch["architecture"]["subtree"][0]["subtree"][0]["subtree"][0]["name"] = f"PE[0..{self.config.num_pes-1}]"
-        arch["architecture"]["subtree"][0]["subtree"][0]["local"][0]["attributes"]["memory_depth"] = self.config.globalbuf_depth
+        simba = arch["architecture"]["subtree"][0]["subtree"][0]
+        global_buffer = simba["local"][0]
+        pe = simba["subtree"][0]
+        pe_input_buffer = pe["local"][0]
+        pe_wght_buffer = pe["local"][1]
+        pe_accu_buffer = pe["local"][2]
+        pe_wght_regs = pe["local"][3]
+        lmac = pe["local"][4]
 
-        pe_template = arch["architecture"]["subtree"][0]["subtree"][0]["subtree"][0]["local"]
-        for component in pe_template:
-            component["attributes"]["meshX"] = self.config.num_pes
-            if "PEWeightBuffer" in component["name"]:
-                #component["name"] = "PEWeightBuffer[0..{}]".format(self.config.weight_bufs-1)
-                component["attributes"]["memory_depth"] = self.config.wbuf_depth
-            elif "PEAccuBuffer" in component["name"]:
-                #component["name"] = "PEAccuBuffer[0..{}]".format(self.config.acc_bufs-1)
-                component["attributes"]["memory_depth"] = self.config.accbuf_depth
-            elif "PEWeightRegs" in component["name"]:
-                component["name"] = f"PEWeightRegs[0..{self.config.num_pes-1}]"
-            elif "MAC" in component["name"]:
-                component["name"] = "MAC[0..{}]".format(self.config.lmacs-1)
-            elif "PEInputBuffer" in component["name"]:
-                component["attributes"]["memory_depth"] = self.config.inbuf_depth
+        # Sanity checks, should keys be reordered for any reason
+        assert(global_buffer["name"] == "GlobalBuffer")
+        assert("PE" in pe["name"])
+        assert(pe_input_buffer["name"] == "PEInputBuffer")
+        assert("PEWeightBuffer" in pe_wght_buffer["name"])
+        assert("PEAccuBuffer" in pe_accu_buffer["name"])
+        assert("PEWeightRegs" in pe_wght_regs["name"])
+        assert("LMAC" in lmac["name"])
+
+        global_buffer["attributes"]["memory_depth"] = self.config.globalbuf_depth
+
+        pe["name"] = f"PE[0..{self.config.num_pes-1}]"
+
+        pe_input_buffer["attributes"]["memory_depth"] = self.config.inbuf_depth
+        pe_input_buffer["attributes"]["meshX"] = self.config.lmacs
+
+        pe_wght_buffer["attributes"]["memory_depth"] = self.config.wbuf_depth
+        pe_wght_buffer["attributes"]["meshX"] = self.config.lmacs
+
+        pe_accu_buffer["attributes"]["memory_depth"] = self.config.accbuf_depth
+        pe_accu_buffer["attributes"]["meshX"] = self.config.lmacs
+
+        pe_wght_regs["name"] = f"PEWeightRegs[0..{self.config.lmacs-1}]"
+        pe_wght_regs["attributes"]["meshX"] = self.config.lmacs
+
+        lmac["name"] = f"LMAC[0..{self.config.lmacs-1}]"
+        lmac["attributes"]["meshX"] = self.config.lmacs
 
         with open(arch_out, "w") as f:
             y = yaml.safe_dump(arch, sort_keys=False)

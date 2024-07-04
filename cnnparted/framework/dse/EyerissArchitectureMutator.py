@@ -24,12 +24,9 @@ class EyerissConfig(ArchitectureConfig):
         self.psum_spad_size = psum_spad_size
         self.psum_spad_depth = int(psum_spad_size*8 // (self.word_bits*self.spad_block_size))
 
-        #TODO Some of these vales are redundant and ahould be cleaned up
-        self.meshX = pe_dim_x #yes, this is correct
         self.pe_dim_y = pe_dim_y
         self.pe_dim_x = pe_dim_x
         self.num_pes = pe_dim_y * pe_dim_x
-        self.pes_per_mesh = self.num_pes / self.meshX
 
     def get_config(self) -> Dict:
         cfg = {}
@@ -45,10 +42,11 @@ class EyerissConfig(ArchitectureConfig):
 class EyerissArchitectureMutator(ArchitectureMutator):
     def __init__(self, cfg):
         super().__init__(cfg)
-        search_space_constraints = cfg["constraints"]
+        self.config: EyerissConfig = None
+        search_space_constraints = cfg.get("constraints", {})
 
         self.pe_dims_y = search_space_constraints.get("pe_dims_y", [12])
-        self.pe_dims_x = search_space_constraints.get("pe_dims_x", [14])
+        self.pe_dims_x = search_space_constraints.get("pe_dims_x", [14, 16])
 
         self.glb_sizes = search_space_constraints.get("gbuf_sizes", [128]) #kB
         self.ifmap_spad_sizes = search_space_constraints.get("ifmap_spad_sizes", [24]) #Byte
@@ -56,7 +54,7 @@ class EyerissArchitectureMutator(ArchitectureMutator):
         self.psum_spad_sizes = search_space_constraints.get("psum_spad_sizes", [32]) #Byte
 
         # Generate valid configuration
-        self._construct_design_space() 
+        self.generate_design_space() 
 
 
     def mutate_arch(self):
@@ -67,30 +65,39 @@ class EyerissArchitectureMutator(ArchitectureMutator):
 
         #Modify the arch parameters
         eyeriss = arch["architecture"]["subtree"][0]["subtree"][0]
+        glb = eyeriss["local"][0]
+        dummy_buffer = eyeriss["local"][1]
+        pe = eyeriss["subtree"][0]
         ifmap_spad = eyeriss["subtree"][0]["local"][0]
         wght_spad = eyeriss["subtree"][0]["local"][1]
         psum_spad = eyeriss["subtree"][0]["local"][2]
-        glb = eyeriss["local"][0]
-        dummy_buffer = eyeriss["local"][1]
+        mac = eyeriss["subtree"][0]["local"][3]
 
-        # Sanity checks, should yaml.dump reorder the keys
+        # Sanity checks, should keys be reordered for any reason
         assert(eyeriss["name"] == "eyeriss")
         assert(glb["name"] == "shared_glb")
         assert(ifmap_spad["name"] == "ifmap_spad")
         assert(wght_spad["name"] == "weights_spad")
         assert(psum_spad["name"] == "psum_spad")
         assert("DummyBuffer" in dummy_buffer["name"])
+        assert(mac["name"] == "mac")
 
+        pe["name"] = f"PE[0..{self.config.num_pes-1}]"
         glb["attributes"]["memory_depth"] = self.config.glb_depth
-        dummy_buffer["name"] = f"DummyBuffer[0..{self.config.meshX-1}]"
 
-        eyeriss["subtree"][0]["name"] = f"PE[0..{self.config.num_pes-1}]"
-        for component in eyeriss["subtree"][0]["local"]:
-            component["attributes"]["meshX"] = self.config.meshX
+        dummy_buffer["name"] = f"DummyBuffer[0..{self.config.pe_dim_x-1}]"
+        dummy_buffer["attributes"]["meshX"] = self.config.pe_dim_x
 
         ifmap_spad["attributes"]["memory_depth"] = self.config.ifmap_spad_depth
-        wght_spad["attributes"]["memory_depth"] = self.config.weights_spad_depth
+        ifmap_spad["attributes"]["meshX"] = self.config.pe_dim_x
+
+        wght_spad["attributes"]["memory_depth"] = self.config.weight_spad_depth
+        wght_spad["attributes"]["meshX"] = self.config.pe_dim_x
+
         psum_spad["attributes"]["memory_depth"] = self.config.psum_spad_depth
+        psum_spad["attributes"]["meshX"] = self.config.pe_dim_x
+
+        mac["attributes"]["meshX"] = self.config.pe_dim_x
 
         with open(arch_out, "w") as f:
             y = yaml.safe_dump(arch, sort_keys=False)
@@ -106,7 +113,7 @@ class EyerissArchitectureMutator(ArchitectureMutator):
         constraints_out = pathlib.Path(self.tl_out_configs_dir, "constraints", "eyeriss_like_map_constraints.yaml")
         shutil.copy(base_map_constraints, constraints_out)
 
-    def _construct_design_space(self):
+    def generate_design_space(self):
         for pe_dim_y in self.pe_dims_y:
             for pe_dim_x in self.pe_dims_x:
                 for glb_size in self.glb_sizes:

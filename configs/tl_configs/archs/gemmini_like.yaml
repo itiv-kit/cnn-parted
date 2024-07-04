@@ -27,6 +27,7 @@ architecture:
           width: 128
           instances: 1
           meshX: 1
+          block_size: 16
           word-bits: 8
           n_rdwr_ports: 2
           n_banks: 4
@@ -41,6 +42,7 @@ architecture:
             width: 32
             instances: 16
             word-bits: 32
+            block_size: 1
             network-word-bits: 16
             n_rdwr_ports: 2
             n_banks: 2
@@ -55,6 +57,7 @@ architecture:
               entries: 1
               instances: 256
               word-bits: 8
+              block_size: 1
               n_rdwr_ports: 2
               n_banks: 1
           - name: MACC
