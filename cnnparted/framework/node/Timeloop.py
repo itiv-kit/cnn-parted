@@ -86,13 +86,13 @@ class Timeloop:
                 design = self.mutator.run()
                 stats[f"design_{i}"] = {}
                 stats[f"design_{i}"]["layers"] = {}
-                stats[f"design_{i}"]["arch_config"] = design.get_config()
+                #stats[f"design_{i}"]["arch_config"] = design.get_config()
                 with open(os.path.join(self.runroot, "arch_config.yaml"), "w") as f:
                     y = yaml.safe_dump(design.get_config(), sort_keys=False)
                     f.write(y)
 
                 for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
-                    layer_name = layer.get("name") + "design" + str(i)
+                    layer_name = layer.get("name")
                     output = self._run_single(layer, tl_files_path=tl_design_dir)
 
                     stats[f"design_{i}"]["layers"][layer_name] = {}

@@ -71,7 +71,6 @@ class PartitioningProblem(ElementwiseProblem):
 
                 current_platform = list(self.nodeStats.keys())[p[i]-1]
                 design_id[current_platform] = optimal_design_id
-                #design_id.append(optimal_design_id)
                 partitions.append([p[i], last_pp, pp])
 
                 # link evaluation
@@ -127,9 +126,10 @@ class PartitioningProblem(ElementwiseProblem):
             energy_per_layer = []
             latency_per_layer = []
 
-            for j in range(last_pp + 1, pp + 1):
+            # TODO: Should this pp+1?
+            for j in range(last_pp + 1, pp):
                 layer = self.schedule[j-1]
-                #could be called for diff designs, then use best
+
                 layer_latency = self._get_layer_latency(platform, design_id, layer)
                 layer_energy = self._get_layer_energy(platform, design_id, layer)
 
@@ -143,11 +143,12 @@ class PartitioningProblem(ElementwiseProblem):
             energy_per_design.append(energy_per_layer)
             area_per_design.append([self._get_area_platform(platform, design_id)])
 
-            platform_energy_per_design.append(platform_latency)
+            platform_energy_per_design.append(platform_energy)
             platform_latency_per_design.append(platform_latency)
 
         # Check bit-width, analyze memory requirements and generate successors needed for link analysis
-        for j in range(last_pp + 1, pp + 1):
+        # TODO: Should this be pp+1?
+        for j in range(last_pp + 1, pp):
             valid &= self._check_layer_bitwidth(platform, layer)
             if layer in self.layer_params.keys():
                 part_l_params += self.layer_params[layer]
@@ -176,6 +177,10 @@ class PartitioningProblem(ElementwiseProblem):
         # Decide which design should be used
     	# Use Energy-Delay-Area-Product as criterium for optimality
         metric_per_design = calc_metric(np.array(energy_per_design), np.array(latency_per_design), np.array(area_per_design), "edap", reduction=True)
+        
+        # Every design is assigned an id during the DSE. Afterwards, they are reshaped to a list,
+        # the index in that list is given by design_id. After the pruning it is possible that
+        # design_id and design_tag are no longer the same, which is why we lookup the tag
         optimal_design_id = self._get_tag_from_id(platform, np.argmax(metric_per_design))
 
         l_pp.append(platform_latency_per_design[optimal_design_id])
