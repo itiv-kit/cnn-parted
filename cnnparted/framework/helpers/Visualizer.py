@@ -18,17 +18,25 @@ def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = 
     # ------------------------
     # d0 | ...| ...| ...| ...|
     # d1 | ...| ...| ...| ...|
-    metric_per_design = []
+    energy_per_design = []
+    latency_per_design = []
+    area_per_design = []
     labels = []
 
     for tag, design in stats.items():
-        metric_per_layer = []
         layers = design["layers"]
+        energy_per_layer = []
+        latency_per_layer = []
         for key, layer in layers.items():
-            metric_per_layer.append(calc_metric(layer, metric))
+            energy_per_layer.append(layer["energy"])    
+            latency_per_layer.append(layer["latency"])    
 
         labels.append(tag)
-        metric_per_design.append(metric_per_layer)
+        energy_per_design.append(energy_per_layer)
+        latency_per_design.append(latency_per_layer)
+        area_per_design.append([layer["area"]])
+
+    metric_per_design = calc_metric(np.array(energy_per_design), np.array(latency_per_design), np.array(area_per_design), metric, reduction=False)
 
     plt.figure(dpi=1200)
     plt.xlabel("Layer Number")
@@ -37,7 +45,7 @@ def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = 
     plt.title(f"{metric_str} for all Designs by layer")
     plt.gca().set_prop_cycle(marker=["o", "+", "*", "s", "x", "d"], 
                             color=['#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02'])
-    layer_idx = np.arange(1, len(metric_per_design[0])+1)
+    layer_idx = np.arange(1, len(layers)+1)
 
     if type== "line":
         for i in range(len(metric_per_design)): 

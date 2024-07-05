@@ -4,6 +4,7 @@ import numpy as np
 from collections import deque, defaultdict
 
 from framework.link.Link import Link
+from framework.helpers.DesignMetrics import calc_metric
 
 
 class PartitioningProblem(ElementwiseProblem):
@@ -187,19 +188,9 @@ class PartitioningProblem(ElementwiseProblem):
             ls[layer] = deepcopy(layer_successors)
 
         # Decide which design should be used
-        # The x_per_design arrays have this layout:
-        #  x | l0 | l1 | l2 | l3 |
-        # ------------------------
-        # d0 | ...| ...| ...| ...|
-        # d1 | ...| ...| ...| ...|
-        edp_per_design_per_layer = np.multiply(np.array(energy_per_design), np.array(latency_per_design))
-        #edap_per_design_per_layer = np.multiply(edp_per_design_per_layer, np.array(area_per_design))
-
     	# Use Energy-Delay-Area-Product as criterium for optimality
-        # edap_per_design is a column vector, each row has the EDAP for one design
-        edap_per_design = np.multiply(np.sum(edp_per_design_per_layer, axis=1), np.array(area_per_design))
-        #edap_per_design = np.sum(edap_per_design_per_layer, axis=1)
-        optimal_design_id = self._get_tag_from_id(platform, np.argmax(edap_per_design))
+        metric_per_design = calc_metric(np.array(energy_per_design), np.array(latency_per_design), np.array(area_per_design), "edap", reduction=True)
+        optimal_design_id = self._get_tag_from_id(platform, np.argmax(metric_per_design))
 
         l_pp.append(platform_latency_per_design[optimal_design_id])
         e_pp.append(platform_energy_per_design[optimal_design_id])

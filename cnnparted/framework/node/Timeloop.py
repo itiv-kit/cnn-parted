@@ -104,7 +104,8 @@ class Timeloop:
             
             # Plot all metrics in all combinations of line/bar, scale/log
             for m in SUPPORTED_METRICS:
-                self._plot_all_of_metric(stats, m)
+                if m != "area":
+                    self._plot_all_of_metric(stats, m)
 
         else:
             stats = {"design_0": {}}
