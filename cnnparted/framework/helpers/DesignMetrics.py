@@ -1,6 +1,6 @@
 import numpy as np
 
-SUPPORTED_METRICS = ["edp", "eap", "edap", "eda2p", "latency", "energy", "area"]
+SUPPORTED_METRICS = ["edp", "eap", "adp", "edap", "eda2p", "latency", "energy", "area"]
 
 def calc_metric(energy_per_design: np.array, latency_per_design: np.array, area_per_design: np.array, metric: str, reduction = True) -> np.array:
     # function assumes that x_per_design arrays have this layout:
@@ -14,37 +14,44 @@ def calc_metric(energy_per_design: np.array, latency_per_design: np.array, area_
     if metric == "edap":
         result = np.multiply(energy_per_design, latency_per_design)
         if reduction:
-            result = np.sum(result, axis=1)
+            result = np.sum(result, axis=1, keepdims=True)
         result = np.multiply(result, area_per_design)
 
     elif metric == "eda2p":
         result = np.multiply(energy_per_design, latency_per_design)
         if reduction:
-            result = np.sum(result, axis=1)
+            result = np.sum(result, axis=1, keepdims=True)
         result = np.multiply(result, np.power(area_per_design,2))
 
     elif metric == "edp":
         result = np.multiply(energy_per_design, latency_per_design)
         if reduction:
-            result = np.sum(result, axis=1)
+            result = np.sum(result, axis=1, keepdims=True)
 
     elif metric == "eap":
         result = np.multiply(energy_per_design, area_per_design)
         if reduction:
-            result = np.sum(result, axis=1)
+            result = np.sum(result, axis=1, keepdims=True)
+    
+    elif metric == "adp":
+        if reduction:
+            result = np.sum(latency_per_design, axis=1)
+            result = np.multiply(result, area_per_design)
+        else:
+            result = np.multiply(latency_per_design, area_per_design)
 
     elif metric == "area":
         result = area_per_design
 
     elif metric == "energy":
         if reduction:
-            result = np.sum(energy_per_design, axis=1)
+            result = np.sum(energy_per_design, axis=1, keepdims=True)
         else:
             result = energy_per_design
 
     elif metric == "latency":
         if reduction:
-            result = np.sum(latency_per_design, axis=1)
+            result = np.sum(latency_per_design, axis=1, keepdims=True)
         else:
             result = latency_per_design
 
@@ -78,5 +85,11 @@ def get_metric_info(metric: str):
     elif metric == "power_density":
         metric_str = "Power Density"
         unit = r'$(\frac{mJ \cdot ms}{mm^2})$'
+    elif metric == "adp":
+        metric_str = "ADP"
+        unit = r"$mm^2 \cdot ms$"
+    else:
+        metric_str = "undef"
+        unit = "-"
 
     return metric_str, unit

@@ -6,6 +6,8 @@ import pandas as pd
 
 from framework.helpers.DesignMetrics import calc_metric, get_metric_info
 
+COLOR_SEQUENCE = ['#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02']
+
 def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = "line", scale: str = "linear", prefix: str = ""):
     assert type in ["line", "bar"], "Currently only 'line' and 'bar' are supported as plot types"
 
@@ -44,7 +46,7 @@ def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = 
     plt.yscale(scale)
     plt.title(f"{metric_str} for all Designs by layer")
     plt.gca().set_prop_cycle(marker=["o", "+", "*", "s", "x", "d"], 
-                            color=['#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02'])
+                            color=COLOR_SEQUENCE)
     layer_idx = np.arange(1, len(layers)+1)
 
     if type== "line":
@@ -53,7 +55,7 @@ def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = 
     elif type == "bar":
         data = np.array(metric_per_design).T
         df = pd.DataFrame(data, columns=labels)
-        df.plot.bar(color=['#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02'])
+        df.plot.bar(color=COLOR_SEQUENCE)
 
     plt.legend()
     
