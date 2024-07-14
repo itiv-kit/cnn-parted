@@ -24,7 +24,7 @@ class PartitioningProblem(ElementwiseProblem):
         for link_conf in link_confs:
             self.links.append(Link(link_conf))
 
-        n_var = self.num_pp * 2 + 1 # Number of max. partitioning points + platform IDs
+        n_var = self.num_pp * 2 + 1 # platform IDs + Number of max. partitioning points
         n_obj = 6 # latency, energy, throughput, area + link latency + link energy
         n_constr = (self.num_pp + 1) + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_accelerator_platforms + num_real_pp + latency/energy per partition + latency/energy per link
 
@@ -57,6 +57,7 @@ class PartitioningProblem(ElementwiseProblem):
             valid = False
         else:
             design_id = {}
+            design_tag = {}
             th_pp = []
             partitions = []
             part_latency = deque()
@@ -65,12 +66,13 @@ class PartitioningProblem(ElementwiseProblem):
             successors = [self.schedule[0]]
             i = last_pp = last_platform = -1
             for i, pp in enumerate(p[0:self.num_pp+1], self.num_pp + 1):
-                v, optimal_design_id, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
+                v, optimal_design_id, optimal_design_tag, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
                 valid &= v
                 part_latency.append([p[i], l_pp[-1]]) # required for throughput calculation
 
                 current_platform = list(self.nodeStats.keys())[p[i]-1]
                 design_id[current_platform] = optimal_design_id
+                design_tag[current_platform] = optimal_design_tag
                 partitions.append([p[i], last_pp, pp])
 
                 # link evaluation
@@ -96,11 +98,12 @@ class PartitioningProblem(ElementwiseProblem):
             throughput = self._get_throughput(th_pp, part_latency) * -1
             area = self._get_area(partitions, design_id)
             design_id = list(design_id.values())
+            design_tag = list(design_tag.values())
 
         out["F"] = [latency, energy, throughput, area, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
         if valid:
-            out["G"] = [i * (-1) for i in design_id] + [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in e_pp] + [i * (-1) for i in l_pp_link] + [i * (-1) for i in e_pp_link]
+            out["G"] = [i * (-1) for i in design_tag] + [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in e_pp] + [i * (-1) for i in l_pp_link] + [i * (-1) for i in e_pp_link]
         else:
             out["G"] = [i for i in range(self.num_pp+1)] + [1] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)]
 
@@ -126,8 +129,8 @@ class PartitioningProblem(ElementwiseProblem):
             energy_per_layer = []
             latency_per_layer = []
 
-            # TODO: Should this pp+1?
-            for j in range(last_pp + 1, pp):
+            # TODO: Check if it runs now
+            for j in range(last_pp + 1, pp+1):
                 layer = self.schedule[j-1]
 
                 layer_latency = self._get_layer_latency(platform, design_id, layer)
@@ -147,8 +150,8 @@ class PartitioningProblem(ElementwiseProblem):
             platform_latency_per_design.append(platform_latency)
 
         # Check bit-width, analyze memory requirements and generate successors needed for link analysis
-        # TODO: Should this be pp+1?
-        for j in range(last_pp + 1, pp):
+        # TODO: Check if it runs now
+        for j in range(last_pp + 1, pp+1):
             valid &= self._check_layer_bitwidth(platform, layer)
             if layer in self.layer_params.keys():
                 part_l_params += self.layer_params[layer]
@@ -181,11 +184,12 @@ class PartitioningProblem(ElementwiseProblem):
         # Every design is assigned an id during the DSE. Afterwards, they are reshaped to a list,
         # the index in that list is given by design_id. After the pruning it is possible that
         # design_id and design_tag are no longer the same, which is why we lookup the tag
-        optimal_design_id = self._get_tag_from_id(platform, np.argmax(metric_per_design))
+        optimal_design_id  = np.argmin(metric_per_design)
+        optimal_design_tag = self._get_tag_from_id(platform, optimal_design_id)
 
         l_pp.append(platform_latency_per_design[optimal_design_id])
         e_pp.append(platform_energy_per_design[optimal_design_id])
-        return valid, optimal_design_id, part_l_params + max(dmem, default=0) # mem evaluation
+        return valid, optimal_design_id, optimal_design_tag, part_l_params + max(dmem, default=0) # mem evaluation
 
     def _get_tag_from_id(self, platform: int, design_id: int):
         tag: str = self.nodeStats[platform]["eval"][design_id]["tag"]
