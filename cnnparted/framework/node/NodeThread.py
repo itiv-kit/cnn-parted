@@ -48,15 +48,24 @@ class NodeThread(ModuleThreadInterface):
         self.stats['bits'] = mn.pim_realADCbit()
 
     def _run_timeloop(self, config: dict) -> None:
-        #runroot = self.runname + "_" + config["accelerator"]
         runroot = os.path.join(self.work_dir, "system_evaluation", str(self.id)+"_"+config["accelerator"])
         config["run_root"] = runroot
         config["work_dir"] = self.work_dir
         fname_csv = os.path.join(self.work_dir, self.runname + "_" + config["accelerator"] + "_tl_layers.csv") #runroot + "_tl_layers.csv"
+        
+        # Check if design is DSE enabled
+        if dse_cfg := config.get("dse"):
+            is_dse = True
+            metric = dse_cfg.get("optimization", "edap")
+            top_k = int(dse_cfg.get("top_k", 2))
+        else:
+            is_dse = False
+            metric= "edap"
+            top_k = 1
 
         if os.path.isfile(fname_csv):
             read_stats = self._read_layer_csv(fname_csv)
-            pruned_stats = self._prune_accelerator_designs(read_stats, 1, "edap")
+            pruned_stats = self._prune_accelerator_designs(read_stats, top_k, metric, is_dse)
             self.stats["eval"] =  pruned_stats
             return
 
@@ -66,15 +75,21 @@ class NodeThread(ModuleThreadInterface):
 
         self._write_layer_csv(fname_csv, tl.stats)
 
-        pruned_stats = self._prune_accelerator_designs(tl.stats, 1, "edap")
+        pruned_stats = self._prune_accelerator_designs(tl.stats, top_k, metric, is_dse)
 
         # Prune accelerator design space 
         self.stats["eval"] = pruned_stats
 
 
-    def _prune_accelerator_designs(self, stats: List[Dict], top_k: int, metric: str):
+    def _prune_accelerator_designs(self, stats: List[Dict], top_k: int, metric: str, is_dse: bool):
         # If there are less designs than top_k simply return the given list
-        if len(stats) <= top_k:
+        if len(stats) <= top_k or not is_dse:
+            pruned_stats = []
+            for design in stats:
+                tag = design["tag"] 
+                layers = design["layers"]
+                #arch_config = design["arch_config"]
+                pruned_stats.append({"tag": tag, "layers": layers})
             return stats
 
         # The metric_per_design array has this structure, with
@@ -125,6 +140,40 @@ class NodeThread(ModuleThreadInterface):
 
         return pruned_stats
 
+    def _apply_platform_constraints(self, stats: List[Dict], constraints: Dict):
+        max_energy = constraints.get("energy", np.inf)
+        max_latency = constraints.get("latency", np.inf)
+        max_area = constraints.get("area", np.inf)
+
+        energy_per_design = []
+        latency_per_design = []
+        area_per_design = []
+        for design in stats:
+            layers = design["layers"]
+            energy_per_layer = []
+            latency_per_layer = []
+            for name, layer in layers.items():
+                energy_per_layer.append(layer["energy"])    
+                latency_per_layer.append(layer["latency"])    
+
+            energy_per_design.append(energy_per_layer)
+            latency_per_design.append(latency_per_layer)
+            area_per_design.append([layer["area"]])
+
+        energy_per_design = np.array(energy_per_design)
+        latency_per_design = np.array(latency_per_design)
+        area_per_design = np.array(area_per_design)
+        
+        total_energy = calc_metric(np.array(energy_per_design), np.array(latency_per_layer), np.array(area_per_design), "energy", reduction= True)
+        total_latency = calc_metric(np.array(energy_per_design), np.array(latency_per_layer), np.array(area_per_design), "latency", reduction= True)
+        total_area = area_per_design
+
+        constrained_stats = [design for idx, design in enumerate(stats) if (total_area[idx] <= max_area and total_latency[idx] <= max_latency and total_energy[idx] <= max_energy)]
+        if not constrained_stats:
+            raise ValueError("After applying constraints no designs remain!")
+
+        return constrained_stats
+        
 
     def _read_layer_csv(self, filename: str) -> dict:
         designs = []

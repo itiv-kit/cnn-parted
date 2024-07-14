@@ -9,13 +9,14 @@ import glob
 import re
 import tqdm
 from typing import Dict
-import numpy as np
+import shutil
 
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
 from framework.helpers.Visualizer import plotMetricPerConfigPerLayer
 from framework.helpers.DesignMetrics import calc_metric, SUPPORTED_METRICS
+from framework.dse.ArchitectureMutator import ArchitectureMutator
 
 class Timeloop:
     # Output file names.
@@ -60,7 +61,7 @@ class Timeloop:
         self.tl_cfg = tl_config
         self.stats = []
 
-        self.mutator = None
+        self.mutator: ArchitectureMutator = None
         if self.dse_config:
             mutator_cfg = self.dse_config
             mutator_cfg["tl_in_configs_dir"] = self.configs_dir
@@ -73,34 +74,17 @@ class Timeloop:
     def run(self, layers : dict, progress : bool = False):
         if self.mutator is not None:
             stats = {}
-            i = 0
-            while not self.mutator.design_space_exhausted:
-                self.runroot = os.path.join(self.runroot, "design"+str(i))
-                tl_design_dir = os.path.join(self.runroot, "tl_config")
-                tl_design_dir_arch = os.path.join(self.runroot, "tl_config", "archs")
-                tl_design_dir_constraints = os.path.join(self.runroot, "tl_config", "constraints")
-                os.makedirs(tl_design_dir_arch)
-                os.makedirs(tl_design_dir_constraints)
-
-                self.mutator.tl_out_configs_dir = tl_design_dir
-                design = self.mutator.run()
-                stats[f"design_{i}"] = {}
-                stats[f"design_{i}"]["layers"] = {}
-                #stats[f"design_{i}"]["arch_config"] = design.get_config()
-                with open(os.path.join(self.runroot, "arch_config.yaml"), "w") as f:
-                    y = yaml.safe_dump(design.get_config(), sort_keys=False)
-                    f.write(y)
-
-                for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
-                    layer_name = layer.get("name")
-                    output = self._run_single(layer, tl_files_path=tl_design_dir)
-
-                    stats[f"design_{i}"]["layers"][layer_name] = {}
-                    stats[f"design_{i}"]["layers"][layer_name]["latency"] = output["latency_ms"]
-                    stats[f"design_{i}"]["layers"][layer_name]["energy"] = output["energy_mJ"]
-                    stats[f"design_{i}"]["layers"][layer_name]["area"] = output["area_mm2"]
-                self.runroot = os.path.join(*self.runroot.split(os.path.sep)[:-1]) # this removes 'designI' from path
-                i += 1
+            
+            #with mp.Manager() as manager:
+            #    stats = manager.dict()
+            #    ins = [(l, p, s, i, d) for  l, p, s, (i, d) in zip(repeat(layers), repeat(progress), repeat(stats), enumerate(self.mutator.design_space))]
+            #    with manager.Pool(4) as pool:
+            #        pool.starmap(self._run_design, ins )
+            
+            for i, design in enumerate(self.mutator.design_space):
+                if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
+                    shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
+                self._run_design(layers, progress, stats, i, design)
             
             # Plot all metrics in all combinations of line/bar, scale/log
             for m in SUPPORTED_METRICS:
@@ -113,7 +97,7 @@ class Timeloop:
             #stats["0"]["design_params"] = ArchitectureConfig.from_yaml()
             for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
                 layer_name = layer.get("name")
-                output = self._run_single(layer, tl_files_path=None)
+                output = self._run_single(self.runroot, layer, tl_files_path=None)
 
                 stats["design_0"]["layers"][layer_name] = {}
                 stats["design_0"]["layers"][layer_name]["latency"] = output["latency_ms"]
@@ -125,7 +109,33 @@ class Timeloop:
             d["tag"] = k
             self.stats.append(d)
 
+    def _run_design(self, layers: Dict, progress: bool, stats: Dict, i: int, design):
+        design_runroot = os.path.join(self.runroot, "design"+str(i))
+        tl_design_dir = os.path.join(design_runroot, "tl_config")
+        tl_design_dir_arch = os.path.join(design_runroot, "tl_config", "archs")
+        tl_design_dir_constraints = os.path.join(design_runroot, "tl_config", "constraints")
+        os.makedirs(tl_design_dir_arch)
+        os.makedirs(tl_design_dir_constraints)
+
+        self.mutator.run_from_config(design, outdir=tl_design_dir)
+        stats[f"design_{i}"] = {}
+        stats[f"design_{i}"]["layers"] = {}
+        #stats[f"design_{i}"]["arch_config"] = design.get_config()
+        with open(os.path.join(design_runroot, "arch_config.yaml"), "w") as f:
+            y = yaml.safe_dump(design.get_config(), sort_keys=False)
+            f.write(y)
+
+        for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
+            layer_name = layer.get("name")
+            output = self._run_single(design_runroot, layer, tl_files_path=tl_design_dir)
+
+            stats[f"design_{i}"]["layers"][layer_name] = {}
+            stats[f"design_{i}"]["layers"][layer_name]["latency"] = output["latency_ms"]
+            stats[f"design_{i}"]["layers"][layer_name]["energy"] = output["energy_mJ"]
+            stats[f"design_{i}"]["layers"][layer_name]["area"] = output["area_mm2"]
+
     def _run_single(self,
+            runroot: str,
             layer : dict,
             logfile : str = 'timeloop.log',
             tl_files_path: str = None
@@ -134,9 +144,9 @@ class Timeloop:
             self.type_cfg = '.cfg'
 
         runname = layer.get('name')[1:]
-        dirname = os.path.join(ROOT_DIR, self.runroot, runname)
+        dirname = os.path.join(ROOT_DIR, runroot, runname)
         subprocess.check_call(['mkdir', '-p', dirname])
-        os.chdir(dirname)
+        #os.chdir(dirname)
 
         prob_name = self.prob_name
         map_fname = os.path.join(self.configs_dir, 'mapper', ('template'+self.type_cfg))
@@ -160,21 +170,21 @@ class Timeloop:
         self._exportConfig(tl_files_path, nprob_fname, nmap_fname, configfile_path)
 
         with open(logfile_path, "w") as outfile:
-            status = subprocess.call([self.exec_path, configfile_path], stdout = outfile, stderr = outfile)
+            status = subprocess.call([self.exec_path, configfile_path], stdout = outfile, stderr = outfile, cwd=dirname)
             if status != 0:
                 subprocess.check_call(['cat', logfile_path])
                 print('Did you remember to build timeloop and set up your environment properly?')
                 sys.exit(1)
 
-        os.chdir(ROOT_DIR)
+        #os.chdir(ROOT_DIR)
         return self._parse_stats(dirname)
 
 
     def _plot_all_of_metric(self, stats, metric: str):
-        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric)
-        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric, scale="log", prefix="log_")
-        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric, type="bar")
-        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric, type="bar", scale="log", prefix="log_")
+        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric,                          prefix=self.accname+"_")
+        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric,             scale="log", prefix=self.accname+"_log_")
+        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric, type="bar",              prefix=self.accname+"_")
+        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric, type="bar", scale="log", prefix=self.accname+"_log_")
 
     def _rewrite_mapper_cfg(self, src : str, dst : str) -> None:
         with open(src, "r") as f:
