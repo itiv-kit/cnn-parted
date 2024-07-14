@@ -10,7 +10,7 @@ class GemminiConfig(ArchitectureConfig):
         return (n & (n-1) == 0) and n != 0
 
 
-    def __init__(self, mesh_dim, spad_size, acc_size, enable_checks=True):
+    def __init__(self, mesh_dim, spad_size, acc_size, enable_checks=False):
         self.mesh_dim = mesh_dim
         self.tile_dim = 1 #const for now
         self.dim = self.mesh_dim * self.tile_dim
@@ -62,25 +62,28 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         search_space_constraints = cfg.get("constraints", {})
 
         #Boundaries of scratchpad sizes
-        self.min_spad_size = search_space_constraints.get("min_spad_size", 128)
-        self.max_spad_size = search_space_constraints.get("max_spad_size", 1024)
+        self.min_spad_size = search_space_constraints.get("min_spad_size", 256)
+        self.max_spad_size = search_space_constraints.get("max_spad_size", 256)
 
         #Boundaries of accumulator sizes 
-        self.min_acc_size = search_space_constraints.get("min_acc_size", 128)
-        self.max_acc_size = search_space_constraints.get("max_acc_size", 1024)
+        self.min_acc_size = search_space_constraints.get("min_acc_size", 64)
+        self.max_acc_size = search_space_constraints.get("max_acc_size", 64)
 
         self.spad_sizes = []
         self.acc_sizes = []
     
         # Mesh dim parameters
-        self.mesh_dim_min = search_space_constraints.get("mesh_dim_min", 4)
-        self.mesh_dim_max = search_space_constraints.get("mesh_dim_max", 32)
+        self.mesh_dim_min = search_space_constraints.get("mesh_dim_min", 16)
+        self.mesh_dim_max = search_space_constraints.get("mesh_dim_max", 16)
         _min = int(log2(self.mesh_dim_min))
         _max = int(log2(self.mesh_dim_max))
         self.mesh_dims = [2**x for x in range(_min, _max+1) ]
 
+        if mesh_dim_fix := search_space_constraints.get("mesh_dims_fix"):
+            self.mesh_dims = mesh_dim_fix
+
         # Tile dim parameters
-        self.tile_dims = search_space_constraints.get("tile_dim", [1])
+        self.tile_dims = [1] #search_space_constraints.get("tile_dim", [1])
 
         self.spad_banks = 4
         self.acc_banks = 2
@@ -91,8 +94,10 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         # Generate valid configuration
         self.generate_design_space() 
 
-    def _calc_valid_mem_sizes(self, dim, mem_banks, mem_width, min_mem_size, max_mem_size, rows_max=None):
+    def _calc_valid_mem_sizes(self, dim, mem_banks, mem_width, min_mem_size, max_mem_size, rows_max=None, enable_checks=False):
         mem_sizes = []
+        if not enable_checks and (dim % 16) == 0:
+            enable_checks = True
 
         n = 4
         while True:
@@ -100,11 +105,11 @@ class GemminiArchitectureMutator(ArchitectureMutator):
             bank_rows = 2**n
 
             #Consider constraint for scrachpad size in relation to accumulator size
-            if rows_max is not None and bank_rows>rows_max:
+            if enable_checks and rows_max is not None and bank_rows>rows_max:
                 break
 
             # Bank rows must be a multiple of array dimension
-            if (bank_rows % dim != 0):
+            if enable_checks and (bank_rows % dim != 0):
                 n += 1
                 continue
 
@@ -115,8 +120,10 @@ class GemminiArchitectureMutator(ArchitectureMutator):
                 continue
             elif (mem_size_kilobytes <= max_mem_size):
                 n += 1
-                if (mem_size_kilobytes==int(mem_size_kilobytes)):
+                if enable_checks and (mem_size_kilobytes==int(mem_size_kilobytes)):
                     mem_sizes.append(int(mem_size_kilobytes))
+                elif not enable_checks:
+                    mem_sizes.append(mem_size_kilobytes)
             else:
                 break
 
@@ -139,30 +146,38 @@ class GemminiArchitectureMutator(ArchitectureMutator):
                     for acc_size in acc_sizes:
                         self.design_space.append(copy.copy(GemminiConfig(mesh_dim, spad_size, acc_size) )) 
 
-    def mutate_arch_constraints(self):
+    def mutate_arch_constraints(self, config=None, outdir=None):
         # no arch constraints for Gemmini-like config
         pass
     
-    def mutate_map_constraints(self):
+    def mutate_map_constraints(self, config=None, outdir=None):
+        if config is None:
+            config = self.config
+        if outdir is None:
+            outdir = self.tl_out_configs_dir
         base_map_constraints = pathlib.Path(self.tl_in_configs_dir, "constraints", "gemmini_like_map_constraints.yaml")
-        constraints_out = pathlib.Path(self.tl_out_configs_dir, "constraints", "gemmini_like_map_constraints.yaml")
+        constraints_out = pathlib.Path(outdir, "constraints", "gemmini_like_map_constraints.yaml")
         with open(base_map_constraints, "r") as f:
             constraints = yaml.safe_load(f)
 
         accumulator = constraints["mapspace_constraints"][5] #TODO Magic numbers        
         scratchpad  = constraints["mapspace_constraints"][7] #TODO Magic numbers        
 
-        accumulator["factors"] = f"R=1 S=1 P=1 Q=1 C<={self.config.dim} M=1 N=1"
-        scratchpad["factors"] = f"R=1 S=1 P=1 Q=1 N=1 C=1 M<={self.config.dim}"
+        accumulator["factors"] = f"R=1 S=1 P=1 Q=1 C<={config.dim} M=1 N=1"
+        scratchpad["factors"] = f"R=1 S=1 P=1 Q=1 N=1 C=1 M<={config.dim}"
 
         with open(constraints_out, "w") as f:
             y = yaml.safe_dump(constraints, sort_keys=False)
             f.write(y)
 
 
-    def mutate_arch(self):
+    def mutate_arch(self, config=None, outdir=None):
+        if config is None:
+            config = self.config
+        if outdir is None:
+            outdir = self.tl_out_configs_dir
         base_arch = pathlib.Path(self.tl_in_configs_dir, "archs", "gemmini_like.yaml")
-        arch_out = pathlib.Path(self.tl_out_configs_dir, "archs", "gemmini_like.yaml")
+        arch_out = pathlib.Path(outdir, "archs", "gemmini_like.yaml")
         with open(base_arch, "r") as f:
             arch = yaml.safe_load(f)
 
@@ -174,32 +189,35 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         registers = pe_rows["local"][0]
         macc = pe_rows["local"][1]
 
-        scratchpad["attributes"]["depth"] = self.config.spad_rows
-        scratchpad["attributes"]["width"] = self.config.dim * self.config.data_w
-        scratchpad["attributes"]["entries"] = self.config.spad_rows * self.config.dim
-        scratchpad["attributes"]["n_banks"] = self.config.spad_banks
-        scratchpad["attributes"]["block_size"] = self.config.dim
-        #scratchpad["attributes"]["word-bits"] = self.config.data_w
+        scratchpad["attributes"]["depth"] = int(config.spad_rows)
+        scratchpad["attributes"]["width"] = config.dim * config.data_w
+        scratchpad["attributes"]["entries"] = int(config.spad_rows * config.dim)
+        scratchpad["attributes"]["n_banks"] = config.spad_banks
+        scratchpad["attributes"]["block_size"] = config.dim
+        #scratchpad["attributes"]["word-bits"] = config.data_w
 
-        pe_cols["name"] = f"PECols[0..{self.config.dim-1}]"
+        pe_cols["name"] = f"PECols[0..{config.dim-1}]"
 
-        accumulator["attributes"]["entries"] = self.config.acc_rows
-        accumulator["attributes"]["depth"] = self.config.acc_rows
-        accumulator["attributes"]["width"] = self.config.acc_w #in bit
-        accumulator["attributes"]["instances"] = self.config.dim
-        accumulator["attributes"]["n_banks"] = self.config.acc_banks
+        accumulator["attributes"]["entries"] = int(config.acc_rows)
+        accumulator["attributes"]["depth"] = int(config.acc_rows)
+        accumulator["attributes"]["width"] = config.acc_w #in bit
+        accumulator["attributes"]["instances"] = config.dim
+        accumulator["attributes"]["n_banks"] = config.acc_banks
 
-        pe_rows["name"] = f"PERows[0..{self.config.dim-1}]"
-        registers["attributes"]["width"] = self.config.data_w
-        registers["attributes"]["instances"] = self.config.dim*self.config.dim
+        pe_rows["name"] = f"PERows[0..{config.dim-1}]"
+        registers["attributes"]["width"] = config.data_w
+        registers["attributes"]["instances"] = config.dim*config.dim
 
-        #macc["attributes"]["datawidth"] = self.config.data_w
-        #macc["attributes"]["word-bits"] = self.config.data_w
+        #macc["attributes"]["datawidth"] = config.data_w
+        #macc["attributes"]["word-bits"] = config.data_w
 
         with open(arch_out, "w") as f:
             y = yaml.safe_dump(arch, sort_keys=False)
             f.write(y)
 
+
+    def run_from_config(self, config: GemminiConfig, outdir=None):
+        return super().run_from_config(config, outdir)
 
     def run(self):
         return super().run()

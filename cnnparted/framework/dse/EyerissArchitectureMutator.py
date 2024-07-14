@@ -46,20 +46,40 @@ class EyerissArchitectureMutator(ArchitectureMutator):
         search_space_constraints = cfg.get("constraints", {})
 
         self.pe_dims_y = search_space_constraints.get("pe_dims_y", [12])
-        self.pe_dims_x = search_space_constraints.get("pe_dims_x", [14, 16])
+        self.pe_dims_x = search_space_constraints.get("pe_dims_x", [14])
+
+        self.ifmap_spad_range = search_space_constraints.get("ifmap_spad_range", None)
+        self.ifmap_spad_sizes = search_space_constraints.get("ifmap_spad_sizes", [24]) #Byte
+
+        self.weight_spad_range = search_space_constraints.get("weight_spad_range", None)
+        self.weight_spad_sizes = search_space_constraints.get("weight_spad_sizes", [384]) #Byte
+
+        self.psum_spad_range = search_space_constraints.get("psum_spad_range", None)
+        self.psum_spad_sizes = search_space_constraints.get("psum_spad_sizes", [32]) #Byte
 
         self.glb_sizes = search_space_constraints.get("gbuf_sizes", [128]) #kB
-        self.ifmap_spad_sizes = search_space_constraints.get("ifmap_spad_sizes", [24]) #Byte
-        self.weight_spad_sizes = search_space_constraints.get("weight_spad_sizes", [384]) #Byte
-        self.psum_spad_sizes = search_space_constraints.get("psum_spad_sizes", [32]) #Byte
+
+        if self.ifmap_spad_range is not None:
+            self.ifmap_spad_sizes = self._generate_mem_sizes(*self.ifmap_spad_range)
+        if self.weight_spad_range is not None:
+            self.weight_spad_sizes = self._generate_mem_sizes(*self.weight_spad_range)
+        if self.psum_spad_range is not None:
+            self.psum_spad_sizes = self._generate_mem_sizes(*self.psum_spad_range)
 
         # Generate valid configuration
         self.generate_design_space() 
 
+    def _generate_mem_sizes(self, lower: int, upper: int, step: int):
+        mem_sizes = list(range(lower, upper, step))
+        return mem_sizes
 
-    def mutate_arch(self):
+    def mutate_arch(self, config: EyerissConfig = None, outdir=None):
+        if config is None:
+            config = self.config
+        if outdir is None:
+            outdir = self.tl_out_configs_dir
         base_arch = pathlib.Path(self.tl_in_configs_dir, "archs", "eyeriss_like.yaml")
-        arch_out = pathlib.Path(self.tl_out_configs_dir, "archs", "eyeriss_like.yaml")
+        arch_out = pathlib.Path(outdir, "archs", "eyeriss_like.yaml")
         with open(base_arch, "r") as f:
             arch = yaml.safe_load(f)
 
@@ -82,35 +102,43 @@ class EyerissArchitectureMutator(ArchitectureMutator):
         assert("DummyBuffer" in dummy_buffer["name"])
         assert(mac["name"] == "mac")
 
-        pe["name"] = f"PE[0..{self.config.num_pes-1}]"
-        glb["attributes"]["memory_depth"] = self.config.glb_depth
+        pe["name"] = f"PE[0..{config.num_pes-1}]"
+        glb["attributes"]["memory_depth"] = config.glb_depth
 
-        dummy_buffer["name"] = f"DummyBuffer[0..{self.config.pe_dim_x-1}]"
-        dummy_buffer["attributes"]["meshX"] = self.config.pe_dim_x
+        dummy_buffer["name"] = f"DummyBuffer[0..{config.pe_dim_x-1}]"
+        dummy_buffer["attributes"]["meshX"] = config.pe_dim_x
 
-        ifmap_spad["attributes"]["memory_depth"] = self.config.ifmap_spad_depth
-        ifmap_spad["attributes"]["meshX"] = self.config.pe_dim_x
+        ifmap_spad["attributes"]["memory_depth"] = config.ifmap_spad_depth
+        ifmap_spad["attributes"]["meshX"] = config.pe_dim_x
 
-        wght_spad["attributes"]["memory_depth"] = self.config.weight_spad_depth
-        wght_spad["attributes"]["meshX"] = self.config.pe_dim_x
+        wght_spad["attributes"]["memory_depth"] = config.weight_spad_depth
+        wght_spad["attributes"]["meshX"] = config.pe_dim_x
 
-        psum_spad["attributes"]["memory_depth"] = self.config.psum_spad_depth
-        psum_spad["attributes"]["meshX"] = self.config.pe_dim_x
+        psum_spad["attributes"]["memory_depth"] = config.psum_spad_depth
+        psum_spad["attributes"]["meshX"] = config.pe_dim_x
 
-        mac["attributes"]["meshX"] = self.config.pe_dim_x
+        mac["attributes"]["meshX"] = config.pe_dim_x
 
         with open(arch_out, "w") as f:
             y = yaml.safe_dump(arch, sort_keys=False)
             f.write(y)
     
-    def mutate_arch_constraints(self):
+    def mutate_arch_constraints(self, config:EyerissConfig = None, outdir=None):
+        if config is None:
+            config = self.config
+        if outdir is None:
+            outdir = self.tl_out_configs_dir
         base_arch_constraints = pathlib.Path(self.tl_in_configs_dir, "constraints", "eyeriss_like_arch_constraints.yaml")
-        constraints_out = pathlib.Path(self.tl_out_configs_dir, "constraints", "eyeriss_like_arch_constraints.yaml")
+        constraints_out = pathlib.Path(outdir, "constraints", "eyeriss_like_arch_constraints.yaml")
         shutil.copy(base_arch_constraints, constraints_out)
     
-    def mutate_map_constraints(self):
+    def mutate_map_constraints(self, config: EyerissConfig=None, outdir=None):
+        if config is None:
+            config = self.config
+        if outdir is None:
+            outdir = self.tl_out_configs_dir
         base_map_constraints = pathlib.Path(self.tl_in_configs_dir, "constraints", "eyeriss_like_map_constraints.yaml")
-        constraints_out = pathlib.Path(self.tl_out_configs_dir, "constraints", "eyeriss_like_map_constraints.yaml")
+        constraints_out = pathlib.Path(outdir, "constraints", "eyeriss_like_map_constraints.yaml")
         shutil.copy(base_map_constraints, constraints_out)
 
     def generate_design_space(self):
@@ -126,6 +154,8 @@ class EyerissArchitectureMutator(ArchitectureMutator):
     def run(self):
         return super().run()
         
+    def run_from_config(self, config: EyerissConfig, outdir=None):
+        return super().run_from_config(config, outdir)
 
 if __name__ == "__main__":
     ds = {"PE": [336],

@@ -26,15 +26,15 @@ class ArchitectureMutator(ABC):
         self.tl_out_configs_dir: str = ""
 
     @abstractmethod
-    def mutate_arch(self):
+    def mutate_arch(self, config=None, outdir=None):
         ...
 
     @abstractmethod
-    def mutate_arch_constraints(self):
+    def mutate_arch_constraints(self, config=None, outdir=None):
         ...
     
     @abstractmethod
-    def mutate_map_constraints(self):
+    def mutate_map_constraints(self, config=None, outdir=None):
         ...
 
     @abstractmethod
@@ -56,5 +56,14 @@ class ArchitectureMutator(ABC):
             self.config = None
 
         return self.config
+
+    @abstractmethod
+    def run_from_config(self, config, outdir=None):
+        if outdir is None:
+            outdir = self.tl_out_configs_dir
+
+        self.mutate_arch(config=config, outdir=outdir)
+        self.mutate_arch_constraints(config=config, outdir=outdir)
+        self.mutate_map_constraints(config=config, outdir=outdir)
         
 
