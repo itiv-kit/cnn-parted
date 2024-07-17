@@ -64,7 +64,7 @@ class TreeModel:
             elif node.op_type =='AveragePool':
                 pool_params = self._get_pool_params(node)
                 layer['pool_params'] = pool_params
-            elif node.op_type =='Gemm':
+            elif node.op_type =='Gemm' or node.op_type == "MatMul":
                 gemm_params = self._get_gemm_params(node)
                 layer['gemm_params'] = gemm_params
 
@@ -105,6 +105,14 @@ class TreeModel:
             c = self.in_layer['output_size'][1]
         else :
             c = i_shape[0][1]
+
+        # check if shapes are in format for batched_matmul
+        if len(o_shape[0]) == 4:
+            assert o_shape[0][0] == 1, "Batched matmul currently not supported"
+            o_shape[0] = o_shape[0][1:]
+        if len(i_shape[0]) == 4:
+            assert i_shape[0][0] == 1, "Batched matmul currently not supported"
+            i_shape[0] = i_shape[0][1:]
 
         output = {
             'n': o_shape[0][0],
@@ -203,11 +211,26 @@ class TreeModel:
             else:
                 out_shape.append(d.dim_value)
 
+        # This loop assumes that the output shapes can be concatendated along axis=0
+        # The dummy zero array is only used to get the shape of the concatenated output
+        if len(graph_def.output) > 1:
+            out_shapes = []
+            for out in graph_def.output:
+                shape = []
+                for d in out.type.tensor_type.shape.dim:
+                    if d.dim_value == 0:
+                        shape.append(None)
+                    else:
+                        shape.append(d.dim_value)
+                out_shapes.append(shape)
+            tmp = [np.zeros(s) for s in out_shapes]
+            out_shape = np.concatenate((tmp[0], tmp[1]), axis=0).shape
+
         output_layer = {
             "name": 'output',
             "op_type": graph_output.type.tensor_type.elem_type,
             "output_size": out_shape,
-            "input":graph_output.name,
+            "input": 'output',
             "output":[]
             }
 

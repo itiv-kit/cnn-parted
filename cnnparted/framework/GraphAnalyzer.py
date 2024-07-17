@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+import networkx as nx
 
 from framework.model.model import TreeModel
 from framework.model.graph import LayersGraph
@@ -26,14 +27,16 @@ class GraphAnalyzer:
             df = pd.read_csv(fname_csv, header=None, index_col=0)
             self.schedules = df.values.tolist()
         else:
-            self.schedules = topo_sort_random_start_node(G=self.graph.get_Graph(), n=num_topos, seed=0, as_ndarray=True, progress=self.progress)
+            self.schedules = []
+            self.schedules.append(list(nx.topological_sort(self.graph.get_Graph())))
+            #self.schedules = topo_sort_random_start_node(G=self.graph.get_Graph(), n=num_topos, seed=0, as_ndarray=True, progress=self.progress)
             self.schedules = np.unique(self.schedules, axis=0)
             df = pd.DataFrame(self.schedules)
             df.to_csv(fname_csv, header=False)
         return self.schedules
 
     def get_timeloop_layers(self):
-        output = [layer for layer in self._tree if layer.get("op_type") == "Conv" or layer.get("op_type") == "Gemm"]
+        output = [layer for layer in self._tree if layer.get("op_type") == "Conv" or layer.get("op_type") == "Gemm" or layer.get("op_type") == "MatMul"]
         return output
 
     def get_mnsim_layers(self):
@@ -44,5 +47,5 @@ class GraphAnalyzer:
         return output
 
     def get_gemm_layers(self):
-        output = [layer for layer in self._tree if layer.get("op_type") == "Gemm"]
+        output = [layer for layer in self._tree if layer.get("op_type") == "Gemm" or layer.get("op_type") == "MatMul"]
         return output

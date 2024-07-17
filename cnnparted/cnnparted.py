@@ -92,6 +92,19 @@ def main(args):
 
 def setup_workload(run_name : str, model_settings: dict) -> Callable:
     try:
+        filename = os.path.join(MODEL_PATH, run_name, "model.onnx")
+        subprocess.check_call(['mkdir', '-p', os.path.join(MODEL_PATH, run_name)])
+
+        if os.path.isfile(model_settings['name']) and model_settings['name'].endswith(".onnx"):
+            shutil.copy(model_settings['name'], filename)
+
+            #TODO This is just a temporary workaround, accuracy eval currently not used
+            accuracy_function = importlib.import_module(
+                f"{WORKLOAD_FOLDER}.alexnet", package=__package__
+            ).accuracy_function
+            return accuracy_function
+
+
         model = importlib.import_module(
             f"{WORKLOAD_FOLDER}.{model_settings['name']}", package=__package__
         ).model
@@ -101,10 +114,7 @@ def setup_workload(run_name : str, model_settings: dict) -> Callable:
         ).accuracy_function
 
         input_size= model_settings['input-size']
-
         x = torch.randn(input_size)
-        subprocess.check_call(['mkdir', '-p', os.path.join(MODEL_PATH, run_name)])
-        filename = os.path.join(MODEL_PATH, run_name, "model.onnx")
         torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
 
         return accuracy_function
