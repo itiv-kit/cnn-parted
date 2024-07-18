@@ -64,7 +64,7 @@ def get_metric_info(metric: str):
     if metric == "edap":
         metric_str = metric.upper()
         unit = r"$mJ \cdot ms \cdot mm^2$"
-    if metric == "eda2p":
+    elif metric == "eda2p":
         metric_str = "EDA$^2$P"
         unit = r"$mJ \cdot ms \cdot mm^4$"
     elif metric == "edp":
