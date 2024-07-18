@@ -106,20 +106,24 @@ class TreeModel:
         else :
             c = i_shape[0][1]
 
-        # check if shapes are in format for batched_matmul
-        if len(o_shape[0]) == 4:
-            assert o_shape[0][0] == 1, "Batched matmul currently not supported"
-            o_shape[0] = o_shape[0][1:]
-        if len(i_shape[0]) == 4:
-            assert i_shape[0][0] == 1, "Batched matmul currently not supported"
-            i_shape[0] = i_shape[0][1:]
-
         output = {
             'n': o_shape[0][0],
             'm': o_shape[0][1],
             'c': c,
             'weights': np.prod(i_shape + o_shape)
         }
+
+        # Check if this is a batch matmul
+        if len(o_shape[0]) == 4 and len(i_shape[0]) == 4:
+            # Shape layout: [1, b, x, y]
+            assert o_shape[0][0] == 1 and i_shape[0][0] == 1, "4D matmul is currently not supported" 
+            output = {
+                'b': o_shape[0][1],
+                'n': o_shape[0][2],
+                'm': o_shape[0][3],
+                'c': i_shape[0][3],
+                'weights': np.prod(i_shape + o_shape)
+            }
 
         return output
 

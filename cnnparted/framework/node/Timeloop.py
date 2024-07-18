@@ -80,6 +80,7 @@ class Timeloop:
             #    ins = [(l, p, s, i, d) for  l, p, s, (i, d) in zip(repeat(layers), repeat(progress), repeat(stats), enumerate(self.mutator.design_space))]
             #    with manager.Pool(4) as pool:
             #        pool.starmap(self._run_design, ins )
+            print(f"There are a total of {len(self.mutator.design_space)} designs to be evaluated!")
             
             for i, design in enumerate(self.mutator.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
@@ -177,7 +178,17 @@ class Timeloop:
                 sys.exit(1)
 
         #os.chdir(ROOT_DIR)
-        return self._parse_stats(dirname)
+        timeloop_stats = self._parse_stats(dirname)
+
+        # Workaround for batched matmul operations. We assume that the accelerator would 
+        # just perform each batch separately. Since they then all have the same
+        # shape the mapping is also the same and we can just multiply the results of one batch.
+        # For acclerators where this is not the case, a new mapping configuration must be designed
+        if gemm_params := layer.get('gemm_params'):
+            if batch_size := gemm_params.get('b'):
+                timeloop_stats["energy_mJ"] = timeloop_stats["energy_mJ"] * batch_size
+                timeloop_stats["latency_ms"] = timeloop_stats["latency_ms"] * batch_size
+        return timeloop_stats
 
 
     def _plot_all_of_metric(self, stats, metric: str):
