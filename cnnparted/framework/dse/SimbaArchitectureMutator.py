@@ -2,7 +2,6 @@ import copy
 from math import sqrt
 import pathlib
 import yaml
-from typing import Dict
 import shutil
 
 from framework.dse.ArchitectureMutator import ArchitectureMutator, ArchitectureConfig
@@ -33,7 +32,7 @@ class SimbaConfig(ArchitectureConfig):
         self.inbuf_size = inbuf_size
         self.inbuf_depth = int(inbuf_size*8*1024 // (self.word_bits*self.block_size_input_buf))
 
-    def get_config(self) -> Dict:
+    def get_config(self) -> dict:
         cfg = {}
         cfg["num_pes"] = self.num_pes
         cfg["lmacs"] = self.lmacs
@@ -45,7 +44,7 @@ class SimbaConfig(ArchitectureConfig):
 
 
 class SimbaArchitectureMutator(ArchitectureMutator):
-    def __init__(self, cfg: Dict):
+    def __init__(self, cfg: dict):
         super().__init__(cfg)
         self.config: SimbaConfig = None
         search_space_constraints = cfg.get("constraints", {})

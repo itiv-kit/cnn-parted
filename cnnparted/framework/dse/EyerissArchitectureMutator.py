@@ -1,7 +1,7 @@
 import copy
 from math import sqrt
 import pathlib
-from typing import Dict
+from typing import dict
 import yaml
 import shutil
 
@@ -28,7 +28,7 @@ class EyerissConfig(ArchitectureConfig):
         self.pe_dim_x = pe_dim_x
         self.num_pes = pe_dim_y * pe_dim_x
 
-    def get_config(self) -> Dict:
+    def get_config(self) -> dict:
         cfg = {}
         cfg["pe_dim_y"] = self.pe_dim_y
         cfg["pe_dim_x"] = self.pe_dim_x

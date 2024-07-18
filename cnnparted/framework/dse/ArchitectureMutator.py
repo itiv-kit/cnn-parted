@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Dict
 import os
 import yaml
 
@@ -11,7 +10,7 @@ class ArchitectureConfig(ABC):
             yaml.dump(stats, f, sort_keys=False)
 
     @abstractmethod
-    def get_config(self) -> Dict:
+    def get_config(self) -> dict:
         ...
 
 ## Base class for design space exploration. For a given Timeloop architecture description this
@@ -21,7 +20,7 @@ class ArchitectureMutator(ABC):
         self.design_space = []
         self.config: ArchitectureConfig = None
         self.design_space_exhausted = False
-        self.cfg: Dict = cfg
+        self.cfg: dict = cfg
         self.tl_in_configs_dir: str = cfg["tl_in_configs_dir"]
         self.tl_out_configs_dir: str = ""
 

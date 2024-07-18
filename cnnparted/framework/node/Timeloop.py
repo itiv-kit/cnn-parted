@@ -8,7 +8,6 @@ import yaml
 import glob
 import re
 import tqdm
-from typing import Dict
 import shutil
 
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
@@ -110,7 +109,7 @@ class Timeloop:
             d["tag"] = k
             self.stats.append(d)
 
-    def _run_design(self, layers: Dict, progress: bool, stats: Dict, i: int, design):
+    def _run_design(self, layers: dict, progress: bool, stats: dict, i: int, design):
         design_runroot = os.path.join(self.runroot, "design"+str(i))
         tl_design_dir = os.path.join(design_runroot, "tl_config")
         tl_design_dir_arch = os.path.join(design_runroot, "tl_config", "archs")

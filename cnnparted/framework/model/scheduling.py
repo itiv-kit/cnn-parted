@@ -8,14 +8,14 @@ import tqdm
 import networkx as nx
 import numpy as np
 
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from copy import deepcopy
 
 
 def topo_sort_starting_node(
     G: nx.DiGraph, strating_node: int, seed: Optional[int] = None, as_ndarray: bool = False
-) -> Union[List[int], np.ndarray]:
+) -> Union[list[int], np.ndarray]:
 
     if seed is not None:
         random.seed(seed)

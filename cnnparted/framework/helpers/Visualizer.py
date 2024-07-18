@@ -1,6 +1,5 @@
 import os
 import matplotlib.pyplot as plt
-from typing import Dict, List
 import numpy as np
 import pandas as pd
 
@@ -8,7 +7,7 @@ from framework.helpers.DesignMetrics import calc_metric, get_metric_info
 
 COLOR_SEQUENCE = ['#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02']
 
-def plotMetricPerConfigPerLayer(stats: Dict, dir: str, metric: str, type: str = "line", scale: str = "linear", prefix: str = ""):
+def plotMetricPerConfigPerLayer(stats: dict, dir: str, metric: str, type: str = "line", scale: str = "linear", prefix: str = ""):
     assert type in ["line", "bar"], "Currently only 'line' and 'bar' are supported as plot types"
 
     metric = metric.lower()
