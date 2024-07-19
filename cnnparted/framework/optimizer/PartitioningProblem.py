@@ -30,7 +30,7 @@ class PartitioningProblem(ElementwiseProblem):
 
         xu = self.num_platforms * self.num_layers - 1
 
-        super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=1, xu=xu)
+        super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=0, xu=xu)
 
     def _evaluate(self, x : np.ndarray, out : dict, *args, **kwargs) -> None:
         valid = True
@@ -43,11 +43,15 @@ class PartitioningProblem(ElementwiseProblem):
         bandwidth = np.full((self.num_pp + 1), np.inf)
         mem = np.full((self.num_pp + 1), np.inf)
 
+        # [ [partitioning_point, num_pp], [map_partition_to_platform, num_pp+1] ]
         p : list = x.tolist()
         p[0:self.num_pp] = np.divide(p[0:self.num_pp], self.num_platforms)
         p[self.num_pp:] = np.divide(p[self.num_pp:], self.num_layers)
-        p = np.floor(p).astype(int) + 1
-        p = np.insert(p, self.num_pp, self.num_layers)
+        p = np.floor(p).astype(int)
+        # insert a partitioning point after last layer as otherwise evaluation of final partition is not perforrmed
+        # e.g. if there are 10 layers and pp=5, the inserted point is needed to trigger
+        # evaluation of partition from layer 6-10
+        p = np.insert(p, self.num_pp, self.num_layers-1) 
 
         if not np.array_equal(np.sort(p[:self.num_pp]), p[:self.num_pp]): # keep order of partitioning points
             valid = False
@@ -70,7 +74,7 @@ class PartitioningProblem(ElementwiseProblem):
                 valid &= v
                 part_latency.append([p[i], l_pp[-1]]) # required for throughput calculation
 
-                current_platform = list(self.nodeStats.keys())[p[i]-1]
+                current_platform = list(self.nodeStats.keys())[p[i]]
                 design_id[current_platform] = optimal_design_id
                 design_tag[current_platform] = optimal_design_tag
                 partitions.append([p[i], last_pp, pp])
@@ -108,7 +112,7 @@ class PartitioningProblem(ElementwiseProblem):
             out["G"] = [i for i in range(self.num_pp+1)] + [1] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)]
 
     def _eval_partition(self, platform : int, last_pp : int, pp : int, l_pp : list, e_pp : list, successors : list) -> tuple[bool, int]:
-        platform = list(self.nodeStats.keys())[platform-1]
+        platform = list(self.nodeStats.keys())[platform]
 
         area_per_design = []
         latency_per_design = []
@@ -116,7 +120,7 @@ class PartitioningProblem(ElementwiseProblem):
 
         platform_latency_per_design = []
         platform_energy_per_design = []
-
+        
         for design_id, _ in enumerate(self.nodeStats[platform]["eval"]):
             valid = True
             platform_latency = 0.0
@@ -129,9 +133,8 @@ class PartitioningProblem(ElementwiseProblem):
             energy_per_layer = []
             latency_per_layer = []
 
-            # TODO: Check if it runs now
             for j in range(last_pp + 1, pp+1):
-                layer = self.schedule[j-1]
+                layer = self.schedule[j]
 
                 layer_latency = self._get_layer_latency(platform, design_id, layer)
                 layer_energy = self._get_layer_energy(platform, design_id, layer)
@@ -150,7 +153,6 @@ class PartitioningProblem(ElementwiseProblem):
             platform_latency_per_design.append(platform_latency)
 
         # Check bit-width, analyze memory requirements and generate successors needed for link analysis
-        # TODO: Check if it runs now
         for j in range(last_pp + 1, pp+1):
             valid &= self._check_layer_bitwidth(platform, layer)
             if layer in self.layer_params.keys():
@@ -263,7 +265,7 @@ class PartitioningProblem(ElementwiseProblem):
         for platform in range(self.num_platforms):
             parts[platform] = []
         for p in partitions:
-            parts[p[0]-1].append(p[1:])
+            parts[p[0]].append(p[1:])
 
         area = 0.0
         for key in parts.keys():

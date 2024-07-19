@@ -123,20 +123,20 @@ class PartitioningOptimizer(Optimizer):
         return comp_paretos
 
     def _gen_initial_x(self, num_layers, num_pp, fixed_sys, acc_once):
-        num_acc = len(self.nodeStats)
+        num_platforms = len(self.nodeStats)
+        xu = num_platforms * num_layers - 1
         samples = []
 
         while len(samples) < self.pop_size:
-            pps = np.random.randint(1, num_layers+1, size=num_pp) * num_acc
+            pps = np.random.randint(0, xu+1, size=num_pp)
             pps = np.sort(pps).tolist()
             rng = default_rng()
-            accs = (rng.choice(num_acc, size=num_pp+1, replace=not acc_once)) * num_layers
+            accs = (rng.choice(num_platforms, size=num_pp+1, replace=not acc_once)) * num_layers
             if fixed_sys:
                 accs = np.sort(accs)
 
-            if pps + accs.tolist() not in samples:
+            if pps + accs.tolist() not in samples or num_pp == 0:
                 samples.append(pps + accs.tolist())
-
         return np.array(samples)
 
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
