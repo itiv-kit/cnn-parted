@@ -126,11 +126,12 @@ class PartitioningOptimizer(Optimizer):
         num_platforms = len(self.nodeStats)
         xu = num_platforms * num_layers - 1
         samples = []
-
+        rng = default_rng(seed=42)
+        
         while len(samples) < self.pop_size:
-            pps = np.random.randint(0, xu+1, size=num_pp)
+            pps = rng.integers(low=0, high=xu+1, size=num_pp)
+            #pps = np.random.randint(0, xu+1, size=num_pp)
             pps = np.sort(pps).tolist()
-            rng = default_rng()
             accs = (rng.choice(num_platforms, size=num_pp+1, replace=not acc_once)) * num_layers
             if fixed_sys:
                 accs = np.sort(accs)
