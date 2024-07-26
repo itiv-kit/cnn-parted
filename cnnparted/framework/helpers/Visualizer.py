@@ -5,7 +5,7 @@ import pandas as pd
 
 from framework.helpers.DesignMetrics import calc_metric, get_metric_info
 
-COLOR_SEQUENCE = ['#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02']
+COLOR_SEQUENCE = ['#4477AA', '#EE6677', '#228833', '#CCBB44', '#66CCEE', '#AA3377', '#BBBBBB']
 
 def plotMetricPerConfigPerLayer(stats: dict, dir: str, metric: str, type: str = "line", scale: str = "linear", prefix: str = ""):
     assert type in ["line", "bar"], "Currently only 'line' and 'bar' are supported as plot types"
@@ -41,10 +41,10 @@ def plotMetricPerConfigPerLayer(stats: dict, dir: str, metric: str, type: str = 
 
     plt.figure(dpi=1200)
     plt.xlabel("Layer Number")
-    plt.ylabel(metric_str)
+    plt.ylabel(f"{metric_str} [{metric_unit}]")
     plt.yscale(scale)
     plt.title(f"{metric_str} for all Designs by layer")
-    plt.gca().set_prop_cycle(marker=["o", "+", "*", "s", "x", "d"], 
+    plt.gca().set_prop_cycle(marker=["o", "+", "*", "s", "x", "d", "o"], 
                             color=COLOR_SEQUENCE)
     layer_idx = np.arange(1, len(layers)+1)
 

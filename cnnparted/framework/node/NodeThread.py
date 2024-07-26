@@ -1,7 +1,6 @@
 import os
 import csv
 import numpy as np
-from typing import Dict, List
 
 from framework.ModuleThreadInterface import ModuleThreadInterface
 from framework.node.Timeloop import Timeloop
@@ -81,15 +80,9 @@ class NodeThread(ModuleThreadInterface):
         self.stats["eval"] = pruned_stats
 
 
-    def _prune_accelerator_designs(self, stats: List[Dict], top_k: int, metric: str, is_dse: bool):
+    def _prune_accelerator_designs(self, stats: dict[str, dict], top_k: int, metric: str, is_dse: bool):
         # If there are less designs than top_k simply return the given list
         if len(stats) <= top_k or not is_dse:
-            pruned_stats = []
-            for design in stats:
-                tag = design["tag"] 
-                layers = design["layers"]
-                #arch_config = design["arch_config"]
-                pruned_stats.append({"tag": tag, "layers": layers})
             return stats
 
         # The metric_per_design array has this structure, with
@@ -103,8 +96,8 @@ class NodeThread(ModuleThreadInterface):
         latency_per_design = []
         area_per_design = []
 
-        for design in stats:
-            tag = design["tag"]
+        for tag, design in stats.items():
+            #tag = design["tag"]
             layers = design["layers"]
             energy_per_layer = []
             latency_per_layer = []
@@ -130,17 +123,19 @@ class NodeThread(ModuleThreadInterface):
         design_candidates = np.unique(design_candidates) 
 
         # Remove all designs that have not been found to be suitable design candidates
-        pruned_stats = []
-        for design in stats:
-            if design["tag"] in design_candidates: 
-               tag = design["tag"] 
-               layers = design["layers"]
-               #arch_config = design["arch_config"]
-               pruned_stats.append({"tag": tag, "layers": layers})
+        #pruned_stats = []
+        #for design in stats:
+        #    if design["tag"] in design_candidates: 
+        #       tag = design["tag"] 
+        #       layers = design["layers"]
+        #       #arch_config = design["arch_config"]
+        #       pruned_stats.append({"tag": tag, "layers": layers})
+        
+        pruned_stats = {tag: results for tag, results in stats.items() if tag in design_candidates}
 
         return pruned_stats
 
-    def _apply_platform_constraints(self, stats: List[Dict], constraints: Dict):
+    def _apply_platform_constraints(self, stats: dict[str, dict], constraints: dict):
         max_energy = constraints.get("energy", np.inf)
         max_latency = constraints.get("latency", np.inf)
         max_area = constraints.get("area", np.inf)
@@ -148,7 +143,7 @@ class NodeThread(ModuleThreadInterface):
         energy_per_design = []
         latency_per_design = []
         area_per_design = []
-        for design in stats:
+        for tag, design in stats.items():
             layers = design["layers"]
             energy_per_layer = []
             latency_per_layer = []
@@ -168,7 +163,8 @@ class NodeThread(ModuleThreadInterface):
         total_latency = calc_metric(np.array(energy_per_design), np.array(latency_per_layer), np.array(area_per_design), "latency", reduction= True)
         total_area = area_per_design
 
-        constrained_stats = [design for idx, design in enumerate(stats) if (total_area[idx] <= max_area and total_latency[idx] <= max_latency and total_energy[idx] <= max_energy)]
+        #constrained_stats = [design for idx, design in enumerate(stats) if (total_area[idx] <= max_area and total_latency[idx] <= max_latency and total_energy[idx] <= max_energy)]
+        constrained_stats = {tag: design for idx, (tag, design) in stats.items() if (total_area[idx] <= max_area and total_latency[idx] <= max_latency and total_energy[idx] <= max_energy)}
         if not constrained_stats:
             raise ValueError("After applying constraints no designs remain!")
 
@@ -176,24 +172,20 @@ class NodeThread(ModuleThreadInterface):
         
 
     def _read_layer_csv(self, filename: str) -> dict:
-        designs = []
+        designs = {}
         stats = {}
-        first_design = True
 
         with open(filename, 'r', newline="") as f:
             reader = csv.DictReader(f, delimiter=";")
             current_design_tag = "design_0"
             stats["layers"] = {}
-            #stats["tag"] = current_design_tag
             for row in reader:
                 if row["Design Tag"] != current_design_tag:
-                    stats["tag"] = current_design_tag if first_design else row["Design Tag"]
-                    designs.append(stats)
+                    designs[current_design_tag] = stats
+                    current_design_tag = row["Design Tag"]
 
                     stats = {}
                     stats["layers"] = {}
-                    current_design_tag = row["Design Tag"]
-                    first_design = False
 
                 layer_name = row['Layer']
                 stats["layers"][layer_name] = {}
@@ -202,11 +194,11 @@ class NodeThread(ModuleThreadInterface):
                 stats["layers"][layer_name]['area'] = float(row['Area [mm2]'])
 
         # Append stats for final design
-        stats["tag"] = row["Design Tag"]
-        designs.append(stats)
+        tag = row["Design Tag"]
+        designs[tag] = stats
         return designs
 
-    def _write_layer_csv(self, filename: str, stats: List[Dict] = None) -> None:
+    def _write_layer_csv(self, filename: str, stats: dict[str, dict] = None) -> None:
         if stats is None:
             stats = self.stats
         with open(filename, "w", newline="") as f:
@@ -221,13 +213,13 @@ class NodeThread(ModuleThreadInterface):
             ]
             writer.writerow(header)
             row_num = 1
-            for i, design in enumerate(stats):
+            for tag, design in stats.items():
                 layers = design["layers"]
                 for layer in layers.keys():
                     if isinstance(design["layers"][layer], dict):
                         row = [
                             row_num,
-                            design["tag"],
+                            tag,
                             layer,
                             str(design["layers"][layer]["latency"]),
                             str(design["layers"][layer]["energy"]),

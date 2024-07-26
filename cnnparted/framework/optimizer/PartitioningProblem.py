@@ -60,7 +60,7 @@ class PartitioningProblem(ElementwiseProblem):
         elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_pp-1:]), p[-self.num_pp-1:]): # keep order of Accelerators
             valid = False
         else:
-            design_id = {}
+            #design_id = {}
             design_tag = {}
             th_pp = []
             partitions = []
@@ -70,12 +70,11 @@ class PartitioningProblem(ElementwiseProblem):
             successors = [self.schedule[0]]
             i = last_pp = last_platform = -1
             for i, pp in enumerate(p[0:self.num_pp+1], self.num_pp + 1):
-                v, optimal_design_id, optimal_design_tag, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
+                v, optimal_design_tag, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
                 valid &= v
                 part_latency.append([p[i], l_pp[-1]]) # required for throughput calculation
 
                 current_platform = list(self.nodeStats.keys())[p[i]]
-                design_id[current_platform] = optimal_design_id
                 design_tag[current_platform] = optimal_design_tag
                 partitions.append([p[i], last_pp, pp])
 
@@ -100,9 +99,8 @@ class PartitioningProblem(ElementwiseProblem):
             latency = sum(l_pp) + link_latency
             energy = sum(e_pp) + link_energy
             throughput = self._get_throughput(th_pp, part_latency) * -1
-            area = self._get_area(partitions, design_id)
-            design_id = list(design_id.values())
-            design_tag = list(design_tag.values())
+            area = self._get_area(partitions, design_tag)
+            design_tag = [self._get_tag_as_int(tag) for tag in design_tag.values()]
 
         out["F"] = [latency, energy, throughput, area, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
 
@@ -120,8 +118,10 @@ class PartitioningProblem(ElementwiseProblem):
 
         platform_latency_per_design = []
         platform_energy_per_design = []
+
+        design_tags: list[str] = list(self.nodeStats[platform]["eval"].keys())
         
-        for design_id, _ in enumerate(self.nodeStats[platform]["eval"]):
+        for design_tag, _ in self.nodeStats[platform]["eval"].items():
             valid = True
             platform_latency = 0.0
             platform_energy = 0.0
@@ -136,8 +136,8 @@ class PartitioningProblem(ElementwiseProblem):
             for j in range(last_pp + 1, pp+1):
                 layer = self.schedule[j]
 
-                layer_latency = self._get_layer_latency(platform, design_id, layer)
-                layer_energy = self._get_layer_energy(platform, design_id, layer)
+                layer_latency = self._get_layer_latency(platform, design_tag, layer)
+                layer_energy = self._get_layer_energy(platform, design_tag, layer)
 
                 latency_per_layer.append(layer_latency)
                 energy_per_layer.append(layer_energy)
@@ -147,7 +147,7 @@ class PartitioningProblem(ElementwiseProblem):
 
             latency_per_design.append(latency_per_layer)
             energy_per_design.append(energy_per_layer)
-            area_per_design.append([self._get_area_platform(platform, design_id)])
+            area_per_design.append([self._get_area_platform(platform, design_tag)])
 
             platform_energy_per_design.append(platform_energy)
             platform_latency_per_design.append(platform_latency)
@@ -183,30 +183,28 @@ class PartitioningProblem(ElementwiseProblem):
     	# Use Energy-Delay-Area-Product as criterium for optimality
         metric_per_design = calc_metric(np.array(energy_per_design), np.array(latency_per_design), np.array(area_per_design), "edap", reduction=True)
         
-        # Every design is assigned an id during the DSE. Afterwards, they are reshaped to a list,
-        # the index in that list is given by design_id. After the pruning it is possible that
-        # design_id and design_tag are no longer the same, which is why we lookup the tag
-        optimal_design_id  = np.argmin(metric_per_design)
-        optimal_design_tag = self._get_tag_from_id(platform, optimal_design_id)
+        #optimal_design_id  = np.argmin(metric_per_design)
+        optimal_design_idx = np.argmin(metric_per_design)
+        optimal_design_tag = design_tags[optimal_design_idx]
 
-        l_pp.append(platform_latency_per_design[optimal_design_id])
-        e_pp.append(platform_energy_per_design[optimal_design_id])
-        return valid, optimal_design_id, optimal_design_tag, part_l_params + max(dmem, default=0) # mem evaluation
+        l_pp.append(platform_latency_per_design[optimal_design_idx])
+        e_pp.append(platform_energy_per_design[optimal_design_idx])
+        return valid, optimal_design_tag, part_l_params + max(dmem, default=0) # mem evaluation
 
-    def _get_tag_from_id(self, platform: int, design_id: int):
-        tag: str = self.nodeStats[platform]["eval"][design_id]["tag"]
-        tag = tag.split("_")[-1]
+    def _get_tag_as_int(self, design_tag: str):
+        #tag: str = self.nodeStats[platform]["eval"][design_id]["tag"]
+        tag = design_tag.split("_")[-1]
         return int(tag)
 
-    def _get_layer_latency(self, platform : int, design_id: int, layer_name : str) -> float:
-        if self.nodeStats[platform]["eval"][design_id]["layers"].get(layer_name):
-            return float(self.nodeStats[platform]["eval"][design_id]["layers"][layer_name]['latency'])
+    def _get_layer_latency(self, platform : int, design_tag: str, layer_name : str) -> float:
+        if self.nodeStats[platform]["eval"][design_tag]["layers"].get(layer_name):
+            return float(self.nodeStats[platform]["eval"][design_tag]["layers"][layer_name]['latency'])
         else:
             return 0
 
-    def _get_layer_energy(self, platform : int, design_id: int,  layer_name : str) -> float:
-        if self.nodeStats[platform]["eval"][design_id]["layers"].get(layer_name):
-            return float(self.nodeStats[platform]["eval"][design_id]["layers"][layer_name]['energy'])
+    def _get_layer_energy(self, platform : int, design_tag: str,  layer_name : str) -> float:
+        if self.nodeStats[platform]["eval"][design_tag]["layers"].get(layer_name):
+            return float(self.nodeStats[platform]["eval"][design_tag]["layers"][layer_name]['energy'])
         else:
             return 0
 
@@ -260,7 +258,7 @@ class PartitioningProblem(ElementwiseProblem):
 
         return np.min(th_pp)
 
-    def _get_area(self, partitions : list, design_id: list) -> float:
+    def _get_area(self, partitions : list, design_tag: list[str]) -> float:
         parts = {}
         for platform in range(self.num_platforms):
             parts[platform] = []
@@ -280,9 +278,9 @@ class PartitioningProblem(ElementwiseProblem):
                 #part: partition
                 for part in parts[key]:
                     if part[0] != part[1]: #partitions stores [platform, layer_ids], here check if both partitions are executed on same platform
-                        id = design_id[platform]
-                        first_layer = [*self.nodeStats[platform]["eval"][id]["layers"]][0]
-                        area += float(self.nodeStats[platform]["eval"][id]["layers"][first_layer]['area'])
+                        tag = design_tag[platform]
+                        first_layer = [*self.nodeStats[platform]["eval"][tag]["layers"]][0]
+                        area += float(self.nodeStats[platform]["eval"][tag]["layers"][first_layer]['area'])
                         break
 
         return area

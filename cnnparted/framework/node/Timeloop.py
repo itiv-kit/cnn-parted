@@ -1,4 +1,4 @@
-from copy import deepcopy
+import pickle
 import importlib
 import os
 import sys
@@ -58,7 +58,7 @@ class Timeloop:
         self.runroot = tl_config['run_root']
         self.dse_config = tl_config.get('dse', None)
         self.tl_cfg = tl_config
-        self.stats = []
+        self.stats = {} #[]
 
         self.mutator: ArchitectureMutator = None
         if self.dse_config:
@@ -74,11 +74,6 @@ class Timeloop:
         if self.mutator is not None:
             stats = {}
             
-            #with mp.Manager() as manager:
-            #    stats = manager.dict()
-            #    ins = [(l, p, s, i, d) for  l, p, s, (i, d) in zip(repeat(layers), repeat(progress), repeat(stats), enumerate(self.mutator.design_space))]
-            #    with manager.Pool(4) as pool:
-            #        pool.starmap(self._run_design, ins )
             print(f"There are a total of {len(self.mutator.design_space)} designs to be evaluated!")
             
             for i, design in enumerate(self.mutator.design_space):
@@ -104,10 +99,10 @@ class Timeloop:
                 stats["design_0"]["layers"][layer_name]["energy"] = output["energy_mJ"]
                 stats["design_0"]["layers"][layer_name]["area"] = output["area_mm2"]
 
-        # Add design tag to a dedicated key
-        for k, d in stats.items():
-            d["tag"] = k
-            self.stats.append(d)
+        # Gather results
+        self.stats = {tag: results for tag, results in stats.items()}
+        with open(os.path.join(self.runroot, f"results_{self.accname}.pkl"), "wb") as f:
+            pickle.dump(self.stats, f)
 
     def _run_design(self, layers: dict, progress: bool, stats: dict, i: int, design):
         design_runroot = os.path.join(self.runroot, "design"+str(i))
@@ -120,7 +115,7 @@ class Timeloop:
         self.mutator.run_from_config(design, outdir=tl_design_dir)
         stats[f"design_{i}"] = {}
         stats[f"design_{i}"]["layers"] = {}
-        #stats[f"design_{i}"]["arch_config"] = design.get_config()
+        stats[f"design_{i}"]["arch_config"] = design.get_config()
         with open(os.path.join(design_runroot, "arch_config.yaml"), "w") as f:
             y = yaml.safe_dump(design.get_config(), sort_keys=False)
             f.write(y)

@@ -55,6 +55,8 @@ def main(args):
     num_pp = main_conf.get('num_pp')
     if num_pp == -1:
         num_pp = len(nodeStats[list(nodeStats.keys())[0]]) - 4
+    elif len(nodeStats) == 1:
+        num_pp = 0
     optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.p)
     n_constr, n_var, sol = optimizer.optimize(q_constr, main_conf)
 
@@ -64,8 +66,8 @@ def main(args):
 
     print("Evaluating accuracy...")
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
-    if config.get('accuracy'):
-        quant = AccuracyEvaluator(ga.torchmodel, nodeStats, config.get('accuracy'), device, args.p)
+    if accuracy_cfg := config.get('accuracy'):
+        quant = AccuracyEvaluator(ga.torchmodel, nodeStats, accuracy_cfg, device, args.p)
         quant.eval(sol["nondom"], n_constr, n_var, ga.schedules, accuracy_function)
         for i, p in enumerate(sol["dom"]): # achieving aligned csv file
             sol["dom"][i] = np.append(p, float(0))
@@ -76,12 +78,12 @@ def main(args):
     # Step 7 - Output exploration results
     write_files(work_dir, args.run_name, n_constr, n_var, sol, ga.schedules)
     sols = 0
-    for pareto, sched in sol.items():
-        print(pareto, len(sched))
-        sols += len(sched)
+    for pareto, scheme in sol.items():
+        print(pareto, len(scheme))
+        sols += len(scheme)
 
     if sols > 0:
-        num_real_pp = [int(sched[1]) for sched in sol["nondom"]]
+        num_real_pp = [int(scheme[num_pp+2]) for scheme in sol["nondom"]]
         for i in range(1, max(num_real_pp)+1):
             print(i, "Partition(s):", num_real_pp.count(i))
     else:
