@@ -1,4 +1,7 @@
 import os
+from turtle import title
+from matplotlib import legend
+from matplotlib.pylab import xlabel, ylabel, yscale
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -54,7 +57,12 @@ def plotMetricPerConfigPerLayer(stats: dict, dir: str, metric: str, type: str = 
     elif type == "bar":
         data = np.array(metric_per_design).T
         df = pd.DataFrame(data, columns=labels)
-        df.plot.bar(color=COLOR_SEQUENCE)
+        df.plot.bar(color=COLOR_SEQUENCE, 
+                    title=f"{metric_str} for all Designs by layer", 
+                    ylabel=f"{metric_str} [{metric_unit}]", 
+                    xlabel="Layer Number",
+                    logy=(scale=="log"),
+                    )
 
     plt.legend()
     

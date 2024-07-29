@@ -146,19 +146,19 @@ class SimbaArchitectureMutator(ArchitectureMutator):
         pe["name"] = f"PE[0..{config.num_pes-1}]"
 
         pe_input_buffer["attributes"]["memory_depth"] = config.inbuf_depth
-        pe_input_buffer["attributes"]["meshX"] = config.lmacs
+        pe_input_buffer["attributes"]["meshX"] = config.num_pes
 
         pe_wght_buffer["attributes"]["memory_depth"] = config.wbuf_depth
-        pe_wght_buffer["attributes"]["meshX"] = config.lmacs
+        pe_wght_buffer["attributes"]["meshX"] = config.num_pes
 
         pe_accu_buffer["attributes"]["memory_depth"] = config.accbuf_depth
-        pe_accu_buffer["attributes"]["meshX"] = config.lmacs
+        pe_accu_buffer["attributes"]["meshX"] = config.num_pes
 
         pe_wght_regs["name"] = f"PEWeightRegs[0..{config.lmacs-1}]"
-        pe_wght_regs["attributes"]["meshX"] = config.lmacs
+        pe_wght_regs["attributes"]["meshX"] = config.num_pes
 
         lmac["name"] = f"LMAC[0..{config.lmacs-1}]"
-        lmac["attributes"]["meshX"] = config.lmacs
+        lmac["attributes"]["meshX"] = config.num_pes
 
         with open(arch_out, "w") as f:
             y = yaml.safe_dump(arch, sort_keys=False)
