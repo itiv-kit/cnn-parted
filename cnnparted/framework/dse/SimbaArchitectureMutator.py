@@ -64,7 +64,10 @@ class SimbaArchitectureMutator(ArchitectureMutator):
         self.lmac_nums = search_space_constraints.get("num_lmacs", [16])
 
         #weight and accumulator buffers are in equal numbers
-        self.buf_nums = 4
+        self.num_bufs = 4
+        # LMAC must be a multiple of num_bufs due to Timeloop requirements 
+        self.lmac_nums = list(filter(lambda x: x % self.num_bufs == 0, self.lmac_nums))
+        assert self.lmac_nums, f"No valid number of LMAC specified, must be multiple of num_bufs={self.num_bufs}"
 
         self.inbuf_sizes = search_space_constraints.get("inbuf_sizes", [64])
         self.wbuf_sizes = search_space_constraints.get("wbuf_sizes", [32])
@@ -156,6 +159,7 @@ class SimbaArchitectureMutator(ArchitectureMutator):
 
         pe_wght_regs["name"] = f"PEWeightRegs[0..{config.lmacs-1}]"
         pe_wght_regs["attributes"]["meshX"] = config.num_pes
+        pe_wght_regs["attributes"]["cluster-size"] = config.lmacs*4
 
         lmac["name"] = f"LMAC[0..{config.lmacs-1}]"
         lmac["attributes"]["meshX"] = config.num_pes

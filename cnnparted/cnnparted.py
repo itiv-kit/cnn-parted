@@ -76,7 +76,7 @@ def main(args):
     # objective = conf_helper.get_optimization_objectives(node_components, link_components)
 
     # Step 7 - Output exploration results
-    write_files(work_dir, args.run_name, n_constr, n_var, sol, ga.schedules)
+    write_files(work_dir, args.run_name, n_constr, n_var, sol, ga.schedules, len(nodeStats))
     sols = 0
     for pareto, scheme in sol.items():
         print(pareto, len(scheme))
@@ -84,8 +84,8 @@ def main(args):
 
     if sols > 0:
         num_real_pp = [int(scheme[num_pp+2]) for scheme in sol["nondom"]]
-        for i in range(1, max(num_real_pp)+1):
-            print(i, "Partition(s):", num_real_pp.count(i))
+        for i in range(0, max(num_real_pp)+1):
+            print(i, "Partitioning Point(s):", num_real_pp.count(i))
     else:
         print()
         print("### [CNNParted] No valid partitioning found! ###")
@@ -150,13 +150,14 @@ def node_eval(ga : GraphAnalyzer, node_components : list, work_dir: str, run_nam
 
     return nodeStats
 
-def write_files(work_dir: str, run_name : str, n_constr : int, n_var : int, results : dict, schedules : list) -> None:
+def write_files(work_dir: str, run_name : str, n_constr : int, n_var : int, results : dict, schedules : list, num_platforms: int) -> None:
     rows = []
+    idx_max = 1 + num_platforms + 1
     for pareto, sched in results.items():
         for sd in sched:
             data = np.append(sd, pareto)
             data = data.astype('U256')
-            data[0:2] = data[0:2].astype(float).astype(int)
+            data[0:idx_max] = data[0:idx_max].astype(float).astype(int)
             data[n_constr+1:n_constr+n_var+1] = data[n_constr+1:n_constr+n_var+1].astype(float).astype(int)
             for i in range(n_constr+1,int(n_var/2)+n_constr+1):
                 data[i] = schedules[int(data[0])][int(data[i])-1]

@@ -34,7 +34,7 @@ class PartitioningProblem(ElementwiseProblem):
 
     def _evaluate(self, x : np.ndarray, out : dict, *args, **kwargs) -> None:
         valid = True
-        num_real_pp = 0
+        num_real_pp = -1
 
         l_pp = []
         e_pp = []

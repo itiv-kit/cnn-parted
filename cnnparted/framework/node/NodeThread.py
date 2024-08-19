@@ -31,7 +31,7 @@ class NodeThread(ModuleThreadInterface):
         raise NotImplementedError
 
     def _run_mnsim(self, config: dict) -> None:
-        runroot = self.runname + "_" + config["accelerator"]
+        runroot = self.runname + "_" + str(self.id) + "_" + config["accelerator"]
         fname_csv = runroot + "_mnsim_layers.csv"
 
         layers = self.ga.get_mnsim_layers()
@@ -50,7 +50,7 @@ class NodeThread(ModuleThreadInterface):
         runroot = os.path.join(self.work_dir, "system_evaluation", str(self.id)+"_"+config["accelerator"])
         config["run_root"] = runroot
         config["work_dir"] = self.work_dir
-        fname_csv = os.path.join(self.work_dir, self.runname + "_" + config["accelerator"] + "_tl_layers.csv") #runroot + "_tl_layers.csv"
+        fname_csv = os.path.join(self.work_dir, self.runname + "_" + str(self.id) + "_" + config["accelerator"] + "_tl_layers.csv")
         
         # Check if design is DSE enabled
         if dse_cfg := config.get("dse"):

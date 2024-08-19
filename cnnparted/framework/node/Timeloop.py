@@ -186,10 +186,12 @@ class Timeloop:
 
 
     def _plot_all_of_metric(self, stats, metric: str):
-        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric,                          prefix=self.accname+"_")
-        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric,             scale="log", prefix=self.accname+"_log_")
-        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric, type="bar",              prefix=self.accname+"_")
-        plotMetricPerConfigPerLayer(stats, self.tl_cfg["work_dir"], metric, type="bar", scale="log", prefix=self.accname+"_log_")
+        figure_path = os.path.join(self.tl_cfg["work_dir"], "figures")
+        os.makedirs(figure_path, exist_ok=True)
+        plotMetricPerConfigPerLayer(stats, figure_path, metric,                          prefix=self.accname+"_")
+        plotMetricPerConfigPerLayer(stats, figure_path, metric,             scale="log", prefix=self.accname+"_log_")
+        plotMetricPerConfigPerLayer(stats, figure_path, metric, type="bar",              prefix=self.accname+"_")
+        plotMetricPerConfigPerLayer(stats, figure_path, metric, type="bar", scale="log", prefix=self.accname+"_log_")
 
     def _rewrite_mapper_cfg(self, src : str, dst : str) -> None:
         with open(src, "r") as f:
