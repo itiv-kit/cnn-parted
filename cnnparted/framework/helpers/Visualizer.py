@@ -9,6 +9,7 @@ import pandas as pd
 from framework.helpers.DesignMetrics import calc_metric, get_metric_info
 
 COLOR_SEQUENCE = ['#4477AA', '#EE6677', '#228833', '#CCBB44', '#66CCEE', '#AA3377', '#BBBBBB']
+MARKER_SEQUENCE = ["x",          "+",     "1",       "2",       "3",         "4",      "."]
 
 def plotMetricPerConfigPerLayer(stats: dict, dir: str, metric: str, type: str = "line", scale: str = "linear", prefix: str = ""):
     assert type in ["line", "bar"], "Currently only 'line' and 'bar' are supported as plot types"

@@ -1,4 +1,3 @@
-from cProfile import label
 import csv
 import os
 import numpy as np
@@ -10,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from framework.constants import ROOT_DIR
 from framework.helpers.DesignMetrics import calc_metric, get_metric_info, SUPPORTED_METRICS
-from framework.helpers.Visualizer import plotMetricPerConfigPerLayer, COLOR_SEQUENCE
+from framework.helpers.Visualizer import plotMetricPerConfigPerLayer, COLOR_SEQUENCE, MARKER_SEQUENCE
 
 def objective_to_str(objective: str):
     if objective in ["latency", "energy", "throughput", "area"]:
@@ -195,7 +194,7 @@ if __name__ == "__main__":
 
     # Plot settings
     all_objectives = ["latency", "energy", "throughput", "area", "link_latency", "link_energy"]
-    plot_combinations: list[tuple[str, str]] = list(itertools.permutations(all_objectives, 2))
+    plot_combinations: list[tuple[str, str]] = list(itertools.combinations(all_objectives, 2))
 
     assert(args.indir != args.outdir)
     if not os.path.isdir(args.outdir):
@@ -308,18 +307,17 @@ if __name__ == "__main__":
         fname_results_base_nondom = glob.glob(os.path.join(ROOT_DIR, args.basedir, "*result_nondom.csv"))
         fname_results_base_all = glob.glob(os.path.join(ROOT_DIR, args.basedir, "*result_all.csv"))
 
-        results_all_dse = pd.read_csv(fname_results_all[0], header=None)
-        results_all_dse = results_all_dse.to_numpy()
-        results_all_base = pd.read_csv(fname_results_base_all[0], header=None)
-        results_all_base = results_all_base.to_numpy()
+        results_all_dse = pd.read_csv(fname_results_all[0], header=None).to_numpy()
+        results_dom_dse = np.array([res for res in results_all_dse if res[-1]=="dom"])
 
-        results_pareto_dse = pd.read_csv(fname_results_nondom[0], header=None)
-        results_pareto_dse = results_pareto_dse.to_numpy()
-        results_pareto_base = pd.read_csv(fname_results_base_nondom[0], header=None)
-        results_pareto_base = results_pareto_base.to_numpy()
+        results_all_base = pd.read_csv(fname_results_base_all[0], header=None).to_numpy()
+        results_dom_base = np.array([res for res in results_all_base if res[-1]=="dom"])
 
-        dse_dom_objectives = results_all_dse[:, n_constr+2+n_var:-1]
-        base_dom_objectives=results_all_base[:, n_constr+2+n_var:-1]
+        results_pareto_dse = pd.read_csv(fname_results_nondom[0], header=None).to_numpy()
+        results_pareto_base = pd.read_csv(fname_results_base_nondom[0], header=None).to_numpy()
+
+        dse_dom_objectives = results_dom_dse[:, n_constr+2+n_var:-1]
+        base_dom_objectives=results_dom_base[:, n_constr+2+n_var:-1]
 
         base_dom_latency, base_dom_energy, base_dom_throughput, base_dom_area, base_dom_link_latency, base_dom_link_energy = get_individual_metrics(base_dom_objectives)
         dse_dom_latency, dse_dom_energy, dse_dom_throughput, dse_dom_area, dse_dom_link_latency, dse_dom_link_energy = get_individual_metrics(dse_dom_objectives)
@@ -414,13 +412,12 @@ if __name__ == "__main__":
         for odir in args.otherdirs:
             fname_results_nondom = glob.glob(os.path.join(ROOT_DIR, odir, "*result_nondom.csv"))
             fname_results_all = glob.glob(os.path.join(ROOT_DIR, odir, "*result_all.csv"))
+            results_pareto_dse = pd.read_csv(fname_results_nondom[0], header=None).to_numpy()
 
-            results_all_dse = pd.read_csv(fname_results_all[0], header=None)
-            results_all_dse = results_all_dse.to_numpy()
-            results_pareto_dse = pd.read_csv(fname_results_nondom[0], header=None)
-            results_pareto_dse = results_pareto_dse.to_numpy()
+            results_all_dse = pd.read_csv(fname_results_all[0], header=None).to_numpy()
+            results_dom_dse = np.array([res for res in results_all_dse if res[-1]=="dom"])
 
-            dse_dom_objectives = results_all_dse[:, n_constr+2+n_var:-1]
+            dse_dom_objectives = results_dom_dse[:, n_constr+2+n_var:-1]
             dse_dom_latency, dse_dom_energy, dse_dom_throughput, dse_dom_area, dse_dom_link_latency, dse_dom_link_energy = get_individual_metrics(dse_dom_objectives)
 
             append_results(dse_dom_latencies, dse_dom_energies, dse_dom_throughputs, dse_dom_areas, dse_dom_link_latencies, dse_dom_link_energies, *get_individual_metrics(dse_dom_objectives))
@@ -446,9 +443,10 @@ if __name__ == "__main__":
         fname_results_base_nondom = glob.glob(os.path.join(ROOT_DIR, args.basedir, "*result_nondom.csv"))
         fname_results_base_all = glob.glob(os.path.join(ROOT_DIR, args.basedir, "*result_all.csv"))
 
-        results_all_base = pd.read_csv(fname_results_base_all[0], header=None)
-        results_all_base = results_all_base.to_numpy()
-        base_dom_objectives = results_all_base[:, n_constr+2+n_var:-1]
+        results_all_base = pd.read_csv(fname_results_base_all[0], header=None).to_numpy()
+        results_dom_base = np.array([res for res in results_all_base if res[-1]=="dom"])
+
+        base_dom_objectives = results_dom_base[:, n_constr+2+n_var:-1]
         base_dom_latency, base_dom_energy, base_dom_throughput, base_dom_area, base_dom_link_latency, base_dom_link_energy = get_individual_metrics(base_dom_objectives)
 
         results_pareto_base = pd.read_csv(fname_results_base_nondom[0], header=None)
@@ -482,24 +480,24 @@ if __name__ == "__main__":
 
         for ptype in plot_combinations:
 
-            ax1.scatter( eval(f"base_dom_{ptype[0]}"), eval(f"base_dom_{ptype[1]}"), marker="o", color="lightgrey", label="Dominated" )
+            ax1.scatter( eval(f"base_dom_{ptype[0]}"), eval(f"base_dom_{ptype[1]}"), marker=MARKER_SEQUENCE[0], color="lightgrey", label="Dominated" )
 
             # iterate over other results that were specified
             # First we print only the dominated results so they are in the background
             for ores in range(num_odirs):
                 list_names = [get_list_name(ptype[0]), get_list_name(ptype[1])]
                 objective_dom_list0, objective_dom_list1 = eval(f"dse_dom_{list_names[0]}"), eval(f"dse_dom_{list_names[1]}")
-                ax1.scatter( objective_dom_list0[ores], objective_dom_list1[ores],  marker="o", color="lightgrey")
+                ax1.scatter( objective_dom_list0[ores], objective_dom_list1[ores],  marker=MARKER_SEQUENCE[0], color="lightgrey")
 
             # iterate over other results that were specified
-            plt.gca().set_prop_cycle(color=COLOR_SEQUENCE[1:] )
+            plt.gca().set_prop_cycle(color=COLOR_SEQUENCE[1:], marker=MARKER_SEQUENCE[1:] )
             for ores in range(num_odirs):
                 list_names = [get_list_name(ptype[0]), get_list_name(ptype[1])]
                 objective_list0, objective_list1 = eval(f"dse_{list_names[0]}"), eval(f"dse_{list_names[1]}")
-                ax1.scatter( objective_list0[ores], objective_list1[ores], label=args.labels[ores], marker="o")
+                ax1.scatter( objective_list0[ores], objective_list1[ores], label=args.labels[ores], marker=MARKER_SEQUENCE[1+ores])
 
             # Plot base results
-            ax1.scatter( eval(f"base_{ptype[0]}"), eval(f"base_{ptype[1]}"), label="Base", marker="+", color=COLOR_SEQUENCE[0])
+            ax1.scatter( eval(f"base_{ptype[0]}"), eval(f"base_{ptype[1]}"), label="Base", marker=MARKER_SEQUENCE[0], color=COLOR_SEQUENCE[0])
             
             # General settings
             ax1.set_xlabel(f"{objective_to_str(ptype[0])} [{objective_to_unit(ptype[0])}]")
@@ -508,4 +506,23 @@ if __name__ == "__main__":
             figname = f"{objective_to_str(ptype[0])}_over_{objective_to_str(ptype[1])}.pdf"
             fig.savefig(os.path.join(outdir_figs, figname))
             ax1.clear()
+        plt.close()
+            
+        # plot metrics such as EDAP
+        fig = plt.figure(dpi=1200)
+        ax1 = fig.add_subplot(111)
+
+        dse_dom_all_edaps = np.concatenate(dse_dom_edaps)
+        ax1.scatter(dse_dom_all_edaps, dse_dom_all_edaps, label="Dominated", color="lightgrey", marker=".")
+        breakpoint()
+
+        plt.gca().set_prop_cycle(color=COLOR_SEQUENCE[1:])
+        for ores in range(num_odirs):
+            #ax1.scatter(base_dom_edap ,base_dom_edaps, marker="o", color="lightgrey",  )
+            #ax1.scatter(dse_dom_edaps[ores] ,dse_dom_edaps[ores], marker="o", color="lightgrey", label=args.labels[ores] )
+            ax1.scatter(dse_edaps[ores], dse_edaps[ores], label=args.labels[ores], marker=MARKER_SEQUENCE[1+ores])
+
+        ax1.scatter(base_edap, base_edap, marker=MARKER_SEQUENCE[0], color=COLOR_SEQUENCE[0], label="Base" )
+        ax1.legend()
+        fig.savefig(os.path.join(outdir_figs, "edap.pdf"))
         plt.close()
