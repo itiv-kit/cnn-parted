@@ -83,7 +83,8 @@ def main(args):
         sols += len(scheme)
 
     if sols > 0:
-        num_real_pp = [int(scheme[num_pp+2]) for scheme in sol["nondom"]]
+        num_platforms = len(nodeStats)
+        num_real_pp = [int(scheme[num_platforms+1]) for scheme in sol["nondom"]]
         for i in range(0, max(num_real_pp)+1):
             print(i, "Partitioning Point(s):", num_real_pp.count(i))
     else:

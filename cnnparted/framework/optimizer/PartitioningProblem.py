@@ -34,7 +34,7 @@ class PartitioningProblem(ElementwiseProblem):
 
     def _evaluate(self, x : np.ndarray, out : dict, *args, **kwargs) -> None:
         valid = True
-        num_real_pp = -1
+        num_real_pp = 0
 
         l_pp = []
         e_pp = []
@@ -68,34 +68,38 @@ class PartitioningProblem(ElementwiseProblem):
             th_pp = []
             partitions = []
             part_latency = deque()
-            l_pp_link = []
-            e_pp_link = []
+            l_pp_link = np.full((self.num_pp + 1), 0, dtype=float)
+            e_pp_link = np.full((self.num_pp + 1), 0, dtype=float)
             successors = [self.schedule[0]]
             i = last_pp = last_platform = -1
             for i, pp in enumerate(p[0:self.num_pp+1], self.num_pp + 1):
+                partitions.append([p[i], last_pp, pp])
+
+                # link evaluation
+                if len(partitions) > 1: # do not calculate time to transfer input data
+                    if partitions[-2][0] != partitions[-1][0] or last_platform != partitions[-1][0]: #and last_platform != -1): # not the same platform
+                        if partitions[-1][1] != partitions[-1][2] and partitions[-1][1] != 0: # not the same layer and not the input
+                            num_real_pp += 1 # set number of real partitioning points
+                            last_platform = partitions[-1][0]
+
+                            link_l, link_e, bandwidth[i-self.num_pp-1] = self._get_link_metrics(i-self.num_pp-1, last_pp, successors)
+                            l_pp_link[i-self.num_pp-1] = link_l
+                            e_pp_link[i-self.num_pp-1] = link_e
+                            th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
+                else:
+                    last_platform = partitions[-1][0]
+
+                # node evaluation
                 v, optimal_design_tag, mem[i-self.num_pp-1] = self._eval_partition(p[i], last_pp, pp, l_pp, e_pp, successors)
                 valid &= v
                 part_latency.append([p[i], l_pp[-1]]) # required for throughput calculation
 
                 current_platform = list(self.nodeStats.keys())[p[i]]
                 design_tag[current_platform] = optimal_design_tag
-                partitions.append([p[i], last_pp, pp])
-
-                # link evaluation
-                link_l, link_e, bandwidth[i-self.num_pp-1] = self._get_link_metrics(i-self.num_pp-1, pp, successors)
-                l_pp_link.append(link_l)
-                e_pp_link.append(link_e)
-                th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
-
-                # set number of real partitioning points
-                if last_platform != p[i] and l_pp[-1] != 0:
-                    num_real_pp += 1
 
                 # update last pp and acc
                 if last_pp != pp:
                     last_pp = pp
-                    if last_pp != 1: # if last_pp not input
-                        last_platform = p[i]
 
             link_latency = sum(l_pp_link)
             link_energy = sum(e_pp_link)
@@ -130,9 +134,6 @@ class PartitioningProblem(ElementwiseProblem):
             platform_energy = 0.0
             part_l_params = 0
 
-            ls = {}
-            dmem = []
-
             energy_per_layer = []
             latency_per_layer = []
 
@@ -156,7 +157,12 @@ class PartitioningProblem(ElementwiseProblem):
             platform_latency_per_design.append(platform_latency)
 
         # Check bit-width, analyze memory requirements and generate successors needed for link analysis
+        ls = {}
+        dmem = []
+
         for j in range(last_pp + 1, pp+1):
+            layer = self.schedule[j]
+
             valid &= self._check_layer_bitwidth(platform, layer)
             if layer in self.layer_params.keys():
                 part_l_params += self.layer_params[layer]
@@ -238,7 +244,7 @@ class PartitioningProblem(ElementwiseProblem):
         layers = np.unique([layer for layer in layers if layer not in successors])
 
         # Only consider already executed layers
-        layers = np.unique([layer for layer in layers if layer in list(self.layer_dict.keys())[:pp]])
+        layers = np.unique([layer for layer in layers if layer in list(self.layer_dict.keys())[:pp+1]])
 
         data_sizes = [np.prod(self.layer_dict[layer]["output_size"]) for layer in layers]
 
