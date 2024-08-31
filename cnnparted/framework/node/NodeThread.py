@@ -32,16 +32,16 @@ class NodeThread(ModuleThreadInterface):
 
     def _run_mnsim(self, config: dict) -> None:
         runroot = self.runname + "_" + str(self.id) + "_" + config["accelerator"]
-        fname_csv = runroot + "_mnsim_layers.csv"
+        fname_csv = os.path.join(self.work_dir, runroot + "_mnsim_layers.csv")
 
         layers = self.ga.get_mnsim_layers()
         mn = MNSIMInterface(layers, config, self.ga.input_size)
 
         if os.path.isfile(fname_csv):
-            self.stats = self._read_layer_csv(fname_csv)
+            self.stats["eval"] = self._read_layer_csv(fname_csv)
         else:
             mn.run()
-            self.stats["eval"] = [mn.stats]
+            self.stats["eval"] = mn.stats
             self._write_layer_csv(fname_csv, stats=mn.stats)
 
         self.stats['bits'] = mn.pim_realADCbit()
@@ -51,7 +51,7 @@ class NodeThread(ModuleThreadInterface):
         config["run_root"] = runroot
         config["work_dir"] = self.work_dir
         fname_csv = os.path.join(self.work_dir, self.runname + "_" + str(self.id) + "_" + config["accelerator"] + "_tl_layers.csv")
-        
+
         # Check if design is DSE enabled
         if dse_cfg := config.get("dse"):
             is_dse = True
@@ -76,7 +76,7 @@ class NodeThread(ModuleThreadInterface):
 
         pruned_stats = self._prune_accelerator_designs(tl.stats, top_k, metric, is_dse)
 
-        # Prune accelerator design space 
+        # Prune accelerator design space
         self.stats["eval"] = pruned_stats
 
 
@@ -102,8 +102,8 @@ class NodeThread(ModuleThreadInterface):
             energy_per_layer = []
             latency_per_layer = []
             for name, layer in layers.items():
-                energy_per_layer.append(layer["energy"])    
-                latency_per_layer.append(layer["latency"])    
+                energy_per_layer.append(layer["energy"])
+                latency_per_layer.append(layer["latency"])
 
             energy_per_design.append(energy_per_layer)
             latency_per_design.append(latency_per_layer)
@@ -120,17 +120,17 @@ class NodeThread(ModuleThreadInterface):
             for i in metric_for_layer[0:top_k]:
                 design_candidates.append(f"design_{i}")
 
-        design_candidates = np.unique(design_candidates) 
+        design_candidates = np.unique(design_candidates)
 
         # Remove all designs that have not been found to be suitable design candidates
         #pruned_stats = []
         #for design in stats:
-        #    if design["tag"] in design_candidates: 
-        #       tag = design["tag"] 
+        #    if design["tag"] in design_candidates:
+        #       tag = design["tag"]
         #       layers = design["layers"]
         #       #arch_config = design["arch_config"]
         #       pruned_stats.append({"tag": tag, "layers": layers})
-        
+
         pruned_stats = {tag: results for tag, results in stats.items() if tag in design_candidates}
 
         return pruned_stats
@@ -148,8 +148,8 @@ class NodeThread(ModuleThreadInterface):
             energy_per_layer = []
             latency_per_layer = []
             for name, layer in layers.items():
-                energy_per_layer.append(layer["energy"])    
-                latency_per_layer.append(layer["latency"])    
+                energy_per_layer.append(layer["energy"])
+                latency_per_layer.append(layer["latency"])
 
             energy_per_design.append(energy_per_layer)
             latency_per_design.append(latency_per_layer)
@@ -158,7 +158,7 @@ class NodeThread(ModuleThreadInterface):
         energy_per_design = np.array(energy_per_design)
         latency_per_design = np.array(latency_per_design)
         area_per_design = np.array(area_per_design)
-        
+
         total_energy = calc_metric(np.array(energy_per_design), np.array(latency_per_layer), np.array(area_per_design), "energy", reduction= True)
         total_latency = calc_metric(np.array(energy_per_design), np.array(latency_per_layer), np.array(area_per_design), "latency", reduction= True)
         total_area = area_per_design
@@ -169,7 +169,7 @@ class NodeThread(ModuleThreadInterface):
             raise ValueError("After applying constraints no designs remain!")
 
         return constrained_stats
-        
+
 
     def _read_layer_csv(self, filename: str) -> dict:
         designs = {}

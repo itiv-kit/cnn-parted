@@ -4,7 +4,9 @@ general:
   num_pp: -1
   num_topos: 1
   num_jobs: 1
-  optimization: ppa
+  optimization: all
+  work_dir: alexnet_run
+  keep_dir: True
 
 neural-network:
   name: alexnet

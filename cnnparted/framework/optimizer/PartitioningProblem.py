@@ -26,7 +26,7 @@ class PartitioningProblem(ElementwiseProblem):
 
         n_var = self.num_pp * 2 + 1 # platform IDs + Number of max. partitioning points
         n_obj = 6 # latency, energy, throughput, area + link latency + link energy
-        n_constr = (self.num_pp + 1) + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_accelerator_platforms + num_real_pp + latency/energy per partition + latency/energy per link
+        n_constr = self.num_platforms + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_accelerator_platforms + num_real_pp + latency/energy per partition + latency/energy per link
 
         xu = self.num_platforms * self.num_layers - 1
 
@@ -39,6 +39,11 @@ class PartitioningProblem(ElementwiseProblem):
         l_pp = []
         e_pp = []
 
+        # Init dict
+        design_tag = {}
+        for key in self.nodeStats.keys():
+            design_tag[key] = 'design_0'
+
         latency = energy = throughput = area = link_latency = link_energy = 0.0
         bandwidth = np.full((self.num_pp + 1), np.inf)
         mem = np.full((self.num_pp + 1), np.inf)
@@ -48,20 +53,18 @@ class PartitioningProblem(ElementwiseProblem):
         p[0:self.num_pp] = np.divide(p[0:self.num_pp], self.num_platforms)
         p[self.num_pp:] = np.divide(p[self.num_pp:], self.num_layers)
         p = np.floor(p).astype(int)
-        # insert a partitioning point after last layer as otherwise evaluation of final partition is not perforrmed
+        # insert a partitioning point after last layer as otherwise evaluation of final partition is not performed
         # e.g. if there are 10 layers and pp=5, the inserted point is needed to trigger
         # evaluation of partition from layer 6-10
-        p = np.insert(p, self.num_pp, self.num_layers-1) 
+        p = np.insert(p, self.num_pp, self.num_layers-1)
 
         if not np.array_equal(np.sort(p[:self.num_pp]), p[:self.num_pp]): # keep order of partitioning points
             valid = False
-        elif self.acc_once and np.unique(p[-self.num_pp-1:]).size != np.asarray(p[-self.num_pp-1:]).size:   # only use accelerator once
+        elif self.acc_once and np.unique(p[-self.num_pp-1:]).size != np.asarray(p[-self.num_pp-1:]).size: # only use accelerator once
             valid = False
         elif self.fixed_sys and not np.array_equal(np.sort(p[-self.num_pp-1:]), p[-self.num_pp-1:]): # keep order of Accelerators
             valid = False
         else:
-            #design_id = {}
-            design_tag = {}
             th_pp = []
             partitions = []
             part_latency = deque()
@@ -84,7 +87,7 @@ class PartitioningProblem(ElementwiseProblem):
                 e_pp_link.append(link_e)
                 th_pp.append(self._zero_division(1000.0, link_l)) # FPS - latency in ms
 
-                # # set number of real partitioning points
+                # set number of real partitioning points
                 if last_platform != p[i] and l_pp[-1] != 0:
                     num_real_pp += 1
 
@@ -107,7 +110,7 @@ class PartitioningProblem(ElementwiseProblem):
         if valid:
             out["G"] = [i * (-1) for i in design_tag] + [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in e_pp] + [i * (-1) for i in l_pp_link] + [i * (-1) for i in e_pp_link]
         else:
-            out["G"] = [i for i in range(self.num_pp+1)] + [1] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)]
+            out["G"] = [i for i in design_tag] + [1] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)] + [i for i in range(self.num_pp+1)]
 
     def _eval_partition(self, platform : int, last_pp : int, pp : int, l_pp : list, e_pp : list, successors : list) -> tuple[bool, int]:
         platform = list(self.nodeStats.keys())[platform]
@@ -120,7 +123,7 @@ class PartitioningProblem(ElementwiseProblem):
         platform_energy_per_design = []
 
         design_tags: list[str] = list(self.nodeStats[platform]["eval"].keys())
-        
+
         for design_tag, _ in self.nodeStats[platform]["eval"].items():
             valid = True
             platform_latency = 0.0
@@ -182,7 +185,7 @@ class PartitioningProblem(ElementwiseProblem):
         # Decide which design should be used
     	# Use Energy-Delay-Area-Product as criterium for optimality
         metric_per_design = calc_metric(np.array(energy_per_design), np.array(latency_per_design), np.array(area_per_design), "edap", reduction=True)
-        
+
         #optimal_design_id  = np.argmin(metric_per_design)
         optimal_design_idx = np.argmin(metric_per_design)
         optimal_design_tag = design_tags[optimal_design_idx]

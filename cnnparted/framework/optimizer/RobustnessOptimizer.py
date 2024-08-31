@@ -35,7 +35,7 @@ class RobustnessOptimizerCallback(Callback):
 
 class RobustnessOptimizer(Optimizer):
     def __init__(self, work_dir: str, run_name: str, model: nn.Module, accuracy_function: Callable, config: dict, device : str, progress: bool):
-        self.fname_csv = work_dir + run_name + "_" + "robustness.csv"
+        self.fname_csv = os.path.join(work_dir, run_name + "_" + "robustness.csv")
 
         self.sample_limit_schedule = config.get('robustness').get('sample_limit_generation_schedule')
         self.sample_limit_steps = config.get('robustness').get('sample_limit_steps')

@@ -61,7 +61,7 @@ class PartitioningOptimizer(Optimizer):
 
         all_paretos = []
         non_optimals = []
-        g_len = (self.num_pp + 1) + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
+        g_len = len(self.nodeStats) + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
         x_len = (self.num_pp) * 2 + 1
 
         fname_p_npy = os.path.join(self.work_dir, self.run_name + "_" + "paretos.npy")
@@ -127,7 +127,7 @@ class PartitioningOptimizer(Optimizer):
         xu = num_platforms * num_layers - 1
         samples = []
         rng = default_rng(seed=42)
-        
+
         while len(samples) < self.pop_size:
             pps = rng.integers(low=0, high=xu+1, size=num_pp)
             #pps = np.random.randint(0, xu+1, size=num_pp)
