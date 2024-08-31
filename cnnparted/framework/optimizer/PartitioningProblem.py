@@ -272,11 +272,12 @@ class PartitioningProblem(ElementwiseProblem):
         for key in parts.keys():
             #platform = [*self.nodeStats][key]
             platform = list(self.nodeStats.keys())[key]
+            tag = design_tag[platform]
             if self.nodeStats[platform]['type'] == 'mnsim':
                 for part in parts[key]:
-                    for l in self.schedule[part[0]:part[1]]:
-                        if l in [*self.nodeStats[platform]]:
-                            area += float(self.nodeStats[platform][l]['area'])
+                    for l in self.schedule[part[0]+1:part[1]+1]:
+                        if l in [*self.nodeStats[platform]["eval"][tag]["layers"]]:
+                            area += float(self.nodeStats[platform]["eval"][tag]["layers"][l]['area'])
             else: # timeloop
                 #part: partition
                 for part in parts[key]:
