@@ -124,10 +124,12 @@ class AccuracyEvaluator():
         quant_list = []
         for base_layer in self.qmodel.explorable_module_names:
             quant_list.append(self.bits[0])
-            for l in schedules[0]:
+            for i, l in enumerate(schedules[0]):
                 if l in base_layer and l != 'input' and l != 'output':
                     layer_dict[l] = len(quant_list) - 1
                     break
+                elif l == 'output': # FIXME? hotfix for last layer being renamed in ONNX file
+                    layer_dict[schedules[0][i-1]] = len(quant_list) - 1
 
         quants = []
         num_pp = n_var/2 - 1
