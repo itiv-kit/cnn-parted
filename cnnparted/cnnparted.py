@@ -10,12 +10,14 @@ import importlib
 import numpy as np
 import pandas as pd
 from typing import Callable
+from timeit import default_timer as timer
 
 from framework import ConfigHelper, NodeThread, GraphAnalyzer, PartitioningOptimizer, RobustnessOptimizer, AccuracyEvaluator
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 
 def main(args):
+    # Step 0 - Initialize CNNParted
     if args.cuda:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(args.cid)
         device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -37,57 +39,53 @@ def main(args):
 
     node_components, link_components = conf_helper.get_system_components()
     accuracy_function = setup_workload(args.run_name, config['neural-network'])
+    step_runtime = [timer()]
 
     # Step 1 - Analysis
     ga = GraphAnalyzer(work_dir, args.run_name, tuple(config['neural-network']['input-size']), args.p)
     ga.find_schedules(main_conf.get('num_topos'))
+    step_runtime.append(timer())
 
     # Step 2 - Robustness Analysis
     q_constr = {}
     if config.get('accuracy'):
         robustnessAnalyzer = RobustnessOptimizer(work_dir, args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), device, args.p)
         q_constr = robustnessAnalyzer.optimize()
+    step_runtime.append(timer())
 
     # Step 3 - Layer Evaluation
     nodeStats = node_eval(ga, node_components, work_dir, args.run_name, args.p)
+    num_platforms = len(nodeStats)
+    step_runtime.append(timer())
 
     # Step 4 - Find pareto-front
     num_pp = main_conf.get('num_pp')
     if num_pp == -1:
         num_pp = len(nodeStats[list(nodeStats.keys())[0]]["eval"]["design_0"]["layers"].keys()) - 1
-    elif len(nodeStats) == 1:
+    elif num_platforms == 1:
         num_pp = 0
     optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.p)
     n_constr, n_var, sol = optimizer.optimize(q_constr, main_conf)
+    step_runtime.append(timer())
 
-    print("Found: ")
-    for pareto, sched in sol.items():
-        print(pareto, len(sched))
-
-    print("Evaluating accuracy...")
     # Step 5 - Accuracy Evaluation (only non-dominated solutions)
     if accuracy_cfg := config.get('accuracy'):
+        print("Found: ")
+        for pareto, sched in sol.items():
+            print(pareto, len(sched))
+        print("Evaluating accuracy...")
+
         quant = AccuracyEvaluator(ga.torchmodel, nodeStats, accuracy_cfg, device, args.p)
         quant.eval(sol["nondom"], n_constr, n_var, ga.schedules, accuracy_function)
         for i, p in enumerate(sol["dom"]): # achieving aligned csv file
             sol["dom"][i] = np.append(p, float(0))
+    step_runtime.append(timer())
 
-    # Step 6 - Find best partitioning point
-    # objective = conf_helper.get_optimization_objectives(node_components, link_components)
+    # Step 6 - Output exploration results
+    write_files(work_dir, args.run_name, n_constr, n_var, sol, ga.schedules, num_platforms)
+    num_pp_schemes = write_log_file(work_dir, args.run_name, step_runtime, sol, num_platforms)
 
-    # Step 7 - Output exploration results
-    write_files(work_dir, args.run_name, n_constr, n_var, sol, ga.schedules, len(nodeStats))
-    sols = 0
-    for pareto, scheme in sol.items():
-        print(pareto, len(scheme))
-        sols += len(scheme)
-
-    if sols > 0:
-        num_platforms = len(nodeStats)
-        num_real_pp = [int(scheme[num_platforms+1]) for scheme in sol["nondom"]]
-        for i in range(0, max(num_real_pp)+1):
-            print(i, "Partitioning Point(s):", num_real_pp.count(i))
-    else:
+    if num_pp_schemes == 0:
         print()
         print("### [CNNParted] No valid partitioning found! ###")
         print()
@@ -168,6 +166,32 @@ def write_files(work_dir: str, run_name : str, n_constr : int, n_var : int, resu
             df.to_csv( os.path.join(work_dir, run_name + "_" + "result_nondom.csv"), header=False)
     df = pd.DataFrame(rows)
     df.to_csv( os.path.join(work_dir, run_name + "_" + "result_all.csv"), header=False)
+
+def write_log_file(work_dir: str, run_name : str, step_runtimes : list, sol : dict, num_platforms : int) -> int:
+    log_file = os.path.join(work_dir, run_name + ".log")
+    f = open(log_file, "a")
+
+    # Runtime of each step
+    step_runtimes = [x - step_runtimes[0] for x in step_runtimes[1:]]
+    t_prev = 0
+    for i, x in enumerate(step_runtimes, 1):
+        f.write("Step " + str(i) +  ": " + str(x - t_prev) + ' s \n')
+        t_prev = x
+
+    # Number of solutions found
+    num_pp_schemes = 0
+    for pareto, scheme in sol.items():
+        f.write(str(pareto) + ": " + str(len(scheme)) + '\n')
+        num_pp_schemes += len(scheme)
+    if num_pp_schemes > 0:
+        num_real_pp = [int(scheme[num_platforms+1]) for scheme in sol["nondom"]]
+        for i in range(0, max(num_real_pp)+1):
+            f.write(str(i) + " Partitioning Point(s): " + str(num_real_pp.count(i)) + '\n')
+    else:
+        f.write("No valid partitioning found! \n")
+
+    f.close()
+    return num_pp_schemes
 
 
 if __name__ == '__main__':
