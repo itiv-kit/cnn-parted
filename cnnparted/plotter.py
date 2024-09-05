@@ -184,12 +184,13 @@ if __name__ == "__main__":
     parser.add_argument("-in", "--indir", type=str, help="Path to the evaluation directory")
     parser.add_argument("-out", "--outdir", type=str, help="Path to which results will be saved")
     parser.add_argument("-d", "--designs", type=int, nargs="+", help="Which designs to consider, defaults to all", default=None)
-    parser.add_argument("-t", "--plottype", choices=["metric", "partitioning", "compare_base", "compare_multiple"], required=True)
+    parser.add_argument("-t", "--plottype", choices=["metric", "partitioning", "compare_base", "compare_multiple", "print_opt"], required=True)
     parser.add_argument("-s", "--system", choices = ["eyeriss_like", "simba_like", "gemmini_like"], nargs="+", help="Accelerators used in the system in order: [platform_0, platform_1, ...]")
     parser.add_argument("-c", "--constraints", type=str, help="Input yaml file that was used to start the simulation")
     parser.add_argument("-b", "--basedir", type=str, help="Directory which contains evaluation of baseline evaluation", default=None)
     parser.add_argument("-o", "--otherdirs", type=str, nargs="+", help="Directories to multiple other results which are also used for comparison")
-    parser.add_argument("-l", "--labels", type=str, nargs="+", help="Labels for plots. Only used when plottype==compare_multiple")
+    parser.add_argument("-l", "--labels", type=str, nargs="+", help="Labels for plots. Only used when plottype==compare_multiple", required=False, default=None)
+    parser.add_argument("-n", "--network", type=str, help="String with network name")
     args = parser.parse_args()
 
     # Plot settings
@@ -198,10 +199,10 @@ if __name__ == "__main__":
 
     assert(args.indir != args.outdir)
     if not os.path.isdir(args.outdir):
-        os.mkdir(args.outdir)
+        os.makedirs(args.outdir, exist_ok=True)
     outdir_figs = os.path.join(os.getcwd(), args.outdir, "figures")
     if not os.path.isdir(outdir_figs):
-        os.mkdir(outdir_figs)
+        os.makedirs(outdir_figs, exist_ok=True)
 
     
     #system_eval_dir = os.path.join(ROOT_DIR, args.indir, "system_evaluation")
@@ -526,3 +527,68 @@ if __name__ == "__main__":
         ax1.legend()
         fig.savefig(os.path.join(outdir_figs, "edap.pdf"))
         plt.close()
+
+    elif args.plottype == "print_opt":
+        # This requires a base and a dse directory
+        fname_results_all = glob.glob(os.path.join(ROOT_DIR, args.indir, "*result_all.csv"))
+        fname_results_base_all = glob.glob(os.path.join(ROOT_DIR, args.basedir, "*result_all.csv"))
+
+        results_all_dse = pd.read_csv(fname_results_all[0], header=None).to_numpy()
+        results_all_base = pd.read_csv(fname_results_base_all[0], header=None).to_numpy()
+
+        base_all_objectives = results_all_base[:, n_constr+2+n_var:-1]
+        dse_all_objectives = results_all_dse[:, n_constr+2+n_var:-1]
+
+        base_latency, base_energy, base_throughput, base_area, base_link_latency, base_link_energy = get_individual_metrics(base_all_objectives)
+        dse_latency, dse_energy, dse_throughput, dse_area, dse_link_latency, dse_link_energy = get_individual_metrics(dse_all_objectives)
+
+        base_idx_opt_latency = np.argmin(base_latency)
+        base_opt_latency_params = [base_latency[base_idx_opt_latency], base_energy[base_idx_opt_latency], base_area[base_idx_opt_latency]]
+
+        base_idx_opt_energy = np.argmin(base_energy)
+        base_opt_energy_params = [base_latency[base_idx_opt_energy], base_energy[base_idx_opt_energy], base_area[base_idx_opt_energy]]
+
+        dse_idx_opt_latency = np.argmin(dse_latency)
+        dse_opt_latency_params = [dse_latency[dse_idx_opt_latency], dse_energy[dse_idx_opt_latency], dse_area[dse_idx_opt_latency]]
+
+        dse_idx_opt_energy = np.argmin(dse_energy)
+        dse_opt_energy_params = [dse_latency[dse_idx_opt_energy], dse_energy[dse_idx_opt_energy], dse_area[dse_idx_opt_energy]]
+
+        def export_tex(energy_opt_base: list, latency_opt_base: list, energy_opt_dse: list, latency_opt_dse: list):
+            flist_energy_base = ["%.2f" % elem for elem in energy_opt_base]
+            fl_energy_base = "   &   ".join(flist_energy_base)
+
+            flist_latency_base = ["%.2f" % elem for elem in latency_opt_base]
+            fl_latency_base = "   &   ".join(flist_latency_base)
+
+            fl_energy_dse  = ["%.2f" % elem for elem in energy_opt_dse]
+            fl_energy_dse =  "   &   ".join(fl_energy_dse)
+
+            fl_latency_dse = ["%.2f" % elem for elem in latency_opt_dse]
+            fl_latency_dse = "   &   ".join(fl_latency_dse)
+
+            network = str(args.network) + " Base"
+            line = f"\multirow{{2}}{{*}}{{{network}}}" + "  &  " + "  Latency opt.  &  " + fl_latency_base + "      \\\\  \n"
+            line += "                                  " +  "  &  " + "  Energy opt.  &  " + fl_energy_base + "      \\\\  \n"
+
+            network = str(args.network) + " DSE"
+            line += f"\multirow{{2}}{{*}}{{{network}}}" + "  &  " + "  Latency opt.  &  " + fl_latency_dse + "      \\\\  \n"
+            line += "                                  " +  "  &  " + "  Energy opt.  &  " + fl_energy_dse + "      \\\\  \n"
+            print(line)
+
+        def pprint_list(l: list):
+            format_list = ["%.2f" % elem for elem in l]
+            print(format_list)
+
+        export_tex(base_opt_energy_params, base_opt_latency_params, dse_opt_energy_params, dse_opt_latency_params)
+        #print("Base Opt Latency")
+        #pprint_list(base_opt_latency_params)
+        #print("Base Opt Energy")
+        #pprint_list(base_opt_energy_params)
+
+        #print("DSE Opt Latency")
+        #pprint_list(dse_opt_latency_params)
+        #print("DSE Opt Energy")
+        #pprint_list(dse_opt_energy_params)
+
+
