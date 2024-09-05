@@ -48,7 +48,7 @@ def main(args):
 
     # Step 2 - Robustness Analysis
     q_constr = {}
-    if config.get('accuracy').get('robustness'):
+    if config.get('accuracy', {}).get('robustness'):
         robustnessAnalyzer = RobustnessOptimizer(work_dir, args.run_name, ga.torchmodel, accuracy_function, config.get('accuracy'), device, args.p)
         q_constr = robustnessAnalyzer.optimize()
     step_runtime.append(timer())
