@@ -174,14 +174,18 @@ class Timeloop:
         #os.chdir(ROOT_DIR)
         timeloop_stats = self._parse_stats(dirname)
 
-        # Workaround for batched matmul operations. We assume that the accelerator would 
-        # just perform each batch separately. Since they then all have the same
+        # Workaround for batched matmul and grouped conv operations. We assume that the accelerator would 
+        # just perform each batch/group separately. Since they then all have the same
         # shape the mapping is also the same and we can just multiply the results of one batch.
         # For acclerators where this is not the case, a new mapping configuration must be designed
         if gemm_params := layer.get('gemm_params'):
             if batch_size := gemm_params.get('b'):
                 timeloop_stats["energy_mJ"] = timeloop_stats["energy_mJ"] * batch_size
                 timeloop_stats["latency_ms"] = timeloop_stats["latency_ms"] * batch_size
+        elif conv_params := layer.get('conv_params'):
+            if (groups := conv_params.get('groups')) and groups > 1: 
+                timeloop_stats["energy_mJ"] = timeloop_stats["energy_mJ"] * groups
+                timeloop_stats["latency_ms"] = timeloop_stats["latency_ms"] * groups
         return timeloop_stats
 
 

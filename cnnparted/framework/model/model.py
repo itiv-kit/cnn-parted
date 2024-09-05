@@ -130,6 +130,7 @@ class TreeModel:
     def _get_conv_params(self,node):
         #(N,Cin​,H,W) and output (N,Cout,Hout,Wout)(N,Cout​,Hout​,Wout​)
         attributes = {}
+        attributes['groups'] = 1
         for attr in node.attribute:
             if attr.name == 'kernel_shape':
                 attributes['kernel_shape'] = list(attr.ints)
@@ -139,7 +140,7 @@ class TreeModel:
                 attributes['pads'] = list(attr.ints)
             elif attr.name == 'dilations':
                 attributes['dilations'] = list(attr.ints)
-            elif attr.name == 'groups':
+            elif attr.name == 'groups' or attr.name == 'group':
                 attributes['groups'] = attr.i
 
         matched_outputs = [output for output in node.output if output in self.output_sizes]
@@ -158,10 +159,10 @@ class TreeModel:
         ifms    = o_shape[0][0]*c*((o_shape[0][3]-1)*attributes['strides'][1]+attributes['kernel_shape'][1])*((o_shape[0][2]-1)*attributes['strides'][0]+attributes['kernel_shape'][0])
         output = {
             'n': o_shape[0][0],
-            'm': o_shape[0][1],
+            'm': o_shape[0][1] // attributes['groups'],
             'q': o_shape[0][2],
             'p': o_shape[0][3],
-            'c': c,
+            'c': c // attributes['groups'],
             's': attributes['kernel_shape'][0],
             'r': attributes['kernel_shape'][1],
             'wpad': attributes['pads'][0],
@@ -170,7 +171,8 @@ class TreeModel:
             'hstride': attributes['strides'][1],
             'ifms':ifms,
             'ofms':ofms,
-            'weights':weights
+            'weights':weights,
+            'groups': attributes.get("groups", 1)
         }
 
         return output
