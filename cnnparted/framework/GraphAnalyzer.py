@@ -1,4 +1,5 @@
 import os
+import random
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -27,13 +28,35 @@ class GraphAnalyzer:
             df = pd.read_csv(fname_csv, header=None, index_col=0)
             self.schedules = df.values.tolist()
         else:
+            #try:
+            #    self.schedules = topo_sort_random_start_node(G=self.graph.get_Graph(), n=num_topos, seed=0, as_ndarray=True, progress=self.progress)
+            #except:
+            #    topo_sorts = nx.all_topological_sorts(self.graph.get_Graph())
+            #    self.schedules = self._iter_sample_fast(topo_sorts, num_topos)
+
             self.schedules = []
             self.schedules.append(list(nx.topological_sort(self.graph.get_Graph())))
-            #self.schedules = topo_sort_random_start_node(G=self.graph.get_Graph(), n=num_topos, seed=0, as_ndarray=True, progress=self.progress)
+
             self.schedules = np.unique(self.schedules, axis=0)
             df = pd.DataFrame(self.schedules)
             df.to_csv(fname_csv, header=False)
         return self.schedules
+
+    # https://stackoverflow.com/questions/12581437/python-random-sample-with-a-generator-iterable-iterator
+    def _iter_sample_fast(self, iterable, samplesize):
+        results = []
+        iterator = iter(iterable)
+        # Fill in the first samplesize elements:
+        for _ in range(samplesize): results.append(next(iterator))
+        random.shuffle(results)  # Randomize their positions
+        for i, v in enumerate(iterator, samplesize):
+            r = random.randint(0, i)
+            if r < samplesize:
+                results[r] = v  # at a decreasing rate, replace random items
+
+        if len(results) < samplesize:
+            raise ValueError("Sample larger than population.")
+        return results
 
     def get_timeloop_layers(self):
         output = [layer for layer in self._tree if layer.get("op_type") == "Conv" or layer.get("op_type") == "Gemm" or layer.get("op_type") == "MatMul"]
