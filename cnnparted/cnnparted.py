@@ -85,7 +85,7 @@ def main(args):
     step_runtime.append(timer())
 
     # Step 6 - Output exploration results
-    write_files(work_dir, args.run_name, n_constr, n_var, sol, ga.schedules, num_platforms)
+    export_files(work_dir, args.run_name, n_constr, n_var, sol, ga.schedules, num_platforms)
     num_pp_schemes = write_log_file(work_dir, args.run_name, step_runtime, sol, num_platforms)
 
     if num_pp_schemes == 0:
@@ -152,8 +152,9 @@ def node_eval(ga : GraphAnalyzer, node_components : list, work_dir: str, run_nam
 
     return nodeStats
 
-def write_files(work_dir: str, run_name : str, n_constr : int, n_var : int, results : dict, schedules : list, num_platforms: int) -> None:
-    rows = []
+def export_files(work_dir: str, run_name : str, n_constr : int, n_var : int, results : dict, schedules : list, num_platforms: int) -> None:
+    res = []
+    objectives = []
     idx_max = 1 + num_platforms + 1
     for pareto, sched in results.items():
         for sd in sched:
@@ -163,12 +164,19 @@ def write_files(work_dir: str, run_name : str, n_constr : int, n_var : int, resu
             data[n_constr+1:n_constr+n_var+1] = data[n_constr+1:n_constr+n_var+1].astype(float).astype(int)
             for i in range(n_constr+1,int(n_var/2)+n_constr+1):
                 data[i] = schedules[int(data[0])][int(data[i])-1]
-            rows.append(data)
+            res.append(data)
+            objectives.append(data[n_constr+n_var+1:])
         if pareto == "nondom":
-            df = pd.DataFrame(rows)
-            df.to_csv( os.path.join(work_dir, run_name + "_" + "result_nondom.csv"), header=False)
-    df = pd.DataFrame(rows)
-    df.to_csv( os.path.join(work_dir, run_name + "_" + "result_all.csv"), header=False)
+            write_files(res, objectives, work_dir, run_name, "nondom")
+    write_files(res, objectives, work_dir, run_name, "all")
+
+def write_files(result : list, objectives : list, work_dir : str, run : str, name : str) -> None:
+    df = pd.DataFrame(result)
+    df.to_csv( os.path.join(work_dir, run + "_result_" + name + ".csv"), header=False)
+
+    hdr = ["latency", "energy", "throughput", "area", "link_latency", "link_energy", "accuracy", "type"]
+    df = pd.DataFrame(objectives)
+    df.to_csv( os.path.join(work_dir, run + "_objectives_" + name + ".csv"), header=hdr, index_label='idx')
 
 def write_log_file(work_dir: str, run_name : str, step_runtimes : list, sol : dict, num_platforms : int) -> int:
     log_file = os.path.join(work_dir, run_name + ".log")
