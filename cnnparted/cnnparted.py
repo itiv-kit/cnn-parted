@@ -77,8 +77,11 @@ def main(args):
 
         quant = AccuracyEvaluator(ga.torchmodel, nodeStats, accuracy_cfg, device, args.p)
         quant.eval(sol["nondom"], n_constr, n_var, ga.schedules, accuracy_function)
-        for i, p in enumerate(sol["dom"]): # achieving aligned csv file
-            sol["dom"][i] = np.append(p, float(0))
+    else:
+        for i, p in enumerate(sol["nondom"]): # achieving aligned csv file
+            sol["nondom"][i] = np.append(p, float(0))
+    for i, p in enumerate(sol["dom"]): # achieving aligned csv file
+        sol["dom"][i] = np.append(p, float(0))
     step_runtime.append(timer())
 
     # Step 6 - Output exploration results
