@@ -287,7 +287,7 @@ class PartitioningProblem(ElementwiseProblem):
             else: # timeloop
                 #part: partition
                 for part in parts[key]:
-                    if part[0] != part[1]: #partitions stores [platform, layer_ids], here check if both partitions are executed on same platform
+                    if part[0] != part[1] and part[1] != 0: #partitions stores [platform, layer_ids], here check if layers are executed on platform
                         tag = design_tag[platform]
                         first_layer = [*self.nodeStats[platform]["eval"][tag]["layers"]][0]
                         area += float(self.nodeStats[platform]["eval"][tag]["layers"][first_layer]['area'])
