@@ -1,6 +1,7 @@
 import os
 import torch.nn as nn
 import numpy as np
+from numpy.random import default_rng
 import pandas as pd
 
 from pymoo.algorithms.moo.nsga2 import NSGA2
@@ -44,12 +45,20 @@ class RobustnessOptimizer(Optimizer):
         self.num_gen = config.get('robustness').get('num_gen')
         self.problem = RobustnessProblem(model, self.sample_limit_steps[0], config, device, accuracy_function, progress)
 
+        self.max_bits_idx = [len(config.get('robustness').get('bits')) - 2, len(config.get('robustness').get('bits')) - 1]
+
     def optimize(self):
+        rng = default_rng(seed=42)
+        n_var = self.problem.n_var
+        init_x = [np.full(n_var, self.max_bits_idx[-1]), np.full(n_var, self.max_bits_idx[-2])]
+        for i in range(self.pop_size-2):
+            init_x.append(rng.choice(self.max_bits_idx, size=n_var))
+
         if not os.path.isfile(self.fname_csv):
             algorithm = NSGA2(
                 pop_size=self.pop_size,
                 n_offsprings=self.pop_size,
-                sampling=IntegerRandomSampling(),
+                sampling=np.array(init_x),
                 crossover=SBX(prob=0.9, eta=5, repair=RoundingRepair()),
                 mutation=PM(prob=0.9, eta=10, repair=RoundingRepair()),
                 eliminate_duplicates=True)
