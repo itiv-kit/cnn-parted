@@ -47,6 +47,8 @@ class RobustnessOptimizer(Optimizer):
 
         self.max_bits_idx = [len(config.get('robustness').get('bits')) - 2, len(config.get('robustness').get('bits')) - 1]
 
+        self.delta = config.get('robustness').get('delta')
+
     def optimize(self):
         rng = default_rng(seed=42)
         n_var = self.problem.n_var
@@ -91,7 +93,17 @@ class RobustnessOptimizer(Optimizer):
             df = pd.read_csv(self.fname_csv, header=None, index_col=0)
             data = df.to_numpy()
 
-        constr = list(data[np.argmax(data, axis=0)[-3]])[:-3] # use configuration with max bits
+        best_idx = np.argmax(data, axis=0)[-2]
+        lowest_accuracy = data[best_idx][-2] - self.delta
+
+        sel_idx = 0
+        sel_accuracy = data[best_idx][-2]
+        for i, x in enumerate(data):
+            if x[-2] >= lowest_accuracy and x[-2] < sel_accuracy:
+                sel_idx = i
+                sel_accuracy = x[-2]
+
+        constr = data[sel_idx][:-3]
         constr_dict = {}
         for i, name in enumerate(self.problem.qmodel.explorable_module_names):
             constr_dict[name] = constr[int(i/2)]

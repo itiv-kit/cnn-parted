@@ -17,7 +17,8 @@ accuracy:
     bits: [4, 6, 8, 16]
     sample_limit_steps: [1024, 2048, 4096, 8196]
     sample_limit_generation_schedule: [1, 6, 12, 15]
-    min_acc: 0.65
+    min_acc: 0.65 # minimal accuracy accepted during mixed-precision analysis
+    delta : 0.01 # best_acc - delta = lower boundary for the selection of the bit constraints
   retraining:
     epochs: 0
   datasets:
