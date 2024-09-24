@@ -129,13 +129,13 @@ class PartitioningOptimizer(Optimizer):
         rng = default_rng(seed=42)
 
         for i in range(num_platforms):
-            pps = np.full(num_pp, 0)
+            pps = rng.integers(low=0, high=xu+1, size=num_pp)
+            pps = np.sort(pps).tolist()
             accs = np.full(num_pp+1, i) * num_layers
-            samples.append(pps.tolist() + accs.tolist())
+            samples.append(pps + accs.tolist())
 
         while len(samples) < self.pop_size:
             pps = rng.integers(low=0, high=xu+1, size=num_pp)
-            #pps = np.random.randint(0, xu+1, size=num_pp)
             pps = np.sort(pps).tolist()
             accs = (rng.choice(num_platforms, size=num_pp+1, replace=not acc_once)) * num_layers
             if fixed_sys:
