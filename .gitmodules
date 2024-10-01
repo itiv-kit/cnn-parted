@@ -1,9 +1,11 @@
 [submodule "tools/timeloop"]
 	path = tools/timeloop
 	url = https://github.com/NVlabs/timeloop.git
+    ignore = dirty
 [submodule "tools/accelergy"]
 	path = tools/accelergy
 	url = https://github.com/Accelergy-Project/accelergy.git
+    ignore = dirty
 [submodule "tools/accelergy-aladdin-plug-in"]
 	path = tools/accelergy-aladdin-plug-in
 	url = https://github.com/Accelergy-Project/accelergy-aladdin-plug-in.git
@@ -20,3 +22,19 @@
 	path = tools/cacti
 	url = https://github.com/HewlettPackard/cacti.git
 	ignore = dirty
+[submodule "tools/dnn-model-exploration"]
+	path = tools/dnn-model-exploration
+	url = https://github.com/itiv-kit/dnn-model-exploration.git
+    ignore = dirty
+[submodule "tools/ramulator"]
+	path = tools/ramulator
+	url = https://github.com/CMU-SAFARI/ramulator.git
+    ignore = dirty
+[submodule "tools/VAMPIRE"]
+	path = tools/VAMPIRE
+	url = https://github.com/CMU-SAFARI/VAMPIRE.git
+    ignore = dirty
+[submodule "tools/MNSIM-2.0"]
+	path = tools/MNSIM-2.0
+	url = https://github.com/thu-nics/MNSIM-2.0.git
+    ignore = dirty

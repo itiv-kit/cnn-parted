@@ -4,10 +4,15 @@
 *.json
 
 #run outputs
-run*
+onnx_models/
+*run/
 *.csv
+*.npy
 timeloop-mapper.*
 !examples/results/*
+calibrations*
+*.onnx
+*.pt
 
 #visualization outputs
 _visualizations/

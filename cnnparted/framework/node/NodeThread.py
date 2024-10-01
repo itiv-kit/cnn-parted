@@ -1,145 +1,234 @@
-from framework.ModuleThreadInterface import ModuleThreadInterface
-from .GenericNode import GenericNode
-from .Timeloop import Timeloop
-
+import os
 import csv
+import numpy as np
+
+from framework.ModuleThreadInterface import ModuleThreadInterface
+from framework.node.Timeloop import Timeloop
+from framework.node.MNSIMInterface import MNSIMInterface
+from framework.helpers.DesignMetrics import calc_metric
 
 class NodeThread(ModuleThreadInterface):
     def _eval(self) -> None:
         if not self.config:
             return
 
-        if self.name == 'edge':
-            self.reverse = True
-        else:
-            self.reverse = False
-
-        if self.config.get('timeloop'):
-            self._run_timeloop(self.config['timeloop'])
+        if self.config.get("timeloop"):
+            self._run_timeloop(self.config["timeloop"])
+            self.stats["type"] = 'tl'
+        elif self.config.get("mnsim"):
+            self._run_mnsim(self.config["mnsim"])
+            self.stats["type"] = 'mnsim'
         else:
             self._run_generic(self.config)
+            self.stats["type"] = 'generic'
 
+        if 'bits' not in self.stats:
+            self.stats["bits"] = self.config.get("bits") or 8
 
-    def _run_generic(self, config : dict) -> None:
-        part_points = self.dnn.partition_points
-        input_size = self.dnn.input_size
+        self.stats["fault_rates"] = [float(i) for i in self.config.get("fault_rates") or [0.0, 0.0]]
 
-        gn = GenericNode(config)
+    def _run_generic(self, config: dict) -> None:
+        raise NotImplementedError
 
-        layer_name = 'Identity'
-        if self.reverse:
-            layers = part_points.copy()
-        else: # Set stats to zero for Identity
-            self.stats[layer_name] = {}
-            self.stats[layer_name]['latency'] = 0
-            self.stats[layer_name]['latency_iqr'] = 0
-            self.stats[layer_name]['energy'] = 0
+    def _run_mnsim(self, config: dict) -> None:
+        runroot = self.runname + "_" + str(self.id) + "_" + config["accelerator"]
+        fname_csv = os.path.join(self.work_dir, runroot + "_mnsim_layers.csv")
 
-        # only iterate through filtered list to save time
-        for point in self.dnn.partpoints_filtered:
-            layer_name = point.get_layer_name(False, True)
+        layers = self.ga.get_mnsim_layers()
+        mn = MNSIMInterface(layers, config, self.ga.input_size)
 
-            if not self.reverse:
-                idx = part_points.index(point) + 1
-                layers = part_points[:idx]
-            else:
-                idx = layers.index(point) + 1
-                del layers[:idx]
-                input_size = point.output_size
-
-            output = gn.run(layers, input_size)
-            self.stats[layer_name] = {}
-            self.stats[layer_name]['latency'] = output['latency_ms']
-            self.stats[layer_name]['latency_iqr'] = output['latency_iqr']
-            self.stats[layer_name]['energy'] = output['energy_mJ']
-
-            if self.show_progress:
-                layer_i = self.dnn.partpoints_filtered.index(point) + 1
-                print("Finished", layer_i, "/", len(self.dnn.partpoints_filtered), self.name, "models" )
-
-
-    def _run_timeloop(self, config : dict) -> None:
-        overall_latency = 0
-        overall_energy = 0
-
-        conv_layers = self.dnn.get_conv2d_layers()
-
-        if self.reverse:
-            conv_layers = conv_layers[::-1]
-
-        runroot = 'run' + self.name
-        config['run_root'] = runroot
-
-        tl = Timeloop(config)
-
-        for layer in conv_layers:
-            output = tl.run(layer)
-            overall_latency += output['latency_ms']
-            overall_energy += output['energy_mJ']
-
-            layer_name = layer.get_layer_name(False, True)
-            partpoint_name = self.dnn.search_partition_point(layer).get_layer_name(False, True)
-
-            if not partpoint_name in self.stats.keys():
-                self.stats[partpoint_name] = {}
-
-            self.stats[partpoint_name]['latency'] = overall_latency
-            self.stats[partpoint_name]['latency_iqr'] = 0
-            self.stats[partpoint_name]['energy'] = overall_energy
-
-            # save single layer stats
-            self.stats[partpoint_name][layer_name] = {}
-            self.stats[partpoint_name][layer_name]['latency'] = output['latency_ms']
-            self.stats[partpoint_name][layer_name]['latency_iqr'] = 0
-            self.stats[partpoint_name][layer_name]['energy'] = output['energy_mJ']
-
-            if self.show_progress:
-                layer_i = conv_layers.index(layer) + 1
-                print("Finished", layer_i, "/", len(conv_layers), self.name, "layers" )
-
-        # Fill up dict with partitioning points not containing CONVs
-        prev_latency = 0
-        prev_energy = 0
-        if self.reverse:
-            plist = self.dnn.partition_points[::-1]
+        if os.path.isfile(fname_csv):
+            self.stats["eval"] = self._read_layer_csv(fname_csv)
         else:
-            plist = self.dnn.partition_points
+            mn.run()
+            self.stats["eval"] = mn.stats
+            self._write_layer_csv(fname_csv, stats=mn.stats)
 
-        for point in plist:
-            l_name = point.get_layer_name(False, True)
-            if l_name in self.stats.keys():
-                prev_latency = self.stats[l_name]['latency']
-                prev_energy = self.stats[l_name]['energy']
-            else:
-                self.stats[l_name] = {}
-                self.stats[l_name]['latency'] = prev_latency
-                self.stats[l_name]['latency_iqr'] = 0
-                self.stats[l_name]['energy'] = prev_energy
+        self.stats['bits'] = mn.pim_realADCbit()
 
-        self._write_timeloop_csv(self.runname + "_" + self.name + "_tl_layers.csv")
+    def _run_timeloop(self, config: dict) -> None:
+        runroot = os.path.join(self.work_dir, "system_evaluation", str(self.id)+"_"+config["accelerator"])
+        config["run_root"] = runroot
+        config["work_dir"] = self.work_dir
+        fname_csv = os.path.join(self.work_dir, self.runname + "_" + str(self.id) + "_" + config["accelerator"] + "_tl_layers.csv")
+
+        # Check if design is DSE enabled
+        if dse_cfg := config.get("dse"):
+            is_dse = True
+            metric = dse_cfg.get("optimization", "edap")
+            top_k = int(dse_cfg.get("top_k", 2))
+        else:
+            is_dse = False
+            metric= "edap"
+            top_k = 1
+
+        if os.path.isfile(fname_csv):
+            read_stats = self._read_layer_csv(fname_csv)
+            pruned_stats = self._prune_accelerator_designs(read_stats, top_k, metric, is_dse)
+            self.stats["eval"] =  pruned_stats
+            return
+
+        layers = self.ga.get_timeloop_layers()
+        tl = Timeloop(config)
+        tl.run(layers, self.progress)
+
+        self._write_layer_csv(fname_csv, tl.stats)
+
+        pruned_stats = self._prune_accelerator_designs(tl.stats, top_k, metric, is_dse)
+
+        # Prune accelerator design space
+        self.stats["eval"] = pruned_stats
 
 
-    def _write_timeloop_csv(self, filename : str) -> None:
-        with open(filename, 'w', newline='') as f:
-            writer = csv.writer(f, delimiter=';')
+    def _prune_accelerator_designs(self, stats: dict[str, dict], top_k: int, metric: str, is_dse: bool):
+        # If there are less designs than top_k simply return the given list
+        if len(stats) <= top_k or not is_dse:
+            return stats
+
+        # The metric_per_design array has this structure, with
+        # every cell holding EAP, EDP or some other metric:
+        #  x | l0 | l1 | l2 | l3 |
+        # ------------------------
+        # d0 | ...| ...| ...| ...|
+        # d1 | ...| ...| ...| ...|
+        metric_per_design = []
+        energy_per_design = []
+        latency_per_design = []
+        area_per_design = []
+
+        for tag, design in stats.items():
+            #tag = design["tag"]
+            layers = design["layers"]
+            energy_per_layer = []
+            latency_per_layer = []
+            for name, layer in layers.items():
+                energy_per_layer.append(layer["energy"])
+                latency_per_layer.append(layer["latency"])
+
+            energy_per_design.append(energy_per_layer)
+            latency_per_design.append(latency_per_layer)
+            area_per_design.append([layer["area"]])
+
+        metric_per_design = calc_metric(np.array(energy_per_design), np.array(latency_per_design), np.array(area_per_design), metric, reduction=False)
+
+        # Now, we need to find the top_k designs per layer
+        design_candidates = []
+        for col in metric_per_design.T:
+            metric_for_layer = col.copy()
+            metric_for_layer = np.argsort(metric_for_layer)
+
+            for i in metric_for_layer[0:top_k]:
+                design_candidates.append(f"design_{i}")
+
+        design_candidates = np.unique(design_candidates)
+
+        # Remove all designs that have not been found to be suitable design candidates
+        #pruned_stats = []
+        #for design in stats:
+        #    if design["tag"] in design_candidates:
+        #       tag = design["tag"]
+        #       layers = design["layers"]
+        #       #arch_config = design["arch_config"]
+        #       pruned_stats.append({"tag": tag, "layers": layers})
+
+        pruned_stats = {tag: results for tag, results in stats.items() if tag in design_candidates}
+
+        return pruned_stats
+
+    def _apply_platform_constraints(self, stats: dict[str, dict], constraints: dict):
+        max_energy = constraints.get("energy", np.inf)
+        max_latency = constraints.get("latency", np.inf)
+        max_area = constraints.get("area", np.inf)
+
+        energy_per_design = []
+        latency_per_design = []
+        area_per_design = []
+        for tag, design in stats.items():
+            layers = design["layers"]
+            energy_per_layer = []
+            latency_per_layer = []
+            for name, layer in layers.items():
+                energy_per_layer.append(layer["energy"])
+                latency_per_layer.append(layer["latency"])
+
+            energy_per_design.append(energy_per_layer)
+            latency_per_design.append(latency_per_layer)
+            area_per_design.append([layer["area"]])
+
+        energy_per_design = np.array(energy_per_design)
+        latency_per_design = np.array(latency_per_design)
+        area_per_design = np.array(area_per_design)
+
+        total_energy = calc_metric(np.array(energy_per_design), np.array(latency_per_layer), np.array(area_per_design), "energy", reduction= True)
+        total_latency = calc_metric(np.array(energy_per_design), np.array(latency_per_layer), np.array(area_per_design), "latency", reduction= True)
+        total_area = area_per_design
+
+        #constrained_stats = [design for idx, design in enumerate(stats) if (total_area[idx] <= max_area and total_latency[idx] <= max_latency and total_energy[idx] <= max_energy)]
+        constrained_stats = {tag: design for idx, (tag, design) in stats.items() if (total_area[idx] <= max_area and total_latency[idx] <= max_latency and total_energy[idx] <= max_energy)}
+        if not constrained_stats:
+            raise ValueError("After applying constraints no designs remain!")
+
+        return constrained_stats
+
+
+    def _read_layer_csv(self, filename: str) -> dict:
+        designs = {}
+        stats = {}
+
+        with open(filename, 'r', newline="") as f:
+            reader = csv.DictReader(f, delimiter=";")
+            current_design_tag = "design_0"
+            stats["layers"] = {}
+            for row in reader:
+                if row["Design Tag"] != current_design_tag:
+                    designs[current_design_tag] = stats
+                    current_design_tag = row["Design Tag"]
+
+                    stats = {}
+                    stats["layers"] = {}
+
+                layer_name = row['Layer']
+                stats["layers"][layer_name] = {}
+                stats["layers"][layer_name]['latency'] = float(row['Latency [ms]'])
+                stats["layers"][layer_name]['energy'] = float(row['Energy [mJ]'])
+                stats["layers"][layer_name]['area'] = float(row['Area [mm2]'])
+
+        # Append stats for final design
+        tag = row["Design Tag"]
+        designs[tag] = stats
+        return designs
+
+    def _write_layer_csv(self, filename: str, stats: dict[str, dict] = None) -> None:
+        if stats is None:
+            stats = self.stats
+        with open(filename, "w", newline="") as f:
+            writer = csv.writer(f, delimiter=";")
             header = [
                 "No.",
-                "Partitioning Point",
+                "Design Tag",
                 "Layer",
                 "Latency [ms]",
-                "Energy [mJ]"
+                "Energy [mJ]",
+                'Area [mm2]'
             ]
             writer.writerow(header)
             row_num = 1
-            for pp in self.stats.keys():
-                for l in self.stats[pp].keys():
-                    if isinstance(self.stats[pp][l], dict):
+            for tag, design in stats.items():
+                layers = design["layers"]
+                for layer in layers.keys():
+                    if isinstance(design["layers"][layer], dict):
                         row = [
                             row_num,
-                            pp,
-                            l,
-                            str(self.stats[pp][l]['latency']),
-                            str(self.stats[pp][l]['energy'])
+                            tag,
+                            layer,
+                            str(design["layers"][layer]["latency"]),
+                            str(design["layers"][layer]["energy"]),
+                            str(design["layers"][layer]["area"])
                         ]
                         writer.writerow(row)
                         row_num += 1
+
+
+    def _remove_file(self,file_path):
+        if os.path.exists(file_path):
+            os.remove(file_path)

@@ -1,16 +1,17 @@
 import threading
 import time
 
-from .DNNAnalyzer import DNNAnalyzer
+from framework import GraphAnalyzer
 
 class ModuleThreadInterface(threading.Thread):
-    def __init__(self, name : str, dnn : DNNAnalyzer, config : dict, runname : str, show_progress : bool) -> None:
+    def __init__(self, id : str, ga : GraphAnalyzer, config : dict, work_dir: str, runname : str, progress : bool) -> None:
         threading.Thread.__init__(self)
-        self.name = name
-        self.dnn = dnn
+        self.id = id
+        self.ga = ga
         self.config = config
+        self.work_dir = work_dir
         self.runname = runname
-        self.show_progress = show_progress
+        self.progress = progress
 
         self.stats = {}
 
@@ -24,4 +25,4 @@ class ModuleThreadInterface(threading.Thread):
         raise NotImplementedError
 
     def getStats(self) -> dict:
-        return self.stats
+        return self.id ,self.stats
