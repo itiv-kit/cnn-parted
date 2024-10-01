@@ -61,14 +61,4 @@ If you found this tool useful, please use the following BibTeX to cite us
     doi = {https://doi.org/10.1016/j.comnet.2023.109759},
     url = {https://www.sciencedirect.com/science/article/pii/S1389128623002049}
 }
-
-
-@inproceedings{kress2022hwpart,
-    title={Hardware-aware Partitioning of Convolutional Neural Network Inference for Embedded AI Applications},
-    author={Kreß, Fabian and Hoefer, Julian and Hotfilter, Tim and Walter, Iris and Sidorenko, Vladimir and Harbaum, Tanja and Becker, Jürgen},
-    booktitle={2022 18th International Conference on Distributed Computing in Sensor Systems (DCOSS)},
-    pages={133-140},
-    year={2022},
-    doi={10.1109/DCOSS54816.2022.00034}
-}
 ```
