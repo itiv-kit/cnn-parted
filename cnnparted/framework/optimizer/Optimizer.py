@@ -22,7 +22,7 @@ class Optimizer():
         if res.history is not None:
             for h in res.history:
                 for ind in h.pop:
-                    if ind.get("G")[0] > 0:
+                    if np.max(ind.get("G")) > 0:
                         continue
                     data.append(np.append(ind.get("G").tolist(), np.append(ind.get("X").tolist(), ind.get("F").tolist())))
         data = np.unique(data, axis=0)

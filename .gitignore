@@ -5,7 +5,7 @@
 
 #run outputs
 onnx_models/
-run*
+*run/
 *.csv
 *.npy
 timeloop-mapper.*

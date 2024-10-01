@@ -219,6 +219,13 @@ class MNSIMInterface(TrainTestInterface):
             self.stats[layer[0][0].get('name')]["latency"] = latency / 1e6 # ns -> ms
             self.stats[layer[0][0].get('name')]["energy"] = energy / 1e6 # nJ -> mJ
             self.stats[layer[0][0].get('name')]["area"] = area / 1e6 # um^2 -> mm^2
+
+        # for compatibility reasons with DSE-Extension
+        temp_stats = {}
+        temp_stats["design_0"] = {}
+        temp_stats["design_0"]["layers"] = self.stats
+        self.stats = temp_stats
+
     #linqiushi modified
     #calculating the real ADC bit supported by pim using the formula mentioned before
     #return an integer list

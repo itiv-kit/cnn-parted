@@ -4,11 +4,12 @@ import time
 from framework import GraphAnalyzer
 
 class ModuleThreadInterface(threading.Thread):
-    def __init__(self, id : str, ga : GraphAnalyzer, config : dict, runname : str, progress : bool) -> None:
+    def __init__(self, id : str, ga : GraphAnalyzer, config : dict, work_dir: str, runname : str, progress : bool) -> None:
         threading.Thread.__init__(self)
         self.id = id
         self.ga = ga
         self.config = config
+        self.work_dir = work_dir
         self.runname = runname
         self.progress = progress
 

@@ -124,10 +124,12 @@ class AccuracyEvaluator():
         quant_list = []
         for base_layer in self.qmodel.explorable_module_names:
             quant_list.append(self.bits[0])
-            for l in schedules[0]:
+            for i, l in enumerate(schedules[0]):
                 if l in base_layer and l != 'input' and l != 'output':
                     layer_dict[l] = len(quant_list) - 1
                     break
+                elif l == 'output': # FIXME? hotfix for last layer being renamed in ONNX file
+                    layer_dict[schedules[0][i-1]] = len(quant_list) - 1
 
         quants = []
         num_pp = n_var/2 - 1
@@ -144,9 +146,8 @@ class AccuracyEvaluator():
                         bits = self.bits[acc-1][layer]
                     quant_list[layer_dict[layer]-1] = bits # input quantizer
                     quant_list[layer_dict[layer]] = bits   # weight quantizer
-                if partition < num_pp:
-                    while layer == schedules[int(sol[0])][int(mapping[partition])-1]:
-                        partition += 1
+                while partition < num_pp and layer == schedules[int(sol[0])][int(mapping[partition])-1]:
+                    partition += 1
             quants.append(deepcopy(quant_list))
 
         return quants
@@ -170,9 +171,8 @@ class AccuracyEvaluator():
                 acc = int(mapping[int(n_var/2)+partition])
                 if layer in layer_dict.keys():
                     fault_rate_list[layer_dict[layer]] = self.fault_rates[acc-1]
-                if partition < num_pp:
-                    while layer == schedules[int(sol[0])][int(mapping[partition])-1]:
-                        partition += 1
+                while partition < num_pp and layer == schedules[int(sol[0])][int(mapping[partition])-1]:
+                    partition += 1
             fault_rates.append(deepcopy(fault_rate_list))
 
         return fault_rates

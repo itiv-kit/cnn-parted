@@ -64,7 +64,7 @@ class TreeModel:
             elif node.op_type =='AveragePool':
                 pool_params = self._get_pool_params(node)
                 layer['pool_params'] = pool_params
-            elif node.op_type =='Gemm':
+            elif node.op_type =='Gemm' or node.op_type == "MatMul":
                 gemm_params = self._get_gemm_params(node)
                 layer['gemm_params'] = gemm_params
 
@@ -113,11 +113,24 @@ class TreeModel:
             'weights': np.prod(i_shape + o_shape)
         }
 
+        # Check if this is a batch matmul
+        if len(o_shape[0]) == 4 and len(i_shape[0]) == 4:
+            # Shape layout: [1, b, x, y]
+            assert o_shape[0][0] == 1 and i_shape[0][0] == 1, "4D matmul is currently not supported" 
+            output = {
+                'b': o_shape[0][1],
+                'n': o_shape[0][2],
+                'm': o_shape[0][3],
+                'c': i_shape[0][3],
+                'weights': np.prod(i_shape + o_shape)
+            }
+
         return output
 
     def _get_conv_params(self,node):
         #(N,Cin​,H,W) and output (N,Cout,Hout,Wout)(N,Cout​,Hout​,Wout​)
         attributes = {}
+        attributes['groups'] = 1
         for attr in node.attribute:
             if attr.name == 'kernel_shape':
                 attributes['kernel_shape'] = list(attr.ints)
@@ -127,7 +140,7 @@ class TreeModel:
                 attributes['pads'] = list(attr.ints)
             elif attr.name == 'dilations':
                 attributes['dilations'] = list(attr.ints)
-            elif attr.name == 'groups':
+            elif attr.name == 'groups' or attr.name == 'group':
                 attributes['groups'] = attr.i
 
         matched_outputs = [output for output in node.output if output in self.output_sizes]
@@ -146,10 +159,10 @@ class TreeModel:
         ifms    = o_shape[0][0]*c*((o_shape[0][3]-1)*attributes['strides'][1]+attributes['kernel_shape'][1])*((o_shape[0][2]-1)*attributes['strides'][0]+attributes['kernel_shape'][0])
         output = {
             'n': o_shape[0][0],
-            'm': o_shape[0][1],
+            'm': o_shape[0][1] // attributes['groups'],
             'q': o_shape[0][2],
             'p': o_shape[0][3],
-            'c': c,
+            'c': c // attributes['groups'],
             's': attributes['kernel_shape'][0],
             'r': attributes['kernel_shape'][1],
             'wpad': attributes['pads'][0],
@@ -158,7 +171,8 @@ class TreeModel:
             'hstride': attributes['strides'][1],
             'ifms':ifms,
             'ofms':ofms,
-            'weights':weights
+            'weights':weights,
+            'groups': attributes.get("groups", 1)
         }
 
         return output
@@ -203,11 +217,26 @@ class TreeModel:
             else:
                 out_shape.append(d.dim_value)
 
+        # This loop assumes that the output shapes can be concatendated along axis=0
+        # The dummy zero array is only used to get the shape of the concatenated output
+        if len(graph_def.output) > 1:
+            out_shapes = []
+            for out in graph_def.output:
+                shape = []
+                for d in out.type.tensor_type.shape.dim:
+                    if d.dim_value == 0:
+                        shape.append(None)
+                    else:
+                        shape.append(d.dim_value)
+                out_shapes.append(shape)
+            tmp = [np.zeros(s) for s in out_shapes]
+            out_shape = np.concatenate((tmp[0], tmp[1]), axis=0).shape
+
         output_layer = {
             "name": 'output',
             "op_type": graph_output.type.tensor_type.elem_type,
             "output_size": out_shape,
-            "input":graph_output.name,
+            "input": 'output',
             "output":[]
             }
 

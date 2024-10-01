@@ -19,6 +19,7 @@ from framework import GraphAnalyzer
 
 class PartitioningOptimizer(Optimizer):
     def __init__(self, ga : GraphAnalyzer, num_pp : int, nodeStats : dict, link_components : list, progress : bool) -> None:
+        self.work_dir = ga.work_dir
         self.run_name = ga.run_name
         self.schedules = ga.schedules
         self.num_pp = num_pp
@@ -60,11 +61,11 @@ class PartitioningOptimizer(Optimizer):
 
         all_paretos = []
         non_optimals = []
-        g_len = 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
+        g_len = len(self.nodeStats) + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
         x_len = (self.num_pp) * 2 + 1
 
-        fname_p_npy = self.run_name + "_" + "paretos.npy"
-        fname_n_npy = self.run_name + "_" + "non_optimals.npy"
+        fname_p_npy = os.path.join(self.work_dir, self.run_name + "_" + "paretos.npy")
+        fname_n_npy = os.path.join(self.work_dir, self.run_name + "_" + "non_optimals.npy")
         if os.path.isfile(fname_p_npy) and os.path.isfile(fname_n_npy):
             all_paretos = np.load(fname_p_npy)
             non_optimals = np.load(fname_n_npy)
@@ -74,12 +75,12 @@ class PartitioningOptimizer(Optimizer):
                 for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
             )
 
-            num_acc = len(self.nodeStats)
+            num_platforms = len(self.nodeStats)
             num_layers = len(self.schedules[0])
             for i, sort in enumerate(sorts):
                 if sort is not None:
                     for res in sort:
-                        res[g_len:g_len+self.num_pp] = np.divide(res[g_len:g_len+self.num_pp], num_acc)
+                        res[g_len:g_len+self.num_pp] = np.divide(res[g_len:g_len+self.num_pp], num_platforms)
                         res[g_len+self.num_pp:g_len+x_len] = np.divide(res[g_len+self.num_pp:g_len+x_len], num_layers)
                         res[g_len:g_len+x_len] = np.floor(res[g_len:g_len+x_len]).astype(int) + 1
                         if res[-1]:
@@ -122,20 +123,26 @@ class PartitioningOptimizer(Optimizer):
         return comp_paretos
 
     def _gen_initial_x(self, num_layers, num_pp, fixed_sys, acc_once):
-        num_acc = len(self.nodeStats)
+        num_platforms = len(self.nodeStats)
+        xu = num_platforms * num_layers - 1
         samples = []
+        rng = default_rng(seed=42)
+
+        for i in range(num_platforms):
+            pps = rng.integers(low=0, high=xu+1, size=num_pp)
+            pps = np.sort(pps).tolist()
+            accs = np.full(num_pp+1, i) * num_layers
+            samples.append(pps + accs.tolist())
 
         while len(samples) < self.pop_size:
-            pps = np.random.randint(1, num_layers+1, size=num_pp) * num_acc
+            pps = rng.integers(low=0, high=xu+1, size=num_pp)
             pps = np.sort(pps).tolist()
-            rng = default_rng()
-            accs = (rng.choice(num_acc, size=num_pp+1, replace=not acc_once)) * num_layers
+            accs = (rng.choice(num_platforms, size=num_pp+1, replace=not acc_once)) * num_layers
             if fixed_sys:
                 accs = np.sort(accs)
 
-            if pps + accs.tolist() not in samples:
+            if pps + accs.tolist() not in samples or num_pp == 0:
                 samples.append(pps + accs.tolist())
-
         return np.array(samples)
 
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
