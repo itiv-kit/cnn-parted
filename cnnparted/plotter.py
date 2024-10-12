@@ -36,24 +36,20 @@ def objective_to_unit(objective: str):
 
 # These functions are all copied from somewhere in cnnparted, mostly NodeThread.py
 def read_layer_csv(filename: str) -> dict:
-    designs = []
+    designs = {}
     stats = {}
-    first_design = True
 
     with open(filename, 'r', newline="") as f:
         reader = csv.DictReader(f, delimiter=";")
         current_design_tag = "design_0"
         stats["layers"] = {}
-        #stats["tag"] = current_design_tag
         for row in reader:
             if row["Design Tag"] != current_design_tag:
-                stats["tag"] = current_design_tag if first_design else row["Design Tag"]
-                designs.append(stats)
+                designs[current_design_tag] = stats
+                current_design_tag = row["Design Tag"]
 
                 stats = {}
                 stats["layers"] = {}
-                current_design_tag = row["Design Tag"]
-                first_design = False
 
             layer_name = row['Layer']
             stats["layers"][layer_name] = {}
@@ -62,8 +58,8 @@ def read_layer_csv(filename: str) -> dict:
             stats["layers"][layer_name]['area'] = float(row['Area [mm2]'])
 
     # Append stats for final design
-    stats["tag"] = row["Design Tag"]
-    designs.append(stats)
+    tag = row["Design Tag"]
+    designs[tag] = stats
     return designs
 
 
@@ -195,7 +191,7 @@ if __name__ == "__main__":
 
     # Plot settings
     all_objectives = ["latency", "energy", "throughput", "area", "link_latency", "link_energy"]
-    plot_combinations: list[tuple[str, str]] = list(itertools.combinations(all_objectives, 2))
+    plot_combinations: list[tuple[str, str]] = list(itertools.permutations(all_objectives, 2)) #combinations
 
     assert(args.indir != args.outdir)
     if not os.path.isdir(args.outdir):
@@ -225,15 +221,14 @@ if __name__ == "__main__":
         if args.designs is not None:
             stats = [s for i, s in enumerate(stats) if i in args.designs]
 
-
         # Create plots for all combinations of metric, scale and plot type
         # Area is not plotted as it is constant for all layers
-        statsdict = stats_to_dict(stats)
+        #statsdict = stats_to_dict(stats)
         for type in ["line", "bar"]:
             for scale in ["linear", "log"]:
                 for metric in SUPPORTED_METRICS:
                     if metric != "area":
-                        plotMetricPerConfigPerLayer(statsdict, outdir_figs, metric, type=type, scale=scale, prefix=args.accelerator+"_"+scale+"_")
+                        plotMetricPerConfigPerLayer(stats, outdir_figs, metric, type=type, scale=scale, prefix=args.system[0]+"_"+scale+"_")
 
     # Generate the plots to evaluate the partitioning
     elif args.plottype == "partitioning":
@@ -478,55 +473,55 @@ if __name__ == "__main__":
         # Do the actual plotting
         fig = plt.figure(dpi=1200)
         ax1 = fig.add_subplot(111)
+        marker_size= 10**2
 
         for ptype in plot_combinations:
 
-            ax1.scatter( eval(f"base_dom_{ptype[0]}"), eval(f"base_dom_{ptype[1]}"), marker=MARKER_SEQUENCE[0], color="lightgrey", label="Dominated" )
+            ax1.scatter( eval(f"base_dom_{ptype[0]}"), eval(f"base_dom_{ptype[1]}"), marker=".", color="lightgrey", label="Dominated", s=marker_size )
 
             # iterate over other results that were specified
             # First we print only the dominated results so they are in the background
             for ores in range(num_odirs):
                 list_names = [get_list_name(ptype[0]), get_list_name(ptype[1])]
                 objective_dom_list0, objective_dom_list1 = eval(f"dse_dom_{list_names[0]}"), eval(f"dse_dom_{list_names[1]}")
-                ax1.scatter( objective_dom_list0[ores], objective_dom_list1[ores],  marker=MARKER_SEQUENCE[0], color="lightgrey")
+                ax1.scatter( objective_dom_list0[ores], objective_dom_list1[ores],  marker=".", color="lightgrey", s=marker_size)
 
             # iterate over other results that were specified
-            plt.gca().set_prop_cycle(color=COLOR_SEQUENCE[1:], marker=MARKER_SEQUENCE[1:] )
+            plt.gca().set_prop_cycle(color=COLOR_SEQUENCE[1:]) #, marker=MARKER_SEQUENCE[1:] 
             for ores in range(num_odirs):
                 list_names = [get_list_name(ptype[0]), get_list_name(ptype[1])]
                 objective_list0, objective_list1 = eval(f"dse_{list_names[0]}"), eval(f"dse_{list_names[1]}")
-                ax1.scatter( objective_list0[ores], objective_list1[ores], label=args.labels[ores], marker=MARKER_SEQUENCE[1+ores])
+                ax1.scatter( objective_list0[ores], objective_list1[ores], label=args.labels[ores], marker="o", s=marker_size) #MARKER_SEQUENCE[1+ores]
 
             # Plot base results
-            ax1.scatter( eval(f"base_{ptype[0]}"), eval(f"base_{ptype[1]}"), label="Base", marker=MARKER_SEQUENCE[0], color=COLOR_SEQUENCE[0])
+            ax1.scatter( eval(f"base_{ptype[0]}"), eval(f"base_{ptype[1]}"), label="Base", marker=MARKER_SEQUENCE[0], color=COLOR_SEQUENCE[0], s=marker_size)
             
             # General settings
-            ax1.set_xlabel(f"{objective_to_str(ptype[0])} [{objective_to_unit(ptype[0])}]")
-            ax1.set_ylabel(f"{objective_to_str(ptype[1])} [{objective_to_unit(ptype[1])}]")
+            ax1.set_xlabel(f"{objective_to_str(ptype[0])} [{objective_to_unit(ptype[0])}]", fontsize=18)
+            ax1.set_ylabel(f"{objective_to_str(ptype[1])} [{objective_to_unit(ptype[1])}]", fontsize=18)
             ax1.legend()
-            figname = f"{objective_to_str(ptype[0])}_over_{objective_to_str(ptype[1])}.pdf"
+            figname = f"{objective_to_str(ptype[1])}_over_{objective_to_str(ptype[0])}.pdf"
             fig.savefig(os.path.join(outdir_figs, figname))
             ax1.clear()
         plt.close()
             
         # plot metrics such as EDAP
-        fig = plt.figure(dpi=1200)
-        ax1 = fig.add_subplot(111)
+        #fig = plt.figure(dpi=1200)
+        #ax1 = fig.add_subplot(111)
 
-        dse_dom_all_edaps = np.concatenate(dse_dom_edaps)
-        ax1.scatter(dse_dom_all_edaps, dse_dom_all_edaps, label="Dominated", color="lightgrey", marker=".")
-        breakpoint()
+        #dse_dom_all_edaps = np.concatenate(dse_dom_edaps)
+        #ax1.scatter(dse_dom_all_edaps, dse_dom_all_edaps, label="Dominated", color="lightgrey", marker=".")
 
-        plt.gca().set_prop_cycle(color=COLOR_SEQUENCE[1:])
-        for ores in range(num_odirs):
-            #ax1.scatter(base_dom_edap ,base_dom_edaps, marker="o", color="lightgrey",  )
-            #ax1.scatter(dse_dom_edaps[ores] ,dse_dom_edaps[ores], marker="o", color="lightgrey", label=args.labels[ores] )
-            ax1.scatter(dse_edaps[ores], dse_edaps[ores], label=args.labels[ores], marker=MARKER_SEQUENCE[1+ores])
+        #plt.gca().set_prop_cycle(color=COLOR_SEQUENCE[1:])
+        #for ores in range(num_odirs):
+        #    #ax1.scatter(base_dom_edap ,base_dom_edaps, marker="o", color="lightgrey",  )
+        #    #ax1.scatter(dse_dom_edaps[ores] ,dse_dom_edaps[ores], marker="o", color="lightgrey", label=args.labels[ores] )
+        #    ax1.scatter(dse_edaps[ores], dse_edaps[ores], label=args.labels[ores], marker=MARKER_SEQUENCE[1+ores])
 
-        ax1.scatter(base_edap, base_edap, marker=MARKER_SEQUENCE[0], color=COLOR_SEQUENCE[0], label="Base" )
-        ax1.legend()
-        fig.savefig(os.path.join(outdir_figs, "edap.pdf"))
-        plt.close()
+        #ax1.scatter(base_edap, base_edap, marker=MARKER_SEQUENCE[0], color=COLOR_SEQUENCE[0], label="Base" )
+        #ax1.legend()
+        #fig.savefig(os.path.join(outdir_figs, "edap.pdf"))
+        #plt.close()
 
     elif args.plottype == "print_opt":
         # This requires a base and a dse directory
@@ -542,17 +537,19 @@ if __name__ == "__main__":
         base_latency, base_energy, base_throughput, base_area, base_link_latency, base_link_energy = get_individual_metrics(base_all_objectives)
         dse_latency, dse_energy, dse_throughput, dse_area, dse_link_latency, dse_link_energy = get_individual_metrics(dse_all_objectives)
 
+        # Results for baseline
         base_idx_opt_latency = np.argmin(base_latency)
-        base_opt_latency_params = [base_latency[base_idx_opt_latency], base_energy[base_idx_opt_latency], base_area[base_idx_opt_latency]]
+        base_opt_latency_params = [base_latency[base_idx_opt_latency], base_energy[base_idx_opt_latency], base_area[base_idx_opt_latency], base_throughput[base_idx_opt_latency]]
 
         base_idx_opt_energy = np.argmin(base_energy)
-        base_opt_energy_params = [base_latency[base_idx_opt_energy], base_energy[base_idx_opt_energy], base_area[base_idx_opt_energy]]
+        base_opt_energy_params = [base_latency[base_idx_opt_energy], base_energy[base_idx_opt_energy], base_area[base_idx_opt_energy], base_throughput[base_idx_opt_energy]]
 
+        # Results for DSE
         dse_idx_opt_latency = np.argmin(dse_latency)
-        dse_opt_latency_params = [dse_latency[dse_idx_opt_latency], dse_energy[dse_idx_opt_latency], dse_area[dse_idx_opt_latency]]
+        dse_opt_latency_params = [dse_latency[dse_idx_opt_latency], dse_energy[dse_idx_opt_latency], dse_area[dse_idx_opt_latency], dse_throughput[dse_idx_opt_latency]]
 
         dse_idx_opt_energy = np.argmin(dse_energy)
-        dse_opt_energy_params = [dse_latency[dse_idx_opt_energy], dse_energy[dse_idx_opt_energy], dse_area[dse_idx_opt_energy]]
+        dse_opt_energy_params = [dse_latency[dse_idx_opt_energy], dse_energy[dse_idx_opt_energy], dse_area[dse_idx_opt_energy], dse_throughput[dse_idx_opt_energy]]
 
         def export_tex(energy_opt_base: list, latency_opt_base: list, energy_opt_dse: list, latency_opt_dse: list):
             flist_energy_base = ["%.2f" % elem for elem in energy_opt_base]
