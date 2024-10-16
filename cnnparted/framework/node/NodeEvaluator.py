@@ -1,5 +1,4 @@
 from abc import ABC
-from unittest import result
 
 ## Information about a single layer
 class LayerResult:
@@ -10,7 +9,7 @@ class LayerResult:
         self.energy: float #must be in mJ
         self.cycles: int #must be in mm2
 
-    def to_dict(self):
+    def to_dict(self) -> dict :
         return {self.name: 
                 {"latency": self.latency,
                  "area": self.area,
@@ -20,19 +19,23 @@ class LayerResult:
 #   layers: layerwise information about energy, area, ...
 #   architecture: architecture parameters, such as number of PEs, memory sizes, ...
 class DesignResult:
-    def __init__(self):
-        self.layers: list[LayerResult]
-        self.architecture: dict = None
+    def __init__(self, architecture: dict = {}):
+        self.layers: list[LayerResult] = []
+        self.architecture: dict = architecture
 
     def add_layer(self, results: LayerResult):
         self.layers.append(results)
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         res = {}
         res["arch_config"] = self.architecture
         res["layers"] = {} 
         for layer in self.layers:
-            res["layers"].setdefault(layer.to_dict().keys(), layer.to_dict().values())
+            ld: dict = layer.to_dict()
+            name = list(ld.keys())[0]
+            data = list(ld.values())[0]
+            res["layers"][name] = data
+        return res
 
 ## Information about a compute node/platform of the overall system
 class NodeResult:
@@ -42,10 +45,11 @@ class NodeResult:
     def add_design(self, result: DesignResult):
         self.designs.append(result)
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         stats = {}
         for i, design in enumerate(self.designs):
             stats[f"design_{i}"] = design.to_dict()
+        return stats
     
 
 class NodeEvaluator(ABC):

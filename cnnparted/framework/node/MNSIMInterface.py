@@ -1,6 +1,7 @@
 import collections
 import configparser
 import math
+from platform import node
 import torch
 from tqdm import tqdm
 
@@ -8,6 +9,8 @@ import sys
 import os
 from framework.constants import ROOT_DIR
 sys.path.append(os.path.join(ROOT_DIR, "tools", "MNSIM-2.0"))
+
+from framework.node.NodeEvaluator import  NodeResult, DesignResult, LayerResult
 
 from MNSIM.Interface.network import NetworkGraph
 from MNSIM.Interface.interface import TrainTestInterface
@@ -209,22 +212,25 @@ class MNSIMInterface(TrainTestInterface):
         mod_a = Model_area(struct_file,self.SimConfig)
         mod_l.calculate_model_latency()
         area_list=mod_a.area_output_CNNParted()
+        design = DesignResult()
+        node_res = NodeResult()
         for idx, layer in enumerate(struct_file):
             input_l=mod_l.NetStruct[idx][0][0]['Inputindex']
             final_idx=list(map(int, input_l))
             latency = (max(mod_l.finish_time[idx]) - max(mod_l.finish_time[idx+final_idx[0]])) if idx > 0 else max(mod_l.finish_time[idx])
             energy = mod_e.arch_energy[idx]
             area=area_list[idx]
-            self.stats[layer[0][0].get('name')] = {}
-            self.stats[layer[0][0].get('name')]["latency"] = latency / 1e6 # ns -> ms
-            self.stats[layer[0][0].get('name')]["energy"] = energy / 1e6 # nJ -> mJ
-            self.stats[layer[0][0].get('name')]["area"] = area / 1e6 # um^2 -> mm^2
+
+            l = LayerResult()
+            l.name = layer[0][0].get('name')
+            l.latency = latency / 1e6 # ns -> ms
+            l.energy = energy / 1e6 # nJ -> mJ
+            l.area = area / 1e6 # um^2 -> mm^2
+            design.add_layer(l)
 
         # for compatibility reasons with DSE-Extension
-        temp_stats = {}
-        temp_stats["design_0"] = {}
-        temp_stats["design_0"]["layers"] = self.stats
-        self.stats = temp_stats
+        node_res.add_design(design)
+        self.stats = node_res.to_dict()
 
     #linqiushi modified
     #calculating the real ADC bit supported by pim using the formula mentioned before
