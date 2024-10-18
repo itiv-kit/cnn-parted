@@ -17,13 +17,14 @@ from framework.constants import ROOT_DIR
 from framework.helpers.Visualizer import plotMetricPerConfigPerLayer
 from framework.helpers.DesignMetrics import calc_metric, SUPPORTED_METRICS
 from framework.dse.ArchitectureMutator import ArchitectureMutator
-from framework.node.NodeEvaluator import LayerResult, DesignResult, NodeResult
+from framework.node.NodeEvaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
 
-class Timeloop:
+class Timeloop(NodeEvaluator):
     # Output file names.
     out_prefix = "timeloop-mapper."
     exec_path = os.path.join(ROOT_DIR, 'tools', 'timeloop', 'build', 'timeloop-mapper')
     configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
+    fname_result = "tl_layers.csv"
 
     def __init__ (self, tl_config : dict) -> None:
         log_file_name = self.out_prefix + "log"
@@ -57,10 +58,9 @@ class Timeloop:
         self.freq = tl_config['frequency']
         self.mapper_cfg = {} if not tl_config.get('mapper') else tl_config['mapper']
         self.type_cfg = '.yaml'
-        self.runroot = tl_config['run_root']
         self.dse_config = tl_config.get('dse', None)
-        self.tl_cfg = tl_config
-        self.stats = {} #[]
+        self.config = tl_config
+        self.stats = {}
 
         self.mutator: ArchitectureMutator = None
         if self.dse_config:
@@ -71,6 +71,9 @@ class Timeloop:
             package = importlib.import_module(f"framework.dse.{mutator_name}")
             mutator_cls = getattr(package, self.dse_config["mutator"])
             self.mutator = mutator_cls(self.dse_config)
+
+    def set_workdir(self, work_dir: str, runname: str, id: int):
+        return super().set_workdir(work_dir, runname, id)
 
     def run(self, layers : dict, progress : bool = False) -> NodeResult:
         node_result = NodeResult()
@@ -92,7 +95,7 @@ class Timeloop:
             design_result = DesignResult()
             for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
                 layer_name = layer.get("name")
-                output = self._run_single(self.runroot, layer, tl_files_path=None)
+                output = self._run_layer(self.runroot, layer, tl_files_path=None)
 
                 layer_result = LayerResult()
                 layer_result.name = layer_name
@@ -125,7 +128,7 @@ class Timeloop:
 
         for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
             layer_name = layer.get("name")
-            output = self._run_single(design_runroot, layer, tl_files_path=tl_design_dir)
+            output = self._run_layer(design_runroot, layer, tl_files_path=tl_design_dir)
 
             layer_result = LayerResult()
             layer_result.name = layer_name
@@ -137,8 +140,7 @@ class Timeloop:
         
         stats.add_design(design_result)
 
-
-    def _run_single(self,
+    def _run_layer(self,
             runroot: str,
             layer : dict,
             logfile : str = 'timeloop.log',
@@ -197,7 +199,7 @@ class Timeloop:
 
 
     def _plot_all_of_metric(self, stats, metric: str):
-        figure_path = os.path.join(self.tl_cfg["work_dir"], "figures")
+        figure_path = os.path.join(self.workdir, "figures")
         os.makedirs(figure_path, exist_ok=True)
         plotMetricPerConfigPerLayer(stats, figure_path, metric,                          prefix=self.accname+"_")
         plotMetricPerConfigPerLayer(stats, figure_path, metric,             scale="log", prefix=self.accname+"_log_")

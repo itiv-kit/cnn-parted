@@ -8,9 +8,10 @@ from tqdm import tqdm
 import sys
 import os
 from framework.constants import ROOT_DIR
+from tools.zigzag.docs.source import conf
 sys.path.append(os.path.join(ROOT_DIR, "tools", "MNSIM-2.0"))
 
-from framework.node.NodeEvaluator import  NodeResult, DesignResult, LayerResult
+from framework.node.NodeEvaluator import  NodeResult, DesignResult, LayerResult, NodeEvaluator
 
 from MNSIM.Interface.network import NetworkGraph
 from MNSIM.Interface.interface import TrainTestInterface
@@ -20,9 +21,12 @@ from MNSIM.Area_Model.Model_Area import Model_area
 
 from pytorch_quantization import tensor_quant
 
-class MNSIMInterface(TrainTestInterface):
-    def __init__ (self, layers : list, config : dict, input_size : list) -> None:
+class MNSIMInterface(TrainTestInterface, NodeEvaluator):
+    fname_result = "mnsim_layers.csv"
+
+    def __init__ (self, config : dict, input_size : list) -> None:
         self.SimConfig = ROOT_DIR + config.get('conf_path')
+        self.config = config
         self.input_size = input_size
 
         # load simconfig
@@ -82,9 +86,12 @@ class MNSIMInterface(TrainTestInterface):
         self.tile_row = self.tile_size[0]
         self.tile_column = self.tile_size[1]
 
-        self.net = self._get_net(layers, self.hardware_config)
+        #self.net = self._get_net(layers, self.hardware_config)
 
         self.stats = {}
+
+    def set_workdir(self, work_dir: str, runname: str, id: int):
+        return super().set_workdir(work_dir, runname, id)
 
     def _find_rel_layer_idx(self, layers : list, l_idx : int, name: str) -> int:
         for i in range(l_idx-1,0, -1):
@@ -205,7 +212,9 @@ class MNSIMInterface(TrainTestInterface):
         net = NetworkGraph(hardware_config, layer_config_list, quantize_config_list, input_index_list, input_params)
         return net
 
-    def run(self):
+    def run(self, layers: list, progress : bool = False):
+        self.net = self._get_net(layers, self.hardware_config)
+
         struct_file = self.get_structure()
         mod_l = Model_latency(struct_file, self.SimConfig)
         mod_e = Model_energy(struct_file, self.SimConfig)
