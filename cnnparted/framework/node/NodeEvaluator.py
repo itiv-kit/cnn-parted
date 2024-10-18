@@ -1,7 +1,17 @@
+import os
 from abc import ABC
 
-## Information about a single layer
 class LayerResult:
+    """ 
+    Contains basic information about a single layer of a nerual networ
+
+    Attributes:
+        name:           A name that must be unique in the network
+        area:           Area of the accelerator this layer runs on
+        latency:        Latency when this layer is executed
+        energy:         Energy required to run this layer on an accelerator
+        cycles          Latency in clock cycles
+    """
     def __init__(self):
         self.name: str
         self.area: float
@@ -15,10 +25,15 @@ class LayerResult:
                  "area": self.area,
                  "energy": self.energy}}
 
-## Information about a design
-#   layers: layerwise information about energy, area, ...
-#   architecture: architecture parameters, such as number of PEs, memory sizes, ...
 class DesignResult:
+    """
+    Information about the execution of a full network and the specific architecture it is run on.
+    The architecture can contain information such as number of PEs, size of memory, Crossbar specification etc. and is accelerator specific.
+    
+    Attributes:
+        layers:         List with the results of the individual layers
+        architecture:   Information about the architecture
+    """
     def __init__(self, architecture: dict = {}):
         self.layers: list[LayerResult] = []
         self.architecture: dict = architecture
@@ -39,6 +54,13 @@ class DesignResult:
 
 ## Information about a compute node/platform of the overall system
 class NodeResult:
+    """
+    Complete informatino about a node on which the simulation is run. For the design space exploration multiple designs can be
+    evaluated. For this reason we include a list of DesignResult here
+
+    Attributes:
+        designs:         Results for each design point
+    """
     def __init__(self):
         self.designs: list[DesignResult] = []
 
@@ -53,5 +75,17 @@ class NodeResult:
     
 
 class NodeEvaluator(ABC):
-    def eval_network(self, config: dict):
+    """
+    Interface which all node evluators should inherit from
+    """
+    fname_result: str
+    config: dict
+
+    def set_workdir(self, work_dir: str, runname: str, id: int):
+        self.workdir = work_dir
+        self.runroot = os.path.join(work_dir, "system_evaluation", str(id)+"_"+self.config["accelerator"])
+        fname_csv = os.path.join(work_dir, runname + "_" + str(id) + "_" + self.config["accelerator"] + "_" + self.fname_result)
+        return fname_csv
+
+    def run(self, layers: list):
         ...
