@@ -6,28 +6,10 @@ from framework.ModuleThreadInterface import ModuleThreadInterface
 from framework.node.Timeloop import Timeloop
 from framework.node.MNSIMInterface import MNSIMInterface
 from framework.node.GenericNode import GenericNode
+from framework.node.ZigZag import Zigzag
 from framework.helpers.DesignMetrics import calc_metric
 
 class NodeThread(ModuleThreadInterface):
-    def _eval(self) -> None:
-        if not self.config:
-            return
-
-        if self.config.get("timeloop"):
-            self._run_timeloop(self.config["timeloop"])
-            self.stats["type"] = 'tl'
-        elif self.config.get("mnsim"):
-            self._run_mnsim(self.config["mnsim"])
-            self.stats["type"] = 'mnsim'
-        else:
-            self._run_generic(self.config)
-            self.stats["type"] = 'generic'
-
-        if 'bits' not in self.stats:
-            self.stats["bits"] = self.config.get("bits") or 8
-
-        self.stats["fault_rates"] = [float(i) for i in self.config.get("fault_rates") or [0.0, 0.0]]
-
     def eval_node(self) -> None:
         if not self.config:
             return
@@ -45,7 +27,8 @@ class NodeThread(ModuleThreadInterface):
             simulator = MNSIMInterface(config, self.ga.input_size)
             self.stats["type"] = 'mnsim'
         elif config := self.config.get("zigzag"):
-            ...
+            layers = [] 
+            simulator = Zigzag(config)
             self.stats["type"] = 'zigzag'
         else:
             layers = []
