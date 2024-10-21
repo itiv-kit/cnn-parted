@@ -28,6 +28,7 @@ class Zigzag(NodeEvaluator):
         self.accname = config["accelerator"] + ".yaml"
         self.mapname = config["mapping"] + ".yaml"
         self.optimization = config.get("optimization", "latency")
+        assert self.optimization in ["energy", "latency", "EDP"]
         self.freq = config["frequency"]
 
 
@@ -58,7 +59,8 @@ class Zigzag(NodeEvaluator):
                                                                 accelerator=str(accfile), 
                                                                 mapping=str(mapfile), 
                                                                 dump_folder=str(zigzag_out_dir), 
-                                                                pickle_filename=str(zigzag_pickle))
+                                                                pickle_filename=str(zigzag_pickle),
+                                                                opt=self.optimization)
 
         # Get layerwise results                                                
         node_result = NodeResult()
@@ -67,10 +69,10 @@ class Zigzag(NodeEvaluator):
         for layer in layers:
             cme = layer[0]
             l = LayerResult()
-            l.name = cme.layer
+            l.name = cme.layer.name
             l.energy = cme.energy_total / 1e9 # pJ -> mJ
             l.latency = cme.latency_total2  / self.freq * 1e3 # cycles -> ms
-            l.area = None # zigzag doesn't return the area
+            l.area = 1.0 # zigzag doesn't return the area
 
             design_result.add_layer(l)
 
