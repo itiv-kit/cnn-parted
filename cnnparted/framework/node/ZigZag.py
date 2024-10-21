@@ -72,7 +72,7 @@ class Zigzag(NodeEvaluator):
             l.name = cme.layer.name
             l.energy = cme.energy_total / 1e9 # pJ -> mJ
             l.latency = cme.latency_total2  / self.freq * 1e3 # cycles -> ms
-            l.area = 1.0 # zigzag doesn't return the area
+            l.area = 0.0 # zigzag doesn't return the area
 
             design_result.add_layer(l)
 
