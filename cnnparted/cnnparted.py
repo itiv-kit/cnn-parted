@@ -137,11 +137,11 @@ def node_eval(ga : GraphAnalyzer, node_components : list, work_dir: str, run_nam
         ]
 
     for t in node_threads:
-        if not t.config.get("timeloop"):
+        if not t.config.get("timeloop") and not t.config.get("zigzag"):
             t.start()
 
     for t in node_threads:
-        if t.config.get("timeloop"): # run them simply on main thread
+        if t.config.get("timeloop") or t.config.get("zigzag"): # run them simply on main thread
             t.run()
         else:
             t.join()

@@ -38,3 +38,6 @@
 	path = tools/MNSIM-2.0
 	url = https://github.com/thu-nics/MNSIM-2.0.git
     ignore = dirty
+[submodule "tools/zigzag"]
+	path = tools/zigzag
+	url = https://github.com/KULeuven-MICAS/zigzag.git

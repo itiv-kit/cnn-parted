@@ -19,7 +19,7 @@ class ConfigHelper:
         node_components = []
         link_components = []
         for component in sorted_components:
-            if 'timeloop' in component or 'mnsim' in component or 'device' in component:
+            if 'timeloop' in component or 'mnsim' in component or 'device' in component or 'zigzag' in component:
                 node_components.append(component)
             else:
                 link_components.append(component)
