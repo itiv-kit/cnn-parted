@@ -126,6 +126,8 @@ class AccuracyEvaluator():
             quant_list.append(self.bits[0])
             for i, l in enumerate(schedules[0]):
                 if l in base_layer and l != 'input' and l != 'output':
+                    if l in layer_dict and layer_dict[l] % 2:
+                        continue
                     layer_dict[l] = len(quant_list) - 1
                     break
                 elif l == 'output': # FIXME? hotfix for last layer being renamed in ONNX file
@@ -159,6 +161,8 @@ class AccuracyEvaluator():
             fault_rate_list.append(self.fault_rates[0])
             for l in schedules[0]:
                 if l in base_layer:
+                    if l in layer_dict:
+                        continue
                     layer_dict[l] = len(fault_rate_list) - 1
                     break
 
