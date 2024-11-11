@@ -1,3 +1,4 @@
+from ast import Lambda
 import yaml
 
 class ConfigHelper:
@@ -13,16 +14,28 @@ class ConfigHelper:
         return self.config
 
     def get_system_components(self):
-        components = self.config.get('components', [])
-        sorted_components = sorted(components, key=lambda x: x.get('id', -1))
+        if "components" in self.config.keys():
+            # Old config style: determine compute vs link by content of the entry
+            components = self.config.get('components', [])
+            sorted_components = sorted(components, key=lambda x: x.get('id', -1))
 
-        node_components = []
-        link_components = []
-        for component in sorted_components:
-            if 'timeloop' in component or 'mnsim' in component or 'device' in component or 'zigzag' in component:
-                node_components.append(component)
-            else:
-                link_components.append(component)
+            node_components = []
+            link_components = []
+            for component in sorted_components:
+                if 'timeloop' in component or 'mnsim' in component or 'device' in component or 'zigzag' in component:
+                    node_components.append(component)
+                else:
+                    link_components.append(component)
+        elif system := self.config.get("system"):
+            # New config style: dedicated fields for compute and link nodes
+            nodes = system.get("compute", [])
+            links = system.get("link", [])
+            node_components = sorted(nodes, key=lambda x: x.get("id", -1))
+            link_components = sorted(links, key=lambda x: x.get("id", -1))
+        else:
+            # No system config found
+            node_components = []
+            link_components = []
 
         return node_components,link_components
 
