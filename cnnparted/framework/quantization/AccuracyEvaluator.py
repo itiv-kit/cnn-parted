@@ -6,7 +6,7 @@ import numpy as np
 
 from copy import deepcopy
 from tqdm import tqdm
-from typing import Callable
+from typing import Callable, Tuple
 
 from model_explorer.utils.setup import build_dataloader_generators
 
@@ -18,6 +18,7 @@ class AccuracyEvaluator():
     def __init__(self, model : nn.Module, nodeStats : dict, config : dict, device : str, progress : bool) -> None:
         self.bits = [nodeStats[acc].get("bits") for acc in nodeStats]
         self.fault_rates = [nodeStats[acc].get("fault_rates") for acc in nodeStats]
+        self.faulty_bits = [nodeStats[acc].get("faulty_bits") for acc in nodeStats]
         self.gpu_device = torch.device(device)
         self.progress = progress
 
@@ -41,7 +42,7 @@ class AccuracyEvaluator():
             return []
 
         quants = self._gen_quant_list(sols, n_constr, n_var, schedules)
-        fault_rates = self._gen_fault_rate_list(sols, n_constr, n_var, schedules)
+        fault_rates, faulty_bits = self._gen_fault_rate_list(sols, n_constr, n_var, schedules)
 
         # Training
         # self.qmodel.bit_widths = np.ones(len(quants[0])) * max(self.bits)
@@ -86,6 +87,7 @@ class AccuracyEvaluator():
         for i, q in enumerate(quants):
             self.qmodel.bit_widths = q
             self.qmodel.fault_rates = fault_rates[i]
+            self.qmodel.faulty_bits = faulty_bits[i]
 
             acc = None
             if self.qmodel.bit_widths in bits_lut and self.qmodel.fault_rates in fault_lut:
@@ -154,11 +156,13 @@ class AccuracyEvaluator():
 
         return quants
 
-    def _gen_fault_rate_list(self, sols : list, n_constr : int, n_var : int, schedules : list) -> list:
+    def _gen_fault_rate_list(self, sols : list, n_constr : int, n_var : int, schedules : list) -> Tuple[list, list]:
         layer_dict = {}
         fault_rate_list = []
+        faulty_bit_list = []
         for base_layer in self.qmodel.faulty_module_names:
             fault_rate_list.append(self.fault_rates[0])
+            faulty_bit_list.append(self.faulty_bits[0])
             for l in schedules[0]:
                 if l in base_layer:
                     if l in layer_dict:
@@ -167,6 +171,7 @@ class AccuracyEvaluator():
                     break
 
         fault_rates = []
+        faulty_bits = []
         num_pp = n_var/2 - 1
         for sol in sols:
             mapping = sol[n_constr+1:n_var+n_constr+1]
@@ -175,8 +180,10 @@ class AccuracyEvaluator():
                 acc = int(mapping[int(n_var/2)+partition])
                 if layer in layer_dict.keys():
                     fault_rate_list[layer_dict[layer]] = self.fault_rates[acc-1]
+                    faulty_bit_list[layer_dict[layer]] = self.faulty_bits[acc-1]
                 while partition < num_pp and layer == schedules[int(sol[0])][int(mapping[partition])-1]:
                     partition += 1
             fault_rates.append(deepcopy(fault_rate_list))
+            faulty_bits.append(deepcopy(faulty_bit_list))
 
-        return fault_rates
+        return fault_rates, faulty_bits

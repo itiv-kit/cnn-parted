@@ -8,7 +8,6 @@ from tqdm import tqdm
 import sys
 import os
 from framework.constants import ROOT_DIR
-from tools.zigzag.docs.source import conf
 sys.path.append(os.path.join(ROOT_DIR, "tools", "MNSIM-2.0"))
 
 from framework.node.NodeEvaluator import  NodeResult, DesignResult, LayerResult, NodeEvaluator

@@ -17,6 +17,9 @@ class NodeThread(ModuleThreadInterface):
         if 'bits' not in self.stats:
             self.stats["bits"] = self.config.get("bits") or 8
 
+        self.stats["fault_rates"] = [float(i) for i in self.config.get("fault_rates") or [0.0, 0.0]]
+        self.stats["faulty_bits"] = self.config.get("faulty_bits") or 0
+
         # Select which simulator should be used
         if config := self.config.get("timeloop"):
             layers = self.ga.get_timeloop_layers()
@@ -27,14 +30,14 @@ class NodeThread(ModuleThreadInterface):
             simulator = MNSIMInterface(config, self.ga.input_size)
             self.stats["type"] = 'mnsim'
         elif config := self.config.get("zigzag"):
-            layers = [] 
+            layers = []
             simulator = Zigzag(config)
             self.stats["type"] = 'zigzag'
         else:
             layers = []
             simulator = GenericNode(config)
             self.stats["type"] = 'generic'
-        
+
         # Check if design is DSE enabled
         dse_cfg = config.get("dse", {"optimization": "edap",
                                      "top_k": 2})
@@ -55,53 +58,6 @@ class NodeThread(ModuleThreadInterface):
         self._write_layer_csv(fname_csv, simulator.stats)
         pruned_stats = self._prune_accelerator_designs(simulator.stats, top_k, metric, is_dse)
         self.stats["eval"] = pruned_stats
-
-
-    def eval_node(self) -> None:
-        if not self.config:
-            return
-
-        if 'bits' not in self.stats:
-            self.stats["bits"] = self.config.get("bits") or 8
-
-        # Select which simulator should be used
-        if config := self.config.get("timeloop"):
-            layers = self.ga.get_timeloop_layers()
-            simulator = Timeloop(config)
-            self.stats["type"] = 'tl'
-        elif config := self.config.get("mnsim"):
-            layers = self.ga.get_mnsim_layers()
-            simulator = MNSIMInterface(config, self.ga.input_size)
-            self.stats["type"] = 'mnsim'
-        elif config := self.config.get("zigzag"):
-            ...
-            self.stats["type"] = 'zigzag'
-        else:
-            layers = []
-            simulator = GenericNode(config)
-            self.stats["type"] = 'generic'
-        
-        # Check if design is DSE enabled
-        dse_cfg = config.get("dse", {"optimization": "edap",
-                                     "top_k": 2})
-        is_dse = "dse" in config.keys()
-        metric = dse_cfg.get("optimization", "edap")
-        top_k = int(dse_cfg.get("top_k", 2))
-
-        # Check if some previous results are available
-        fname_csv = simulator.set_workdir(self.work_dir, self.runname, self.id)
-        if os.path.isfile(fname_csv):
-            read_stats = self._read_layer_csv(fname_csv)
-            pruned_stats = self._prune_accelerator_designs(read_stats, top_k, metric, is_dse)
-            self.stats["eval"] = pruned_stats
-            return
-
-        # Perform the actual evaluation
-        simulator.run(layers)
-        self._write_layer_csv(fname_csv, simulator.stats)
-        pruned_stats = self._prune_accelerator_designs(simulator.stats, top_k, metric, is_dse)
-        self.stats["eval"] = pruned_stats
-
 
     def _run_generic(self, config: dict) -> None:
         raise NotImplementedError
