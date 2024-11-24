@@ -8,9 +8,20 @@ general:
   work_dir: alexnet_run
   keep_dir: True
 
-neural-network:
+workload:
   name: alexnet
   input-size: [ 1, 3, 227, 227 ]
+
+pipeline:
+  stages:
+    - WorkloadParser
+    - SystemParser
+    - GraphAnalysis
+    - RobustnessOptimization
+    - NodeEvaluation
+    - PartitioningOptimization
+    - AccuracyEvaluation
+    - ExportPartitionResults
 
 accuracy:
   robustness:

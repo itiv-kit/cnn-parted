@@ -2,9 +2,16 @@ from ast import Lambda
 import yaml
 
 class ConfigHelper:
-    def __init__(self, fname : str):
-        self.fname = fname
-        self.config = self.__load_config()
+    def __init__(self, conf_in : str | dict):
+        if isinstance(conf_in, str):
+            self.fname = conf_in
+            self.config = self.__load_config()
+        elif isinstance(conf_in, dict):
+            self.fname = ""
+            self.config = conf_in
+        else:
+            raise RuntimeError(f"Invalid argument to ConfigHelper. Expected str or dict but received {type(conf_in)}")
+        
 
     def __load_config(self) -> dict:
         with open(self.fname) as f:

@@ -1,0 +1,60 @@
+image: gitlab.itiv.kit.edu:1443/itiv/docker/itiv-rocky8:latest
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+setup-env:
+  stage: build
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    untracked: true
+    paths:
+      - tools/
+      - pythonEnv/
+      - .cache/pip
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    GIT_SUBMODULE_FORCE_HTTPS: "true"
+  before_script:
+    - sudo dnf -y install libstdc++-static.x86_64 ncurses-devel libconfig-devel boost-serialization boost-devel yaml-cpp-devel libstdc++ python3.11 python3.11-pip python3.11-wheel
+    - python3.11 -m venv pythonEnv
+    - source pythonEnv/bin/activate
+  script:
+    - pip install --upgrade pip
+    - pip install wheel
+    - pip install scons
+    - pip install nvidia-pyindex 
+    - pip install numpy absl-py scipy sphinx-glpi-theme prettytable pyyaml
+    - pip install --no-cache-dir --index-url https://pypi.nvidia.com pytorch-quantization
+    - git config --global --add safe.directory /builds/ai-hardware-accelerators/cnn-parted
+    - git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then  pip install .; elif [ -f setup.py ]; then pip install -e .; fi'
+    - git submodule foreach --recursive 'if [ -f requirements.txt ]; then pip install -r requirements.txt; fi'
+    - sudo ln -s /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so
+    - which accelergy
+    - source tools/setupTimeloop.sh
+    - pip install -e .
+    - pip install -r requirements.txt
+
+
+run-test:
+  cache:
+    key: $CI_COMMIT_REF_SLUG
+    untracked: true
+    paths:
+      - tools/
+      - pythonEnv/
+      - .cache/pip
+  artifacts:
+    when: always
+    paths:
+      - test_pipe_alexnet
+  stage: test
+  before_script:    
+    - sudo dnf -y install libstdc++-static.x86_64 ncurses-devel libconfig-devel boost-serialization boost-devel yaml-cpp-devel python3.11 python3.11-pip python3.11-wheel
+    - sudo ln -s /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so
+    - source env/setupEnv.sh
+    - export ACCELERGYPATH=$(which accelergy)
+  script:
+    - python3.11 cnnparted/cnnparted.py examples/test_pipeline/alexnet_pipe.yaml test
+  timeout: 12 hours
+ 
