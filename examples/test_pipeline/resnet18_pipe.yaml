@@ -1,28 +1,25 @@
 general:
-  fixed_sys: True
-  acc_once: True
-  num_pp: 1
+  fixed_sys: False
+  acc_once: False
+  num_pp: -1
   num_topos: 1
   num_jobs: 1
   optimization: ppa
-  work_dir: debug_dir
-  keep_dir: False
+  work_dir: test_pipe
+  keep_dir: True
 
 workload:
-  name: RadarNet.onnx
-  input-size: [ 2,1,16,512,256 ]
+  name: resnet18
+  input-size: [ 1, 3, 227, 227 ]
 
 pipeline:
   stages:
     - WorkloadParser
     - SystemParser
     - GraphAnalysis
-    - RobustnessOptimization
     - NodeEvaluation
     - PartitioningOptimization
-    - AccuracyEvaluation
     - ExportPartitionResults
-
 
 system:
   compute:
@@ -81,4 +78,3 @@ system:
         latency_ns: 2 # including D2D Adapter and PHY
         power_bit_pj: 0.5
       fps: 25
-

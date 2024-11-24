@@ -3,22 +3,24 @@ general:
   acc_once: True
   num_pp: 1
   num_topos: 1
-  num_jobs: 1
+  num_jobs: 64
   optimization: ppa
-  work_dir: googlenet_run
+  work_dir: dbg_resnext_eyeriss
   keep_dir: False
 
 workload:
-  name: googlenet
-  input-size: [ 1, 3, 224, 224 ]
+  name: resnext50
+  input-size: [ 1, 3, 227, 227 ]
 
 pipeline:
   stages:
     - WorkloadParser
     - SystemParser
     - GraphAnalysis
+    - RobustnessOptimization
     - NodeEvaluation
     - PartitioningOptimization
+    - AccuracyEvaluation
     - ExportPartitionResults
 
 components:
@@ -27,36 +29,27 @@ components:
     fault_rates: [0, 0] # input, weight
     max_memory_size: 600000000
     timeloop:
-      accelerator: gemmini_like
-      dse:
-        constraints:
-          mesh_dim_min: 16
-          mesh_dim_max: 128
-          min_spad_size: 256
-          max_spad_size: 256
-          min_acc_size: 64
-          max_acc_size: 64
-        mutator: GemminiArchitectureMutator
+      accelerator: eyeriss_like
       frequency: 200000000
       layer: conv2d
       mapper:
         algorithm: random-pruned
         live-status: false
         max-permutations-per-if-visit: 16
-        num-threads: 8
+        num-threads: 200
         optimization-metrics:
         - edp
         timeout: 15000
         victory-condition: 500
   - id: 1
-    max_out_size: 20000000
-    data_bit_width: 8
-    noi:
-      noi_mode: UCIe
-      width: 16
-      data_rate_Gbps: 4
-      latency_ns: 2 # including D2D Adapter and PHY
-      power_bit_pj: 0.5
+    max_out_size: 150000000
+    data_bit_width: 16
+    ethernet:
+      cable_len_m: 5
+      eee_lmi_ratio: 0.1
+      eee_toff_ms: 0
+      enable_eee: false
+      eth_mode: BASE1000-T
     fps: 25
   - id: 2
     bits: 8
@@ -69,7 +62,7 @@ components:
         algorithm: random-pruned
         live-status: false
         max-permutations-per-if-visit: 16
-        num-threads: 8
+        num-threads: 200
         optimization-metrics:
         - edp
         timeout: 15000

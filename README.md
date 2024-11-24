@@ -17,12 +17,6 @@ The framework currently includes a custom Ethernet model as well as hardware acc
     pip install --no-cache-dir --index-url https://pypi.nvidia.com pytorch-quantization
     ```
 
-    Additionally, if you want to use th ZigZag simulator install its dependencies:
-    ```sh
-    cd tools/zigzag
-    pip install -r requirements.txt
-    ```
-
 1. Download submodules
     ```sh
     git submodule update --init --recursive
@@ -30,7 +24,8 @@ The framework currently includes a custom Ethernet model as well as hardware acc
 
 2. Run installation
     ```sh
-    git submodule foreach --recursive 'if [ -f setup.py ]; then pip install -e .; fi'
+    git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then  pip install .; elif [ -f setup.py ]; then pip install -e .; fi'
+    git submodule foreach --recursive 'if [ -f requirements.txt ]; then pip install -r requirements.txt; fi'
     pip install -e .
     pip install -r requirements.txt
     ```
