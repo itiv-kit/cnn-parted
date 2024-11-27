@@ -8,17 +8,25 @@ general:
   work_dir: resnet18_faulty_weights_run
   keep_dir: True
 
-
-neural-network:
+workload:
   name: resnet18
   input-size: [ 1, 3, 227, 227 ]
 
+pipeline:
+  stages:
+    - WorkloadParser
+    - SystemParser
+    - GraphAnalysis
+    - RobustnessOptimization
+    - NodeEvaluation
+    - PartitioningOptimization
+    - AccuracyEvaluation
+    - ExportPartitionResults
+
 accuracy:
-  # robustness:
-  #   bits: [4, 6, 8, 16]
-  #   delta : 0.01 # best_acc - delta = lower boundary for the selection of the bit constraints
-  retraining:
-    epochs: 0
+  robustness:
+    bits: [4, 6, 8, 16]
+    delta : 0.01 # best_acc - delta = lower boundary for the selection of the bit constraints
   datasets:
     calibrate:
       type: imagenet
