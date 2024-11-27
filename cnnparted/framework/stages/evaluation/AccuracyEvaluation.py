@@ -6,7 +6,7 @@ from framework.stages.optimization.PartitioningOptimization import PartitioningO
 from framework.stages.inputs.WorkloadParser import WorkloadParser
 from framework.stages.StageBase import Stage, register_required_stage
 from framework.stages.Artifacts import Artifacts
-from framework.quantization import AccuracyEvaluator
+from framework.quantization.AccuracyEvaluator import AccuracyEvaluator
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 import numpy as np
@@ -15,7 +15,7 @@ import numpy as np
 class AccuracyEvaluation(Stage):
     def __init__(self):
         super().__init__()
-    
+
     def run(self, artifacts: Artifacts):
         self._take_artifacts(artifacts)
         if accuracy_cfg := self.config["accuracy"]:
@@ -32,7 +32,7 @@ class AccuracyEvaluation(Stage):
         for i, p in enumerate(self.sol["dom"]): # achieving aligned csv file
             self.sol["dom"][i] = np.append(p, float(0))
         self._update_artifacts(artifacts)
-    
+
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
         self.torch_model = artifacts.get_stage_result(GraphAnalysis, "ga").torchmodel
@@ -47,4 +47,3 @@ class AccuracyEvaluation(Stage):
 
     def _update_artifacts(self, artifacts: Artifacts):
         artifacts.set_stage_result(PartitioningOptimization, "sol", self.sol)
-    

@@ -34,7 +34,7 @@ class AccuracyEvaluator():
         if not os.path.exists(self.param_path):
             generate_calibration(model, self.calib_dataloadergen, True, self.param_path)
 
-        self.train_epochs = config['retraining'].get('epochs')
+        self.train_epochs = config.get('retraining', {'epochs' : 0})['epochs']
 
 
     def eval(self, sols : list, n_constr : int, n_var : int, schedules : list, accuracy_function : Callable) -> list:
@@ -182,6 +182,7 @@ class AccuracyEvaluator():
                     fault_rate_list[layer_dict[layer]] = self.fault_rates[acc-1]
                     faulty_bit_list[layer_dict[layer]] = self.faulty_bits[acc-1]
                 while partition < num_pp and layer == schedules[int(sol[0])][int(mapping[partition])-1]:
+                    # breakpoint()
                     partition += 1
             fault_rates.append(deepcopy(fault_rate_list))
             faulty_bits.append(deepcopy(faulty_bit_list))
