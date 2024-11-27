@@ -149,6 +149,8 @@ class TreeModel:
         i_shape = [self.output_sizes[i] for i in matched_inputs]
 
 
+        if matched_outputs == [] and node.output[0] == "output":
+            o_shape = [self.out_layer['output_size']]
         if matched_inputs == [] and node.input[0]=="input":
             c = self.in_layer['output_size'][1]
         else :

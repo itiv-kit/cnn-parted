@@ -1,3 +1,4 @@
+from math import inf
 from framework.link.LinkModelInterface import LinkModelInterface
 
 from framework.link.EthernetLink import EthernetLink
@@ -48,8 +49,8 @@ class Link():
                 energy = self.link.get_pow_cons_mW(slice_size, self.config['fps']) * latency / 1e3
             except ValueError as e:
                 print(e)
-                latency = 0
-                energy = 0
+                latency = inf
+                energy = inf
 
             self.lut[slice_size] = [latency, energy]
 
