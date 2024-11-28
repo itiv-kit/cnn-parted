@@ -12,13 +12,13 @@ from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 class ExportPartitionResults(Stage):
     def __init__(self):
         super().__init__()
-    
+
     def run(self, artifacts: Artifacts):
         self._take_artifacts(artifacts)
         self._export_files()
         self._write_log_file()
         self._update_artifacts(artifacts)
-    
+
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
         self.work_dir = self.config["work_dir"]
@@ -63,10 +63,36 @@ class ExportPartitionResults(Stage):
         self._write_files(res, objectives, "all")
 
     def _write_files(self, result : list, objectives : list, name : str) -> None:
-        df = pd.DataFrame(result)
-        df.to_csv( os.path.join(self.work_dir, self.run_name + "_result_" + name + ".csv"), header=False)
+        hdr_front = ["Schedule_ID", "PPs"]
+        # generate number of platforms, latency of platforms, energy of platforms, num of pps, num of platforms
+        hdr_mid = []
+        for i in range(self.num_platforms):
+            hdr_mid.append("Design_ID" + str(i))
+        for i in range(int(self.n_var / 2) + 1):
+            hdr_mid.append("Latency_" + str(i))
+        for i in range(int(self.n_var / 2) + 1):
+            hdr_mid.append("Energy_" + str(i))
+        for i in range(int(self.n_var / 2) + 1):
+            hdr_mid.append("Link_Latency_" + str(i))
+        for i in range(int(self.n_var / 2) + 1):
+            hdr_mid.append("Link_Energy_" + str(i))
+        for i in range(int(self.n_var / 2)):
+            hdr_mid.append("PartitioningPoint_" + str(i))
+        for i in range(int(self.n_var / 2) + 1):
+            hdr_mid.append("Platform_" + str(i))
+        if len(objectives[0]) == 7:
+            hdr_back = ["Latency", "Energy", "Throughput", "Area", "Link_Latency", "Link_Energy", "Type"]
+        else:
+            hdr_back = ["Latency", "Energy", "Throughput", "Area", "Link_Latency", "Link_Energy", "Accuracy", "Type"]
 
-        hdr = ["latency", "energy", "throughput", "area", "link_latency", "link_energy", "accuracy", "type"]
+        hdr = hdr_front + hdr_mid + hdr_back
+        df = pd.DataFrame(result)
+        df.to_csv( os.path.join(self.work_dir, self.run_name + "_result_" + name + ".csv"), header=hdr, index_label='idx')
+
+        if len(objectives[0]) == 7:
+            hdr = ["Latency", "Energy", "Throughput", "Area", "Link_Latency", "Link_Energy", "Type"]
+        else:
+            hdr = ["Latency", "Energy", "Throughput", "Area", "Link_Latency", "Link_Energy", "Accuracy", "Type"]
         df = pd.DataFrame(objectives)
         df.to_csv( os.path.join(self.work_dir, self.run_name + "_objectives_" + name + ".csv"), header=hdr, index_label='idx')
 
@@ -96,4 +122,3 @@ class ExportPartitionResults(Stage):
 
         f.close()
         return num_pp_schemes
-    
