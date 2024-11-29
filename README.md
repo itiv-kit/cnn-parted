@@ -6,13 +6,15 @@ CNNParted is a framework for hardware-aware design space exploration of CNN infe
 The framework currently includes a custom Ethernet model as well as hardware accelerators models taken from Timeloop example repository (Simba, Eyeriss and Simple OS Array).
 
 ## Instructions
-0. If you have no permission to install python packages on your system, create a virtual environment
+0. First, create a virtual environment to install all the dependencies:
     ```sh
-    python3.9 -m venv pythonEnv
+    python3.11 -m venv pythonEnv
     source pythonEnv/bin/activate
     pip install --upgrade pip
     pip install wheel
-    pip install nvidia-pyindex pytorch_quantization
+    pip install nvidia-pyindex 
+    pip install numpy absl-py scipy sphinx-glpi-theme prettytable pyyaml
+    pip install --no-cache-dir --index-url https://pypi.nvidia.com pytorch-quantization
     ```
 
 1. Download submodules
@@ -22,7 +24,8 @@ The framework currently includes a custom Ethernet model as well as hardware acc
 
 2. Run installation
     ```sh
-    git submodule foreach --recursive 'if [ -f setup.py ]; then pip install -e .; fi'
+    git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then  pip install .; elif [ -f setup.py ]; then pip install -e .; fi'
+    git submodule foreach --recursive 'if [ -f requirements.txt ]; then pip install -r requirements.txt; fi'
     pip install -e .
     pip install -r requirements.txt
     ```
@@ -34,7 +37,7 @@ The framework currently includes a custom Ethernet model as well as hardware acc
 
 4. Run the given python script:
     ```sh
-    python3.9 cnnparted/cnnparted.py examples/squeezenet1_1.yaml RunName
+    python3.11 cnnparted/cnnparted.py examples/squeezenet1_1.yaml RunName
     ```
 
 ## Known issues

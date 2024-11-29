@@ -33,6 +33,7 @@ class FaultyQuantizedModel(CustomModel):
         super().__init__(base_model, device)
 
         self._fault_rates = []
+        self._faulty_bits = []
         self.faulty_modules = []
         self.faulty_module_names = []
 
@@ -69,6 +70,25 @@ class FaultyQuantizedModel(CustomModel):
             module.fault_rate = new_fault_rates[i]
 
         self._fault_rates = new_fault_rates
+
+    @property
+    def faulty_bits(self):
+        return self._faulty_bits
+
+    @faulty_bits.setter
+    def faulty_bits(self, new_faulty_bits):
+        assert isinstance(new_faulty_bits, list) or isinstance(
+            new_faulty_bits,
+            np.ndarray), "faulty_bits have to be a list or ndarray"
+        assert len(new_faulty_bits) == len(
+            self.faulty_modules
+        ), "faulty_bits list has to match the amount of quantization layers"
+
+        # Update Model ...
+        for i, module in enumerate(self.faulty_modules):
+            module.faulty_bits = new_faulty_bits[i]
+
+        self._faulty_bits = new_faulty_bits
 
     @property
     def bit_widths(self):

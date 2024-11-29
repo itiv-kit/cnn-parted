@@ -17,11 +17,14 @@ class ModuleThreadInterface(threading.Thread):
 
     def run(self) -> None:
         t0 = time.time()
-        self._eval()
+        self.eval_node()
         t1 = time.time()
         self.stats['sim_time'] = t1 - t0
 
     def _eval(self) -> None:
+        raise NotImplementedError
+    
+    def eval_node(self):
         raise NotImplementedError
 
     def getStats(self) -> dict:

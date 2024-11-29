@@ -11,4 +11,4 @@ if [ ! -d "tools/timeloop/pat" ]; then
     ln -sf ../pat-public/src/pat tools/timeloop/src
 fi
 
-scons-3.6 -C tools/timeloop -j4 --accelergy
+scons -C tools/timeloop -j4 --accelergy
