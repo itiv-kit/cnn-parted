@@ -33,7 +33,19 @@ class NodeEvaluation(Stage):
 
         for node_thread in node_threads:
             id,stats = node_thread.getStats()
-            nodeStats[id] = stats
+
+            instances = node_thread.config.get("instances", 1)
+            if instances == 1:
+                nodeStats[id] = stats
+            else:
+                # If the accelerator should be instatiated multiple times, copy the results and generate a unique id
+                for i in range(0, instances):
+                    id_str = "10" + str(id) + str(i) # generate a unique id for instances
+                    nodeStats[int(id_str)] = stats
+
+        # ensure IDs are actually all unique
+        all_ids = list(nodeStats.keys())
+        assert len(all_ids) == len(set(all_ids)), f"Component IDs are not unique. Found IDs: {all_ids}"
 
         self._update_artifacts(artifacts, nodeStats)
     

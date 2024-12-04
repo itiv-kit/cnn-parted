@@ -77,12 +77,18 @@ class PartitioningOptimizer(Optimizer):
 
             num_platforms = len(self.nodeStats)
             num_layers = len(self.schedules[0])
+            nodeStatsIds = list(self.nodeStats.keys())
             for i, sort in enumerate(sorts):
                 if sort is not None:
                     for res in sort:
-                        res[g_len:g_len+self.num_pp] = np.divide(res[g_len:g_len+self.num_pp], num_platforms)
-                        res[g_len+self.num_pp:g_len+x_len] = np.divide(res[g_len+self.num_pp:g_len+x_len], num_layers)
-                        res[g_len:g_len+x_len] = np.floor(res[g_len:g_len+x_len]).astype(int) + 1
+                        res[g_len:g_len+self.num_pp] = np.divide(res[g_len:g_len+self.num_pp], num_platforms).astype(int)
+                        res[g_len+self.num_pp:g_len+x_len] = np.divide(res[g_len+self.num_pp:g_len+x_len], num_layers).astype(int)
+                        
+                        #res[g_len:g_len+x_len] = np.floor(res[g_len:g_len+x_len]).astype(int) + 1
+                        res[g_len:g_len+self.num_pp] = np.floor(res[g_len:g_len+self.num_pp]).astype(int) + 1
+                        res[g_len+self.num_pp:g_len+x_len] = [nodeStatsIds[int(p)] for p in res[g_len+self.num_pp:g_len+x_len]]
+                        
+                        #print(res[g_len+self.num_pp:g_len+x_len])
                         if res[-1]:
                             all_paretos.append(np.insert(res, 0, i)[:-1]) # insert schedule ID and append to list
                         else:
