@@ -1,3 +1,4 @@
+import math
 from pymoo.core.problem import ElementwiseProblem
 from copy import deepcopy
 import numpy as np
@@ -8,7 +9,7 @@ from framework.helpers.DesignMetrics import calc_metric
 
 
 class PartitioningProblem(ElementwiseProblem):
-    def __init__(self, num_pp : int, nodeStats : dict, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool, layer_dict : dict, layer_params : dict, link_confs : list):
+    def __init__(self, num_pp : int, nodeStats : dict, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool, layer_dict : dict, layer_params : dict, link_confs : list, system_constraints: dict):
         self.nodeStats = nodeStats
         self.num_platforms = len(nodeStats)
         self.num_pp = num_pp
@@ -19,6 +20,7 @@ class PartitioningProblem(ElementwiseProblem):
         self.num_layers = len(schedule)
         self.layer_dict = layer_dict
         self.layer_params = layer_params
+        self.system_constraints = system_constraints
 
         self.links = []
         for link_conf in link_confs:
@@ -110,6 +112,12 @@ class PartitioningProblem(ElementwiseProblem):
             design_tag = [self._get_tag_as_int(tag) for tag in design_tag.values()]
 
         out["F"] = [latency, energy, throughput, area, link_latency, link_energy] #+ list(bandwidth) #+ list(mem)
+
+        valid &= self._check_system_constraints(self.system_constraints, 
+                                                energy+link_energy,
+                                                latency+link_latency,
+                                                throughput,
+                                                area)
 
         if valid:
             out["G"] = [i * (-1) for i in design_tag] + [-num_real_pp] + [i * (-1) for i in l_pp] + [i * (-1) for i in e_pp] + [i * (-1) for i in l_pp_link] + [i * (-1) for i in e_pp_link]
@@ -299,3 +307,17 @@ class PartitioningProblem(ElementwiseProblem):
         first_layer = [*self.nodeStats[platform]["eval"][design_id]["layers"]][0]
         area = float(self.nodeStats[platform]["eval"][design_id]["layers"][first_layer]['area'])
         return area
+
+    def _check_system_constraints(self, constraints, energy, latency, throughput, area) -> bool:
+        valid = True
+        if (latency_constraint := constraints.get("latency", math.inf)) and latency > latency_constraint:
+            valid = False
+        if (energy_constraint := constraints.get("energy", math.inf)) and energy > energy_constraint:
+            valid = False
+        if (throughput_constraint := constraints.get("throughput", 0)) and abs(throughput) < throughput_constraint:
+            # throughput is passed as a negative value
+            valid = False
+        if (area_constraint := constraints.get("area", math.inf)) and area > area_constraint:
+            valid = False
+        
+        return valid

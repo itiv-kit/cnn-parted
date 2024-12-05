@@ -54,6 +54,17 @@ class ConfigHelper:
             else:
                 print(f"{indent}{key}")
 
+    @staticmethod
+    def get_system_constraints(config):
+        default_constraints = {
+            "latency": None,
+            "energy": None,
+            "area": None,
+            "throughput": None,
+        }
+        constraints = config.get("system_constraints", default_constraints)
+        return constraints
+
     def get_node_memory_sizes(self, node_components ):
         memories=[]
         for node in node_components:

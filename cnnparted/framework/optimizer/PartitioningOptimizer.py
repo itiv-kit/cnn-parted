@@ -15,6 +15,7 @@ from joblib import Parallel, delayed
 from framework.optimizer.Optimizer import Optimizer
 from framework.optimizer.PartitioningProblem import PartitioningProblem
 from framework import GraphAnalyzer
+from framework.helpers.ConfigHelper import ConfigHelper
 
 
 class PartitioningOptimizer(Optimizer):
@@ -54,10 +55,11 @@ class PartitioningOptimizer(Optimizer):
         return params
 
     def optimize(self, q_constr : dict, conf : dict) -> tuple[int, int, dict]:
-        fixed_sys = conf.get('fixed_sys')
-        acc_once = conf.get('acc_once')
-        opt = conf.get('optimization')
-        num_jobs = conf.get('num_jobs')
+        fixed_sys = conf["general"].get('fixed_sys')
+        acc_once = conf["general"].get('acc_once')
+        opt = conf["general"].get('optimization')
+        num_jobs = conf["general"].get('num_jobs')
+        system_constraints = ConfigHelper.get_system_constraints(conf)
 
         all_paretos = []
         non_optimals = []
@@ -71,7 +73,7 @@ class PartitioningOptimizer(Optimizer):
             non_optimals = np.load(fname_n_npy)
         else:
             sorts = Parallel(n_jobs=num_jobs, backend="multiprocessing")(
-                delayed(self._optimize_single)(self.num_pp, s, q_constr, fixed_sys, acc_once)
+                delayed(self._optimize_single)(self.num_pp, s, q_constr, fixed_sys, acc_once, system_constraints)
                 for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
             )
 
@@ -84,9 +86,9 @@ class PartitioningOptimizer(Optimizer):
                         res[g_len:g_len+self.num_pp] = np.divide(res[g_len:g_len+self.num_pp], num_platforms).astype(int)
                         res[g_len+self.num_pp:g_len+x_len] = np.divide(res[g_len+self.num_pp:g_len+x_len], num_layers).astype(int)
                         
-                        #res[g_len:g_len+x_len] = np.floor(res[g_len:g_len+x_len]).astype(int) + 1
-                        res[g_len:g_len+self.num_pp] = np.floor(res[g_len:g_len+self.num_pp]).astype(int) + 1
-                        res[g_len+self.num_pp:g_len+x_len] = [nodeStatsIds[int(p)] for p in res[g_len+self.num_pp:g_len+x_len]]
+                        res[g_len:g_len+x_len] = np.floor(res[g_len:g_len+x_len]).astype(int) + 1
+                        #res[g_len:g_len+self.num_pp] = np.floor(res[g_len:g_len+self.num_pp]).astype(int) + 1
+                        #res[g_len+self.num_pp:g_len+x_len] = [nodeStatsIds[int(p)] for p in res[g_len+self.num_pp:g_len+x_len]]
                         
                         #print(res[g_len+self.num_pp:g_len+x_len])
                         if res[-1]:
@@ -151,8 +153,9 @@ class PartitioningOptimizer(Optimizer):
                 samples.append(pps + accs.tolist())
         return np.array(samples)
 
-    def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool) -> list:
-        problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, self.layer_params, self.link_confs)
+    def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool, system_constraints: dict) -> list:
+        problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, 
+                                      self.layer_params, self.link_confs, system_constraints)
 
         num_layers = len(schedule)
         initial_x = self._gen_initial_x(num_layers, num_pp, fixed_sys, acc_once)
