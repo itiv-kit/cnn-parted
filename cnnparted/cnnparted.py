@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 import argparse
+from genericpath import isfile
 import tempfile
 import shutil
 import torch
@@ -57,6 +58,10 @@ if __name__ == '__main__':
                         type=int,
                         default=0,
                         help='CUDA ID')
+    parser.add_argument('-clp',
+                        '--clear-partitioning',
+                        action='store_true',
+                        help="Use to clean results of partitioning evaluation")
     args = parser.parse_args()
 
     if args.cuda:
@@ -81,7 +86,24 @@ if __name__ == '__main__':
     else:
         work_dir_tmp = tempfile.TemporaryDirectory(dir=ROOT_DIR)
         work_dir = work_dir_tmp.name.split(os.path.sep)[-1]
+    
+    if args.clear_partitioning:
+        rn = args.run_name
+        files = [rn+"_non_optimals.npy",
+                 rn+"_paretos.npy",
+                 rn+"_objectives_all.csv",
+                 rn+"_objectives_nondom.csv",
+                 rn+"_result_all.csv",
+                 rn+"_result_nondom.csv",
+                 rn+"_robustness.csv"
+                ]
+        for file in files:
+            file_p = os.path.join(ROOT_DIR, work_dir, file)
+            if os.path.isfile(file_p):
+                os.remove(file_p)
+        sys.exit()
 
+        
     # Determine stages that should be run
     stages = parse_pipeline(config)
         
