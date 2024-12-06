@@ -197,7 +197,6 @@ class PartitioningProblem(ElementwiseProblem):
             ls[layer] = deepcopy(layer_successors)
 
         # Decide which design should be used
-    	# Use Energy-Delay-Area-Product as criterium for optimality
         metric_per_design = calc_metric(np.array(energy_per_design), np.array(latency_per_design), np.array(area_per_design), "edp", reduction=True)
 
         #optimal_design_id  = np.argmin(metric_per_design)
