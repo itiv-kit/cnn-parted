@@ -14,6 +14,7 @@ from joblib import Parallel, delayed
 
 from framework.optimizer.Optimizer import Optimizer
 from framework.optimizer.PartitioningProblem import PartitioningProblem
+from framework.optimizer.config.PartitioningOptConfig import PartitioningOptConfig
 from framework import GraphAnalyzer
 from framework.helpers.ConfigHelper import ConfigHelper
 
@@ -44,6 +45,7 @@ class PartitioningOptimizer(Optimizer):
             self.pop_size = 50 if nodes>100 else nodes//2 if nodes>30 else 15 if nodes>20 else nodes
 
         self.results = {}
+        self.optimizer_cfg = PartitioningOptConfig(self.nodeStats, num_pp, len(self.schedules[0]))
 
     def _set_layer_params(self, ga : GraphAnalyzer) -> dict:
         params = {}
@@ -63,8 +65,8 @@ class PartitioningOptimizer(Optimizer):
 
         all_paretos = []
         non_optimals = []
-        g_len = len(self.nodeStats) + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
-        x_len = (self.num_pp) * 2 + 1
+        g_len = self.optimizer_cfg.g_len #len(self.nodeStats) + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2
+        x_len = self.optimizer_cfg.x_len #(self.num_pp) * 2 + 1
 
         fname_p_npy = os.path.join(self.work_dir, self.run_name + "_" + "paretos.npy")
         fname_n_npy = os.path.join(self.work_dir, self.run_name + "_" + "non_optimals.npy")
@@ -87,10 +89,9 @@ class PartitioningOptimizer(Optimizer):
                         res[g_len+self.num_pp:g_len+x_len] = np.divide(res[g_len+self.num_pp:g_len+x_len], num_layers).astype(int)
                         
                         res[g_len:g_len+x_len] = np.floor(res[g_len:g_len+x_len]).astype(int) + 1
-                        #res[g_len:g_len+self.num_pp] = np.floor(res[g_len:g_len+self.num_pp]).astype(int) + 1
-                        #res[g_len+self.num_pp:g_len+x_len] = [nodeStatsIds[int(p)] for p in res[g_len+self.num_pp:g_len+x_len]]
+                        #res[g_len:g_len+self.num_pp] = np.floor(res[g_len:g_len+self.num_pp]).astype(int) + 1 #partitioning points
+                        #res[g_len+self.num_pp:g_len+x_len] = [nodeStatsIds[int(p)] for p in res[g_len+self.num_pp:g_len+x_len]] #partitioning mapping
                         
-                        #print(res[g_len+self.num_pp:g_len+x_len])
                         if res[-1]:
                             all_paretos.append(np.insert(res, 0, i)[:-1]) # insert schedule ID and append to list
                         else:
@@ -155,7 +156,7 @@ class PartitioningOptimizer(Optimizer):
 
     def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool, system_constraints: dict) -> list:
         problem = PartitioningProblem(num_pp, self.nodeStats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, 
-                                      self.layer_params, self.link_confs, system_constraints)
+                                      self.layer_params, self.link_confs, system_constraints, self.optimizer_cfg)
 
         num_layers = len(schedule)
         initial_x = self._gen_initial_x(num_layers, num_pp, fixed_sys, acc_once)

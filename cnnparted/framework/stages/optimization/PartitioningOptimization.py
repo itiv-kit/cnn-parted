@@ -17,7 +17,7 @@ class PartitioningOptimization(Stage):
         self._take_artifacts(artifacts)
         optimizer = PartitioningOptimizer(self.ga, self.num_pp, self.nodeStats, self.link_components, self.show_progress)
         n_constr, n_var, sol = optimizer.optimize(self.q_constr, self.config)
-        self._update_artifacts(artifacts, n_constr, n_var, sol)
+        self._update_artifacts(artifacts, n_constr, n_var, sol, optimizer.optimizer_cfg)
     
     def _take_artifacts(self, artifacts: Artifacts):
         self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
@@ -32,7 +32,8 @@ class PartitioningOptimization(Stage):
             self.q_constr = {}
         
 
-    def _update_artifacts(self, artifacts: Artifacts, n_constr, n_var, sol):
+    def _update_artifacts(self, artifacts: Artifacts, n_constr, n_var, sol, optimizer_config):
         artifacts.set_stage_result(PartitioningOptimization, "n_constr", n_constr)
         artifacts.set_stage_result(PartitioningOptimization, "n_var", n_var)
         artifacts.set_stage_result(PartitioningOptimization, "sol", sol)
+        artifacts.set_stage_result(PartitioningOptimization, "optimizer_cfg", optimizer_config)

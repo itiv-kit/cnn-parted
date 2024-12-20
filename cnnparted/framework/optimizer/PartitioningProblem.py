@@ -5,11 +5,12 @@ import numpy as np
 from collections import deque, defaultdict
 
 from framework.link.Link import Link
+from framework.optimizer.config.PartitioningOptConfig import PartitioningOptConfig
 from framework.helpers.DesignMetrics import calc_metric
 
 
 class PartitioningProblem(ElementwiseProblem):
-    def __init__(self, num_pp : int, nodeStats : dict, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool, layer_dict : dict, layer_params : dict, link_confs : list, system_constraints: dict):
+    def __init__(self, num_pp : int, nodeStats : dict, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool, layer_dict : dict, layer_params : dict, link_confs : list, system_constraints: dict, optimizer_cfg: PartitioningOptConfig):
         self.nodeStats = nodeStats
         self.num_platforms = len(nodeStats)
         self.num_pp = num_pp
@@ -26,13 +27,14 @@ class PartitioningProblem(ElementwiseProblem):
         for link_conf in link_confs:
             self.links.append(Link(link_conf))
 
-        n_var = self.num_pp * 2 + 1 # platform IDs + Number of max. partitioning points
-        n_obj = 6 # latency, energy, throughput, area + link latency + link energy
-        n_constr = self.num_platforms + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_accelerator_platforms + num_real_pp + latency/energy per partition + latency/energy per link
+        n_var = optimizer_cfg.n_var #self.num_pp * 2 + 1 # platform IDs + Number of max. partitioning points
+        n_obj = optimizer_cfg.n_obj # latency, energy, throughput, area + link latency + link energy
+        n_constr = optimizer_cfg.n_constr #self.num_platforms + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_accelerator_platforms + num_real_pp + latency/energy per partition + latency/energy per link
 
-        xu = self.num_platforms * self.num_layers - 1
+        xl = optimizer_cfg.xl
+        xu = optimizer_cfg.xu #self.num_platforms * self.num_layers - 1
 
-        super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=0, xu=xu)
+        super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=xl, xu=xu)
 
     def _evaluate(self, x : np.ndarray, out : dict, *args, **kwargs) -> None:
         valid = True

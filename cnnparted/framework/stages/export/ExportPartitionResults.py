@@ -25,6 +25,7 @@ class ExportPartitionResults(Stage):
         self.run_name = artifacts.args["run_name"]
         self.n_constr = artifacts.get_stage_result(PartitioningOptimization, "n_constr")
         self.n_var = artifacts.get_stage_result(PartitioningOptimization, "n_var")
+        self.optimizer_cfg = artifacts.get_stage_result(PartitioningOptimization, "optimizer_cfg")
         self.runtime = artifacts.step_runtime
 
         sol = artifacts.get_stage_result(PartitioningOptimization, "sol")
@@ -47,7 +48,7 @@ class ExportPartitionResults(Stage):
         objectives = []
         n_var = self.n_var
         n_constr = self.n_constr
-        idx_max = 1 + self.num_platforms + 1
+        idx_max = 1 + self.num_platforms + 1 #schedule ID + design IDs + num_pp
         for pareto, sched in self.sol.items():
             for sd in sched:
                 data = np.append(sd, pareto)
