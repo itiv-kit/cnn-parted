@@ -7,8 +7,8 @@ class PartitioningMutation(Mutation):
         self.num_layers = num_layers
 
     def _do(self, problem, X, **kwargs):
-        assert problem.nodeStats is not None
-        num_platforms = len(problem.nodeStats)
+        assert problem.node_stats is not None
+        num_platforms = len(problem.node_stats)
 
         X = X.astype(object)
 

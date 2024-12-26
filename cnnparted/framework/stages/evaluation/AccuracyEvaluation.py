@@ -24,7 +24,7 @@ class AccuracyEvaluation(Stage):
                 print(pareto, len(sched))
             print("Evaluating accuracy...")
 
-            quant = AccuracyEvaluator(self.torch_model, self.nodeStats, accuracy_cfg, self.device, self.show_progress)
+            quant = AccuracyEvaluator(self.torch_model, self.node_stats, accuracy_cfg, self.device, self.show_progress)
             quant.eval(self.sol["nondom"], self.n_constr, self.n_var, self.schedules, self.accuracy_function)
         else:
             for i, p in enumerate(self.sol["nondom"]): # achieving aligned csv file
@@ -36,7 +36,7 @@ class AccuracyEvaluation(Stage):
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
         self.torch_model = artifacts.get_stage_result(GraphAnalysis, "ga").torchmodel
-        self.nodeStats = artifacts.get_stage_result(NodeEvaluation, "nodeStats")
+        self.node_stats = artifacts.get_stage_result(NodeEvaluation, "node_stats")
         self.device = artifacts.device
         self.show_progress = artifacts.args["p"]
         self.schedules = artifacts.get_stage_result(GraphAnalysis, "ga").schedules

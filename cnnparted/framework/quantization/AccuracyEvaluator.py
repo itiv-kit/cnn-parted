@@ -15,10 +15,10 @@ from framework.quantization.generate_calibration import generate_calibration
 
 
 class AccuracyEvaluator():
-    def __init__(self, model : nn.Module, nodeStats : dict, config : dict, device : str, progress : bool) -> None:
-        self.bits = [nodeStats[acc].get("bits") for acc in nodeStats]
-        self.fault_rates = [nodeStats[acc].get("fault_rates") for acc in nodeStats]
-        self.faulty_bits = [nodeStats[acc].get("faulty_bits") for acc in nodeStats]
+    def __init__(self, model : nn.Module, node_stats : dict, config : dict, device : str, progress : bool) -> None:
+        self.bits = [node_stats[acc].get("bits") for acc in node_stats]
+        self.fault_rates = [node_stats[acc].get("fault_rates") for acc in node_stats]
+        self.faulty_bits = [node_stats[acc].get("faulty_bits") for acc in node_stats]
         self.gpu_device = torch.device(device)
         self.progress = progress
 

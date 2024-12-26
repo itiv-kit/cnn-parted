@@ -15,7 +15,7 @@ class NodeEvaluation(Stage):
 
         self._take_artifacts(artifacts)
 
-        nodeStats = {}
+        node_stats = {}
         node_threads = [
                 NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress)
                 for component in self.node_components
@@ -36,18 +36,18 @@ class NodeEvaluation(Stage):
 
             instances = node_thread.config.get("instances", 1)
             if instances == 1:
-                nodeStats[id] = stats
+                node_stats[id] = stats
             else:
                 # If the accelerator should be instatiated multiple times, copy the results and generate a unique id
                 for i in range(0, instances):
                     id_str = "10" + str(id) + str(i) # generate a unique id for instances
-                    nodeStats[int(id_str)] = stats
+                    node_stats[int(id_str)] = stats
 
         # ensure IDs are actually all unique
-        all_ids = list(nodeStats.keys())
+        all_ids = list(node_stats.keys())
         assert len(all_ids) == len(set(all_ids)), f"Component IDs are not unique. Found IDs: {all_ids}"
 
-        self._update_artifacts(artifacts, nodeStats)
+        self._update_artifacts(artifacts, node_stats)
     
     def _take_artifacts(self, artifacts: Artifacts):
         self.work_dir = artifacts.config["general"]["work_dir"]
@@ -56,15 +56,15 @@ class NodeEvaluation(Stage):
         self.show_progress = artifacts.args["p"]
         self.node_components = artifacts.get_stage_result(SystemParser, "nodes")
 
-    def _update_artifacts(self, artifacts: Artifacts, nodeStats):
-        artifacts.set_stage_result(NodeEvaluation, "nodeStats", nodeStats)
-        artifacts.config["num_platforms"] = len(nodeStats)
+    def _update_artifacts(self, artifacts: Artifacts, node_stats):
+        artifacts.set_stage_result(NodeEvaluation, "node_stats", node_stats)
+        artifacts.config["num_platforms"] = len(node_stats)
         
         # Update number of partitioning points
         num_pp = artifacts.config["general"]["num_pp"]
         if num_pp == -1:
-            num_pp = len(nodeStats[list(nodeStats.keys())[0]]["eval"]["design_0"]["layers"].keys()) - 1
-        elif len(nodeStats) == 1:
+            num_pp = len(node_stats[list(node_stats.keys())[0]]["eval"]["design_0"]["layers"].keys()) - 1
+        elif len(node_stats) == 1:
             num_pp = 0
         artifacts.config["num_pp"] = num_pp
     

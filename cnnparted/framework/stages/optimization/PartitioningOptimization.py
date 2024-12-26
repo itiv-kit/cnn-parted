@@ -15,14 +15,14 @@ class PartitioningOptimization(Stage):
     
     def run(self, artifacts: Artifacts):
         self._take_artifacts(artifacts)
-        optimizer = PartitioningOptimizer(self.ga, self.num_pp, self.nodeStats, self.link_components, self.show_progress)
+        optimizer = PartitioningOptimizer(self.ga, self.num_pp, self.node_stats, self.link_components, self.show_progress)
         n_constr, n_var, sol = optimizer.optimize(self.q_constr, self.config)
         self._update_artifacts(artifacts, n_constr, n_var, sol, optimizer.optimizer_cfg)
     
     def _take_artifacts(self, artifacts: Artifacts):
         self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
         self.num_pp = artifacts.config["num_pp"]
-        self.nodeStats = artifacts.get_stage_result(NodeEvaluation, "nodeStats")
+        self.node_stats = artifacts.get_stage_result(NodeEvaluation, "node_stats")
         self.link_components = artifacts.get_stage_result(SystemParser, "links")
         self.show_progress = artifacts.args["p"]
         self.config = artifacts.config

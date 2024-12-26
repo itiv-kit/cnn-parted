@@ -3,9 +3,9 @@ import numpy as np
 from  framework.optimizer.config.OptimizerConfig import OptimizerConfig
 
 class PartitioningOptConfig(OptimizerConfig):
-    def __init__(self, nodeStats: dict, num_pp: int, num_layers: int):
+    def __init__(self, node_stats: dict, num_pp: int, num_layers: int):
         super().__init__()
-        num_platforms = len(nodeStats)
+        num_platforms = len(node_stats)
 
         self.n_var_part = (num_pp + 1) + (num_pp) # platform IDs + mapping partition to platform
         self.n_var      = self.n_var_part

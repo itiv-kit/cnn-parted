@@ -60,17 +60,17 @@ def main(args):
     step_runtime.append(timer())
 
     # Step 3 - Layer Evaluation
-    nodeStats = node_eval(ga, node_components, work_dir, args.run_name, args.p)
-    num_platforms = len(nodeStats)
+    node_stats = node_eval(ga, node_components, work_dir, args.run_name, args.p)
+    num_platforms = len(node_stats)
     step_runtime.append(timer())
 
     # Step 4 - Find pareto-front
     num_pp = main_conf.get('num_pp')
     if num_pp == -1:
-        num_pp = len(nodeStats[list(nodeStats.keys())[0]]["eval"]["design_0"]["layers"].keys()) - 1
+        num_pp = len(node_stats[list(node_stats.keys())[0]]["eval"]["design_0"]["layers"].keys()) - 1
     elif num_platforms == 1:
         num_pp = 0
-    optimizer = PartitioningOptimizer(ga, num_pp, nodeStats, link_components, args.p)
+    optimizer = PartitioningOptimizer(ga, num_pp, node_stats, link_components, args.p)
     n_constr, n_var, sol = optimizer.optimize(q_constr, main_conf)
     step_runtime.append(timer())
 
@@ -81,7 +81,7 @@ def main(args):
             print(pareto, len(sched))
         print("Evaluating accuracy...")
 
-        quant = AccuracyEvaluator(ga.torchmodel, nodeStats, accuracy_cfg, device, args.p)
+        quant = AccuracyEvaluator(ga.torchmodel, node_stats, accuracy_cfg, device, args.p)
         quant.eval(sol["nondom"], n_constr, n_var, ga.schedules, accuracy_function)
     else:
         for i, p in enumerate(sol["nondom"]): # achieving aligned csv file
@@ -136,7 +136,7 @@ def setup_workload(run_name : str, model_settings: dict) -> Callable:
         quit(1)
 
 def node_eval(ga : GraphAnalyzer, node_components : list, work_dir: str, run_name : str, progress : bool) -> dict:
-    nodeStats = {}
+    node_stats = {}
     node_threads = [
             NodeThread(component.get('id'), ga, component, work_dir, run_name, progress)
             for component in node_components
@@ -154,9 +154,9 @@ def node_eval(ga : GraphAnalyzer, node_components : list, work_dir: str, run_nam
 
     for node_thread in node_threads:
         id,stats = node_thread.getStats()
-        nodeStats[id] = stats
+        node_stats[id] = stats
 
-    return nodeStats
+    return node_stats
 
 def export_files(work_dir: str, run_name : str, n_constr : int, n_var : int, results : dict, schedules : list, num_platforms: int) -> None:
     res = []
