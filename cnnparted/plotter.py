@@ -8,8 +8,8 @@ import glob
 import matplotlib.pyplot as plt
 
 from framework.constants import ROOT_DIR
-from framework.helpers.DesignMetrics import calc_metric, get_metric_info, SUPPORTED_METRICS
-from framework.helpers.Visualizer import plotMetricPerConfigPerLayer, COLOR_SEQUENCE, MARKER_SEQUENCE
+from framework.helpers.design_metrics import calc_metric, get_metric_info, SUPPORTED_METRICS
+from framework.helpers.visualizer import plotMetricPerConfigPerLayer, COLOR_SEQUENCE, MARKER_SEQUENCE
 
 def objective_to_str(objective: str):
     if objective in ["latency", "energy", "throughput", "area"]:

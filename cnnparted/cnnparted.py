@@ -11,8 +11,8 @@ import numpy as np
 from timeit import default_timer as timer
 
 from framework import ConfigHelper
-from framework.stages.Artifacts import Artifacts
-from framework.stages.StageBase import STAGE_DEPENDENCIES;
+from framework.stages.artifacts import Artifacts
+from framework.stages.stage_base import STAGE_DEPENDENCIES;
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 def parse_pipeline(config):
