@@ -16,15 +16,15 @@ class TimeloopInterface(ABC):
         self.tl_out_configs_dir: str = ""
 
     @abstractmethod
-    def mutate_arch(self, config=None, outdir=None):
+    def write_tl_arch(self, config=None, outdir=None):
         ...
 
     @abstractmethod
-    def mutate_arch_constraints(self, config=None, outdir=None):
+    def write_tl_arch_constraints(self, config=None, outdir=None):
         ...
     
     @abstractmethod
-    def mutate_map_constraints(self, config=None, outdir=None):
+    def write_tl_map_constraints(self, config=None, outdir=None):
         ...
 
     @abstractmethod
@@ -35,9 +35,9 @@ class TimeloopInterface(ABC):
     def run(self):
         try:
             self.config = self.design_space.pop()
-            self.mutate_arch()
-            self.mutate_arch_constraints()
-            self.mutate_map_constraints()
+            self.write_tl_arch()
+            self.write_tl_arch_constraints()
+            self.write_tl_map_constraints()
             # Check if there are any configs left to simulate
             if not self.design_space:
                 self.design_space_exhausted=True
@@ -52,8 +52,8 @@ class TimeloopInterface(ABC):
         if outdir is None:
             outdir = self.tl_out_configs_dir
 
-        self.mutate_arch(config=config, outdir=outdir)
-        self.mutate_arch_constraints(config=config, outdir=outdir)
-        self.mutate_map_constraints(config=config, outdir=outdir)
+        self.write_tl_arch(config=config, outdir=outdir)
+        self.write_tl_arch_constraints(config=config, outdir=outdir)
+        self.write_tl_map_constraints(config=config, outdir=outdir)
         
 

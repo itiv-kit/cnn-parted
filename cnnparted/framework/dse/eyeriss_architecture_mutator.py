@@ -73,7 +73,7 @@ class EyerissArchitectureMutator(TimeloopInterface):
         mem_sizes = list(range(lower, upper, step))
         return mem_sizes
 
-    def mutate_arch(self, config: EyerissConfig = None, outdir=None):
+    def write_tl_arch(self, config: EyerissConfig = None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -123,7 +123,7 @@ class EyerissArchitectureMutator(TimeloopInterface):
             y = yaml.safe_dump(arch, sort_keys=False)
             f.write(y)
     
-    def mutate_arch_constraints(self, config:EyerissConfig = None, outdir=None):
+    def write_tl_arch_constraints(self, config:EyerissConfig = None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -132,7 +132,7 @@ class EyerissArchitectureMutator(TimeloopInterface):
         constraints_out = pathlib.Path(outdir, "constraints", "eyeriss_like_arch_constraints.yaml")
         shutil.copy(base_arch_constraints, constraints_out)
     
-    def mutate_map_constraints(self, config: EyerissConfig=None, outdir=None):
+    def write_tl_map_constraints(self, config: EyerissConfig=None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:

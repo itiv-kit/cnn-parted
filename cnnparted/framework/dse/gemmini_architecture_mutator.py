@@ -147,11 +147,11 @@ class GemminiArchitectureMutator(TimeloopInterface):
                     for acc_size in acc_sizes:
                         self.design_space.append(copy.copy(GemminiConfig(mesh_dim, spad_size, acc_size) )) 
 
-    def mutate_arch_constraints(self, config=None, outdir=None):
+    def write_tl_arch_constraints(self, config=None, outdir=None):
         # no arch constraints for Gemmini-like config
         pass
     
-    def mutate_map_constraints(self, config=None, outdir=None):
+    def write_tl_map_constraints(self, config=None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -172,7 +172,7 @@ class GemminiArchitectureMutator(TimeloopInterface):
             f.write(y)
 
 
-    def mutate_arch(self, config=None, outdir=None):
+    def write_tl_arch(self, config=None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:

@@ -37,9 +37,9 @@ class SimbaConfig(ArchitectureConfig):
         cfg = {}
         cfg["num_pes"] = self.num_pes
         cfg["lmacs"] = self.lmacs
+        cfg["globalbuf_size"] = self.globalbuf_size
         cfg["wbuf_size"] = self.wbuf_size
         cfg["accbuf_size"] = self.accbuf_size
-        cfg["globalbuf_size"] = self.globalbuf_size
         cfg["inbuf_size"] = self.inbuf_size
         return cfg
 
@@ -116,7 +116,7 @@ class SimbaArchitectureMutator(TimeloopInterface):
                             for inbuf_size in self.inbuf_sizes:
                                 self.design_space.append(copy.copy(SimbaConfig(pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size))) 
 
-    def mutate_arch(self, config:SimbaConfig = None, outdir=None):
+    def write_tl_arch(self, config:SimbaConfig = None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -169,7 +169,7 @@ class SimbaArchitectureMutator(TimeloopInterface):
             y = yaml.safe_dump(arch, sort_keys=False)
             f.write(y)
 
-    def mutate_arch_constraints(self, config:SimbaConfig = None, outdir=None):
+    def write_tl_arch_constraints(self, config:SimbaConfig = None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -178,7 +178,7 @@ class SimbaArchitectureMutator(TimeloopInterface):
         constraints_out = pathlib.Path(outdir, "constraints", "simba_like_arch_constraints.yaml")
         shutil.copy(base_arch_constraints, constraints_out)
     
-    def mutate_map_constraints(self, config:SimbaConfig = None, outdir=None):
+    def write_tl_map_constraints(self, config:SimbaConfig = None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
