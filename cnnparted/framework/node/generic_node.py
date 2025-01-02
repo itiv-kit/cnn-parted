@@ -1,7 +1,6 @@
 from framework.constants import ROOT_DIR
 from framework.helpers.visualizer import plotMetricPerConfigPerLayer
 from framework.helpers.design_metrics import calc_metric, SUPPORTED_METRICS
-from framework.dse.architecture_mutator import ArchitectureMutator
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
 
 class GenericNode(NodeEvaluator):

@@ -6,6 +6,7 @@ from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.stages.optimization.partitioning_optimization import PartitioningOptimization
 from framework.stages.analysis.graph_analysis import GraphAnalysis
+from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 @register_required_stage("PartitioningOptimization", "GraphAnalysis")
@@ -23,9 +24,11 @@ class ExportPartitionResults(Stage):
         self.config = artifacts.config
         self.work_dir = self.config["work_dir"]
         self.run_name = artifacts.args["run_name"]
-        self.n_constr = artifacts.get_stage_result(PartitioningOptimization, "n_constr")
-        self.n_var = artifacts.get_stage_result(PartitioningOptimization, "n_var")
-        self.optimizer_cfg = artifacts.get_stage_result(PartitioningOptimization, "optimizer_cfg")
+        #self.n_constr = artifacts.get_stage_result(PartitioningOptimization, "n_constr")
+        #self.n_var = artifacts.get_stage_result(PartitioningOptimization, "n_var")
+        self.optimizer_cfg: PartitioningOptConfig = artifacts.get_stage_result(PartitioningOptimization, "optimizer_cfg")
+        self.n_constr = self.optimizer_cfg.n_constr
+        self.n_var = self.optimizer_cfg.n_var_part
         self.runtime = artifacts.step_runtime
 
         sol = artifacts.get_stage_result(PartitioningOptimization, "sol")

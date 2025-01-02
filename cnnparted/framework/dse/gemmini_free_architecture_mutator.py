@@ -4,7 +4,8 @@ import pathlib
 import yaml
 
 from framework.dse.gemmini_architecture_mutator import GemminiArchitectureMutator, GemminiConfig
-from framework.dse.architecture_mutator import ArchitectureMutator, ArchitectureConfig
+from framework.dse.timeloop_interface import TimeloopInterface
+from framework.dse.architecture_config import ArchitectureConfig
 
 class GemminiFreeConfig(ArchitectureConfig):
     def _is_pow_2(self, n):

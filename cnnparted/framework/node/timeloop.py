@@ -16,7 +16,7 @@ from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 from framework.constants import ROOT_DIR
 from framework.helpers.visualizer import plotMetricPerConfigPerLayer
 from framework.helpers.design_metrics import calc_metric, SUPPORTED_METRICS
-from framework.dse.architecture_mutator import ArchitectureMutator
+from framework.dse.timeloop_interface import TimeloopInterface
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
 
 class Timeloop(NodeEvaluator):
@@ -62,7 +62,7 @@ class Timeloop(NodeEvaluator):
         self.config = tl_config
         self.stats = {}
 
-        self.mutator: ArchitectureMutator = None
+        self.mutator: TimeloopInterface = None
         if self.dse_config:
             mutator_cfg = self.dse_config
             mutator_cfg["tl_in_configs_dir"] = self.configs_dir

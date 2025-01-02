@@ -4,7 +4,8 @@ import pathlib
 import yaml
 import shutil
 
-from framework.dse.architecture_mutator import ArchitectureMutator, ArchitectureConfig
+from framework.dse.architecture_config import ArchitectureConfig
+from framework.dse.timeloop_interface import TimeloopInterface
 
 
 class EyerissConfig(ArchitectureConfig):
@@ -38,7 +39,7 @@ class EyerissConfig(ArchitectureConfig):
         return cfg
 
 
-class EyerissArchitectureMutator(ArchitectureMutator):
+class EyerissArchitectureMutator(TimeloopInterface):
     def __init__(self, cfg):
         super().__init__(cfg)
         self.config: EyerissConfig = None

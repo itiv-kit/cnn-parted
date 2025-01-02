@@ -2,20 +2,11 @@ from abc import ABC, abstractmethod
 import os
 import yaml
 
-class ArchitectureConfig(ABC):
-    def to_yaml(self, dir: str):
-        stats = vars(self)
-        fname = os.path.join(dir, "architecture_params.yaml")
-        with open(fname, "w") as f:
-            yaml.dump(stats, f, sort_keys=False)
-
-    @abstractmethod
-    def get_config(self) -> dict:
-        ...
+from framework.dse.architecture_config import ArchitectureConfig
 
 ## Base class for design space exploration. For a given Timeloop architecture description this
 #  class is used to mutate the architecture configuration to evaluate different configurations.
-class ArchitectureMutator(ABC):
+class TimeloopInterface(ABC):
     def __init__(self, cfg):
         self.design_space = []
         self.config: ArchitectureConfig = None

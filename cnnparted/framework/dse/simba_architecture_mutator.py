@@ -4,7 +4,8 @@ import pathlib
 import yaml
 import shutil
 
-from framework.dse.architecture_mutator import ArchitectureMutator, ArchitectureConfig
+from framework.dse.architecture_config import ArchitectureConfig
+from framework.dse.timeloop_interface import TimeloopInterface
 
 class SimbaConfig(ArchitectureConfig):
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
@@ -43,7 +44,7 @@ class SimbaConfig(ArchitectureConfig):
         return cfg
 
 
-class SimbaArchitectureMutator(ArchitectureMutator):
+class SimbaArchitectureMutator(TimeloopInterface):
     def __init__(self, cfg: dict):
         super().__init__(cfg)
         self.config: SimbaConfig = None

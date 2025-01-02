@@ -52,10 +52,9 @@ class DesignResult:
             res["layers"][name] = data
         return res
 
-## Information about a compute node/platform of the overall system
 class NodeResult:
     """
-    Complete informatino about a node on which the simulation is run. For the design space exploration multiple designs can be
+    Complete information about a node on which the simulation is run. For the design space exploration multiple designs can be
     evaluated. For this reason we include a list of DesignResult here
 
     Attributes:
@@ -73,6 +72,25 @@ class NodeResult:
             stats[f"design_{i}"] = design.to_dict()
         return stats
     
+class SystemResult:
+    def __init__(self):
+        self.platforms = {}
+
+    def add_platform(self, id: int, result: NodeResult):
+        self.platforms[id] = result
+
+    def get_num_platforms(self):
+        return len(self.platforms)
+
+    def get_num_designs(self):
+        ...
+
+    def get_platform_ids(self):
+        return list(self.platforms.keys())
+
+    def get_design_tags(self, platform_id: int):
+        return list(self.platforms[platform_id]["eval"].keys())
+
 
 class NodeEvaluator(ABC):
     """

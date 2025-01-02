@@ -3,7 +3,8 @@ from math import log2
 import pathlib
 import yaml
 
-from framework.dse.architecture_mutator import ArchitectureMutator, ArchitectureConfig
+from framework.dse.architecture_config import ArchitectureConfig
+from framework.dse.timeloop_interface import TimeloopInterface
 
 class GemminiConfig(ArchitectureConfig):
     def _is_pow_2(self, n):
@@ -54,7 +55,7 @@ class GemminiConfig(ArchitectureConfig):
     
 
 
-class GemminiArchitectureMutator(ArchitectureMutator):
+class GemminiArchitectureMutator(TimeloopInterface):
 
     def __init__(self, cfg):
         super().__init__(cfg)
