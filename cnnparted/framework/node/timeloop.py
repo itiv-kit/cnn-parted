@@ -67,9 +67,8 @@ class Timeloop(NodeEvaluator):
             mutator_cfg = self.dse_config
             mutator_cfg["tl_in_configs_dir"] = self.configs_dir
 
-            mutator_name = self.dse_config["mutator"]
-            package = importlib.import_module(f"framework.dse.{mutator_name}")
-            mutator_cls = getattr(package, self.dse_config["mutator"])
+            dse_package = importlib.import_module("framework.dse")
+            mutator_cls = getattr(dse_package, self.dse_config["mutator"])
             self.mutator = mutator_cls(self.dse_config)
 
     def set_workdir(self, work_dir: str, runname: str, id: int):
