@@ -20,8 +20,10 @@ class Zigzag(NodeEvaluator):
         self.fname_result = "zigzag_layers.csv"
 
         self.configs_dir = pathlib.Path(ROOT_DIR, "tools", "zigzag", "zigzag", "inputs")
-        self.hardware_configs_dir = pathlib.Path(self.configs_dir, "hardware")
-        self.mapping_configs_dir = pathlib.Path(self.configs_dir, "mapping")
+        self.zigzag_hardware_configs_dir = pathlib.Path(self.configs_dir, "hardware")
+        self.zigzag_mapping_configs_dir = pathlib.Path(self.configs_dir, "mapping")
+        self.local_hardware_configs_dir = pathlib.Path(ROOT_DIR, "configs", "zigzag_configs", "hardware")
+        self.local_mapping_configs_dir = pathlib.Path(ROOT_DIR, "configs", "zigzag_configs", "mapping")
         self.model_dir= pathlib.Path(ROOT_DIR, "onnx_models")
 
         self.accname = config["accelerator"] + ".yaml"
@@ -46,8 +48,17 @@ class Zigzag(NodeEvaluator):
         zigzag_config_dir_mapping = pathlib.Path(design_runroot, "zigzag_config", "mapping")
         zigzag_config_dir_mapping.mkdir(parents=True, exist_ok=True)
 
-        accfile = pathlib.Path(self.hardware_configs_dir, self.accname)
-        mapfile = pathlib.Path(self.mapping_configs_dir, self.mapname)
+        # First, look in the ZigZag repository if the architecture file exists
+        # Otherwise, check in the local folder
+        accfile = pathlib.Path(self.zigzag_hardware_configs_dir, self.accname)
+        mapfile = pathlib.Path(self.zigzag_mapping_configs_dir, self.mapname)
+        if not accfile.exists():
+            accfile = pathlib.Path(self.local_hardware_configs_dir, self.accname)
+        if not mapfile.exists():
+            mapfile = pathlib.Path(self.local_mapping_configs_dir, self.mapname)
+        
+        assert accfile.exists() and mapfile.exists(), f"Could not found the specified mapping or accelerator.\nAccfile: {str(accfile)}\nMapfile: {str(mapfile)}"
+
         modelfile = pathlib.Path(self.model_dir, self.runname, "new_model.onnx")
 
         shutil.copy(str(accfile), str(zigzag_config_dir_arch))
