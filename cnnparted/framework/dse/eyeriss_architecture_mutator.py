@@ -3,12 +3,14 @@ from math import sqrt
 import pathlib
 import yaml
 import shutil
+import numpy as np
 
 from framework.dse.architecture_config import ArchitectureConfig
+from framework.dse.pymoo_interface import PymooInterface
 from framework.dse.timeloop_interface import TimeloopInterface
 
 
-class EyerissConfig(ArchitectureConfig):
+class EyerissConfig(ArchitectureConfig, PymooInterface):
     def __init__(self, pe_dim_y, pe_dim_x, glb_size, ifmap_spad_size, weight_spad_size, psum_spad_size):
         self.word_bits = 16
         self.glb_block_size = 4
@@ -37,6 +39,52 @@ class EyerissConfig(ArchitectureConfig):
         cfg["weight_spad_size"] = self.weight_spad_size
         cfg["psum_spad_size"] = self.psum_spad_size
         return cfg
+
+    @classmethod
+    def from_genome(cls, genome: list):
+        pe_dims = genome[0:1]
+        pe_mems = genome[2:5]
+        local_mems = genome[5:6]
+        eyeriss = cls(2, 2, 1024, 128, 128, 128)
+        eyeriss.pe_array_dim = pe_dims
+        eyeriss.pe_array_mem = pe_mems
+        eyeriss.local_mems = local_mems
+        return eyeriss
+
+    def to_genome(self) -> list:
+        return self.pe_array_dim + self.pe_array_mem + self.local_mems
+
+    @property
+    def pe_array_dim(self):
+        return [self.pe_dim_y, self.pe_dim_x]
+
+    @pe_array_dim.setter
+    def pe_array_dim(self, dims):
+        self.pe_dim_y = dims[0]
+        self.pe_dim_x = dims[1]
+        self.num_pes = dims[0] * dims[1]
+    
+    @property
+    def pe_array_mem(self):
+        return [self.ifmap_spad_depth, self.weight_spad_depth, self.psum_spad_depth]
+
+    @pe_array_mem.setter
+    def pe_array_mem(self, mem_depths):
+        self.ifmap_spad_depths = mem_depths[0]
+        self.ifmap_spad_size = int(mem_depths[0] * self.word_bits * self.spad_block_size // 8)
+        self.weight_spad_depth = mem_depths[1]
+        self.weight_spad_size = int(mem_depths[1] * self.word_bits * self.spad_block_size // 8)
+        self.psum_spad_depth = mem_depths[2]
+        self.psum_spad_size = int(mem_depths[2] * self.word_bits * self.spad_block_size // 8)
+
+    @property
+    def local_mems(self):
+        return [self.glb_depth]
+
+    @local_mems.setter
+    def local_mems(self, glb_depth):
+        self.glb_depth = glb_depth
+        self.glb_size = int(glb_depth * self.word_bits * self.glb_block_size // (8*1024))
 
 
 class EyerissArchitectureMutator(TimeloopInterface):
@@ -160,4 +208,7 @@ class EyerissArchitectureMutator(TimeloopInterface):
 if __name__ == "__main__":
     ds = {"PE": [336],
         "meshX": [28]}
+
+    eyeriss = EyerissConfig(12, 14, 1024, 128, 128, 128)
+    breakpoint()
 

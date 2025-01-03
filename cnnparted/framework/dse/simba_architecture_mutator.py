@@ -3,11 +3,13 @@ from math import sqrt
 import pathlib
 import yaml
 import shutil
+import numpy as np
 
 from framework.dse.architecture_config import ArchitectureConfig
+from framework.dse.pymoo_interface import PymooInterface
 from framework.dse.timeloop_interface import TimeloopInterface
 
-class SimbaConfig(ArchitectureConfig):
+class SimbaConfig(ArchitectureConfig, PymooInterface):
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
         #Constants
         self.word_bits = 8
@@ -43,6 +45,51 @@ class SimbaConfig(ArchitectureConfig):
         cfg["inbuf_size"] = self.inbuf_size
         return cfg
 
+    @classmethod
+    def from_genome(cls, genome: list):
+        pe_dims = genome[0:1]
+        pe_mems = genome[2:5]
+        local_mems = genome[5]
+        simba = cls(1, 1, 1, 1, 1, 1)
+        simba.pe_array_dim = pe_dims
+        simba.pe_array_mem = pe_mems
+        simba.local_mems = local_mems
+        return simba
+
+    def to_genome(self) -> list:
+        return self.pe_array_dim + self.pe_array_mem + self.local_mems
+
+    @property
+    def pe_array_dim(self):
+        return [self.num_pes, self.lmacs]
+
+    @pe_array_dim.setter
+    def pe_array_dim(self, dims):
+        self.num_pes = dims[0]
+        self.lmacs = dims[1]
+    
+    @property
+    def pe_array_mem(self):
+        return [self.inbuf_depth, self.wbuf_depth, self.accbuf_depth]
+
+    @pe_array_mem.setter
+    def pe_array_mem(self, mem_depths):
+        self.inbuf_depth = mem_depths[0]
+        self.inbuf_size = int(mem_depths[0] * self.word_bits * self.block_size_input_buf // (8*1024))
+        self.wbuf_depth = mem_depths[1]
+        self.inbuf_size = int(mem_depths[1] * self.word_bits * self.block_size_weight_buf // (8*1024))
+        self.accbuf_depth = mem_depths[2]
+        self.inbuf_size = int(mem_depths[2] * self.word_bits * self.block_size_acc_buf // (8*1024))
+
+    @property
+    def local_mems(self):
+        return [self.globalbuf_depth]
+
+    @local_mems.setter
+    def local_mems(self, mem_depths):
+        self.globalbuf_depth = mem_depths
+        self.globalbuf_size = int(self.globalbuf_depth * self.word_bits * self.block_size_global_buf // (8*1024))
+
 
 class SimbaArchitectureMutator(TimeloopInterface):
     def __init__(self, cfg: dict):
@@ -75,19 +122,6 @@ class SimbaArchitectureMutator(TimeloopInterface):
         self.accbuf_sizes = search_space_constraints.get("accbuf_sizes", [0.375])
         self.globalbuf_sizes = search_space_constraints.get("gbuf_sizes", [128])
 
-        #self.min_wbuf_size =   search_space_constraints.get("min_wbuf_size", 32)
-        #self.max_wbuf_size =   search_space_constraints.get("max_wbuf_size", 64)
-        #self.min_accbuf_size = search_space_constraints.get("min_accbuf_size", 0.375)
-        #self.max_accbuf_size = search_space_constraints.get("max_accbuf_size", 3)
-        #self.min_gbuf_size =   search_space_constraints.get("min_gbuf_size", 64)
-        #self.max_gbuf_size =   search_space_constraints.get("max_gbuf_size", 128)
-        #self.min_inbuf_size =  search_space_constraints.get("min_inbuf_size", 64)
-        #self.max_inbuf_size =  search_space_constraints.get("max_inbuf_size", 128)
-
-        #self.wbuf_sizes = self._calc_mem_sizes(self.min_wbuf_size, self.max_wbuf_size, self.block_size_weight_buf*self.word_bits)
-        #self.accbuf_sizes = self._calc_mem_sizes(self.min_accbuf_size, self.max_accbuf_size, self.block_size_acc_buf*self.word_bits_acc)
-        #self.globalbuf_sizes = self._calc_mem_sizes(self.min_gbuf_size, self.max_gbuf_size, self.block_size_global_buf*self.word_bits)
-        #self.inbuf_sizes = self._calc_mem_sizes(self.min_inbuf_size, self.max_inbuf_size, self.block_size_input_buf*self.word_bits)
         # Generate valid configuration
         self.generate_design_space() 
 

@@ -1,17 +1,23 @@
 import copy
 from math import log2
 import pathlib
+from cv2 import gemm
 import yaml
+import numpy as np
 
 from framework.dse.architecture_config import ArchitectureConfig
+from framework.dse.pymoo_interface import PymooInterface
 from framework.dse.timeloop_interface import TimeloopInterface
 
-class GemminiConfig(ArchitectureConfig):
+class GemminiConfig(ArchitectureConfig, PymooInterface):
     def _is_pow_2(self, n):
         return (n & (n-1) == 0) and n != 0
 
 
     def __init__(self, mesh_dim, spad_size, acc_size, enable_checks=False):
+        super().__init__()
+        self.mesh_dim_x = mesh_dim
+        self.mesh_dim_y = mesh_dim
         self.mesh_dim = mesh_dim
         self.tile_dim = 1 #const for now
         self.dim = self.mesh_dim * self.tile_dim
@@ -52,6 +58,50 @@ class GemminiConfig(ArchitectureConfig):
         cfg["acc_size"] = self.acc_size
         cfg["spad_size"] = self.spad_size
         return cfg
+
+    @classmethod
+    def from_genome(cls, genome: list):
+        pe_dims = genome[0:1]
+        spad_depth = genome[2]
+        acc_depth = genome[3]
+
+        #instatiate dummy module, then set correct values
+        gemmini = cls(1, 1, 1, enable_checks=False) 
+        gemmini.pe_array_dim = pe_dims
+        gemmini.local_mems = [spad_depth, acc_depth]
+
+    def to_genome(self) -> list:
+        return self.pe_array_dim + self.pe_array_mem + self.local_mems
+
+    @property
+    def pe_array_dim(self):
+        return [self.mesh_dim_y, self.mesh_dim_x]
+
+    @pe_array_dim.setter
+    def pe_array_dim(self, dims):
+        self.mesh_dim = dims[0]
+        self.mesh_dim_y = dims[0]
+        self.mesh_dim_x = dims[1]
+    
+    @property
+    def pe_array_mem(self):
+        return [1, 1, 1] #local memory is only registers with depth=1
+
+    @pe_array_mem.setter
+    def pe_array_mem(self, mem_depths):
+        # only registers here, so nothing will be set
+        ...
+
+    @property
+    def local_mems(self):
+        return [self.spad_rows, self.acc_rows]
+
+    @local_mems.setter
+    def local_mems(self, mem_depths):
+        self.spad_rows = mem_depths[0]
+        self.spad_size = int(self.spad_rows * self.data_w * self.mesh_dim_x // (8*1024))
+        self.acc_rows = mem_depths[1]
+        self.acc_size = int(self.acc_rows * self.acc_w * self.mesh_dim_x // (8*1024))
     
 
 
