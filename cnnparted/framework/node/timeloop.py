@@ -279,14 +279,15 @@ class Timeloop(NodeEvaluator):
 
     def _load_accelerator_files(self, dir : str) -> list:
         arch_fnames = os.path.join(dir, 'archs', (self.accname + '.yaml'))
-        constraint_fname = os.path.join(dir, 'constraints', (self.accname + '_' + '*'))
-
-        input_fnames = [arch_fnames, constraint_fname]
+        constraint_fname = [os.path.join(dir, 'constraints', (self.accname + '_' + 'arch_constraints.yaml')),
+                            os.path.join(dir, 'constraints', (self.accname + '_' + 'map_constraints.yaml'))]
+        input_fnames = [arch_fnames] + constraint_fname
         input_files = []
         for fname in input_fnames:
             input_files += glob.glob(fname, recursive = True)
 
         if not input_files:
+            print(f"Did not find Timeloop files for {self.accname}.\nWas looking for these files:\n{input_fnames}")
             raise Exception("Accelerator " + self.accname + " not available.")
 
         return input_files
