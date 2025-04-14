@@ -5,7 +5,7 @@ general:
   num_topos: 1
   num_jobs: 64
   optimization: ppa
-  work_dir: dbg_resnext_eyeriss
+  work_dir: runs/resnext50_run
   keep_dir: False
 
 workload:

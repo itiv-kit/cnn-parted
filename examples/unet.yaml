@@ -5,7 +5,7 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: all
-  work_dir: "work_dir"
+  work_dir: runs/unet_run
   keep_dir: False
 
 workload:

@@ -5,6 +5,7 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: ppa
+  work_dir: runs/vgg16_run
 
 workload:
   name: vgg16

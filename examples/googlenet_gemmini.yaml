@@ -5,7 +5,7 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: ppa
-  work_dir: googlenet_run
+  work_dir: runs/googlenet_gemmini_run
   keep_dir: False
 
 workload:

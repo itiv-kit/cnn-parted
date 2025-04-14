@@ -5,7 +5,7 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: all
-  work_dir: alexnet_run
+  work_dir: runs/alexnet_run
   keep_dir: False
 
 workload:

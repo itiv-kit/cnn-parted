@@ -5,6 +5,7 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: ppa
+  work_dir: runs/resnet18_run
 
 workload:
   name: resnet18

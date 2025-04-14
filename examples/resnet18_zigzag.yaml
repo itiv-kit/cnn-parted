@@ -5,7 +5,7 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: ppa
-  work_dir: debug_zigzag
+  work_dir: runs/resnet18_zigzag_run
   keep_dir: False
 
 workload:

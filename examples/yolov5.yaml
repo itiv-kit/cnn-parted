@@ -5,6 +5,7 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: all
+  work_dir: runs/yolov5_run
 
 workload:
   name: yolov5

@@ -5,7 +5,7 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: all
-  work_dir: dbg_dir_googlenet
+  work_dir: runs/googlenet_dbg
 
 workload:
   name: googlenet

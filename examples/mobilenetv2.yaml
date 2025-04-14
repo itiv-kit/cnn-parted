@@ -5,6 +5,7 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: all
+  work_dir: runs/mobilenetv2_run
 
 workload:
   name: mobilenetv2
