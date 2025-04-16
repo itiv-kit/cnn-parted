@@ -135,7 +135,7 @@ class PartitioningOptimizer(Optimizer):
         num_platforms = len(self.node_stats)
         xu = num_platforms * num_layers - 1
         samples = []
-        rng = default_rng(seed=42)
+        rng = default_rng()
 
         for i in range(num_platforms):
             pps = rng.integers(low=0, high=xu+1, size=num_pp)
