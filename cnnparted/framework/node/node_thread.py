@@ -54,7 +54,10 @@ class NodeThread(ModuleThreadInterface):
             return
 
         # Perform the actual evaluation
-        simulator.run(layers)
+        if self.acc_config is None:
+            simulator.run(layers)
+        else:
+            simulator.run_from_config(layers, self.acc_config)
         self._write_layer_csv(fname_csv, simulator.stats)
         pruned_stats = self._prune_accelerator_designs(simulator.stats, top_k, metric, is_dse)
         self.stats["eval"] = pruned_stats

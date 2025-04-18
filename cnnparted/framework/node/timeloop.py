@@ -11,6 +11,8 @@ import re
 import tqdm
 import shutil
 
+from framework.dse.genome_interface import GenomeInterface
+from framework.dse.architecture_config import ArchitectureConfig
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
@@ -62,6 +64,8 @@ class Timeloop(NodeEvaluator):
         self.config = tl_config
         self.stats = {}
 
+        self.design_id = 0
+
         self.mutator: TimeloopInterface = None
         if self.dse_config:
             mutator_cfg = self.dse_config
@@ -73,6 +77,16 @@ class Timeloop(NodeEvaluator):
 
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
+
+    def run_from_config(self, layers : dict, config: GenomeInterface, progress : bool = False):
+        node_result = NodeResult()
+        design_result = DesignResult()
+
+        genome = config.to_genome()
+        self._run_design(layers, progress, node_result, self.design_id, genome)
+        self.design_id += 1
+
+        self.stats = {tag: results for tag, results in node_result.to_dict().items()}
 
     def run(self, layers : dict, progress : bool = False) -> NodeResult:
         node_result = NodeResult()

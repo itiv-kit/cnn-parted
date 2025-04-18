@@ -6,10 +6,10 @@ import yaml
 import numpy as np
 
 from framework.dse.architecture_config import ArchitectureConfig
-from framework.dse.pymoo_interface import PymooInterface
+from framework.dse.genome_interface import GenomeInterface
 from framework.dse.timeloop_interface import TimeloopInterface
 
-class GemminiConfig(ArchitectureConfig, PymooInterface):
+class GemminiConfig(ArchitectureConfig, GenomeInterface):
     def _is_pow_2(self, n):
         return (n & (n-1) == 0) and n != 0
 
@@ -105,7 +105,7 @@ class GemminiConfig(ArchitectureConfig, PymooInterface):
     
 
 
-class GemminiArchitectureMutator(TimeloopInterface):
+class GemminiArchitectureAdaptor(TimeloopInterface):
 
     def __init__(self, cfg):
         super().__init__(cfg)

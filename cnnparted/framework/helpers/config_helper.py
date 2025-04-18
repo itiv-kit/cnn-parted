@@ -46,6 +46,23 @@ class ConfigHelper:
 
         return node_components,link_components
 
+    def get_node_constraints(self):
+        node_components, _ = self.get_system_components()
+        constr_sys = []
+        for node in node_components:
+            xl = []
+            xu = []
+            if "dse" in node:
+                dse_cfg = node["dse"]
+                xl += dse_cfg["min_pe"]
+                xl += dse_cfg["min_size_mem_shared"]
+                xl += dse_cfg["min_size_mem_local"]
+                xu += dse_cfg["max_pe"]
+                xu += dse_cfg["max_size_mem_shared"]
+                xu += dse_cfg["max_size_mem_local"]
+                constr_sys += [[xl, xu]]
+        return constr_sys
+
     def print_all_keys(self,data_dict, indent=''):
         for key, value in data_dict.items():
             if isinstance(value, dict):

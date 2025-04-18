@@ -6,11 +6,11 @@ import shutil
 import numpy as np
 
 from framework.dse.architecture_config import ArchitectureConfig
-from framework.dse.pymoo_interface import PymooInterface
+from framework.dse.genome_interface import GenomeInterface
 from framework.dse.timeloop_interface import TimeloopInterface
 
 
-class EyerissConfig(ArchitectureConfig, PymooInterface):
+class EyerissConfig(ArchitectureConfig, GenomeInterface):
     def __init__(self, pe_dim_y, pe_dim_x, glb_size, ifmap_spad_size, weight_spad_size, psum_spad_size):
         self.word_bits = 16
         self.glb_block_size = 4
@@ -87,7 +87,7 @@ class EyerissConfig(ArchitectureConfig, PymooInterface):
         self.glb_size = int(glb_depth * self.word_bits * self.glb_block_size // (8*1024))
 
 
-class EyerissArchitectureMutator(TimeloopInterface):
+class EyerissArchitectureAdaptor(TimeloopInterface):
     def __init__(self, cfg):
         super().__init__(cfg)
         self.config: EyerissConfig = None

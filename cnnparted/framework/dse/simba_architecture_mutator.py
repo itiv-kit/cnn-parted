@@ -6,10 +6,10 @@ import shutil
 import numpy as np
 
 from framework.dse.architecture_config import ArchitectureConfig
-from framework.dse.pymoo_interface import PymooInterface
+from framework.dse.genome_interface import GenomeInterface
 from framework.dse.timeloop_interface import TimeloopInterface
 
-class SimbaConfig(ArchitectureConfig, PymooInterface):
+class SimbaConfig(ArchitectureConfig, GenomeInterface):
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
         #Constants
         self.word_bits = 8
@@ -91,7 +91,7 @@ class SimbaConfig(ArchitectureConfig, PymooInterface):
         self.globalbuf_size = int(self.globalbuf_depth * self.word_bits * self.block_size_global_buf // (8*1024))
 
 
-class SimbaArchitectureMutator(TimeloopInterface):
+class SimbaArchitectureAdaptor(TimeloopInterface):
     def __init__(self, cfg: dict):
         super().__init__(cfg)
         self.config: SimbaConfig = None

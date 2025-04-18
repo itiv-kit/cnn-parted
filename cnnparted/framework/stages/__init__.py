@@ -6,10 +6,12 @@ from framework.stages.export.export_partition_results import ExportPartitionResu
 from framework.stages.inputs.system_parser import SystemParser
 from framework.stages.inputs.workload_parser import WorkloadParser
 from framework.stages.optimization.partitioning_optimization import PartitioningOptimization
+from framework.stages.optimization.design_partitioning_coopt import DesignPartitioningOptimization
 
 
 __all__ = [GraphAnalysis, RobustnessOptimization,
            AccuracyEvaluation, NodeEvaluation,
            ExportPartitionResults,
            SystemParser, WorkloadParser,
-           PartitioningOptimization]
+           PartitioningOptimization,
+           DesignPartitioningOptimization,]

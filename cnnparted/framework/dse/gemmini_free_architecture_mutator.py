@@ -3,7 +3,7 @@ from math import log2
 import pathlib
 import yaml
 
-from framework.dse.gemmini_architecture_mutator import GemminiArchitectureMutator, GemminiConfig
+from framework.dse.gemmini_architecture_mutator import GemminiArchitectureAdaptor, GemminiConfig
 from framework.dse.timeloop_interface import TimeloopInterface
 from framework.dse.architecture_config import ArchitectureConfig
 
@@ -49,7 +49,7 @@ class GemminiFreeConfig(ArchitectureConfig):
 
 # This is a version of the Gemmini mutator that is not restricted by Gemminis architecture
 # constraints to enable a more free design space exploration
-class GemminiFreeArchitectureMutator(ArchitectureMutator):
+class GemminiFreeArchitectureMutator(TimeloopInterface):
 
     def __init__(self, cfg):
         super().__init__(cfg)
