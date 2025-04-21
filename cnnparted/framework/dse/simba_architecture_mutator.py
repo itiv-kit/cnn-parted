@@ -5,9 +5,10 @@ import yaml
 import shutil
 import numpy as np
 
-from framework.dse.architecture_config import ArchitectureConfig
-from framework.dse.genome_interface import GenomeInterface
-from framework.dse.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.genome_interface import GenomeInterface
+from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 
 class SimbaConfig(ArchitectureConfig, GenomeInterface):
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
@@ -91,11 +92,10 @@ class SimbaConfig(ArchitectureConfig, GenomeInterface):
         self.globalbuf_size = int(self.globalbuf_depth * self.word_bits * self.block_size_global_buf // (8*1024))
 
 
-class SimbaArchitectureAdaptor(TimeloopInterface):
+class SimbaArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
     def __init__(self, cfg: dict):
         super().__init__(cfg)
         self.config: SimbaConfig = None
-        search_space_constraints = cfg.get("constraints", {})
         
         #Constants related to memory width
         self.word_bits = 8
@@ -106,6 +106,10 @@ class SimbaArchitectureAdaptor(TimeloopInterface):
         self.block_size_global_buf = 32
         self.weight_bufs = 4
         self.acc_bufs = 4
+
+
+    def read_space_cfg(self, cfg):
+        search_space_constraints = cfg.get("constraints", {})
 
         #Compute elements
         self.pe_nums = search_space_constraints.get("num_pes", [16])

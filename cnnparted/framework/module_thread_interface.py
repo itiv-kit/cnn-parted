@@ -2,7 +2,7 @@ import threading
 import time
 
 from framework.graph_analyzer import GraphAnalyzer
-from framework.dse.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.architecture_config import ArchitectureConfig
 
 class ModuleThreadInterface(threading.Thread):
     def __init__(self, id : str, ga : GraphAnalyzer, config : dict, work_dir: str, runname : str, progress : bool, acc_config = None) -> None:

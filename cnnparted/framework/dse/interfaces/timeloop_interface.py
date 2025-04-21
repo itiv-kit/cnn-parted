@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 import os
 import yaml
 
-from framework.dse.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.architecture_config import ArchitectureConfig
 
 ## Base class for design space exploration. For a given Timeloop architecture description this
 #  class is used to mutate the architecture configuration to evaluate different configurations.
@@ -10,7 +10,6 @@ class TimeloopInterface(ABC):
     def __init__(self, cfg):
         self.design_space = []
         self.config: ArchitectureConfig = None
-        self.design_space_exhausted = False
         self.cfg: dict = cfg
         self.tl_in_configs_dir: str = cfg["tl_in_configs_dir"]
         self.tl_out_configs_dir: str = ""
@@ -27,25 +26,13 @@ class TimeloopInterface(ABC):
     def write_tl_map_constraints(self, config=None, outdir=None):
         ...
 
-    @abstractmethod
-    def generate_design_space(self):
-        ...
 
     @abstractmethod
     def run(self):
-        try:
-            self.config = self.design_space.pop()
-            self.write_tl_arch()
-            self.write_tl_arch_constraints()
-            self.write_tl_map_constraints()
-            # Check if there are any configs left to simulate
-            if not self.design_space:
-                self.design_space_exhausted=True
-        except IndexError:
-            self.design_space_exhausted = True
-            self.config = None
+        self.write_tl_arch()
+        self.write_tl_arch_constraints()
+        self.write_tl_map_constraints()
 
-        return self.config
 
     @abstractmethod
     def run_from_config(self, config, outdir=None):

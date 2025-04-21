@@ -5,10 +5,10 @@ import yaml
 import shutil
 import numpy as np
 
-from framework.dse.architecture_config import ArchitectureConfig
-from framework.dse.genome_interface import GenomeInterface
-from framework.dse.timeloop_interface import TimeloopInterface
-
+from framework.dse.interfaces.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.genome_interface import GenomeInterface
+from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 
 class EyerissConfig(ArchitectureConfig, GenomeInterface):
     def __init__(self, pe_dim_y, pe_dim_x, glb_size, ifmap_spad_size, weight_spad_size, psum_spad_size):
@@ -87,35 +87,26 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
         self.glb_size = int(glb_depth * self.word_bits * self.glb_block_size // (8*1024))
 
 
-class EyerissArchitectureAdaptor(TimeloopInterface):
+class EyerissArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
     def __init__(self, cfg):
         super().__init__(cfg)
         self.config: EyerissConfig = None
+
+    def read_space_cfg(self, cfg):
         search_space_constraints = cfg.get("constraints", {})
 
         self.pe_dims_y = search_space_constraints.get("pe_dims_y", [12])
         self.pe_dims_x = search_space_constraints.get("pe_dims_x", [14])
 
-        self.ifmap_spad_range = search_space_constraints.get("ifmap_spad_range", None)
         self.ifmap_spad_sizes = search_space_constraints.get("ifmap_spad_sizes", [24]) #Byte
-
-        self.weight_spad_range = search_space_constraints.get("weight_spad_range", None)
         self.weight_spad_sizes = search_space_constraints.get("weight_spad_sizes", [384]) #Byte
-
-        self.psum_spad_range = search_space_constraints.get("psum_spad_range", None)
         self.psum_spad_sizes = search_space_constraints.get("psum_spad_sizes", [32]) #Byte
 
         self.glb_sizes = search_space_constraints.get("gbuf_sizes", [128]) #kB
 
-        if self.ifmap_spad_range is not None:
-            self.ifmap_spad_sizes = self._generate_mem_sizes(*self.ifmap_spad_range)
-        if self.weight_spad_range is not None:
-            self.weight_spad_sizes = self._generate_mem_sizes(*self.weight_spad_range)
-        if self.psum_spad_range is not None:
-            self.psum_spad_sizes = self._generate_mem_sizes(*self.psum_spad_range)
-
         # Generate valid configuration
         self.generate_design_space() 
+
 
     def _generate_mem_sizes(self, lower: int, upper: int, step: int):
         mem_sizes = list(range(lower, upper, step))

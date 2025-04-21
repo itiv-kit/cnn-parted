@@ -10,6 +10,6 @@ from framework.quantization.accuracy_evaluator import AccuracyEvaluator
 from framework.dse.gemmini_architecture_mutator import GemminiArchitectureAdaptor
 from framework.dse.eyeriss_architecture_mutator import EyerissArchitectureAdaptor
 from framework.dse.simba_architecture_mutator import SimbaArchitectureAdaptor
-from framework.dse.timeloop_interface import TimeloopInterface
-from framework.dse.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.architecture_config import ArchitectureConfig
 

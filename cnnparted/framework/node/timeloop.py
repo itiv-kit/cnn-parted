@@ -11,14 +11,15 @@ import re
 import tqdm
 import shutil
 
-from framework.dse.genome_interface import GenomeInterface
-from framework.dse.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.genome_interface import GenomeInterface
+from framework.dse.interfaces.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
 from framework.helpers.visualizer import plotMetricPerConfigPerLayer
 from framework.helpers.design_metrics import calc_metric, SUPPORTED_METRICS
-from framework.dse.timeloop_interface import TimeloopInterface
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
 
 class Timeloop(NodeEvaluator):
@@ -75,6 +76,9 @@ class Timeloop(NodeEvaluator):
             mutator_cls = getattr(dse_package, self.dse_config["mutator"])
             self.mutator = mutator_cls(self.dse_config)
 
+            if isinstance(self.mutator, ExhaustiveSearch):
+                self.mutator.read_space_cfg(self.dse_config)
+
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
 
@@ -130,8 +134,8 @@ class Timeloop(NodeEvaluator):
         tl_design_dir = os.path.join(design_runroot, "tl_config")
         tl_design_dir_arch = os.path.join(design_runroot, "tl_config", "archs")
         tl_design_dir_constraints = os.path.join(design_runroot, "tl_config", "constraints")
-        os.makedirs(tl_design_dir_arch)
-        os.makedirs(tl_design_dir_constraints)
+        os.makedirs(tl_design_dir_arch, exist_ok=True)
+        os.makedirs(tl_design_dir_constraints, exist_ok=True)
 
         self.mutator.run_from_config(design, outdir=tl_design_dir)
         design_result = DesignResult(design.get_config())

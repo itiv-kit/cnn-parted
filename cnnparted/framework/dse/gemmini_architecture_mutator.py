@@ -5,9 +5,10 @@ from cv2 import gemm
 import yaml
 import numpy as np
 
-from framework.dse.architecture_config import ArchitectureConfig
-from framework.dse.genome_interface import GenomeInterface
-from framework.dse.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.genome_interface import GenomeInterface
+from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 
 class GemminiConfig(ArchitectureConfig, GenomeInterface):
     def _is_pow_2(self, n):
@@ -105,11 +106,18 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
     
 
 
-class GemminiArchitectureAdaptor(TimeloopInterface):
+class GemminiArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
 
     def __init__(self, cfg):
         super().__init__(cfg)
         self.config: GemminiConfig = None
+
+    def read_space_cfg(self, cfg):
+        self.spad_banks = 4
+        self.acc_banks = 2
+        self.spad_data_width = 8
+        self.acc_data_width = 32
+
         search_space_constraints = cfg.get("constraints", {})
 
         #Boundaries of scratchpad sizes
@@ -135,12 +143,6 @@ class GemminiArchitectureAdaptor(TimeloopInterface):
 
         # Tile dim parameters
         self.tile_dims = [1] #search_space_constraints.get("tile_dim", [1])
-
-        self.spad_banks = 4
-        self.acc_banks = 2
-
-        self.spad_data_width = 8
-        self.acc_data_width = 32
 
         # Generate valid configuration
         self.generate_design_space() 
@@ -284,7 +286,7 @@ if __name__ == "__main__":
     cfg = {"dse": {"constraints": None}, "work_dir": {"tl_configs": None}}
     cfg["dse"]["constraints"] = constraints
     cfg["work_dir"]["tl_configs"] = "/home/rh8588/Dokumente/git/cnn-parted/cnnparted/framework/dse/my_work_dir"
-    generator = GemminiArchitectureMutator(cfg)
+    generator = GemminiArchitectureAdaptor(cfg)
     generator.run()
 
     print("Generated Gemmini Config:")

@@ -77,10 +77,16 @@ class RobustnessOptimizer(Optimizer):
                     accuracy_result = float(accuracy_result.cpu().detach().numpy())
                     acc_lut[tuple(x)] = accuracy_result
 
+                # TODO This is a workaround for hard constraints
+                accuracy_drop_constraint = 0.05
                 if ref == 0:
                     return accuracy_result
                 else:
-                    return self.qmodel.get_bit_weighted() * abs(accuracy_result - ref)
+                    cost = self.qmodel.get_bit_weighted()
+                    if accuracy_result < abs(ref - accuracy_drop_constraint):
+                        cost = 9223372036854775807 #sys.maxsize
+                    return cost
+                    #return self.qmodel.get_bit_weighted() * abs(accuracy_result - ref)
 
             init_x = np.full(self.n_var, self.max_bits_idx[-1])
             acc_ref = f(init_x, 0) - self.delta
