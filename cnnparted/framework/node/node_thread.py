@@ -9,6 +9,7 @@ from framework.node.generic_node import GenericNode
 from framework.node.zigzag import Zigzag
 from framework.helpers.design_metrics import calc_metric
 
+
 class NodeThread(ModuleThreadInterface):
     def eval_node(self) -> None:
         if not self.config:
@@ -21,27 +22,29 @@ class NodeThread(ModuleThreadInterface):
         self.stats["faulty_bits"] = self.config.get("faulty_bits") or 0
 
         # Select which simulator should be used
-        if config := self.config.get("timeloop"):
+        #if config := self.config.get("timeloop"):
+        if "timeloop" in self.config:
             layers = self.ga.get_timeloop_layers()
-            simulator = Timeloop(config)
+            simulator = Timeloop(self.config)
             self.stats["type"] = 'tl'
-        elif config := self.config.get("mnsim"):
+        elif "mnsim" in self.config:
             layers = self.ga.get_mnsim_layers()
-            simulator = MNSIMInterface(config, self.ga.input_size)
+            simulator = MNSIMInterface(self.config, self.ga.input_size)
             self.stats["type"] = 'mnsim'
-        elif config := self.config.get("zigzag"):
+        elif "zigzag" in self.config:
             layers = []
-            simulator = Zigzag(config)
+            simulator = Zigzag(self.config)
             self.stats["type"] = 'zigzag'
         else:
             layers = []
-            simulator = GenericNode(config)
+            simulator = GenericNode(self.config)
             self.stats["type"] = 'generic'
 
         # Check if design is DSE enabled
-        dse_cfg = config.get("dse", {"optimization": "edap",
+        # TODO Cleanup for new flow
+        dse_cfg = self.config.get("dse", {"optimization": "edap",
                                      "top_k": 2})
-        is_dse = "dse" in config.keys()
+        is_dse = "dse" in self.config
         metric = dse_cfg.get("optimization", "edap")
         top_k = int(dse_cfg.get("top_k", 2))
 
@@ -54,10 +57,11 @@ class NodeThread(ModuleThreadInterface):
             return
 
         # Perform the actual evaluation
-        if self.acc_config is None:
+        if self.acc_adaptor is None:
             simulator.run(layers)
         else:
-            simulator.run_from_config(layers, self.acc_config)
+            simulator.run_from_adaptor(layers, self.acc_adaptor)
+
         self._write_layer_csv(fname_csv, simulator.stats)
         pruned_stats = self._prune_accelerator_designs(simulator.stats, top_k, metric, is_dse)
         self.stats["eval"] = pruned_stats

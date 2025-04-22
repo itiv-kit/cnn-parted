@@ -23,9 +23,10 @@ from pytorch_quantization import tensor_quant
 class MNSIMInterface(TrainTestInterface, NodeEvaluator):
     fname_result = "mnsim_layers.csv"
 
-    def __init__ (self, config : dict, input_size : list) -> None:
-        self.SimConfig = ROOT_DIR + config.get('conf_path')
-        self.config = config
+    def __init__ (self, in_config : dict, input_size : list) -> None:
+        mnsim_config = in_config["mnsim"]
+        self.SimConfig = ROOT_DIR + mnsim_config.get('conf_path')
+        self.config = mnsim_config
         self.input_size = input_size
 
         # load simconfig

@@ -14,9 +14,9 @@ from tools.zigzag.zigzag.api import get_hardware_performance_zigzag
 from tools.zigzag.zigzag.cost_model.cost_model import CostModelEvaluation
 
 class Zigzag(NodeEvaluator):
-    def __init__(self, config: dict) -> None:
+    def __init__(self, in_config: dict) -> None:
         super().__init__()
-        self.config = config
+        self.config = in_config["zigzag"]
         self.fname_result = "zigzag_layers.csv"
 
         self.configs_dir = pathlib.Path(ROOT_DIR, "tools", "zigzag", "zigzag", "inputs")
@@ -26,11 +26,11 @@ class Zigzag(NodeEvaluator):
         self.local_mapping_configs_dir = pathlib.Path(ROOT_DIR, "configs", "zigzag_configs", "mapping")
         self.model_dir= pathlib.Path(ROOT_DIR, "onnx_models")
 
-        self.accname = config["accelerator"] + ".yaml"
-        self.mapname = config["mapping"] + ".yaml"
-        self.optimization = config.get("optimization", "latency")
+        self.accname = self.config["accelerator"] + ".yaml"
+        self.mapname = self.config["mapping"] + ".yaml"
+        self.optimization = self.config.get("optimization", "latency")
         assert self.optimization in ["energy", "latency", "EDP"]
-        self.freq = config["frequency"]
+        self.freq = self.config["frequency"]
 
 
     def set_workdir(self, work_dir: str, runname: str, id: int):

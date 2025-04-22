@@ -29,7 +29,7 @@ class Timeloop(NodeEvaluator):
     configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
     fname_result = "tl_layers.csv"
 
-    def __init__ (self, tl_config : dict) -> None:
+    def __init__ (self, in_config : dict) -> None:
         log_file_name = self.out_prefix + "log"
         stats_file_name = self.out_prefix + "stats.txt"
         xml_file_name = self.out_prefix + "map+stats.xml"
@@ -56,49 +56,53 @@ class Timeloop(NodeEvaluator):
                                     accelergy_ert_name,
                                     flatt_arch_name ]
 
+        tl_config = in_config["timeloop"]
+        self.dse_config = in_config.get("dse", None)
+
         self.accname = tl_config['accelerator']
         self.prob_name = tl_config['layer']
         self.freq = tl_config['frequency']
         self.mapper_cfg = {} if not tl_config.get('mapper') else tl_config['mapper']
         self.type_cfg = '.yaml'
-        self.dse_config = tl_config.get('dse', None)
+        #self.dse_config = tl_config.get('dse', None)
         self.config = tl_config
         self.stats = {}
 
         self.design_id = 0
 
-        self.mutator: TimeloopInterface = None
-        if self.dse_config:
-            mutator_cfg = self.dse_config
-            mutator_cfg["tl_in_configs_dir"] = self.configs_dir
+        self.adaptor: TimeloopInterface = None
+        if self.dse_config and "mutator" in self.dse_config:
+            adaptor_cfg = self.dse_config
+            adaptor_cfg["tl_in_configs_dir"] = self.configs_dir
 
             dse_package = importlib.import_module("framework.dse")
             mutator_cls = getattr(dse_package, self.dse_config["mutator"])
-            self.mutator = mutator_cls(self.dse_config)
+            self.adaptor = mutator_cls(self.dse_config)
 
-            if isinstance(self.mutator, ExhaustiveSearch):
-                self.mutator.read_space_cfg(self.dse_config)
+            if isinstance(self.adaptor, ExhaustiveSearch):
+                self.adaptor.read_space_cfg(self.dse_config)
 
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
 
-    def run_from_config(self, layers : dict, config: GenomeInterface, progress : bool = False):
+    def run_from_adaptor(self, layers : dict, adaptor: TimeloopInterface, progress : bool = False):
+        self.adaptor = adaptor
         node_result = NodeResult()
-        design_result = DesignResult()
 
-        genome = config.to_genome()
-        self._run_design(layers, progress, node_result, self.design_id, genome)
+        genome = adaptor.config.to_genome()
+        self._run_design(layers, progress, node_result, self.design_id, adaptor.config)
         self.design_id += 1
 
         self.stats = {tag: results for tag, results in node_result.to_dict().items()}
+        self.adaptor = None
 
     def run(self, layers : dict, progress : bool = False) -> NodeResult:
         node_result = NodeResult()
 
-        if self.mutator is not None:
-            print(f"There are a total of {len(self.mutator.design_space)} designs to be evaluated!")
+        if self.adaptor is not None:
+            print(f"There are a total of {len(self.adaptor.design_space)} designs to be evaluated!")
             
-            for i, design in enumerate(self.mutator.design_space):
+            for i, design in enumerate(self.adaptor.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
                     shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
                 self._run_design(layers, progress, node_result, i, design)
@@ -137,7 +141,7 @@ class Timeloop(NodeEvaluator):
         os.makedirs(tl_design_dir_arch, exist_ok=True)
         os.makedirs(tl_design_dir_constraints, exist_ok=True)
 
-        self.mutator.run_from_config(design, outdir=tl_design_dir)
+        self.adaptor.run_tl_from_config(design, outdir=tl_design_dir)
         design_result = DesignResult(design.get_config())
         with open(os.path.join(design_runroot, "arch_config.yaml"), "w") as f:
             y = yaml.safe_dump(design.get_config(), sort_keys=False)

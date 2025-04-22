@@ -3,7 +3,7 @@ from math import log2
 import pathlib
 import yaml
 
-from framework.dse.gemmini_architecture_mutator import GemminiArchitectureAdaptor, GemminiConfig
+from framework.dse.gemmini_adaptor import GemminiArchitectureAdaptor, GemminiConfig
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 

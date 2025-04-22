@@ -269,11 +269,11 @@ class GemminiArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
             f.write(y)
 
 
-    def run_from_config(self, config: GemminiConfig, outdir=None):
-        return super().run_from_config(config, outdir)
+    def run_tl_from_config(self, config: GemminiConfig, outdir=None):
+        return super().run_tl_from_config(config, outdir)
 
-    def run(self):
-        return super().run()
+    def run_tl(self):
+        return super().run_tl()
 
 
 if __name__ == "__main__":

@@ -225,11 +225,11 @@ class SimbaArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
         constraints_out = pathlib.Path(outdir, "constraints", "simba_like_map_constraints.yaml")
         shutil.copy(base_map_constraints, constraints_out)
 
-    def run(self):
-        return super().run()
+    def run_tl(self):
+        return super().run_tl()
 
-    def run_from_config(self, config: SimbaConfig, outdir=None):
-        return super().run_from_config(config, outdir)
+    def run_tl_from_config(self, config: SimbaConfig, outdir=None):
+        return super().run_tl_from_config(config, outdir)
 
 
 if __name__ == "__main__":

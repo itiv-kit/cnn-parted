@@ -9,9 +9,9 @@ from framework.stages.evaluation.node_evaluation import NodeEvaluation
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.inputs.system_parser import SystemParser
 from framework.node.node_thread import NodeThread
-from framework.dse.simba_architecture_mutator import SimbaConfig
-from framework.dse.eyeriss_architecture_mutator import EyerissConfig
-from framework.dse.gemmini_architecture_mutator import GemminiConfig
+from framework.dse.simba_adaptor import SimbaConfig, SimbaArchitectureAdaptor
+from framework.dse.eyeriss_adaptor import EyerissConfig, EyerissArchitectureAdaptor
+from framework.dse.gemmini_adaptor import GemminiConfig, GemminiArchitectureAdaptor
 
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 
@@ -26,6 +26,13 @@ ACCELERATOR_CONFIG_MAP = {
     "eyeriss_like": EyerissConfig,
     "simba_like": SimbaConfig
 }
+
+ACCELERATOR_ADAPTOR_MAP = {
+    GemminiConfig: GemminiArchitectureAdaptor,
+    EyerissConfig: EyerissArchitectureAdaptor,
+    SimbaConfig: SimbaArchitectureAdaptor,
+}
+
 
 # This class does the following:
 #   - Get a system vector x which is a system design
@@ -54,6 +61,7 @@ class DesignProblem(ElementwiseProblem):
         n_obj = 3
         n_constr = 3
         self.accelerator_configs = [ACCELERATOR_CONFIG_MAP[node["timeloop"]["accelerator"]] for node in node_components if "dse" in node]
+        self.accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg] for cfg in self.accelerator_configs]
 
         xl = np.array([node_constraint[0] for node_constraint in node_constraints]).flatten()
         xu = np.array([node_constraint[1] for node_constraint in node_constraints]).flatten()
@@ -66,11 +74,11 @@ class DesignProblem(ElementwiseProblem):
         super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=xl, xu=xu)
 
 
-    def _eval_nodes(self, nodes, acc_cfgs=[]):
+    def _eval_nodes(self, nodes, acc_adaptors=[]):
         node_stats = {}
         node_threads = [
-                NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress, acc_config=acc_cfg)
-                for (component, acc_cfg) in zip_longest(nodes, acc_cfgs)
+                NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress, acc_adaptor=acc_adaptor)
+                for (component, acc_adaptor) in zip_longest(nodes, acc_adaptors)
             ]
 
         for t in node_threads:
@@ -102,6 +110,7 @@ class DesignProblem(ElementwiseProblem):
         return node_stats
 
     def _split_system_input(self, sys_vec: np.ndarray):
+        sys_vec = sys_vec.tolist()
         split_vec = []
         start = 0
         for i, n_var in enumerate(self.n_var_per_node):
@@ -115,9 +124,14 @@ class DesignProblem(ElementwiseProblem):
 
         x = self._split_system_input(x)
         acc_cfgs = [cfg(*param) for (cfg, param) in zip(self.accelerator_configs, x, strict=True)]
+        acc_adaptors = [adaptor({}) for adaptor in self.accelerator_adaptors] 
+
+        # Set the config we want to run
+        for (adaptor, cfg) in zip(acc_adaptors, acc_cfgs):
+            adaptor.config = cfg
 
         dse_nodes = [node for node in self.node_components if "dse" in node]
-        dse_node_stats = self._eval_nodes(dse_nodes, acc_cfgs)
+        dse_node_stats = self._eval_nodes(dse_nodes, acc_adaptors)
         breakpoint()
 
         node_stats = self.fixed_node_stats | dse_node_stats

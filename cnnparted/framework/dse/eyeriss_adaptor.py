@@ -190,11 +190,11 @@ class EyerissArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
                                 self.design_space.append(copy.copy(EyerissConfig(pe_dim_y, pe_dim_x, glb_size, ifmap_spad_size, weight_spad_size, psum_spad_size))) 
 
 
-    def run(self):
-        return super().run()
+    def run_tl(self):
+        return super().run_tl()
         
-    def run_from_config(self, config: EyerissConfig, outdir=None):
-        return super().run_from_config(config, outdir)
+    def run_tl_from_config(self, config: EyerissConfig, outdir=None):
+        return super().run_tl_from_config(config, outdir)
 
 if __name__ == "__main__":
     ds = {"PE": [336],
