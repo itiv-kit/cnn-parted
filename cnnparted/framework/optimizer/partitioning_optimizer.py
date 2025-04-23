@@ -45,7 +45,7 @@ class PartitioningOptimizer(Optimizer):
             self.pop_size = 50 if nodes>100 else nodes//2 if nodes>30 else 15 if nodes>20 else nodes
 
         self.results = {}
-        self.optimizer_cfg = PartitioningOptConfig(self.node_stats, num_pp, len(self.schedules[0]))
+        self.optimizer_cfg = PartitioningOptConfig(len(self.node_stats), num_pp, len(self.schedules[0]))
 
     def _set_layer_params(self, ga : GraphAnalyzer) -> dict:
         params = {}

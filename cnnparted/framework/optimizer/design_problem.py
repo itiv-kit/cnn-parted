@@ -3,6 +3,7 @@ from itertools import zip_longest
 import numpy as np
 from pymoo.core.problem import ElementwiseProblem
 
+from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.helpers.config_helper import ConfigHelper
 from framework.stages.artifacts import Artifacts
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
@@ -47,6 +48,7 @@ class DesignProblem(ElementwiseProblem):
         self.run_name = artifacts.args["run_name"]
         self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
         self.show_progress = artifacts.args["p"]
+        self.num_pp = artifacts.config["num_pp"]
         self.config = artifacts.config
 
         self.node_components = node_components
@@ -57,9 +59,22 @@ class DesignProblem(ElementwiseProblem):
         self.n_var_per_node = [N_VAR_ACC[node["timeloop"]["accelerator"]]  for node in node_components if "dse" in node]
         n_var = sum(self.n_var_per_node)
 
-        #TODO
-        n_obj = 3
-        n_constr = 3
+        match self.config["dse"]["optimization"]:
+            case "ppa":
+                n_obj = 3
+            case "edp":
+                n_obj = 1
+            case "edap":
+                n_obj = 1
+            case _:
+                breakpoint()
+                raise RuntimeError(f"Invalid optimization option for DSE")
+
+        num_platforms = sum([node.get("instances", 1) for node in self.node_components])
+        part_opt_cfg = PartitioningOptConfig(num_platforms, self.num_pp, len(self.ga.schedules) )
+
+        # We return all values of the partitioning algorithm as "constraint"
+        n_constr = part_opt_cfg.x_len + part_opt_cfg.g_len + part_opt_cfg.f_len + 1 + 1
         self.accelerator_configs = [ACCELERATOR_CONFIG_MAP[node["timeloop"]["accelerator"]] for node in node_components if "dse" in node]
         self.accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg] for cfg in self.accelerator_configs]
 
@@ -118,9 +133,35 @@ class DesignProblem(ElementwiseProblem):
             start += n_var
         return split_vec
 
+    def _pareto_edp(self, comp_paretos : np.ndarray) -> np.ndarray:
+        comp_paretos = np.delete(comp_paretos, np.s_[2:], axis=1) # only consider latency and energy
+        comp_paretos = np.hstack([comp_paretos, np.expand_dims(np.prod(comp_paretos, axis=1), 1)])
+        return comp_paretos
+    
+    def _pareto_ppa(self, comp_paretos : np.ndarray) -> np.ndarray:
+        comp_paretos = np.delete(comp_paretos, np.s_[-2:], axis=1) # remove link metrics
+        comp_paretos = np.delete(comp_paretos, np.s_[-2], axis=1) # remove throughput metric
+        return comp_paretos
+
+    def _calc_cost(self, objectives: np.ndarray) -> np.ndarray:
+        match self.config["dse"]["optimization"]:
+            case "ppa":
+                objectives_cut = self._pareto_ppa(objectives)
+                cost = objectives_cut
+            case "edp":
+                objectives_cut = self._pareto_edp(objectives)
+                cost = np.prod(objectives_cut, axis=1)
+            case "edap":
+                objectives_cut = self._pareto_ppa(objectives)
+                cost = np.prod(objectives_cut, axis=1)
+            case _:
+                raise RuntimeError(f"Invalid optimization option for DSE")
+
+        return cost
+        
 
     def _evaluate(self, x: np.ndarray, out: dict, *args, **kwargs):
-        valid = True
+        valid = True #TODO: Can this ever be invalid?
 
         x = self._split_system_input(x)
         acc_cfgs = [cfg(*param) for (cfg, param) in zip(self.accelerator_configs, x, strict=True)]
@@ -132,23 +173,28 @@ class DesignProblem(ElementwiseProblem):
 
         dse_nodes = [node for node in self.node_components if "dse" in node]
         dse_node_stats = self._eval_nodes(dse_nodes, acc_adaptors)
-        breakpoint()
 
         node_stats = self.fixed_node_stats | dse_node_stats
 
-        #TODO Instantiate Partitioning problem
-        part_opt = self.partitioning_optimizer_cls(self.ga, 
-                                                   self.num_pp,
-                                                   node_stats,
-                                                   self.link_components,
-                                                   self.show_progress)
+        q_constr = {}
+        part_opt = self.partitioning_optimizer_cls(self.ga, self.num_pp, node_stats, self.link_components, self.show_progress)
+        n_constr, n_var, sol = part_opt.optimize(q_constr, self.config)
+        n_var_total = part_opt.optimizer_cfg.n_var + part_opt.optimizer_cfg.f_len + part_opt.optimizer_cfg.g_len + 1 + 1
 
-        out["F"] = [1,2,3] #cost
+        nondom = np.array(sol["nondom"])
+        objectives = [data[n_constr+n_var+1:] for data in nondom]
+
+        cost = self._calc_cost(objectives)
+        out["F"] = np.array(min(cost))
+
+        res = np.hstack( (nondom, np.reshape(cost,shape=(-1, 1)) ) )
+        res = res[cost.argmin()] #TODO Workaround until I have a better solution for variable number of constraints
 
         if valid:
-            out["G"] = [1,2,3]
+            out["G"] = -res
         else:
-            out["G"] = [-1,-2,-3]
+            out["G"] = res
+
 
 
 

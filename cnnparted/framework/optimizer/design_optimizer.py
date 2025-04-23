@@ -48,10 +48,6 @@ class DesignOptimizerGA(Optimizer):
         return np.array(samples)
 
 
-    def _get_paretos_int(self, res):
-        pass
-
-
     def _optimize_single(self):
         problem = self.problem
 
@@ -76,6 +72,5 @@ class DesignOptimizerGA(Optimizer):
                        save_history=True,
                        verbose=False
                        )
-        
         data = self._get_paretos_int(res)
         return data

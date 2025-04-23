@@ -22,7 +22,7 @@ pipeline:
 dse:
   problem: DesignProblem
   algorithm: nsga2
-  optmization: ppa/edap
+  optimization: edp
 
 components:
   - id: 0

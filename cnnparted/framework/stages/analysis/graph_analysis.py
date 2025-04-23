@@ -27,7 +27,7 @@ class GraphAnalysis(Stage):
         # Update number of partitioning points
         num_pp = artifacts.config["general"]["num_pp"]
         if num_pp == -1:
-            num_pp = len(ga.schedules) - 1
+            num_pp = len(ga.schedules[0]) - 1
         #elif len(node_stats) == 1:
         #    num_pp = 0
         artifacts.config["num_pp"] = num_pp
