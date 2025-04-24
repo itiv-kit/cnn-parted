@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from optparse import Option
 import os
 import yaml
 
@@ -15,6 +16,7 @@ class TimeloopInterface(ABC):
         #self.tl_in_configs_dir: str = cfg["tl_in_configs_dir"]
         self.tl_in_configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
         self.tl_out_configs_dir: str = ""
+        self.tl_out_design_name: Option[str] = None
 
     @abstractmethod
     def write_tl_arch(self, config=None, outdir=None):

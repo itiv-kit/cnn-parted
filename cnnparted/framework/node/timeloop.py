@@ -64,7 +64,6 @@ class Timeloop(NodeEvaluator):
         self.freq = tl_config['frequency']
         self.mapper_cfg = {} if not tl_config.get('mapper') else tl_config['mapper']
         self.type_cfg = '.yaml'
-        #self.dse_config = tl_config.get('dse', None)
         self.config = tl_config
         self.stats = {}
 
@@ -89,7 +88,6 @@ class Timeloop(NodeEvaluator):
         self.adaptor = adaptor
         node_result = NodeResult()
 
-        genome = adaptor.config.to_genome()
         self._run_design(layers, progress, node_result, self.design_id, adaptor.config)
         self.design_id += 1
 
@@ -134,7 +132,10 @@ class Timeloop(NodeEvaluator):
             pickle.dump(self.stats, f)
 
     def _run_design(self, layers: dict, progress: bool, stats: NodeResult, i: int, design):
-        design_runroot = os.path.join(self.runroot, "design"+str(i))
+        if self.adaptor and self.adaptor.tl_out_design_name:
+            design_runroot = os.path.join(self.runroot, self.adaptor.tl_out_design_name)
+        else:
+            design_runroot = os.path.join(self.runroot, "design"+str(i))
         tl_design_dir = os.path.join(design_runroot, "tl_config")
         tl_design_dir_arch = os.path.join(design_runroot, "tl_config", "archs")
         tl_design_dir_constraints = os.path.join(design_runroot, "tl_config", "constraints")

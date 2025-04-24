@@ -60,14 +60,11 @@ class DesignProblem(ElementwiseProblem):
         n_var = sum(self.n_var_per_node)
 
         match self.config["dse"]["optimization"]:
-            case "ppa":
-                n_obj = 3
             case "edp":
                 n_obj = 1
             case "edap":
                 n_obj = 1
             case _:
-                breakpoint()
                 raise RuntimeError(f"Invalid optimization option for DSE")
 
         num_platforms = sum([node.get("instances", 1) for node in self.node_components])
@@ -92,7 +89,7 @@ class DesignProblem(ElementwiseProblem):
     def _eval_nodes(self, nodes, acc_adaptors=[]):
         node_stats = {}
         node_threads = [
-                NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress, acc_adaptor=acc_adaptor)
+                NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress, acc_adaptor=acc_adaptor, save_results=False)
                 for (component, acc_adaptor) in zip_longest(nodes, acc_adaptors)
             ]
 
@@ -145,9 +142,9 @@ class DesignProblem(ElementwiseProblem):
 
     def _calc_cost(self, objectives: np.ndarray) -> np.ndarray:
         match self.config["dse"]["optimization"]:
-            case "ppa":
-                objectives_cut = self._pareto_ppa(objectives)
-                cost = objectives_cut
+            #case "ppa":
+            #    objectives_cut = self._pareto_ppa(objectives)
+            #    cost = objectives_cut
             case "edp":
                 objectives_cut = self._pareto_edp(objectives)
                 cost = np.prod(objectives_cut, axis=1)
@@ -164,11 +161,14 @@ class DesignProblem(ElementwiseProblem):
         valid = True #TODO: Can this ever be invalid?
 
         x = self._split_system_input(x)
+        print(f"Evaluating system with: {x}")
         acc_cfgs = [cfg(*param) for (cfg, param) in zip(self.accelerator_configs, x, strict=True)]
         acc_adaptors = [adaptor({}) for adaptor in self.accelerator_adaptors] 
 
         # Set the config we want to run
         for (adaptor, cfg) in zip(acc_adaptors, acc_cfgs):
+            design_string = "_".join(map(str, cfg.to_genome()))
+            adaptor.tl_out_design_name = design_string
             adaptor.config = cfg
 
         dse_nodes = [node for node in self.node_components if "dse" in node]
@@ -179,7 +179,6 @@ class DesignProblem(ElementwiseProblem):
         q_constr = {}
         part_opt = self.partitioning_optimizer_cls(self.ga, self.num_pp, node_stats, self.link_components, self.show_progress)
         n_constr, n_var, sol = part_opt.optimize(q_constr, self.config)
-        n_var_total = part_opt.optimizer_cfg.n_var + part_opt.optimizer_cfg.f_len + part_opt.optimizer_cfg.g_len + 1 + 1
 
         nondom = np.array(sol["nondom"])
         objectives = [data[n_constr+n_var+1:] for data in nondom]

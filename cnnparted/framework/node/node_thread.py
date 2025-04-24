@@ -43,7 +43,7 @@ class NodeThread(ModuleThreadInterface):
         # Check if design is DSE enabled
         # TODO Cleanup for new flow
         dse_cfg = self.config.get("dse", {"optimization": "edap",
-                                     "top_k": 2})
+                                     "top_k": 2000})
         is_dse = "dse" in self.config
         metric = dse_cfg.get("optimization", "edap")
         top_k = int(dse_cfg.get("top_k", 2))
@@ -62,7 +62,8 @@ class NodeThread(ModuleThreadInterface):
         else:
             simulator.run_from_adaptor(layers, self.acc_adaptor)
 
-        self._write_layer_csv(fname_csv, simulator.stats)
+        if self.save_results:
+            self._write_layer_csv(fname_csv, simulator.stats)
         pruned_stats = self._prune_accelerator_designs(simulator.stats, top_k, metric, is_dse)
         self.stats["eval"] = pruned_stats
 

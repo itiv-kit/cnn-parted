@@ -6,7 +6,7 @@ from framework.dse.interfaces.architecture_config import ArchitectureConfig
 
 class ModuleThreadInterface(threading.Thread):
     def __init__(self, id : str, ga : GraphAnalyzer, config : dict, work_dir: str, runname : str, progress : bool, 
-                 acc_adaptor = None) -> None:
+                 acc_adaptor = None, save_results = True) -> None:
         threading.Thread.__init__(self)
         self.id = id
         self.ga = ga
@@ -15,6 +15,7 @@ class ModuleThreadInterface(threading.Thread):
         self.runname = runname
         self.progress = progress
         self.acc_adaptor = acc_adaptor
+        self.save_results = save_results
 
         self.stats = {}
 
