@@ -27,12 +27,7 @@ class PartitioningProblem(ElementwiseProblem):
         for link_conf in link_confs:
             self.links.append(Link(link_conf))
 
-        n_var = optimizer_cfg.n_var #self.num_pp * 2 + 1 # platform IDs + Number of max. partitioning points
-        n_obj = optimizer_cfg.n_obj # latency, energy, throughput, area + link latency + link energy
-        n_constr = optimizer_cfg.n_constr #self.num_platforms + 1 + (self.num_pp + 1) * 2 + (self.num_pp + 1) * 2 # num_accelerator_platforms + num_real_pp + latency/energy per partition + latency/energy per link
-
-        xl = optimizer_cfg.xl
-        xu = optimizer_cfg.xu #self.num_platforms * self.num_layers - 1
+        n_var, n_obj, n_constr, xl, xu = optimizer_cfg.get()
 
         super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=xl, xu=xu)
 

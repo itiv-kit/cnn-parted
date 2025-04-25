@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 from numpy.random import default_rng
 
@@ -26,7 +28,12 @@ class DesignOptimizer(Optimizer):
         self.algorithm = algorithm
 
     def optimize(self):
-        return self._optimize_single()
+
+        sorts = self._optimize_single()
+        breakpoint()
+        return sorts
+
+
 
     def _gen_initial_x(self):
         samples = []

@@ -3,7 +3,9 @@ from itertools import zip_longest
 import numpy as np
 from pymoo.core.problem import ElementwiseProblem
 
+from framework.optimizer.config import design_opt_config
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
+from framework.optimizer.config.design_opt_config import DesignOptConfig
 from framework.helpers.config_helper import ConfigHelper
 from framework.stages.artifacts import Artifacts
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
@@ -41,8 +43,11 @@ ACCELERATOR_ADAPTOR_MAP = {
 #   - Evaluate the system with the NodeEvaluator, unless the results are already present in a LUT
 #   - After that, call the PartitioningOptimizer with the system that was just evaluated
 class DesignProblem(ElementwiseProblem):
-    def __init__(self, node_components, link_components,
-                 node_constraints, artifacts: Artifacts,
+    def __init__(self, 
+                 node_components, link_components,
+                 node_constraints, 
+                 q_constr: dict,
+                 artifacts: Artifacts,
                  partitioning_optimizer_cls):
         self.work_dir = artifacts.config["general"]["work_dir"]
         self.run_name = artifacts.args["run_name"]
@@ -50,6 +55,7 @@ class DesignProblem(ElementwiseProblem):
         self.show_progress = artifacts.args["p"]
         self.num_pp = artifacts.config["num_pp"]
         self.config = artifacts.config
+        self.q_constr = q_constr
 
         self.node_components = node_components
         self.link_components = link_components
@@ -57,21 +63,8 @@ class DesignProblem(ElementwiseProblem):
         self.num_platforms = len(node_components)
 
         self.n_var_per_node = [N_VAR_ACC[node["timeloop"]["accelerator"]]  for node in node_components if "dse" in node]
-        n_var = sum(self.n_var_per_node)
-
-        match self.config["dse"]["optimization"]:
-            case "edp":
-                n_obj = 1
-            case "edap":
-                n_obj = 1
-            case _:
-                raise RuntimeError(f"Invalid optimization option for DSE")
-
-        num_platforms = sum([node.get("instances", 1) for node in self.node_components])
-        part_opt_cfg = PartitioningOptConfig(num_platforms, self.num_pp, len(self.ga.schedules) )
 
         # We return all values of the partitioning algorithm as "constraint"
-        n_constr = part_opt_cfg.x_len + part_opt_cfg.g_len + part_opt_cfg.f_len + 1 + 1
         self.accelerator_configs = [ACCELERATOR_CONFIG_MAP[node["timeloop"]["accelerator"]] for node in node_components if "dse" in node]
         self.accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg] for cfg in self.accelerator_configs]
 
@@ -81,14 +74,22 @@ class DesignProblem(ElementwiseProblem):
             if "dse" in node:
                 self.dse_node_lut[node["id"]] = {}
 
-        xl = np.array([node_constraint[0] for node_constraint in node_constraints]).flatten()
-        xu = np.array([node_constraint[1] for node_constraint in node_constraints]).flatten()
-
         self.partitioning_optimizer_cls: type[PartitioningOptimizer] = partitioning_optimizer_cls
 
+        # Perform the evaluation for all nodes that not suject to DSE
+        # to prevent simulating them multiple times
         fixed_nodes = [node for node in node_components if "dse" not in node]
         self.fixed_node_stats = self._eval_nodes(fixed_nodes)
 
+        num_platforms = sum([node.get("instances", 1) for node in self.node_components])
+        part_opt_cfg = PartitioningOptConfig(num_platforms, self.num_pp, len(self.ga.schedules) )
+
+        self.design_opt_config = DesignOptConfig(self.n_var_per_node,
+                                                 node_constraints,
+                                                 part_opt_cfg,
+                                                 self.config["dse"])
+
+        n_var, n_obj, n_constr, xl, xu = self.design_opt_config.get()
         super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=xl, xu=xu)
 
 
@@ -210,9 +211,8 @@ class DesignProblem(ElementwiseProblem):
         node_stats = self.fixed_node_stats | dse_node_stats
 
         # Perform the partitioning to distribute the workload between the nodes
-        q_constr = {} #TODO 
         part_opt = self.partitioning_optimizer_cls(self.ga, self.num_pp, node_stats, self.link_components, self.show_progress)
-        n_constr, n_var, sol = part_opt.optimize(q_constr, self.config)
+        n_constr, n_var, sol = part_opt.optimize(self.q_constr, self.config)
 
         nondom = np.array(sol["nondom"])
         objectives = [data[n_constr+n_var+1:] for data in nondom]
