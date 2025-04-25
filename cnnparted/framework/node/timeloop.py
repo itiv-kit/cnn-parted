@@ -4,6 +4,7 @@ import os
 import stat
 import sys
 import subprocess
+from typing import Optional
 import libconf
 import yaml
 import glob
@@ -67,8 +68,6 @@ class Timeloop(NodeEvaluator):
         self.config = tl_config
         self.stats = {}
 
-        self.design_id = 0
-
         self.adaptor: TimeloopInterface = None
         if self.dse_config and "mutator" in self.dse_config:
             adaptor_cfg = self.dse_config
@@ -88,8 +87,7 @@ class Timeloop(NodeEvaluator):
         self.adaptor = adaptor
         node_result = NodeResult()
 
-        self._run_design(layers, progress, node_result, self.design_id, adaptor.config)
-        self.design_id += 1
+        self._run_design(layers, progress, node_result, adaptor.config)
 
         self.stats = {tag: results for tag, results in node_result.to_dict().items()}
         self.adaptor = None
@@ -103,7 +101,7 @@ class Timeloop(NodeEvaluator):
             for i, design in enumerate(self.adaptor.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
                     shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
-                self._run_design(layers, progress, node_result, i, design)
+                self._run_design(layers, progress, node_result, design, i)
             
             # Plot all metrics in all combinations of line/bar, scale/log
             for m in SUPPORTED_METRICS:
@@ -114,7 +112,11 @@ class Timeloop(NodeEvaluator):
             design_result = DesignResult()
             for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
                 layer_name = layer.get("name")
-                output = self._run_layer(self.runroot, layer, tl_files_path=None)
+                output, valid = self._run_layer(self.runroot, layer, tl_files_path=None)
+
+                if not valid:
+                    self.stats = {}
+                    return
 
                 layer_result = LayerResult()
                 layer_result.name = layer_name
@@ -131,11 +133,11 @@ class Timeloop(NodeEvaluator):
         with open(os.path.join(self.runroot, f"results_{self.accname}.pkl"), "wb") as f:
             pickle.dump(self.stats, f)
 
-    def _run_design(self, layers: dict, progress: bool, stats: NodeResult, i: int, design):
+    def _run_design(self, layers: dict, progress: bool, stats: NodeResult,  design: ArchitectureConfig, design_id: Optional[int] = None,):
         if self.adaptor and self.adaptor.tl_out_design_name:
             design_runroot = os.path.join(self.runroot, self.adaptor.tl_out_design_name)
         else:
-            design_runroot = os.path.join(self.runroot, "design"+str(i))
+            design_runroot = os.path.join(self.runroot, "design"+str(design_id))
         tl_design_dir = os.path.join(design_runroot, "tl_config")
         tl_design_dir_arch = os.path.join(design_runroot, "tl_config", "archs")
         tl_design_dir_constraints = os.path.join(design_runroot, "tl_config", "constraints")
@@ -150,7 +152,10 @@ class Timeloop(NodeEvaluator):
 
         for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
             layer_name = layer.get("name")
-            output = self._run_layer(design_runroot, layer, tl_files_path=tl_design_dir)
+            output, valid = self._run_layer(design_runroot, layer, tl_files_path=tl_design_dir)
+
+            if not valid:
+                return
 
             layer_result = LayerResult()
             layer_result.name = layer_name
@@ -203,7 +208,9 @@ class Timeloop(NodeEvaluator):
                 print('Did you remember to build timeloop and set up your environment properly?')
                 sys.exit(1)
 
-        timeloop_stats = self._parse_stats(dirname)
+        timeloop_stats, valid = self._parse_stats(dirname)
+        if not valid:
+            return timeloop_stats, valid
 
         # Workaround for batched matmul and grouped conv operations. We assume that the accelerator would 
         # just perform each batch/group separately. Since they then all have the same
@@ -217,7 +224,7 @@ class Timeloop(NodeEvaluator):
             if (groups := conv_params.get('groups')) and groups > 1: 
                 timeloop_stats["energy_mJ"] = timeloop_stats["energy_mJ"] * groups
                 timeloop_stats["latency_ms"] = timeloop_stats["latency_ms"] * groups
-        return timeloop_stats
+        return timeloop_stats, valid
 
 
     def _plot_all_of_metric(self, stats, metric: str):
@@ -349,6 +356,13 @@ class Timeloop(NodeEvaluator):
         return area
 
     def _parse_stats(self, dirname : str) -> dict:
+        # First check if the Timeloop run found any mappings and emitted the required file
+        valid = True
+        mapping_file = glob.glob( os.path.join(dirname, "*.map+stats.xml") )
+        if not mapping_file:
+            valid = False
+            return {}, valid
+
         output = parse_timeloop_stats(dirname)
         area = self._parse_area_stats(os.path.join(dirname, self.output_file_names[8])) # *.ART.yaml
 
@@ -356,4 +370,4 @@ class Timeloop(NodeEvaluator):
         output["latency_ms"] = output["cycles"] / self.freq * 1e3
         output["area_mm2"] = area / 1e6
 
-        return output
+        return output, valid

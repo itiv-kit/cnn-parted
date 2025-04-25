@@ -75,6 +75,12 @@ class DesignProblem(ElementwiseProblem):
         self.accelerator_configs = [ACCELERATOR_CONFIG_MAP[node["timeloop"]["accelerator"]] for node in node_components if "dse" in node]
         self.accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg] for cfg in self.accelerator_configs]
 
+        # LUT to prevent evaluating duplicates
+        self.dse_node_lut = {}
+        for node in node_components:
+            if "dse" in node:
+                self.dse_node_lut[node["id"]] = {}
+
         xl = np.array([node_constraint[0] for node_constraint in node_constraints]).flatten()
         xu = np.array([node_constraint[1] for node_constraint in node_constraints]).flatten()
 
@@ -88,23 +94,31 @@ class DesignProblem(ElementwiseProblem):
 
     def _eval_nodes(self, nodes, acc_adaptors=[]):
         node_stats = {}
+        cfgs = [acc_adaptor.config.to_genome() for acc_adaptor in acc_adaptors]
+        cfgs_already_in_lut = [self._cfg_in_lut(acc_adaptor.config.to_genome()) for acc_adaptor in acc_adaptors]
+
         node_threads = [
                 NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress, acc_adaptor=acc_adaptor, save_results=False)
                 for (component, acc_adaptor) in zip_longest(nodes, acc_adaptors)
             ]
 
-        for t in node_threads:
-            if not t.config.get("timeloop") and not t.config.get("zigzag"):
+        # A thread is instantiated for every accelerator, but only started if it is not present in the LUT
+        for (t, in_lut) in zip(node_threads, cfgs_already_in_lut):
+            if (not in_lut) and (not t.config.get("timeloop") and not t.config.get("zigzag")):
                 t.start()
 
-        for t in node_threads:
-            if t.config.get("timeloop") or t.config.get("zigzag"): # run them simply on main thread
+        for (t, in_lut) in zip(node_threads, cfgs_already_in_lut):
+            if (not in_lut) and (t.config.get("timeloop") or t.config.get("zigzag")): # run them simply on main thread
                 t.run()
             else:
                 t.join()
 
-        for node_thread in node_threads:
+        for (node_thread, cfg, in_lut) in zip(node_threads, cfgs, cfgs_already_in_lut):
             id,stats = node_thread.getStats()
+
+            # Overwrite empty stats if results are in LUT (stats will be an empty dict otherwise)
+            if in_lut:
+                stats = self.dse_node_lut[id][tuple(cfg)]
 
             instances = node_thread.config.get("instances", 1)
             if instances == 1:
@@ -157,26 +171,46 @@ class DesignProblem(ElementwiseProblem):
         return cost
         
 
+    def _cfg_in_lut(self, cfg):
+        if not isinstance(cfg, tuple):
+            cfg = tuple(cfg)
+
+        for id in self.dse_node_lut.keys():
+            if cfg in self.dse_node_lut[id]:
+                return True
+        return False
+
     def _evaluate(self, x: np.ndarray, out: dict, *args, **kwargs):
-        valid = True #TODO: Can this ever be invalid?
+        valid = True
 
         x = self._split_system_input(x)
         print(f"Evaluating system with: {x}")
         acc_cfgs = [cfg(*param) for (cfg, param) in zip(self.accelerator_configs, x, strict=True)]
         acc_adaptors = [adaptor({}) for adaptor in self.accelerator_adaptors] 
 
-        # Set the config we want to run
+        # Attach the config we want to run to the adaptor
         for (adaptor, cfg) in zip(acc_adaptors, acc_cfgs):
             design_string = "_".join(map(str, cfg.to_genome()))
             adaptor.tl_out_design_name = design_string
             adaptor.config = cfg
 
+        # For every DSE enabled node we call a simulator for evaluation
         dse_nodes = [node for node in self.node_components if "dse" in node]
         dse_node_stats = self._eval_nodes(dse_nodes, acc_adaptors)
 
+        # Check if the simulation failed for any of the nodes and save valid results to LUT
+        for (cfg, (id, data)) in zip(x, dse_node_stats.items()):
+            if not data["eval"]:
+                #simulation failed
+                valid = False
+                out["G"] = [1 for i in range(self.n_constr)]
+            else:
+                self.dse_node_lut[id][tuple(cfg)] = dse_node_stats[id]
+
         node_stats = self.fixed_node_stats | dse_node_stats
 
-        q_constr = {}
+        # Perform the partitioning to distribute the workload between the nodes
+        q_constr = {} #TODO 
         part_opt = self.partitioning_optimizer_cls(self.ga, self.num_pp, node_stats, self.link_components, self.show_progress)
         n_constr, n_var, sol = part_opt.optimize(q_constr, self.config)
 

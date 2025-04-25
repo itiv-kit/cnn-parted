@@ -20,6 +20,7 @@ class DesignPartitioningOptimizer(Optimizer):
         
         self.design_lut = self.design_optimizer.optimize()
 
+        breakpoint()
         self.system_results = self.part_optimizer.optimize(q_constr, conf)
 
     def _optimize_single(self):

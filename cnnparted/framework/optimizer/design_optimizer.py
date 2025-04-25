@@ -14,12 +14,11 @@ from framework.optimizer.design_problem import DesignProblem, ACCELERATOR_CONFIG
 # This modules does the following:
 #   - Instatiate GesignOptimizerGaProblem
 #   - use NSGA2 to optimize
-class DesignOptimizerGA(Optimizer):
+class DesignOptimizer(Optimizer):
 
     def __init__(self, node_components, problem, algorithm: str):
-        #TODO
-        self.num_gen = 8
-        self.pop_size = 8
+        self.num_gen = 4
+        self.pop_size = 4
 
         self.node_components = node_components
         
@@ -53,6 +52,10 @@ class DesignOptimizerGA(Optimizer):
 
         initial_x = self._gen_initial_x()
 
+        pymoo_algorithms = ["nsga2"]
+        pydeap_algorithms = []
+        rl_algorithms = []
+
         if self.algorithm == "nsga2":
             algorithm = NSGA2(
                 pop_size=self.pop_size,
@@ -65,12 +68,13 @@ class DesignOptimizerGA(Optimizer):
         else:
             raise RuntimeError("Invalid algorithm {self.algorithm}")
 
-        res = minimize(problem,
-                       algorithm,
-                       termination=get_termination('n_gen', self.num_gen),
-                       seed=1,
-                       save_history=True,
-                       verbose=False
-                       )
-        data = self._get_paretos_int(res)
+        if self.algorithm in pymoo_algorithms:
+            res = minimize(problem,
+                        algorithm,
+                        termination=get_termination('n_gen', self.num_gen),
+                        seed=1,
+                        save_history=True,
+                        verbose=False
+                        )
+            data = self._get_paretos_int(res)
         return data
