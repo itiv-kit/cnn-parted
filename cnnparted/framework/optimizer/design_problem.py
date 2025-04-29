@@ -1,3 +1,5 @@
+import os
+import pickle
 from itertools import zip_longest
 
 import numpy as np
@@ -56,6 +58,9 @@ class DesignProblem(ElementwiseProblem):
         self.num_pp = artifacts.config["num_pp"]
         self.config = artifacts.config
         self.q_constr = q_constr
+
+        self.dse_results_dir = os.path.join(self.work_dir, "dse_results")
+        os.makedirs(self.dse_results_dir, exist_ok=True)
 
         self.node_components = node_components
         self.link_components = link_components
@@ -184,9 +189,9 @@ class DesignProblem(ElementwiseProblem):
     def _evaluate(self, x: np.ndarray, out: dict, *args, **kwargs):
         valid = True
 
-        x = self._split_system_input(x)
-        print(f"Evaluating system with: {x}")
-        acc_cfgs = [cfg(*param) for (cfg, param) in zip(self.accelerator_configs, x, strict=True)]
+        xs = self._split_system_input(x)
+        print(f"Evaluating system with: {xs}")
+        acc_cfgs = [cfg(*param) for (cfg, param) in zip(self.accelerator_configs, xs, strict=True)]
         acc_adaptors = [adaptor({}) for adaptor in self.accelerator_adaptors] 
 
         # Attach the config we want to run to the adaptor
@@ -200,7 +205,7 @@ class DesignProblem(ElementwiseProblem):
         dse_node_stats = self._eval_nodes(dse_nodes, acc_adaptors)
 
         # Check if the simulation failed for any of the nodes and save valid results to LUT
-        for (cfg, (id, data)) in zip(x, dse_node_stats.items()):
+        for (cfg, (id, data)) in zip(xs, dse_node_stats.items()):
             if not data["eval"]:
                 #simulation failed
                 valid = False
@@ -213,6 +218,12 @@ class DesignProblem(ElementwiseProblem):
         # Perform the partitioning to distribute the workload between the nodes
         part_opt = self.partitioning_optimizer_cls(self.ga, self.num_pp, node_stats, self.link_components, self.show_progress)
         n_constr, n_var, sol = part_opt.optimize(self.q_constr, self.config)
+
+        # Dump the full results to a PKL file, PyMoo Problems can only return a single individual
+        pkl_file = "_".join( map(str, x.tolist()) ) + ".pkl"
+        out_file = os.path.join(self.dse_results_dir, pkl_file)
+        with open(out_file, "wb") as f:
+            pickle.dump(sol, f, protocol=pickle.HIGHEST_PROTOCOL)
 
         nondom = np.array(sol["nondom"])
         objectives = [data[n_constr+n_var+1:] for data in nondom]
