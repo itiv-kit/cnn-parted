@@ -1,5 +1,7 @@
+import os
 import numpy as np
 from pymoo.core.result import Result
+import matplotlib.pyplot as plt
 
 class Optimizer():
     def optimize(self):
@@ -54,3 +56,23 @@ class Optimizer():
             return is_efficient_mask
         else:
             return is_efficient
+
+    def _plot_history(self, res: Result, out_path: str):
+        best_results = []
+        all_results = []
+
+        if res.history:
+            for hist in res.history:
+                all_costs = [float(indiv.F) for indiv in hist.pop]
+                best_results.append(min(all_costs))
+                all_results.append(all_costs)
+
+        fig, ax = plt.subplots(dpi=1200)
+        ax.set_xlabel("Generation")
+        ax.set_ylabel("EDP")
+        for idx, res in enumerate(all_results): 
+            ax.scatter(np.full_like(res, idx, dtype=int).tolist(), res, color='b')
+        ax.plot(best_results, 'r+')
+        os.makedirs(os.path.join(out_path, "dse_results", "figures"), exist_ok=True)
+        out_file = os.path.join(out_path, "dse_results", "figures", "history.png")
+        fig.savefig(out_file)

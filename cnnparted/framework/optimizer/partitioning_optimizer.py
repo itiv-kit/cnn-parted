@@ -56,7 +56,7 @@ class PartitioningOptimizer(Optimizer):
 
         return params
 
-    def optimize(self, q_constr : dict, conf : dict) -> tuple[int, int, dict]:
+    def optimize(self, q_constr : dict, conf : dict, store_results: bool = True) -> tuple[int, int, dict]:
         fixed_sys = conf["general"].get('fixed_sys')
         acc_once = conf["general"].get('acc_once')
         opt = conf["general"].get('optimization')
@@ -100,8 +100,9 @@ class PartitioningOptimizer(Optimizer):
             all_paretos = np.unique(all_paretos, axis=0)
             non_optimals = np.unique(non_optimals, axis=0)
 
-            np.save(fname_p_npy, all_paretos)
-            np.save(fname_n_npy, non_optimals)
+            if store_results:
+                np.save(fname_p_npy, all_paretos)
+                np.save(fname_n_npy, non_optimals)
 
         self.results["nondom"] = []
         self.results["dom"] = list(np.abs(non_optimals))

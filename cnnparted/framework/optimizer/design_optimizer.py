@@ -1,9 +1,13 @@
 import os
+import pickle
 
 import numpy as np
 from numpy.random import default_rng
 
 from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.algorithms.soo.nonconvex.ga import GA
+from pymoo.algorithms.soo.nonconvex.pso import PSO
+
 from pymoo.operators.crossover.sbx import SBX
 from pymoo.operators.mutation.pm import PM
 from pymoo.operators.repair.rounding import RoundingRepair
@@ -11,26 +15,25 @@ from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 
 from framework.optimizer.optimizer import Optimizer
-from framework.optimizer.design_problem import DesignProblem, ACCELERATOR_CONFIG_MAP, N_VAR_ACC
 
 # This modules does the following:
 #   - Instatiate GesignOptimizerGaProblem
 #   - use NSGA2 to optimize
 class DesignOptimizer(Optimizer):
 
-    def __init__(self, node_components, problem, algorithm: str):
-        self.num_gen = 4
-        self.pop_size = 4
+    def __init__(self, node_components, problem, dse_config: dict, work_dir: str):
+        self.num_gen = dse_config["optimizer"]["num_gen"]
+        self.pop_size = dse_config["optimizer"]["pop_size"]
 
         self.node_components = node_components
         
         self.problem = problem
-        self.algorithm = algorithm
+        self.algorithm = dse_config["optimizer"]["algorithm"]
+        self.work_dir = work_dir
 
     def optimize(self):
 
         sorts = self._optimize_single()
-        breakpoint()
         return sorts
 
 
@@ -59,7 +62,7 @@ class DesignOptimizer(Optimizer):
 
         initial_x = self._gen_initial_x()
 
-        pymoo_algorithms = ["nsga2"]
+        pymoo_algorithms = ["nsga2", "pso"]
         pydeap_algorithms = []
         rl_algorithms = []
 
@@ -72,6 +75,12 @@ class DesignOptimizer(Optimizer):
                 mutation=PM(prob=0.9, eta=10, repair=RoundingRepair()),
                 eliminate_duplicates=True
             )
+        elif self.algorithm == "pso":
+            algorithm = PSO(
+                pop_size=self.pop_size,
+                sampling=initial_x,
+                repair=RoundingRepair()
+            )
         else:
             raise RuntimeError("Invalid algorithm {self.algorithm}")
 
@@ -83,5 +92,6 @@ class DesignOptimizer(Optimizer):
                         save_history=True,
                         verbose=False
                         )
+            self._plot_history(res, self.work_dir)
             data = self._get_paretos_int(res)
         return data

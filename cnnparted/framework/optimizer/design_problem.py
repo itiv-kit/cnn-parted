@@ -1,4 +1,5 @@
 import os
+import shutil
 import pickle
 from itertools import zip_longest
 
@@ -60,6 +61,8 @@ class DesignProblem(ElementwiseProblem):
         self.q_constr = q_constr
 
         self.dse_results_dir = os.path.join(self.work_dir, "dse_results")
+        if os.path.exists(self.dse_results_dir):
+            shutil.rmtree(self.dse_results_dir)
         os.makedirs(self.dse_results_dir, exist_ok=True)
 
         self.node_components = node_components
@@ -84,7 +87,9 @@ class DesignProblem(ElementwiseProblem):
         # Perform the evaluation for all nodes that not suject to DSE
         # to prevent simulating them multiple times
         fixed_nodes = [node for node in node_components if "dse" not in node]
+        print("Evaluating fixed nodes...")
         self.fixed_node_stats = self._eval_nodes(fixed_nodes)
+        print("Done evaluating fixed nodes!")
 
         num_platforms = sum([node.get("instances", 1) for node in self.node_components])
         part_opt_cfg = PartitioningOptConfig(num_platforms, self.num_pp, len(self.ga.schedules) )
@@ -100,8 +105,14 @@ class DesignProblem(ElementwiseProblem):
 
     def _eval_nodes(self, nodes, acc_adaptors=[]):
         node_stats = {}
-        cfgs = [acc_adaptor.config.to_genome() for acc_adaptor in acc_adaptors]
-        cfgs_already_in_lut = [self._cfg_in_lut(acc_adaptor.config.to_genome()) for acc_adaptor in acc_adaptors]
+        
+        # If a acc_adaptors have been passed this is a DSE run. Else, init with sane default values to not break zip operation
+        if not acc_adaptors:
+            cfgs = [[] for _ in nodes]
+            cfgs_already_in_lut = [False for _ in nodes]
+        else:
+            cfgs = [acc_adaptor.config.to_genome() for acc_adaptor in acc_adaptors]
+            cfgs_already_in_lut = [self._cfg_in_lut(acc_adaptor.config.to_genome()) for acc_adaptor in acc_adaptors]
 
         node_threads = [
                 NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress, acc_adaptor=acc_adaptor, save_results=False)
@@ -152,7 +163,7 @@ class DesignProblem(ElementwiseProblem):
 
     def _pareto_edp(self, comp_paretos : np.ndarray) -> np.ndarray:
         comp_paretos = np.delete(comp_paretos, np.s_[2:], axis=1) # only consider latency and energy
-        comp_paretos = np.hstack([comp_paretos, np.expand_dims(np.prod(comp_paretos, axis=1), 1)])
+        #comp_paretos = np.hstack([comp_paretos, np.expand_dims(np.prod(comp_paretos, axis=1), 1)])
         return comp_paretos
     
     def _pareto_ppa(self, comp_paretos : np.ndarray) -> np.ndarray:
@@ -162,9 +173,6 @@ class DesignProblem(ElementwiseProblem):
 
     def _calc_cost(self, objectives: np.ndarray) -> np.ndarray:
         match self.config["dse"]["optimization"]:
-            #case "ppa":
-            #    objectives_cut = self._pareto_ppa(objectives)
-            #    cost = objectives_cut
             case "edp":
                 objectives_cut = self._pareto_edp(objectives)
                 cost = np.prod(objectives_cut, axis=1)
@@ -190,7 +198,7 @@ class DesignProblem(ElementwiseProblem):
         valid = True
 
         xs = self._split_system_input(x)
-        print(f"Evaluating system with: {xs}")
+        #print(f"Evaluating system with: {xs}")
         acc_cfgs = [cfg(*param) for (cfg, param) in zip(self.accelerator_configs, xs, strict=True)]
         acc_adaptors = [adaptor({}) for adaptor in self.accelerator_adaptors] 
 
@@ -209,7 +217,9 @@ class DesignProblem(ElementwiseProblem):
             if not data["eval"]:
                 #simulation failed
                 valid = False
-                out["G"] = [1 for i in range(self.n_constr)]
+                out["G"] = np.array([1 for i in range(self.n_constr)])
+                out["F"] = 1000000000
+                return
             else:
                 self.dse_node_lut[id][tuple(cfg)] = dse_node_stats[id]
 
@@ -217,7 +227,7 @@ class DesignProblem(ElementwiseProblem):
 
         # Perform the partitioning to distribute the workload between the nodes
         part_opt = self.partitioning_optimizer_cls(self.ga, self.num_pp, node_stats, self.link_components, self.show_progress)
-        n_constr, n_var, sol = part_opt.optimize(self.q_constr, self.config)
+        n_constr, n_var, sol = part_opt.optimize(self.q_constr, self.config, store_results=False)
 
         # Dump the full results to a PKL file, PyMoo Problems can only return a single individual
         pkl_file = "_".join( map(str, x.tolist()) ) + ".pkl"
@@ -229,7 +239,7 @@ class DesignProblem(ElementwiseProblem):
         objectives = [data[n_constr+n_var+1:] for data in nondom]
 
         cost = self._calc_cost(objectives)
-        out["F"] = np.array(min(cost))
+        out["F"] = np.array(min(cost)).tolist()
 
         res = np.hstack( (nondom, np.reshape(cost,shape=(-1, 1)) ) )
         res = res[cost.argmin()] #TODO Workaround until I have a better solution for variable number of constraints
@@ -238,8 +248,5 @@ class DesignProblem(ElementwiseProblem):
             out["G"] = -res
         else:
             out["G"] = res
-
-
-
 
 
