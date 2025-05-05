@@ -93,5 +93,4 @@ class DesignOptimizer(Optimizer):
                         verbose=False
                         )
             self._plot_history(res, self.work_dir)
-            data = self._get_paretos_int(res)
-        return data
+        return res
