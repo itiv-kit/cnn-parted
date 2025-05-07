@@ -5,8 +5,8 @@ general:
   num_topos: 1
   num_jobs: 1
   optimization: all
-  work_dir: alexnet_coopt_test
-  keep_dir: True
+  work_dir: runs/alexnet_coopt_test
+  keep_dir: False
 
 workload:
   name: alexnet
@@ -20,9 +20,12 @@ pipeline:
     - DesignPartitioningOptimization
 
 dse:
-  problem: DesignProblem
-  algorithm: nsga2
   optimization: edp
+  optimizer:
+    algorithm: nsga2
+    num_gen: 10
+    pop_size: 10
+  problem: DesignProblem
 
 components:
   - id: 0
@@ -30,7 +33,6 @@ components:
     fault_rates: [0, 0] # input, weight
     max_memory_size: 600000000
     dse:
-      optimization: edap
       min_pe: [8, 8]
       max_pe: [32, 32]
       min_size_mem_shared: [512] #in byte
@@ -50,6 +52,7 @@ components:
         - edp
         timeout: 15000
         victory-condition: 500
+        search_size: 50
   - id: 1
     max_out_size: 20000000
     data_bit_width: 8
@@ -76,4 +79,5 @@ components:
         - edp
         timeout: 15000
         victory-condition: 500
+        search_size: 50
 
