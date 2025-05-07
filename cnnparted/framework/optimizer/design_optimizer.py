@@ -14,7 +14,10 @@ from pymoo.operators.repair.rounding import RoundingRepair
 from pymoo.optimize import minimize
 from pymoo.termination import get_termination
 
+from stable_baselines3 import PPO
+
 from framework.optimizer.optimizer import Optimizer
+from framework.optimizer.algorithms.rl_dse import DseEnv
 
 # This modules does the following:
 #   - Instatiate GesignOptimizerGaProblem
@@ -32,11 +35,11 @@ class DesignOptimizer(Optimizer):
         self.work_dir = work_dir
 
     def optimize(self):
-
         sorts = self._optimize_single()
         return sorts
 
-
+    def _rl_wrapper(self, problem, algorithm, seed):
+        ...
 
     def _gen_initial_x(self):
         samples = []
@@ -64,7 +67,7 @@ class DesignOptimizer(Optimizer):
 
         pymoo_algorithms = ["nsga2", "pso"]
         pydeap_algorithms = []
-        rl_algorithms = []
+        rl_algorithms = ["rl_ppo"]
 
         if self.algorithm == "nsga2":
             algorithm = NSGA2(
@@ -81,9 +84,13 @@ class DesignOptimizer(Optimizer):
                 sampling=initial_x,
                 repair=RoundingRepair()
             )
+        elif self.algorithm == "rl_ppo":
+            env = DseEnv(self.problem)
+            algorithm = PPO('MlpPolicy', env, verbose=1, normalize_advantage=True, ent_coef=0.1, vf_coef= 0.5, n_steps=2046, batch_size=64) 
         else:
             raise RuntimeError("Invalid algorithm {self.algorithm}")
 
+        # Select the corresponding wrapper to perform optimization
         if self.algorithm in pymoo_algorithms:
             res = minimize(problem,
                         algorithm,
@@ -93,4 +100,16 @@ class DesignOptimizer(Optimizer):
                         verbose=False
                         )
             self._plot_history(res, self.work_dir)
+
+        elif self.algorithm in rl_algorithms:
+            #rand_obs = algorithm.env.observation_space.sample()
+            #action_before_training = algorithm.predict(rand_obs, deterministic=True)
+            #algorithm.learn(total_timesteps=1000, progress_bar=False)
+            breakpoint()
+            env.step(env.action_space.sample())
+            breakpoint()
+
+            model_out_file = os.path.join(self.work_dir, "dse_results", "rl_model", "PPO_agent")               
+            algorithm.save(model_out_file)
+
         return res
