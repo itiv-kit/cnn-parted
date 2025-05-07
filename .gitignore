@@ -5,6 +5,7 @@
 
 #run outputs
 onnx_models/
+runs/
 *run/
 *.csv
 *.npy
