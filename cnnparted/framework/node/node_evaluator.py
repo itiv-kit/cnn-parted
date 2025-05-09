@@ -24,7 +24,13 @@ class LayerResult:
                 {"latency": self.latency,
                  "area": self.area,
                  "energy": self.energy}}
-
+    
+    def __repr__(self):
+        return str(self.to_dict())
+    
+    def __str__(self):
+        return str(self.to_dict())
+    
 class DesignResult:
     """
     Information about the execution of a full network and the specific architecture it is run on.
@@ -37,6 +43,22 @@ class DesignResult:
     def __init__(self, architecture: dict = {}):
         self.layers: list[LayerResult] = []
         self.architecture: dict = architecture
+
+    @classmethod
+    def from_dict(cls, design_dict: dict):
+        data = design_dict.values()
+        arch = design_dict["arch_config"]
+        layers = design_dict["layers"]
+        design_res = cls()
+        design_res.architecture = arch
+        for name, layer in layers.items():
+            l = LayerResult()
+            l.name = name
+            l.area = layer["area"]
+            l.energy  = layer["energy"]
+            l.latency = layer["latency"]
+            design_res.add_layer(l)
+        return design_res 
 
     def add_layer(self, results: LayerResult):
         self.layers.append(results)
@@ -62,6 +84,30 @@ class NodeResult:
     """
     def __init__(self):
         self.designs: list[DesignResult] = []
+        self.bits: int = 8
+        self.fault_rates = [0.0, 0.0]
+        self.faulty_bits = 0
+        self.type = "tl"
+
+    @classmethod
+    def from_dict(cls, node_dict: dict):
+        node_res = cls()
+        node_res.bits = node_dict.get("bits")
+        node_res.fault_rates = node_dict.get("fault_rates")
+        node_res.faulty_bits = node_dict.get("faulty_bits")
+        node_res.type = node_dict.get("type")
+        for design, eval in node_dict["eval"].items():
+            des = DesignResult()
+            des.architecture = eval["arch_config"]
+            for name, layer in eval["layers"].items():
+                l = LayerResult()
+                l.name = name
+                l.area = layer["area"]
+                l.energy = layer["energy"]
+                l.latency = layer["latency"]
+                des.add_layer(l)
+            node_res.add_design(des)
+        return node_res
 
     def add_design(self, result: DesignResult):
         self.designs.append(result)
@@ -74,7 +120,13 @@ class NodeResult:
     
 class SystemResult:
     def __init__(self):
-        self.platforms = {}
+        self.platforms: dict[int, NodeResult] = {}
+
+    def __getitem__(self, item: int) -> NodeResult:
+        return self.platforms[item]
+
+    def register_platform(self, id: int):
+        self.platforms[id] = NodeResult()
 
     def add_platform(self, id: int, result: NodeResult):
         self.platforms[id] = result
@@ -90,7 +142,13 @@ class SystemResult:
 
     def get_design_tags(self, platform_id: int):
         return list(self.platforms[platform_id]["eval"].keys())
-
+    
+    def to_dict(self) -> dict:
+        stats = {}
+        for id, node_res in self.platforms.items():
+            stats[id] = node_res.to_dict()
+        return stats
+    
 
 class NodeEvaluator(ABC):
     """

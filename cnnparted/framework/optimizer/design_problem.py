@@ -21,6 +21,8 @@ from framework.dse.gemmini_adaptor import GemminiConfig, GemminiArchitectureAdap
 
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 
+from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, SystemResult
+
 N_VAR_ACC = {
     "gemmini_like": 4,
     "eyeriss_like": 6,
@@ -69,6 +71,11 @@ class DesignProblem(ElementwiseProblem):
         self.link_components = link_components
         self.node_constraints = node_constraints
         self.num_platforms = len(node_components)
+        
+        # Initialize variable to gather all results for later export
+        self.system_results = SystemResult()
+        for node in self.node_components:
+            self.system_results.register_platform(node["id"])
 
         self.n_var_per_node = [N_VAR_ACC[node["timeloop"]["accelerator"]]  for node in node_components if "dse" in node]
 
@@ -87,8 +94,10 @@ class DesignProblem(ElementwiseProblem):
         # Perform the evaluation for all nodes that not suject to DSE
         # to prevent simulating them multiple times
         fixed_nodes = [node for node in node_components if "dse" not in node]
-        print("Evaluating fixed nodes...")
         self.fixed_node_stats = self._eval_nodes(fixed_nodes)
+        for id, node_stats in self.fixed_node_stats.items():
+            node_results = NodeResult.from_dict(node_stats)
+            self.system_results.add_platform(id, node_results)
         print("Done evaluating fixed nodes!")
 
         num_platforms = sum([node.get("instances", 1) for node in self.node_components])
@@ -222,6 +231,8 @@ class DesignProblem(ElementwiseProblem):
                 return
             else:
                 self.dse_node_lut[id][tuple(cfg)] = dse_node_stats[id]
+                design_result = DesignResult.from_dict(data["eval"]["design_0"])
+                self.system_results[id].add_design(design_result)
 
         node_stats = self.fixed_node_stats | dse_node_stats
 
@@ -242,7 +253,7 @@ class DesignProblem(ElementwiseProblem):
         out["F"] = np.array(min(cost)).tolist()
 
         res = np.hstack( (nondom, np.reshape(cost,shape=(-1, 1)) ) )
-        res = res[cost.argmin()] #TODO Workaround until I have a better solution for variable number of constraints
+        res = res[cost.argmin()]
 
         if valid:
             out["G"] = -res
