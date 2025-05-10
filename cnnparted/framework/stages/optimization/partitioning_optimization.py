@@ -23,7 +23,7 @@ class PartitioningOptimization(Stage):
     def _take_artifacts(self, artifacts: Artifacts):
         self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
         self.num_pp = artifacts.config["num_pp"]
-        self.node_stats = artifacts.get_stage_result(NodeEvaluation, "node_stats")
+        self.node_stats = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
         self.link_components = artifacts.get_stage_result(SystemParser, "links")
         self.show_progress = artifacts.args["p"]
         self.config = artifacts.config
