@@ -1,4 +1,5 @@
 import os
+import csv
 from abc import ABC
 
 class LayerResult:
@@ -88,6 +89,7 @@ class NodeResult:
         self.fault_rates = [0.0, 0.0]
         self.faulty_bits = 0
         self.type = "tl"
+        self.accelerator_name = ""
 
     @classmethod
     def from_dict(cls, node_dict: dict):
@@ -117,6 +119,57 @@ class NodeResult:
         for i, design in enumerate(self.designs):
             stats[f"design_{i}"] = design.to_dict()
         return stats
+
+    def write_csv(self, out_path: str):
+        with open(out_path, "w", newline="") as f:
+            writer = csv.writer(f, delimiter=";")
+            header = [
+                "No.",
+                "Design Tag",
+                "Layer",
+                "Latency [ms]",
+                "Energy [mJ]",
+                'Area [mm2]'
+            ]
+            writer.writerow(header)
+            row_num = 1
+            for (tag, design_result) in enumerate(self.designs):
+                for layer in design_result.layers:
+                    row = [
+                        row_num,
+                        "design_" + str(tag),
+                        layer.name,
+                        str(layer.latency),
+                        str(layer.energy),
+                        str(layer.area),
+                    ]
+                    writer.writerow(row)
+    
+    @classmethod
+    def from_csv(cls, in_path: str):
+        node_res = cls()
+
+        design_result = DesignResult()
+        with open(in_path, 'r', newline="") as f:
+            reader = csv.DictReader(f, delimiter=";")
+            current_design_tag = "design_0"
+            for row in reader:
+                if row["Design Tag"] != current_design_tag:
+                    node_res.add_design(design_result)
+                    design_result = DesignResult()
+                    current_design_tag = row["Design Tag"]
+                
+                layer_res = LayerResult()
+                layer_res.name = row["Layer"]
+                layer_res.latency = float(row['Latency [ms]'])
+                layer_res.energy = float(row['Energy [mJ]'])
+                layer_res.area = float(row['Area [mm2]'])
+                design_result.add_layer(layer_res)
+
+        # Add results for the final design
+        node_res.add_design(design_result)
+        return node_res
+
     
 class SystemResult:
     def __init__(self):
@@ -148,6 +201,13 @@ class SystemResult:
         for id, node_res in self.platforms.items():
             stats[id] = node_res.to_dict()
         return stats
+    
+    def to_csv(self, out_path, runname: str = ""):
+        for id, node_res in self.platforms.items():
+            accelerator_name= ""
+            file_str = str(id) + "_" + accelerator_name + "tl_layers.csv"
+            file_path = os.path.join(out_path,  file_str)
+            node_res.write_csv(file_path)
     
 
 class NodeEvaluator(ABC):
