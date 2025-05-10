@@ -115,9 +115,15 @@ class NodeResult:
         self.designs.append(result)
 
     def to_dict(self) -> dict:
-        stats = {}
+        stats = {"bits": self.bits,
+                 "eval": {},
+                 "fault_rates": self.fault_rates,
+                 "faulty_bits": self.faulty_bits,
+                 "type": self.type,
+                 }
+
         for i, design in enumerate(self.designs):
-            stats[f"design_{i}"] = design.to_dict()
+            stats["eval"][f"design_{i}"] = design.to_dict()
         return stats
 
     def write_csv(self, out_path: str):
@@ -144,6 +150,7 @@ class NodeResult:
                         str(layer.area),
                     ]
                     writer.writerow(row)
+                    row_num += 1
     
     @classmethod
     def from_csv(cls, in_path: str):
