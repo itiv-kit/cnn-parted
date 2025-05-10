@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+import itertools
 import argparse
 from genericpath import isfile
 import tempfile
@@ -23,12 +24,22 @@ def parse_pipeline(config):
     package = importlib.import_module("framework.stages")
     for stage in stages:
         stage_class = getattr(package, stage)
-        enabled_stages.append(stage_class.__name__)
+        enabled_stages.append(stage_class)
         
         # Check if required stages are available
         if stage_class in STAGE_DEPENDENCIES:
+            dependencies_exist = False
             deps = STAGE_DEPENDENCIES[stage_class]
-            if not set(deps).issubset(enabled_stages):
+            deps_tup = [(dep, ) if not isinstance(dep, tuple) else dep for dep in deps]
+            deps_prod = itertools.product(*deps_tup)
+            # Some stages can take either one or more stages as requirements, these are denoted by a tuple
+            # E.g. deps = ['GraphAnalysis', ('NodeEvaluation', 'DesignPartitioningOptimization'), 'SystemParser']
+            # Construct the cartesian product of these
+            for deps_candidate in deps_prod:
+                if set(deps_candidate).issubset(enabled_stages):
+                    dependencies_exist = True
+                    break
+            if not dependencies_exist:
                 raise RuntimeError(f"Dependencies for \"{stage_class.__name__}\" not found. Required are {deps} to be instantiated previously.")
             
         stage_classes.append(stage_class())

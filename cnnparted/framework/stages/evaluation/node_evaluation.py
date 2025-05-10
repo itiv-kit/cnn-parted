@@ -6,7 +6,7 @@ from framework.stages.stage_base import Stage, register_required_stage
 from framework.node.node_thread import NodeThread
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
-@register_required_stage("GraphAnalysis", "SystemParser")
+@register_required_stage(GraphAnalysis, SystemParser)
 class NodeEvaluation(Stage):
     def __init__(self):
         super().__init__()
@@ -17,7 +17,8 @@ class NodeEvaluation(Stage):
 
         node_stats = {}
         node_threads = [
-                NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress)
+                NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress, 
+                           dse_system_config=self.dse_system_config)
                 for component in self.node_components
             ]
 
@@ -50,6 +51,7 @@ class NodeEvaluation(Stage):
         self._update_artifacts(artifacts, node_stats)
     
     def _take_artifacts(self, artifacts: Artifacts):
+        self.dse_system_config = artifacts.config.get("dse", {})
         self.work_dir = artifacts.config["general"]["work_dir"]
         self.run_name = artifacts.args["run_name"]
         self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")

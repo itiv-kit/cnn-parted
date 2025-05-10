@@ -11,7 +11,7 @@ from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 import numpy as np
 
-@register_required_stage("GraphAnalysis", "NodeEvaluation", "PartitioningOptimization", "WorkloadParser")
+@register_required_stage(GraphAnalysis, NodeEvaluation, PartitioningOptimization, WorkloadParser)
 class AccuracyEvaluation(Stage):
     def __init__(self):
         super().__init__()

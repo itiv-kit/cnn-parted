@@ -9,7 +9,7 @@ from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
-@register_required_stage("PartitioningOptimization", "GraphAnalysis")
+@register_required_stage(PartitioningOptimization, GraphAnalysis)
 class ExportPartitionResults(Stage):
     def __init__(self):
         super().__init__()
