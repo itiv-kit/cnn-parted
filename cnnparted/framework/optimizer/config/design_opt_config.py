@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 
 from framework.optimizer.config.optimizer_config import OptimizerConfig
@@ -25,8 +26,10 @@ class DesignOptConfig(OptimizerConfig):
         self.part_opt_cfg = part_opt_cfg
         self.n_constr = part_opt_cfg.x_len + part_opt_cfg.g_len + part_opt_cfg.f_len + 1 + 1
 
-        self.xl = np.array([node_constraint[0] for node_constraint in node_constraints]).flatten()
-        self.xu = np.array([node_constraint[1] for node_constraint in node_constraints]).flatten()
+        xl_tmp = [node_constraint[0] for node_constraint in node_constraints]
+        xu_tmp = [node_constraint[1] for node_constraint in node_constraints]
+        self.xl = np.array(list(itertools.chain(*xl_tmp))).flatten()
+        self.xu = np.array(list(itertools.chain(*xu_tmp))).flatten()
 
         # Aliases
         self.x_len = self.n_var
