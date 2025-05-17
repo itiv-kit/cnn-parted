@@ -42,13 +42,13 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
 
     @classmethod
     def from_genome(cls, genome: list):
-        pe_dims = genome[0:1]
-        pe_mems = genome[2:5]
-        local_mems = genome[5:6]
+        pe_dims = genome[0:2]
+        local_mems = genome[2]
+        pe_mems = genome[3:6]
         eyeriss = cls(2, 2, 1024, 128, 128, 128)
         eyeriss.pe_array_dim = pe_dims
         eyeriss.pe_array_mem = pe_mems
-        eyeriss.local_mems = local_mems
+        eyeriss.local_mems = local_mems*8
         return eyeriss
 
     def to_genome(self) -> list:
@@ -82,9 +82,11 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
         return [self.glb_depth]
 
     @local_mems.setter
-    def local_mems(self, glb_depth):
-        self.glb_depth = glb_depth
-        self.glb_size = int(glb_depth * self.word_bits * self.glb_block_size // (8*1024))
+    def local_mems(self, glb_size):
+        self.glb_size = glb_size
+        self.glb_depth = (glb_size*8*1024) // (self.word_bits*self.glb_block_size) 
+        #self.glb_depth = glb_depth
+        #self.glb_size = int(glb_depth * self.word_bits * self.glb_block_size // (8*1024))
 
 
 class EyerissArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):

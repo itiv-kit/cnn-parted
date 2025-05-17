@@ -48,13 +48,13 @@ class SimbaConfig(ArchitectureConfig, GenomeInterface):
 
     @classmethod
     def from_genome(cls, genome: list):
-        pe_dims = genome[0:1]
-        pe_mems = genome[2:5]
-        local_mems = genome[5]
+        pe_dims = genome[0:2]
+        local_mems = genome[2]
+        pe_mems = genome[3:6]
         simba = cls(1, 1, 1, 1, 1, 1)
-        simba.pe_array_dim = pe_dims
+        simba.pe_array_dim = [pe_dim*4 for pe_dim in pe_dims]
         simba.pe_array_mem = pe_mems
-        simba.local_mems = local_mems
+        simba.local_mems = local_mems*16
         return simba
 
     def to_genome(self) -> list:
@@ -87,9 +87,11 @@ class SimbaConfig(ArchitectureConfig, GenomeInterface):
         return [self.globalbuf_depth]
 
     @local_mems.setter
-    def local_mems(self, mem_depths):
-        self.globalbuf_depth = mem_depths
-        self.globalbuf_size = int(self.globalbuf_depth * self.word_bits * self.block_size_global_buf // (8*1024))
+    def local_mems(self, mem_sizes):
+        self.globalbuf_size = mem_sizes
+        self.globalbuf_depth = (mem_sizes*8*1024) // (self.word_bits * self.block_size_global_buf)
+        #self.globalbuf_depth = mem_depths
+        #self.globalbuf_size = int(self.globalbuf_depth * self.word_bits * self.block_size_global_buf // (8*1024))
 
 
 class SimbaArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):

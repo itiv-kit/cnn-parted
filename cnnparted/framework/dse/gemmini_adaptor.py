@@ -69,7 +69,8 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
         #instatiate dummy module, then set correct values
         gemmini = cls(1, 1, 1, enable_checks=False) 
         gemmini.pe_array_dim = pe_dims
-        gemmini.local_mems = [spad_depth, acc_depth]
+        gemmini.local_mems = [spad_depth*8, acc_depth*8]
+        return gemmini
 
     def to_genome(self) -> list:
         return self.pe_array_dim + self.pe_array_mem + self.local_mems
@@ -82,7 +83,8 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
     def pe_array_dim(self, dims):
         self.mesh_dim = dims[0]
         self.mesh_dim_y = dims[0]
-        self.mesh_dim_x = dims[1]
+        self.mesh_dim_x = dims[0]
+        self.dim = dims[0]
     
     @property
     def pe_array_mem(self):
@@ -98,11 +100,18 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
         return [self.spad_rows, self.acc_rows]
 
     @local_mems.setter
-    def local_mems(self, mem_depths):
-        self.spad_rows = mem_depths[0]
-        self.spad_size = int(self.spad_rows * self.data_w * self.mesh_dim_x // (8*1024))
-        self.acc_rows = mem_depths[1]
-        self.acc_size = int(self.acc_rows * self.acc_w * self.mesh_dim_x // (8*1024))
+    def local_mems(self, mem_sizes):
+        spad_size = mem_sizes[0]
+        acc_size = mem_sizes[1]
+        self.spad_size = spad_size
+        self.spad_depth = (spad_size*8*1024) // (self.mesh_dim_x*self.data_w)
+        self.acc_size = acc_size
+        self.acc_depth = (acc_size*8*1024) // (self.mesh_dim_x*self.acc_w)
+
+        #self.spad_rows = mem_depths[0]
+        #self.spad_size = int(self.spad_rows * self.data_w * self.mesh_dim_x // (8*1024))
+        #self.acc_rows = mem_depths[1]
+        #self.acc_size = int(self.acc_rows * self.acc_w * self.mesh_dim_x // (8*1024))
     
 
 
