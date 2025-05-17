@@ -63,8 +63,8 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
     @classmethod
     def from_genome(cls, genome: list):
         pe_dims = genome[0:1]
-        spad_depth = genome[2]
-        acc_depth = genome[3]
+        spad_depth = genome[1]
+        acc_depth = genome[2]
 
         #instatiate dummy module, then set correct values
         gemmini = cls(1, 1, 1, enable_checks=False) 
