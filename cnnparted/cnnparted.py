@@ -73,6 +73,16 @@ if __name__ == '__main__':
                         '--clear-partitioning',
                         action='store_true',
                         help="Use to clean results of partitioning evaluation")
+    parser.add_argument('--top-k',
+                        type=int,
+                        required=False,
+                        help="Overwrite top_k parameter of DSE config")
+    parser.add_argument("--no-log",
+                        action = "store_true",
+                        help="Skip writing timing log of the individual steps")
+    parser.add_argument("--prune-strict",
+                        action = "store_true",
+                        help="Overwrite strict-mode parameter of DSE config")
     args = parser.parse_args()
 
     if args.cuda:
@@ -88,6 +98,14 @@ if __name__ == '__main__':
     # Setup working directory based on configuration file
     conf_helper = ConfigHelper(args.conf_file_path)
     config = conf_helper.get_config()
+
+    if args.top_k is not None:
+        if "dse" in config:
+            config["dse"]["top_k"] = args.top_k
+    if args.prune_strict is not None:
+        if "dse" in config:
+            config["dse"]["prune_strict"] = args.prune_strict
+
     main_conf = config.get('general')
     if work_dir_str := main_conf.get('work_dir'):
         work_dir = work_dir_str
@@ -118,15 +136,20 @@ if __name__ == '__main__':
     # Determine stages that should be run
     stages = parse_pipeline(config)
         
-    step_runtime = [timer()]
+    step_runtime = [timer()] #TODO: Remove this
 
     # Setup a class to keep track of results of stages
     artifacts = Artifacts(config, vars(args), device, step_runtime)
     artifacts.config["work_dir"] = work_dir
 
+    local_runtime = []
+
     try:
         for stage in stages:
+            start_time = timer()
             stage.run(artifacts)
+            end_time = timer()
+            local_runtime.append(end_time - start_time)
             step_runtime.append(timer())
     except KeyboardInterrupt:
         print("Interrupted")
@@ -135,4 +158,10 @@ if __name__ == '__main__':
         except SystemExit:
             os._exit(130)
 
+    # write log with runtimes of individual steps
+    if not args.no_log:
+        log_file = os.path.join(work_dir, artifacts.args["run_name"] + "_timing" + ".log" )
+        with open(log_file, "w") as f:
+            for stage, time in zip(stages, local_runtime):
+                f.write("Step " + type(stage).__name__ + ":" + str(time) + " s\n" )
 
