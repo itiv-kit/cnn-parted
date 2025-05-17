@@ -43,13 +43,14 @@ class DesignPartitioningOptimization(Stage):
 
         top_k = self.config["dse"].get("top_k", -1)
         metric = self.config["dse"].get("optimizattion", "edap")
+        strict_mode = self.config["dse"].get("prune_strict", False)
         for id, stats in node_stats.items():
-            pruned_stats = self._prune_accelerator_designs(stats["eval"], top_k=top_k, metric=metric, is_dse=True)
+            pruned_stats = self._prune_accelerator_designs(stats["eval"], top_k=top_k, metric=metric, is_dse=True, strict=strict_mode)
             node_stats[id]["eval"] = pruned_stats
 
         self._update_artifacts(artifacts, node_stats, design_problem.design_opt_config)
 
-    def _prune_accelerator_designs(self, stats: dict[str, dict], top_k: int, metric: str, is_dse: bool):
+    def _prune_accelerator_designs(self, stats: dict[str, dict], top_k: int, metric: str, is_dse: bool, strict=False):
         # If there are less designs than top_k simply return the given list
         if len(stats) <= top_k or not is_dse or top_k == -1:
             return stats
@@ -78,27 +79,23 @@ class DesignPartitioningOptimization(Stage):
             latency_per_design.append(latency_per_layer)
             area_per_design.append([layer["area"]])
 
-        metric_per_design = calc_metric(np.array(energy_per_design), np.array(latency_per_design), np.array(area_per_design), metric, reduction=False)
+        metric_per_design = calc_metric(np.array(energy_per_design), np.array(latency_per_design), np.array(area_per_design), metric, reduction=strict)
 
         # Now, we need to find the top_k designs per layer
         design_candidates = []
-        for col in metric_per_design.T:
-            metric_for_layer = col.copy()
-            metric_for_layer = np.argsort(metric_for_layer)
+        if not strict:
+            for col in metric_per_design.T:
+                metric_for_layer = col.copy()
+                metric_for_layer = np.argsort(metric_for_layer)
 
-            for i in metric_for_layer[0:top_k]:
+                for i in metric_for_layer[0:top_k]:
+                    design_candidates.append(f"design_{i}")
+        else:
+            metric_per_design_sort = np.argsort(metric_per_design.flatten())
+            for i in metric_per_design_sort[0:top_k]:
                 design_candidates.append(f"design_{i}")
 
         design_candidates = np.unique(design_candidates)
-
-        # Remove all designs that have not been found to be suitable design candidates
-        #pruned_stats = []
-        #for design in stats:
-        #    if design["tag"] in design_candidates:
-        #       tag = design["tag"]
-        #       layers = design["layers"]
-        #       #arch_config = design["arch_config"]
-        #       pruned_stats.append({"tag": tag, "layers": layers})
 
         pruned_stats = {tag: results for tag, results in stats.items() if tag in design_candidates}
 
