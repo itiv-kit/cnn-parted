@@ -104,9 +104,12 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
         spad_size = mem_sizes[0]
         acc_size = mem_sizes[1]
         self.spad_size = spad_size
-        self.spad_depth = (spad_size*8*1024) // (self.mesh_dim_x*self.data_w)
-        self.acc_size = acc_size
-        self.acc_depth = (acc_size*8*1024) // (self.mesh_dim_x*self.acc_w)
+        self.spad_rows = (self.spad_size*8*1024) // (self.mesh_dim_x*self.data_w)
+        self.spad_bank_rows = self.spad_rows // self.spad_banks
+
+        self.acc_size = acc_size // self.mesh_dim_x #one instance per column of the array
+        self.acc_rows = (self.acc_size*8*1024) // (self.acc_w)
+        self.acc_bank_rows = self.acc_rows // self.acc_banks
 
         #self.spad_rows = mem_depths[0]
         #self.spad_size = int(self.spad_rows * self.data_w * self.mesh_dim_x // (8*1024))
