@@ -23,7 +23,8 @@ class GraphAnalyzer:
         self.conv_layers = self.get_conv2d_layers()
 
     def find_schedules(self, num_topos : int) -> list:
-        fname_csv = os.path.join(self.work_dir, self.run_name + "_" + "schedules.csv")
+        #fname_csv = os.path.join(self.work_dir, self.run_name + "_" + "schedules.csv")
+        fname_csv = os.path.join(self.work_dir, "schedules.csv")
         if os.path.isfile(fname_csv):
             df = pd.read_csv(fname_csv, header=None, index_col=0)
             self.schedules = df.values.tolist()
