@@ -24,9 +24,9 @@ from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, SystemResult
 
 N_VAR_ACC = {
-    "gemmini_like": 4,
+    "gemmini_like": 6,
     "eyeriss_like": 6,
-    "simba_like": 7
+    "simba_like": 6
 }
 
 ACCELERATOR_CONFIG_MAP = {
@@ -53,7 +53,8 @@ class DesignProblem(ElementwiseProblem):
                  node_constraints, 
                  q_constr: dict,
                  artifacts: Artifacts,
-                 partitioning_optimizer_cls):
+                 partitioning_optimizer_cls,
+                 system_dse_config):
         self.work_dir = artifacts.config["general"]["work_dir"]
         self.run_name = artifacts.args["run_name"]
         self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
@@ -61,6 +62,7 @@ class DesignProblem(ElementwiseProblem):
         self.num_pp = artifacts.config["num_pp"]
         self.config = artifacts.config
         self.q_constr = q_constr
+        self.system_dse_config = system_dse_config
 
         self.dse_results_dir = os.path.join(self.work_dir, "dse_results")
         if os.path.exists(self.dse_results_dir):
@@ -77,10 +79,10 @@ class DesignProblem(ElementwiseProblem):
         for node in self.node_components:
             self.system_results.register_platform(node["id"])
 
-        self.n_var_per_node = [N_VAR_ACC[node["timeloop"]["accelerator"]]  for node in node_components if "dse" in node]
+        self.n_var_per_node = [N_VAR_ACC[node["evaluation"]["accelerator"]]  for node in node_components if "dse" in node]
 
         # We return all values of the partitioning algorithm as "constraint"
-        self.accelerator_configs = [ACCELERATOR_CONFIG_MAP[node["timeloop"]["accelerator"]] for node in node_components if "dse" in node]
+        self.accelerator_configs = [ACCELERATOR_CONFIG_MAP[node["evaluation"]["accelerator"]] for node in node_components if "dse" in node]
         self.accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg] for cfg in self.accelerator_configs]
 
         # LUT to prevent evaluating duplicates
@@ -109,6 +111,9 @@ class DesignProblem(ElementwiseProblem):
                                                  self.config["dse"])
 
         n_var, n_obj, n_constr, xl, xu = self.design_opt_config.get()
+        # TODO: Revert after evaluation for paper
+        n_constr = len(self.dse_node_lut) * 3
+        n_obj = len(self.dse_node_lut)
         super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=xl, xu=xu)
 
 
@@ -124,17 +129,18 @@ class DesignProblem(ElementwiseProblem):
             cfgs_already_in_lut = [self._cfg_in_lut(acc_adaptor.config.to_genome()) for acc_adaptor in acc_adaptors]
 
         node_threads = [
-                NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress, acc_adaptor=acc_adaptor, save_results=False)
+                NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, 
+                           self.show_progress, acc_adaptor=acc_adaptor, save_results=False,
+                           dse_system_config=self.system_dse_config)
                 for (component, acc_adaptor) in zip_longest(nodes, acc_adaptors)
             ]
-
         # A thread is instantiated for every accelerator, but only started if it is not present in the LUT
         for (t, in_lut) in zip(node_threads, cfgs_already_in_lut):
-            if (not in_lut) and (not t.config.get("timeloop") and not t.config.get("zigzag")):
+            if (not in_lut) and (t.config["evaluation"]["simulator"] not in ["timeloop", "zigzag"]):
                 t.start()
 
         for (t, in_lut) in zip(node_threads, cfgs_already_in_lut):
-            if (not in_lut) and (t.config.get("timeloop") or t.config.get("zigzag")): # run them simply on main thread
+            if (not in_lut) and (t.config["evaluation"]["simulator"] in ["timeloop", "zigzag"]): # run them simply on main thread
                 t.run()
             else:
                 t.join()
@@ -207,8 +213,7 @@ class DesignProblem(ElementwiseProblem):
         valid = True
 
         xs = self._split_system_input(x)
-        #print(f"Evaluating system with: {xs}")
-        acc_cfgs = [cfg(*param) for (cfg, param) in zip(self.accelerator_configs, xs, strict=True)]
+        acc_cfgs = [cfg.from_genome(param) for (cfg, param) in zip(self.accelerator_configs, xs, strict=True)]
         acc_adaptors = [adaptor({}) for adaptor in self.accelerator_adaptors] 
 
         # Attach the config we want to run to the adaptor
@@ -221,43 +226,81 @@ class DesignProblem(ElementwiseProblem):
         dse_nodes = [node for node in self.node_components if "dse" in node]
         dse_node_stats = self._eval_nodes(dse_nodes, acc_adaptors)
 
+        # Prevent adding duplicates to the SystemResult, only unique designs should be found there
+        cfgs_already_in_lut = [self._cfg_in_lut(acc_adaptor.config.to_genome()) for acc_adaptor in acc_adaptors]
+
         # Check if the simulation failed for any of the nodes and save valid results to LUT
-        for (cfg, (id, data)) in zip(xs, dse_node_stats.items()):
-            if not data["eval"]:
+        cost = []
+        constraints = []
+        for (cfg, in_lut, (id, stats)) in zip(xs, cfgs_already_in_lut, dse_node_stats.items()):
+            if not stats["eval"]:
                 #simulation failed
                 valid = False
-                out["G"] = np.array([1 for i in range(self.n_constr)])
-                out["F"] = 1000000000
-                return
+                cost.append(float(1000000000))
+                constraints.append([1,1,1])
+                #out["G"] = 1 #np.array([1 for i in range(self.n_constr)])
+                #out["F"] = 1000000000
             else:
                 self.dse_node_lut[id][tuple(cfg)] = dse_node_stats[id]
-                design_result = DesignResult.from_dict(data["eval"]["design_0"])
-                self.system_results[id].add_design(design_result)
+                design_result = DesignResult.from_dict(stats["eval"]["design_0"])
+
+                if not in_lut:
+                    self.system_results[id].add_design(design_result)
+
+                layers_data = stats["eval"]["design_0"]["layers"]
+                energy = [data["energy"] for (key, data) in layers_data.items()]
+                latency = [data["latency"] for (key, data) in layers_data.items()]
+                area = [data["area"] for (key, data) in layers_data.items()][0]
+                energy_total = sum(energy)
+                latency_total = sum(latency)
+
+                cost.append(float(energy_total*latency_total))
+                constraints.append([-energy_total , -latency_total, -area])
 
         node_stats = self.fixed_node_stats | dse_node_stats
 
-        # Perform the partitioning to distribute the workload between the nodes
-        part_opt = self.partitioning_optimizer_cls(self.ga, self.num_pp, node_stats, self.link_components, self.show_progress)
-        n_constr, n_var, sol = part_opt.optimize(self.q_constr, self.config, store_results=False)
+        #cost = []
+        #for id, stats in dse_node_stats.items():
+        #    layers_data = stats["eval"]["design_0"]["layers"]
+        #    energy = [data["energy"] for (key, data) in layers_data.items()]
+        #    latency = [data["latency"] for (key, data) in layers_data.items()]
+        #    energy_total = sum(energy)
+        #    latency_total = sum(latency)
+        #    cost.append(energy_total*latency_total)
 
-        # Dump the full results to a PKL file, PyMoo Problems can only return a single individual
-        pkl_file = "_".join( map(str, x.tolist()) ) + ".pkl"
-        out_file = os.path.join(self.dse_results_dir, pkl_file)
-        with open(out_file, "wb") as f:
-            pickle.dump(sol, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-        nondom = np.array(sol["nondom"])
-        objectives = [data[n_constr+n_var+1:] for data in nondom]
-
-        cost = self._calc_cost(objectives)
-        out["F"] = np.array(min(cost)).tolist()
-
-        res = np.hstack( (nondom, np.reshape(cost,shape=(-1, 1)) ) )
-        res = res[cost.argmin()]
-
-        if valid:
-            out["G"] = -res
+        if self.n_obj == 1:
+            out["F"] = cost[0]
         else:
-            out["G"] = res
+            out["F"] = cost
+        
+        if self.n_constr == 1:
+            out["G"] = constraints[0]
+        else:
+            out["G"] = np.array(constraints).flatten().tolist()
+
+        # Perform the partitioning to distribute the workload between the nodes
+        #part_opt = self.partitioning_optimizer_cls(self.ga, self.num_pp, node_stats, self.link_components, self.show_progress)
+        #n_constr, n_var, sol = part_opt.optimize(self.q_constr, self.config, store_results=False)
+
+        ## Dump the full results to a PKL file, PyMoo Problems can only return a single individual
+        #pkl_file = "_".join( map(str, x.tolist()) ) + ".pkl"
+        #out_file = os.path.join(self.dse_results_dir, pkl_file)
+        #with open(out_file, "wb") as f:
+        #    pickle.dump(sol, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+        #nondom = np.array(sol["nondom"])
+        #objectives = [data[n_constr+n_var+1:] for data in nondom]
+
+        #cost = self._calc_cost(objectives)
+        ##out["F"] = np.array(min(cost)).tolist()
+
+        #res = np.hstack( (nondom, np.reshape(cost,shape=(-1, 1)) ) )
+        #res = res[cost.argmin()]
+
+        #if valid:
+        #    #out["G"] = -res
+        #    out["G"] = -1
+        #else:
+        #    out["G"] = 1#res
 
 

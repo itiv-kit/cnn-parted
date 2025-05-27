@@ -24,7 +24,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
     fname_result = "mnsim_layers.csv"
 
     def __init__ (self, in_config : dict, input_size : list) -> None:
-        mnsim_config = in_config["mnsim"]
+        mnsim_config = in_config["evaluation"]
         self.SimConfig = ROOT_DIR + mnsim_config.get('conf_path')
         self.config = mnsim_config
         self.input_size = input_size

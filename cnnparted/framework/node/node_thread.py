@@ -22,16 +22,15 @@ class NodeThread(ModuleThreadInterface):
         self.stats["faulty_bits"] = self.config.get("faulty_bits") or 0
 
         # Select which simulator should be used
-        #if config := self.config.get("timeloop"):
-        if "timeloop" in self.config:
+        if "timeloop" == self.config["evaluation"]["simulator"]:
             layers = self.ga.get_timeloop_layers()
-            simulator = Timeloop(self.config)
+            simulator = Timeloop(self.config, self.dse_system_config)
             self.stats["type"] = 'tl'
-        elif "mnsim" in self.config:
+        elif "mnsim" in self.config["evaluation"]["simulator"]:
             layers = self.ga.get_mnsim_layers()
             simulator = MNSIMInterface(self.config, self.ga.input_size)
             self.stats["type"] = 'mnsim'
-        elif "zigzag" in self.config:
+        elif "zigzag" in self.config["evaluation"]["simulator"]:
             layers = []
             simulator = Zigzag(self.config)
             self.stats["type"] = 'zigzag'
@@ -41,12 +40,16 @@ class NodeThread(ModuleThreadInterface):
             self.stats["type"] = 'generic'
 
         # Check if design is DSE enabled
-        # TODO Cleanup for new flow
-        dse_cfg = self.config.get("dse", {"optimization": "edap",
-                                     "top_k": 2000})
-        is_dse = "dse" in self.config
-        metric = dse_cfg.get("optimization", "edap")
-        top_k = int(dse_cfg.get("top_k", 2))
+        is_dse = False
+        top_k = -1
+        metric = "edp"
+        if "dse" in self.config:
+            # Check if dse_system_config is empty. If it is, raise an error here
+            assert self.dse_system_config, "Cannot specify DSE for a node if it is not also configured on system level"
+        
+            is_dse = True
+            metric = self.dse_system_config.get("optimization", "edp")
+            top_k = int(self.dse_system_config.get("top_k", -1))
 
         # Check if some previous results are available
         fname_csv = simulator.set_workdir(self.work_dir, self.runname, self.id)
@@ -58,13 +61,13 @@ class NodeThread(ModuleThreadInterface):
 
         # Perform the actual evaluation
         if self.acc_adaptor is None:
-            simulator.run(layers)
+            node_result = simulator.run(layers)
         else:
-            simulator.run_from_adaptor(layers, self.acc_adaptor)
+            node_result = simulator.run_from_adaptor(layers, self.acc_adaptor)
 
         if self.save_results:
-            self._write_layer_csv(fname_csv, simulator.stats)
-        pruned_stats = self._prune_accelerator_designs(simulator.stats, top_k, metric, is_dse)
+            self._write_layer_csv(fname_csv, simulator.stats["eval"])
+        pruned_stats = self._prune_accelerator_designs(simulator.stats["eval"], top_k, metric, is_dse)
         self.stats["eval"] = pruned_stats
 
     def _run_generic(self, config: dict) -> None:
@@ -110,7 +113,7 @@ class NodeThread(ModuleThreadInterface):
 
         layers = self.ga.get_timeloop_layers()
         tl = Timeloop(config)
-        tl.run(layers, self.progress)
+        node_result = tl.run(layers, self.progress)
 
         self._write_layer_csv(fname_csv, tl.stats)
 
@@ -118,11 +121,12 @@ class NodeThread(ModuleThreadInterface):
 
         # Prune accelerator design space
         self.stats["eval"] = pruned_stats
+        self.node_results = node_result
 
 
     def _prune_accelerator_designs(self, stats: dict[str, dict], top_k: int, metric: str, is_dse: bool):
         # If there are less designs than top_k simply return the given list
-        if len(stats) <= top_k or not is_dse:
+        if len(stats) <= top_k or not is_dse or top_k == -1:
             return stats
 
         # The metric_per_design array has this structure, with

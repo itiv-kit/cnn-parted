@@ -16,7 +16,7 @@ from tools.zigzag.zigzag.cost_model.cost_model import CostModelEvaluation
 class Zigzag(NodeEvaluator):
     def __init__(self, in_config: dict) -> None:
         super().__init__()
-        self.config = in_config["zigzag"]
+        self.config = in_config["evaluation"]
         self.fname_result = "zigzag_layers.csv"
 
         self.configs_dir = pathlib.Path(ROOT_DIR, "tools", "zigzag", "zigzag", "inputs")

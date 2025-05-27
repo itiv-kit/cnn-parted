@@ -23,11 +23,11 @@ class NodeEvaluation(Stage):
             ]
 
         for t in node_threads:
-            if not t.config.get("timeloop") and not t.config.get("zigzag"):
+            if t.config["evaluation"]["simulator"] not in ["timeloop", "zigzag"]:
                 t.start()
 
         for t in node_threads:
-            if t.config.get("timeloop") or t.config.get("zigzag"): # run them simply on main thread
+            if t.config["evaluation"]["simulator"] in ["timeloop", "zigzag"]: # run them simply on main thread
                 t.run()
             else:
                 t.join()
