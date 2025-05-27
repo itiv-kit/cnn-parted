@@ -5,7 +5,7 @@ from framework.stages.stage_base import Stage, register_required_stage
 from framework.optimizer.robustness_optimizer import RobustnessOptimizer
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
-@register_required_stage("GraphAnalysis", "WorkloadParser")
+@register_required_stage(GraphAnalysis, WorkloadParser)
 class RobustnessOptimization(Stage):
     def __init__(self):
         super().__init__()
