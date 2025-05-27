@@ -15,10 +15,10 @@ class LayerResult:
     """
     def __init__(self):
         self.name: str
-        self.area: float
+        self.area: float  #must be in mm2
         self.latency: float #must be in ms
         self.energy: float #must be in mJ
-        self.cycles: int #must be in mm2
+        self.cycles: int 
 
     def to_dict(self) -> dict :
         return {self.name: 
@@ -74,6 +74,18 @@ class DesignResult:
             data = list(ld.values())[0]
             res["layers"][name] = data
         return res
+
+    @property
+    def area(self):
+        return self.layers[0].area
+    
+    @property
+    def total_latency(self):
+        return sum([layer.latency for layer in self.layers])
+    
+    @property
+    def total_energy(self):
+        return sum([layer.energy for layer in self.layers])
 
 class NodeResult:
     """
@@ -227,7 +239,7 @@ class NodeEvaluator(ABC):
     def set_workdir(self, work_dir: str, runname: str, id: int):
         self.workdir = work_dir
         self.runroot = os.path.join(work_dir, "system_evaluation", str(id)+"_"+self.config["accelerator"])
-        fname_csv = os.path.join(work_dir, runname + "_" + str(id) + "_" + self.config["accelerator"] + "_" + self.fname_result)
+        fname_csv = os.path.join(work_dir, str(id) + "_" + self.config["accelerator"] + "_" + self.fname_result)
         return fname_csv
 
     def run(self, layers: list):
