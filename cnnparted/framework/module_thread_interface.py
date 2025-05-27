@@ -5,12 +5,15 @@ from framework.graph_analyzer import GraphAnalyzer
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 
 class ModuleThreadInterface(threading.Thread):
-    def __init__(self, id : str, ga : GraphAnalyzer, config : dict, work_dir: str, runname : str, progress : bool, 
-                 acc_adaptor = None, save_results = True) -> None:
+    def __init__(self, id : str, ga : GraphAnalyzer, node_config : dict, 
+                 work_dir: str, runname : str, progress : bool, 
+                 acc_adaptor = None, save_results = True,
+                 dse_system_config = {}) -> None:
         threading.Thread.__init__(self)
         self.id = id
         self.ga = ga
-        self.config = config
+        self.dse_system_config = dse_system_config
+        self.config = node_config
         self.work_dir = work_dir
         self.runname = runname
         self.progress = progress
