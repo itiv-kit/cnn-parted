@@ -221,10 +221,6 @@ class PartitioningProblem(ElementwiseProblem):
 
 
     def _evaluate_old(self, x : np.ndarray, out : dict, *args, **kwargs) -> None:
-        if self.my_num_iteration % 50 == 0:
-            print("Generation: ", self.my_cur_gen)
-            self.my_cur_gen += 1
-        self.my_num_iteration += 1
 
         valid = True
         num_real_pp = 0

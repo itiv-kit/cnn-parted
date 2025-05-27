@@ -57,11 +57,12 @@ class PartitioningOptimizer(Optimizer):
         return params
 
     def optimize(self, q_constr : dict, conf : dict, store_results: bool = True) -> tuple[int, int, dict]:
-        fixed_sys = conf["general"].get('fixed_sys')
-        acc_once = conf["general"].get('acc_once')
+        fixed_sys = conf["general"].get('fixed_sys', False)
+        acc_once = conf["general"].get('acc_once', False)
         opt = conf["general"].get('optimization')
         num_jobs = conf["general"].get('num_jobs')
         system_constraints = ConfigHelper.get_system_constraints(conf)
+        max_num_platforms = conf["general"].get("max_num_platforms", None)
 
         all_paretos = []
         non_optimals = []
@@ -75,7 +76,7 @@ class PartitioningOptimizer(Optimizer):
             non_optimals = np.load(fname_n_npy)
         else:
             sorts = Parallel(n_jobs=num_jobs, backend="multiprocessing")(
-                delayed(self._optimize_single)(self.num_pp, s, q_constr, fixed_sys, acc_once, system_constraints)
+                delayed(self._optimize_single)(self.num_pp, s, q_constr, fixed_sys, acc_once, max_num_platforms, system_constraints)
                 for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
             )
 
@@ -155,9 +156,13 @@ class PartitioningOptimizer(Optimizer):
                 samples.append(pps + accs.tolist())
         return np.array(samples)
 
-    def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool, system_constraints: dict) -> list:
-        problem = PartitioningProblem(num_pp, self.node_stats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, 
-                                      self.layer_params, self.link_confs, system_constraints, self.optimizer_cfg)
+    def _optimize_single(self, num_pp : int, schedule : list, 
+            q_constr : dict, fixed_sys : bool, acc_once : bool, max_num_platforms : int,
+            system_constraints: dict) -> list:
+
+        problem = PartitioningProblem(num_pp, self.node_stats, schedule, 
+                    q_constr, fixed_sys, acc_once, max_num_platforms, self.layer_dict, 
+                    self.layer_params, self.link_confs, system_constraints, self.optimizer_cfg)
 
         num_layers = len(schedule)
         initial_x = self._gen_initial_x(num_layers, num_pp, fixed_sys, acc_once)
