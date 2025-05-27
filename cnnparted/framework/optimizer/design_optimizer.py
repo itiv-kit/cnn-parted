@@ -18,6 +18,7 @@ from stable_baselines3 import PPO
 
 from framework.optimizer.optimizer import Optimizer
 from framework.optimizer.algorithms.rl_dse import DseEnv
+from framework.node.node_evaluator import SystemResult, NodeResult, DesignResult, LayerResult
 
 # This modules does the following:
 #   - Instatiate GesignOptimizerGaProblem
@@ -29,12 +30,14 @@ class DesignOptimizer(Optimizer):
         self.pop_size = dse_config["optimizer"]["pop_size"]
 
         self.node_components = node_components
+        self.node_ids = [node["id"] for node in self.node_components]
+        self.accelerator_names = [node["evaluation"]["accelerator"] for node in self.node_components]
         
         self.problem = problem
         self.algorithm = dse_config["optimizer"]["algorithm"]
         self.work_dir = work_dir
 
-    def optimize(self):
+    def optimize(self, q_constr, conf):
         sorts = self._optimize_single()
         return sorts
 
@@ -44,10 +47,11 @@ class DesignOptimizer(Optimizer):
     def _gen_initial_x(self):
         samples = []
         rng = default_rng()
+        dse_nodes = [node for node in self.node_components if "dse" in node]
 
         while(len(samples) < self.pop_size):
-            for (node, constr) in zip(self.node_components, self.problem.node_constraints):
-                sys_cfg = []
+            sys_cfg = []
+            for (node, constr) in zip(dse_nodes, self.problem.node_constraints):
                 if "dse" in node:
                     xl, xu = constr[0], constr[1]
                     acc_cfg = rng.integers(low=xl, high=[x+1 for x in xu])
@@ -89,6 +93,24 @@ class DesignOptimizer(Optimizer):
             algorithm = PPO('MlpPolicy', env, verbose=1, normalize_advantage=True, ent_coef=0.1, vf_coef= 0.5, n_steps=2046, batch_size=64) 
         else:
             raise RuntimeError("Invalid algorithm {self.algorithm}")
+        
+        # TODO This is a very hacky way to go about it, needs proper integration of
+        #   - support only partial evaluation if only one node is present
+        #   - handling of instances
+        node_eval_stats = SystemResult()
+        for node_id, accelerator_name in zip(self.node_ids, self.accelerator_names):
+            file_str = str(node_id) + "_" + accelerator_name + "_tl_layers.csv"
+            file_str = os.path.join(self.work_dir, file_str)
+            file_str_alt = str(node_id) + "_tl_layers.csv"
+            file_str_alt = os.path.join(self.work_dir, file_str_alt)
+            if os.path.isfile(file_str):
+                node_eval_stats.add_platform(NodeResult.from_csv(file_str))
+            elif os.path.isfile(file_str_alt):
+                node_eval_stats.add_platform(node_id, NodeResult.from_csv(file_str_alt))
+
+        # For now, continue if everything is present
+        if node_eval_stats.get_num_platforms() == len(self.node_components):
+            return node_eval_stats.to_dict()
 
         # Select the corresponding wrapper to perform optimization
         if self.algorithm in pymoo_algorithms:
@@ -99,6 +121,9 @@ class DesignOptimizer(Optimizer):
                         save_history=True,
                         verbose=False
                         )
+            
+            node_eval_stats = problem.system_results.to_dict()
+            problem.system_results.to_csv(self.work_dir)
             self._plot_history(res, self.work_dir)
 
         elif self.algorithm in rl_algorithms:
@@ -112,4 +137,5 @@ class DesignOptimizer(Optimizer):
             model_out_file = os.path.join(self.work_dir, "dse_results", "rl_model", "PPO_agent")               
             algorithm.save(model_out_file)
 
-        return res
+        # TODO: Return type currently does not consider res of minimize call
+        return node_eval_stats
