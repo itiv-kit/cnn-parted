@@ -26,6 +26,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
     def __init__ (self, in_config : dict, input_size : list) -> None:
         mnsim_config = in_config["evaluation"]
         self.SimConfig = ROOT_DIR + mnsim_config.get('conf_path')
+        self.node_config = in_config
         self.config = mnsim_config
         self.input_size = input_size
 
@@ -222,7 +223,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
         mod_l.calculate_model_latency()
         area_list=mod_a.area_output_CNNParted()
         design = DesignResult(self.hardware_config)
-        node_res = NodeResult()
+        node_res = NodeResult(self.node_config)
         for idx, layer in enumerate(struct_file):
             input_l=mod_l.NetStruct[idx][0][0]['Inputindex']
             final_idx=list(map(int, input_l))

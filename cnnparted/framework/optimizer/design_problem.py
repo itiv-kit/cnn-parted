@@ -76,7 +76,7 @@ class DesignProblem(ElementwiseProblem):
         # Initialize variable to gather all results for later export
         self.system_results = SystemResult()
         for node in self.node_components:
-            self.system_results.register_platform(node["id"])
+            self.system_results.register_platform(node["id"], node_config=node)
 
         self.n_var_per_node = [N_VAR_ACC[node["evaluation"]["accelerator"]]  for node in node_components if "dse" in node]
 
@@ -96,8 +96,8 @@ class DesignProblem(ElementwiseProblem):
         # to prevent simulating them multiple times
         fixed_nodes = [node for node in node_components if "dse" not in node]
         self.fixed_node_stats = self._eval_nodes(fixed_nodes)
-        for id, node_stats in self.fixed_node_stats.items():
-            node_results = NodeResult.from_dict(node_stats)
+        for ((id, node_stats), node_config)  in zip(self.fixed_node_stats.items(), fixed_nodes):
+            node_results = NodeResult.from_dict(node_stats, node_config)
             self.system_results.add_platform(id, node_results)
         print("Done evaluating fixed nodes!")
 

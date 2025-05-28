@@ -95,17 +95,19 @@ class NodeResult:
     Attributes:
         designs:         Results for each design point
     """
-    def __init__(self):
+    def __init__(self, config: dict):
         self.designs: list[DesignResult] = []
-        self.bits: int = 8
-        self.fault_rates = [0.0, 0.0]
-        self.faulty_bits = 0
-        self.type = "tl"
-        self.accelerator_name = ""
+        self.bits = config["bits"]
+        self.fault_rates = config.get("fault_rates", [0.0, 0.0])
+        self.faulty_bits = config.get("faulty_bits", 0)
+        self.max_memory_size = config["max_memory_size"]
+        self.type = config["evaluation"]["simulator"]
+        self.accelerator_name = config["evaluation"]["accelerator"]
+
 
     @classmethod
-    def from_dict(cls, node_dict: dict):
-        node_res = cls()
+    def from_dict(cls, node_dict: dict, node_config: dict):
+        node_res = cls(node_config)
         node_res.bits = node_dict.get("bits")
         node_res.fault_rates = node_dict.get("fault_rates")
         node_res.faulty_bits = node_dict.get("faulty_bits")
@@ -197,8 +199,8 @@ class SystemResult:
     def __getitem__(self, item: int) -> NodeResult:
         return self.platforms[item]
 
-    def register_platform(self, id: int):
-        self.platforms[id] = NodeResult()
+    def register_platform(self, id: int, node_config):
+        self.platforms[id] = NodeResult(node_config)
 
     def add_platform(self, id: int, result: NodeResult):
         self.platforms[id] = result
@@ -223,8 +225,7 @@ class SystemResult:
     
     def to_csv(self, out_path, runname: str = ""):
         for id, node_res in self.platforms.items():
-            accelerator_name= ""
-            file_str = str(id) + "_" + accelerator_name + "tl_layers.csv"
+            file_str = str(id) + "_" + node_res.accelerator_name + "_tl_layers.csv"
             file_path = os.path.join(out_path,  file_str)
             node_res.to_csv(file_path)
     

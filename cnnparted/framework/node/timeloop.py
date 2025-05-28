@@ -58,6 +58,7 @@ class Timeloop(NodeEvaluator):
                                     flatt_arch_name ]
 
         self.dse_system_config = dse_system_config
+        self.node_config = in_config
         tl_config = in_config["evaluation"]
         self.dse_node_config = in_config.get("dse", None)
 
@@ -90,8 +91,7 @@ class Timeloop(NodeEvaluator):
 
     def run_from_adaptor(self, layers : dict, adaptor: TimeloopInterface, progress : bool = False) -> NodeResult:
         self.adaptor = adaptor
-        node_result = NodeResult()
-        node_result.accelerator_name = self.accname
+        node_result = NodeResult(self.node_config)
 
         self._run_design(layers, progress, node_result, adaptor.config)
 
@@ -100,7 +100,7 @@ class Timeloop(NodeEvaluator):
         return node_result
 
     def run(self, layers : dict, progress : bool = False) -> NodeResult:
-        node_result = NodeResult()
+        node_result = NodeResult(self.node_config)
         node_result.accelerator_name = self.accname
 
         if self.adaptor is not None:

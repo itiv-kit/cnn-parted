@@ -16,6 +16,7 @@ from tools.zigzag.zigzag.cost_model.cost_model import CostModelEvaluation
 class Zigzag(NodeEvaluator):
     def __init__(self, in_config: dict) -> None:
         super().__init__()
+        self.node_config = in_config
         self.config = in_config["evaluation"]
         self.fname_result = "zigzag_layers.csv"
 
@@ -73,7 +74,7 @@ class Zigzag(NodeEvaluator):
                                                                 opt=self.optimization)
 
         # Get layerwise results                                                
-        node_result = NodeResult()
+        node_result = NodeResult(self.node_config)
         design_result = DesignResult()
         layers = cmes[0][1]
         for layer in layers:
