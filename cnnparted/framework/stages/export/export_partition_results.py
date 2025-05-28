@@ -29,7 +29,6 @@ class ExportPartitionResults(Stage):
         self.optimizer_cfg: PartitioningOptConfig = artifacts.get_stage_result(PartitioningOptimization, "optimizer_cfg")
         self.n_constr = self.optimizer_cfg.n_constr
         self.n_var = self.optimizer_cfg.n_var_part
-        self.runtime = artifacts.step_runtime
 
         sol = artifacts.get_stage_result(PartitioningOptimization, "sol")
         if not "accuracy" in self.config:
@@ -103,14 +102,6 @@ class ExportPartitionResults(Stage):
     def _write_log_file(self) -> int:
         log_file = os.path.join(self.work_dir, self.run_name + ".log")
         f = open(log_file, "a")
-
-        # Runtime of each step
-        step_runtimes = self.runtime
-        step_runtimes = [x - step_runtimes[0] for x in step_runtimes[1:]]
-        t_prev = 0
-        for i, x in enumerate(step_runtimes, 1):
-            f.write("Step " + str(i) +  ": " + str(x - t_prev) + ' s \n')
-            t_prev = x
 
         # Number of solutions found
         num_pp_schemes = 0

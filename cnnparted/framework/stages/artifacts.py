@@ -4,11 +4,10 @@ from framework.stages.stage_base import Stage
 
 
 class Artifacts:
-    def __init__(self, config: dict, args: dict, device: str, step_runtime: list):
+    def __init__(self, config: dict, args: dict, device: str):
         self.config = config
         self.args = args
         self.device = device
-        self.step_runtime = step_runtime
 
         self.parse_stages()
     

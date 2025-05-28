@@ -136,10 +136,8 @@ if __name__ == '__main__':
     # Determine stages that should be run
     stages = parse_pipeline(config)
         
-    step_runtime = [timer()] #TODO: Remove this
-
     # Setup a class to keep track of results of stages
-    artifacts = Artifacts(config, vars(args), device, step_runtime)
+    artifacts = Artifacts(config, vars(args), device)
     artifacts.config["work_dir"] = work_dir
 
     local_runtime = []
@@ -150,7 +148,6 @@ if __name__ == '__main__':
             stage.run(artifacts)
             end_time = timer()
             local_runtime.append(end_time - start_time)
-            step_runtime.append(timer())
     except KeyboardInterrupt:
         print("Interrupted")
         try:
