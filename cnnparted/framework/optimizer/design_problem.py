@@ -46,7 +46,6 @@ ACCELERATOR_ADAPTOR_MAP = {
 #   - Get a system vector x which is a system design
 #   - Parse the vector into a specific system w.r.t. number of PEs, memory sizes etc.
 #   - Evaluate the system with the NodeEvaluator, unless the results are already present in a LUT
-#   - After that, call the PartitioningOptimizer with the system that was just evaluated
 class DesignProblem(ElementwiseProblem):
     def __init__(self, 
                  node_components, link_components,
@@ -111,9 +110,6 @@ class DesignProblem(ElementwiseProblem):
                                                  self.config["dse"])
 
         n_var, n_obj, n_constr, xl, xu = self.design_opt_config.get()
-        # TODO: Revert after evaluation for paper
-        n_constr = len(self.dse_node_lut) * 3
-        n_obj = len(self.dse_node_lut)
         super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=xl, xu=xu)
 
 
