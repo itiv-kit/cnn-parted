@@ -28,11 +28,12 @@ class DesignPartitioningOptimization(Stage):
         cfg_helper = ConfigHelper(self.config)
         node_components, link_components = cfg_helper.get_system_components()
         node_constraints = cfg_helper.get_node_constraints()
+        node_mem_steps = cfg_helper.get_node_mem_steps()
 
         # Instatiate the problem and optimizers
         # TODO: Design Problem and Optimizer selected by config
         design_problem = DesignProblem(node_components, link_components, 
-                                       node_constraints, 
+                                       node_constraints, node_mem_steps,
                                        self.q_constr,
                                        artifacts, PartitioningOptimizer,
                                        self.config["dse"])

@@ -54,14 +54,29 @@ class ConfigHelper:
             xu = []
             if "dse" in node:
                 dse_cfg = node["dse"]
+                mem_steps = dse_cfg["step_mem_shared"]
+
                 xl += dse_cfg["min_pe"]
-                xl += dse_cfg["min_size_mem_shared"]
+                min_size_mem_shared = dse_cfg["min_size_mem_shared"]
+                xl += [min_size // step for (min_size, step) in zip(min_size_mem_shared, mem_steps)]
                 xl += dse_cfg["min_size_mem_local"]
+
                 xu += dse_cfg["max_pe"]
-                xu += dse_cfg["max_size_mem_shared"]
+                max_size_mem_shared = dse_cfg["max_size_mem_shared"]
+                xu += [max_size // step for (max_size, step) in zip(max_size_mem_shared, mem_steps)]
                 xu += dse_cfg["max_size_mem_local"]
+
                 constr_sys += [[xl, xu]]
+
         return constr_sys
+
+    def get_node_mem_steps(self):
+        node_components, _ = self.get_system_components()
+        step_sizes = []
+        for node in node_components:
+            if "dse" in node:
+                step_sizes.append(node["dse"]["step_mem_shared"])
+        return step_sizes
 
     def print_all_keys(self,data_dict, indent=''):
         for key, value in data_dict.items():

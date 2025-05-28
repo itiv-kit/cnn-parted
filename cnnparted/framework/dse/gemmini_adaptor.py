@@ -2,7 +2,8 @@ import copy
 from math import log2
 import pathlib
 from cv2 import gemm
-import yaml
+from ruamel.yaml import YAML
+yaml = YAML(typ="rt")
 import numpy as np
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
@@ -61,7 +62,7 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
         return cfg
 
     @classmethod
-    def from_genome(cls, genome: list):
+    def from_genome(cls, genome: list[int], mem_step: list[int]):
         pe_dims = genome[0:1]
         spad_depth = genome[1]
         acc_depth = genome[2]
@@ -69,7 +70,7 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
         #instatiate dummy module, then set correct values
         gemmini = cls(1, 1, 1, enable_checks=False) 
         gemmini.pe_array_dim = pe_dims
-        gemmini.local_mems = [spad_depth*8, acc_depth*8]
+        gemmini.local_mems = [spad_depth*mem_step[0], acc_depth*mem_step[1]]
         return gemmini
 
     def to_genome(self) -> list:
@@ -223,7 +224,7 @@ class GemminiArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
         base_map_constraints = pathlib.Path(self.tl_in_configs_dir, "constraints", "gemmini_like_map_constraints.yaml")
         constraints_out = pathlib.Path(outdir, "constraints", "gemmini_like_map_constraints.yaml")
         with open(base_map_constraints, "r") as f:
-            constraints = yaml.safe_load(f)
+            constraints = yaml.load(f)
 
         accumulator = constraints["mapspace_constraints"][5] #TODO Magic numbers        
         scratchpad  = constraints["mapspace_constraints"][7] #TODO Magic numbers        
@@ -232,8 +233,7 @@ class GemminiArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
         scratchpad["factors"] = f"R=1 S=1 P=1 Q=1 N=1 C=1 M<={config.dim}"
 
         with open(constraints_out, "w") as f:
-            y = yaml.safe_dump(constraints, sort_keys=False)
-            f.write(y)
+            y = yaml.dump(constraints, f)
 
 
     def write_tl_arch(self, config=None, outdir=None):
@@ -244,7 +244,7 @@ class GemminiArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
         base_arch = pathlib.Path(self.tl_in_configs_dir, "archs", "gemmini_like.yaml")
         arch_out = pathlib.Path(outdir, "archs", "gemmini_like.yaml")
         with open(base_arch, "r") as f:
-            arch = yaml.safe_load(f)
+            arch = yaml.load(f)
 
         chip = arch["architecture"]["subtree"][0]["subtree"][0]
         scratchpad = chip["local"][0]
@@ -277,8 +277,8 @@ class GemminiArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
         #macc["attributes"]["word-bits"] = config.data_w
 
         with open(arch_out, "w") as f:
-            y = yaml.safe_dump(arch, sort_keys=False)
-            f.write(y)
+            y = yaml.dump(arch, f)
+            #f.write(y)
 
 
     def run_tl_from_config(self, config: GemminiConfig, outdir=None):

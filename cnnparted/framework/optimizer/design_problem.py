@@ -49,7 +49,7 @@ ACCELERATOR_ADAPTOR_MAP = {
 class DesignProblem(ElementwiseProblem):
     def __init__(self, 
                  node_components, link_components,
-                 node_constraints, 
+                 node_constraints, node_mem_steps,
                  q_constr: dict,
                  artifacts: Artifacts,
                  partitioning_optimizer_cls,
@@ -72,6 +72,7 @@ class DesignProblem(ElementwiseProblem):
         self.link_components = link_components
         self.node_constraints = node_constraints
         self.num_platforms = len(node_components)
+        self.node_mem_steps = node_mem_steps
         
         # Initialize variable to gather all results for later export
         self.system_results = SystemResult()
@@ -209,7 +210,7 @@ class DesignProblem(ElementwiseProblem):
         valid = True
 
         xs = self._split_system_input(x)
-        acc_cfgs = [cfg.from_genome(param) for (cfg, param) in zip(self.accelerator_configs, xs, strict=True)]
+        acc_cfgs = [cfg.from_genome(param, mem_step) for (cfg, param, mem_step) in zip(self.accelerator_configs, xs, self.node_mem_steps, strict=True)]
         acc_adaptors = [adaptor({}) for adaptor in self.accelerator_adaptors] 
 
         # Attach the config we want to run to the adaptor
@@ -234,8 +235,6 @@ class DesignProblem(ElementwiseProblem):
                 valid = False
                 cost.append(float(1000000000))
                 constraints.append([1,1,1])
-                #out["G"] = 1 #np.array([1 for i in range(self.n_constr)])
-                #out["F"] = 1000000000
             else:
                 self.dse_node_lut[id][tuple(cfg)] = dse_node_stats[id]
                 design_result = DesignResult.from_dict(stats["eval"]["design_0"])

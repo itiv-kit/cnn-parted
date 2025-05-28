@@ -1,7 +1,8 @@
 import copy
 from math import sqrt
 import pathlib
-import yaml
+from ruamel.yaml import YAML
+yaml = YAML(typ="rt")
 import shutil
 import numpy as np
 
@@ -41,14 +42,14 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
         return cfg
 
     @classmethod
-    def from_genome(cls, genome: list):
+    def from_genome(cls, genome: list[int], mem_step: list[int]):
         pe_dims = genome[0:2]
         local_mems = genome[2]
         pe_mems = genome[3:6]
         eyeriss = cls(2, 2, 1024, 128, 128, 128)
         eyeriss.pe_array_dim = pe_dims
         eyeriss.pe_array_mem = pe_mems
-        eyeriss.local_mems = local_mems*8
+        eyeriss.local_mems = local_mems*mem_step[0]
         return eyeriss
 
     def to_genome(self) -> list:
@@ -122,7 +123,7 @@ class EyerissArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
         base_arch = pathlib.Path(self.tl_in_configs_dir, "archs", "eyeriss_like.yaml")
         arch_out = pathlib.Path(outdir, "archs", "eyeriss_like.yaml")
         with open(base_arch, "r") as f:
-            arch = yaml.safe_load(f)
+            arch = yaml.load(f)
 
         #Modify the arch parameters
         eyeriss = arch["architecture"]["subtree"][0]["subtree"][0]
@@ -161,8 +162,8 @@ class EyerissArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
         mac["attributes"]["meshX"] = config.pe_dim_x
 
         with open(arch_out, "w") as f:
-            y = yaml.safe_dump(arch, sort_keys=False)
-            f.write(y)
+            y = yaml.dump(arch, f)
+            #f.write(y)
     
     def write_tl_arch_constraints(self, config:EyerissConfig = None, outdir=None):
         if config is None:

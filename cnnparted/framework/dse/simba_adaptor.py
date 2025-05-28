@@ -1,7 +1,8 @@
 import copy
 from math import sqrt
 import pathlib
-import yaml
+from ruamel.yaml import YAML
+yaml = YAML(typ="rt")
 import shutil
 import numpy as np
 
@@ -47,14 +48,14 @@ class SimbaConfig(ArchitectureConfig, GenomeInterface):
         return cfg
 
     @classmethod
-    def from_genome(cls, genome: list):
+    def from_genome(cls, genome: list, mem_step=[16]):
         pe_dims = genome[0:2]
         local_mems = genome[2]
         pe_mems = genome[3:6]
         simba = cls(1, 1, 1, 1, 1, 1)
         simba.pe_array_dim = [pe_dim*4 for pe_dim in pe_dims]
         simba.pe_array_mem = pe_mems
-        simba.local_mems = local_mems*16
+        simba.local_mems = local_mems*mem_step[0]
         return simba
 
     def to_genome(self) -> list:
@@ -164,7 +165,7 @@ class SimbaArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
         base_arch = pathlib.Path(self.tl_in_configs_dir, "archs", "simba_like.yaml")
         arch_out = pathlib.Path(outdir, "archs", "simba_like.yaml")
         with open(base_arch, "r") as f:
-            arch = yaml.safe_load(f)
+            arch = yaml.load(f)
 
         #Modify the arch parameters
         simba = arch["architecture"]["subtree"][0]["subtree"][0]
@@ -206,8 +207,8 @@ class SimbaArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
         lmac["attributes"]["meshX"] = config.num_pes
 
         with open(arch_out, "w") as f:
-            y = yaml.safe_dump(arch, sort_keys=False)
-            f.write(y)
+            y = yaml.dump(arch, f)
+            #f.write(y)
 
     def write_tl_arch_constraints(self, config:SimbaConfig = None, outdir=None):
         if config is None:
