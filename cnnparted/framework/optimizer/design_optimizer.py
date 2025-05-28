@@ -111,7 +111,6 @@ class DesignOptimizer(Optimizer):
 
         # Select the corresponding wrapper to perform optimization
         if self.algorithm in pymoo_algorithms:
-            breakpoint()
             res = minimize(problem,
                         algorithm,
                         termination=get_termination('n_gen', self.num_gen),
