@@ -138,7 +138,7 @@ class NodeResult:
             stats["eval"][f"design_{i}"] = design.to_dict()
         return stats
 
-    def write_csv(self, out_path: str):
+    def to_csv(self, out_path: str):
         with open(out_path, "w", newline="") as f:
             writer = csv.writer(f, delimiter=";")
             header = [
@@ -226,7 +226,7 @@ class SystemResult:
             accelerator_name= ""
             file_str = str(id) + "_" + accelerator_name + "tl_layers.csv"
             file_path = os.path.join(out_path,  file_str)
-            node_res.write_csv(file_path)
+            node_res.to_csv(file_path)
     
 
 class NodeEvaluator(ABC):
