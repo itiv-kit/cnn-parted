@@ -20,9 +20,6 @@ from framework.optimizer.optimizer import Optimizer
 from framework.optimizer.algorithms.rl_dse import DseEnv
 from framework.node.node_evaluator import SystemResult, NodeResult, DesignResult, LayerResult
 
-# This modules does the following:
-#   - Instatiate GesignOptimizerGaProblem
-#   - use NSGA2 to optimize
 class DesignOptimizer(Optimizer):
 
     def __init__(self, node_components, problem, dse_config: dict, work_dir: str):
@@ -114,6 +111,7 @@ class DesignOptimizer(Optimizer):
 
         # Select the corresponding wrapper to perform optimization
         if self.algorithm in pymoo_algorithms:
+            breakpoint()
             res = minimize(problem,
                         algorithm,
                         termination=get_termination('n_gen', self.num_gen),
@@ -124,7 +122,8 @@ class DesignOptimizer(Optimizer):
             
             node_eval_stats = problem.system_results.to_dict()
             problem.system_results.to_csv(self.work_dir)
-            self._plot_history(res, self.work_dir)
+            dse_accelerator_names = [node["evaluation"]["accelerator"] for node in self.node_components if "dse" in node]
+            self._plot_history(res, self.work_dir, dse_accelerator_names)
 
         elif self.algorithm in rl_algorithms:
             #rand_obs = algorithm.env.observation_space.sample()

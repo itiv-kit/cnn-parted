@@ -57,7 +57,7 @@ class Optimizer():
         else:
             return is_efficient
 
-    def _plot_history(self, res: Result, out_path: str):
+    def _plot_history(self, res: Result, out_path: str, accelerator_names: list[str]):
         best_results = []
         all_results = []
         all_constraints = []
@@ -86,7 +86,7 @@ class Optimizer():
         plt.gca().set_prop_cycle(color=plt.rcParams['axes.prop_cycle'].by_key()['color'][0:2]) 
         ax.set_xlabel("Generation")
         ax.set_ylabel("EDP")
-        platforms = ["Eyeriss", "Simba", "Gemmini"] #TODO
+        platforms = accelerator_names
 
         # Iterate over each generation
         for idx, res in enumerate(all_results): 
