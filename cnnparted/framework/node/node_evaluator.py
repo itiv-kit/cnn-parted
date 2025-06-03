@@ -2,9 +2,13 @@ import os
 import csv
 from abc import ABC
 
+from framework.helpers.design_metrics import calc_metric
+
+import numpy as np
+
 class LayerResult:
     """ 
-    Contains basic information about a single layer of a nerual networ
+    Contains basic information about a single layer of a neural network
 
     Attributes:
         name:           A name that must be unique in the network
@@ -74,6 +78,17 @@ class DesignResult:
             data = list(ld.values())[0]
             res["layers"][name] = data
         return res
+    
+    def get_layer_dict(self) -> dict:
+        layers = {}
+        for layer in self.layers:
+            name = layer.name
+            layers[name] = {
+                "area": layer.area,
+                "energy": layer.energy,
+                "latency": layer.latency,
+                }
+        return layers
 
     @property
     def area(self):
@@ -165,6 +180,58 @@ class NodeResult:
                     ]
                     writer.writerow(row)
                     row_num += 1
+
+    def prune_designs(self, top_k: int, metric: str, strict: bool=False):
+        design_stats = self.to_dict()
+        if len(design_stats["eval"]) <= top_k:
+            return design_stats
+
+        # The metric_per_design array has this structure, with
+        # every cell holding EAP, EDP or some other metric:
+        #  x | l0 | l1 | l2 | l3 |
+        # ------------------------
+        # d0 | ...| ...| ...| ...|
+        # d1 | ...| ...| ...| ...|
+        metric_per_design = []
+        energy_per_design = []
+        latency_per_design = []
+        area_per_design = []
+
+        for tag, design in design_stats["eval"].items():
+            #tag = design["tag"]
+            layers = design["layers"]
+            energy_per_layer = []
+            latency_per_layer = []
+            for name, layer in layers.items():
+                energy_per_layer.append(layer["energy"])
+                latency_per_layer.append(layer["latency"])
+
+            energy_per_design.append(energy_per_layer)
+            latency_per_design.append(latency_per_layer)
+            area_per_design.append([layer["area"]])
+
+        metric_per_design = calc_metric(np.array(energy_per_design), np.array(latency_per_design), np.array(area_per_design), metric, reduction=strict)
+
+        # Now, we need to find the top_k designs per layer
+        design_candidates = []
+        if not strict:
+            for col in metric_per_design.T:
+                metric_for_layer = col.copy()
+                metric_for_layer = np.argsort(metric_for_layer)
+
+                for i in metric_for_layer[0:top_k]:
+                    design_candidates.append(f"design_{i}")
+        else:
+            metric_per_design_sort = np.argsort(metric_per_design.flatten())
+            for i in metric_per_design_sort[0:top_k]:
+                design_candidates.append(f"design_{i}")
+
+        design_candidates = np.unique(design_candidates)
+
+        pruned_stats = {tag: results for tag, results in design_stats["eval"].items() if tag in design_candidates}
+
+        return pruned_stats
+
     
     @classmethod
     def from_csv(cls, in_path: str):
