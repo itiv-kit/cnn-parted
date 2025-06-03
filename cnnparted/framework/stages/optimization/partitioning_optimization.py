@@ -2,7 +2,7 @@ from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
 from framework.stages.inputs.system_parser import SystemParser
 from framework.stages.optimization.robustness_optimization import RobustnessOptimization
-from framework.stages.optimization.design_partitioning_coopt import DesignPartitioningOptimization
+from framework.stages.optimization.design_optimization import DesignPartitioningOptimization
 
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts

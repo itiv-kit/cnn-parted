@@ -1,21 +1,20 @@
 import numpy as np
 
-from framework.optimizer.design_optimizer import DesignOptimizer
-from framework.helpers.config_helper import ConfigHelper
+from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
+
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
 from framework.stages.inputs.system_parser import SystemParser
 from framework.stages.optimization.robustness_optimization import RobustnessOptimization
-
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
-from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
+from framework.optimizer.design_optimizer import DesignOptimizer
+from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 from framework.optimizer.design_problem import DesignProblem
-from framework.optimizer.design_partitioning_cooptimizer import DesignPartitioningOptimizer
 
 from framework.helpers.design_metrics import calc_metric
+from framework.helpers.config_helper import ConfigHelper
 
 @register_required_stage(GraphAnalysis, SystemParser)
 class DesignPartitioningOptimization(Stage):
