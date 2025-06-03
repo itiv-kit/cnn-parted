@@ -26,18 +26,30 @@ class DesignPartitioningOptimization(Stage):
 
         cfg_helper = ConfigHelper(self.config)
         node_components, link_components = cfg_helper.get_system_components()
-        node_constraints = cfg_helper.get_node_constraints()
-        node_mem_steps = cfg_helper.get_node_mem_steps()
 
-        # Instatiate the problem and optimizers
-        # TODO: Design Problem and Optimizer selected by config
-        design_problem = DesignProblem(node_components, link_components, 
-                                       node_constraints, node_mem_steps,
-                                       self.q_constr,
-                                       artifacts, PartitioningOptimizer,
-                                       self.config["dse"])
+        # If no exhaustive search should be performed, instantiate the
+        # problem for evaluation
+        design_problem = None
+        design_opt_config = None #TODO
+        if self.config["dse"]["optimizer"]["algorithm"] != "exhaustive":
+            node_constraints = cfg_helper.get_node_constraints()
+            node_mem_steps = cfg_helper.get_node_mem_steps()
 
-        design_optimizer = DesignOptimizer(node_components, design_problem, self.config["dse"], self.work_dir)
+            # TODO: Design Problem and Optimizer selected by config
+            design_problem = DesignProblem(node_components, link_components, 
+                                        node_constraints, node_mem_steps,
+                                        self.q_constr,
+                                        artifacts, PartitioningOptimizer,
+                                        self.config["dse"])
+            design_opt_config = design_problem.design_opt_config
+
+        design_optimizer = DesignOptimizer(node_components, 
+                                           design_problem, 
+                                           self.config["dse"], 
+                                           self.work_dir,
+                                           self.ga,
+                                           self.run_name,
+                                           self.show_progress)
 
         node_stats = design_optimizer.optimize(self.q_constr, artifacts.config)
 
@@ -48,7 +60,7 @@ class DesignPartitioningOptimization(Stage):
             pruned_stats = self._prune_accelerator_designs(stats["eval"], top_k=top_k, metric=metric, is_dse=True, strict=strict_mode)
             node_stats[id]["eval"] = pruned_stats
 
-        self._update_artifacts(artifacts, node_stats, design_problem.design_opt_config)
+        self._update_artifacts(artifacts, node_stats, design_opt_config)
 
     def _prune_accelerator_designs(self, stats: dict[str, dict], top_k: int, metric: str, is_dse: bool, strict=False):
         # If there are less designs than top_k simply return the given list
@@ -102,7 +114,9 @@ class DesignPartitioningOptimization(Stage):
         return pruned_stats
     
     def _take_artifacts(self, artifacts: Artifacts):
+        self.run_name = artifacts.args["run_name"]
         self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
+        self.show_progress = artifacts.args["p"]
         self.num_pp = artifacts.config["num_pp"]
         self.link_components = artifacts.get_stage_result(SystemParser, "links")
         self.work_dir = artifacts.config["general"]["work_dir"]

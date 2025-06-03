@@ -96,8 +96,8 @@ class SimbaConfig(ArchitectureConfig, GenomeInterface):
 
 
 class SimbaArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
-    def __init__(self, cfg: dict):
-        super().__init__(cfg)
+    def __init__(self):
+        super().__init__()
         self.config: SimbaConfig = None
         
         #Constants related to memory width

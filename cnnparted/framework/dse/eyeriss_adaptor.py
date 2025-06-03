@@ -91,8 +91,8 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
 
 
 class EyerissArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
-    def __init__(self, cfg):
-        super().__init__(cfg)
+    def __init__(self):
+        super().__init__()
         self.config: EyerissConfig = None
 
     def read_space_cfg(self, cfg):

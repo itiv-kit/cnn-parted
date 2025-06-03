@@ -78,7 +78,7 @@ class Timeloop(NodeEvaluator):
 
             dse_package = importlib.import_module("framework.dse")
             mutator_cls = getattr(dse_package, self.dse_node_config["mutator"])
-            self.adaptor = mutator_cls(self.dse_node_config)
+            self.adaptor = mutator_cls()
 
             if self.dse_system_config["optimizer"]["algorithm"] == "exhaustive":
                 self.adaptor.read_space_cfg(self.dse_node_config)
@@ -93,16 +93,37 @@ class Timeloop(NodeEvaluator):
         self.adaptor = adaptor
         node_result = NodeResult(self.node_config)
 
-        self._run_design(layers, progress, node_result, adaptor.config)
+        if not self.adaptor.design_space:
+            self._run_design(layers, progress, node_result, adaptor.config)
+
+            self.stats = {tag: results for tag, results in node_result.to_dict().items()}
+            self.adaptor = None
+            return node_result
+        
+        else:
+            print(f"There are a total of {len(self.adaptor.design_space)} designs to be evaluated!")
+            
+            for i, design in enumerate(self.adaptor.design_space):
+                if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
+                    shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
+                self._run_design(layers, progress, node_result, design, i)
+            
+            # Plot all metrics in all combinations of line/bar, scale/log
+            for m in SUPPORTED_METRICS:
+                if m != "area":
+                    self._plot_all_of_metric(node_result.to_dict()["eval"], m)
 
         self.stats = {tag: results for tag, results in node_result.to_dict().items()}
-        self.adaptor = None
+        with open(os.path.join(self.runroot, f"results_{self.accname}.pkl"), "wb") as f:
+            pickle.dump(self.stats, f)
+
         return node_result
 
     def run(self, layers : dict, progress : bool = False) -> NodeResult:
         node_result = NodeResult(self.node_config)
         node_result.accelerator_name = self.accname
 
+        # Here for compatibility with old definition
         if self.adaptor is not None:
             print(f"There are a total of {len(self.adaptor.design_space)} designs to be evaluated!")
             

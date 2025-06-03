@@ -173,29 +173,6 @@ class DesignProblem(ElementwiseProblem):
             start += n_var
         return split_vec
 
-    def _pareto_edp(self, comp_paretos : np.ndarray) -> np.ndarray:
-        comp_paretos = np.delete(comp_paretos, np.s_[2:], axis=1) # only consider latency and energy
-        #comp_paretos = np.hstack([comp_paretos, np.expand_dims(np.prod(comp_paretos, axis=1), 1)])
-        return comp_paretos
-    
-    def _pareto_ppa(self, comp_paretos : np.ndarray) -> np.ndarray:
-        comp_paretos = np.delete(comp_paretos, np.s_[-2:], axis=1) # remove link metrics
-        comp_paretos = np.delete(comp_paretos, np.s_[-2], axis=1) # remove throughput metric
-        return comp_paretos
-
-    def _calc_cost(self, objectives: np.ndarray) -> np.ndarray:
-        match self.config["dse"]["optimization"]:
-            case "edp":
-                objectives_cut = self._pareto_edp(objectives)
-                cost = np.prod(objectives_cut, axis=1)
-            case "edap":
-                objectives_cut = self._pareto_ppa(objectives)
-                cost = np.prod(objectives_cut, axis=1)
-            case _:
-                raise RuntimeError(f"Invalid optimization option for DSE")
-
-        return cost
-        
 
     def _cfg_in_lut(self, cfg):
         if not isinstance(cfg, tuple):
@@ -211,7 +188,7 @@ class DesignProblem(ElementwiseProblem):
 
         xs = self._split_system_input(x)
         acc_cfgs = [cfg.from_genome(param, mem_step) for (cfg, param, mem_step) in zip(self.accelerator_configs, xs, self.node_mem_steps, strict=True)]
-        acc_adaptors = [adaptor({}) for adaptor in self.accelerator_adaptors] 
+        acc_adaptors = [adaptor() for adaptor in self.accelerator_adaptors] 
 
         # Attach the config we want to run to the adaptor
         for (adaptor, cfg) in zip(acc_adaptors, acc_cfgs):
@@ -252,7 +229,7 @@ class DesignProblem(ElementwiseProblem):
                 cost.append(float(energy_total*latency_total))
                 constraints.append([-energy_total , -latency_total, -area])
 
-        node_stats = self.fixed_node_stats | dse_node_stats
+        #node_stats = self.fixed_node_stats | dse_node_stats
 
         #cost = []
         #for id, stats in dse_node_stats.items():
@@ -272,30 +249,4 @@ class DesignProblem(ElementwiseProblem):
             out["G"] = constraints[0]
         else:
             out["G"] = np.array(constraints).flatten().tolist()
-
-        # Perform the partitioning to distribute the workload between the nodes
-        #part_opt = self.partitioning_optimizer_cls(self.ga, self.num_pp, node_stats, self.link_components, self.show_progress)
-        #n_constr, n_var, sol = part_opt.optimize(self.q_constr, self.config, store_results=False)
-
-        ## Dump the full results to a PKL file, PyMoo Problems can only return a single individual
-        #pkl_file = "_".join( map(str, x.tolist()) ) + ".pkl"
-        #out_file = os.path.join(self.dse_results_dir, pkl_file)
-        #with open(out_file, "wb") as f:
-        #    pickle.dump(sol, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-        #nondom = np.array(sol["nondom"])
-        #objectives = [data[n_constr+n_var+1:] for data in nondom]
-
-        #cost = self._calc_cost(objectives)
-        ##out["F"] = np.array(min(cost)).tolist()
-
-        #res = np.hstack( (nondom, np.reshape(cost,shape=(-1, 1)) ) )
-        #res = res[cost.argmin()]
-
-        #if valid:
-        #    #out["G"] = -res
-        #    out["G"] = -1
-        #else:
-        #    out["G"] = 1#res
-
 

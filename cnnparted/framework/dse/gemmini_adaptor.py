@@ -121,8 +121,8 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
 
 class GemminiArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
+    def __init__(self):
+        super().__init__()
         self.config: GemminiConfig = None
 
     def read_space_cfg(self, cfg):
