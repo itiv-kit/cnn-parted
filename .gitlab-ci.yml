@@ -1,4 +1,4 @@
-image: gitlab.itiv.kit.edu:1443/itiv/docker/itiv-rocky8:latest
+image: gitlab.itiv.kit.edu:1443/itiv/docker/rocky9:latest
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
