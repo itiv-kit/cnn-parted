@@ -33,7 +33,7 @@ class PartitioningOptimizer(Optimizer):
         self.layer_dict = {}
         for l in self.schedules[0]:
             self.layer_dict[l] = {}
-            self.layer_dict[l]["predecessors"] = list(ga.graph.get_Graph().predecessors(l))
+            self.layer_dict[l]["predecessors"] = list(ga.graph.get_graph().predecessors(l))
             self.layer_dict[l]["successors"] = [s for s in ga.graph.get_successors(l)]
             self.layer_dict[l]["output_size"] = ga.graph.output_sizes[l]
 

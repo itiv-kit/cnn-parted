@@ -15,9 +15,9 @@ class GraphAnalyzer:
         self.run_name = run_name
         self.input_size = input_size
         self.progress = progress
-        self._Tree_Model = TreeModel(self.run_name, self.input_size)
-        self._tree = self._Tree_Model.get_Tree()
-        self.torchmodel = self._Tree_Model.get_torchModel()
+        self._tree_model = TreeModel(self.run_name, self.input_size)
+        self._tree = self._tree_model.get_tree()
+        self.torchmodel = self._tree_model.get_torchModel()
 
         self.graph = LayersGraph(self._tree)
         self.conv_layers = self.get_conv2d_layers()
@@ -30,13 +30,13 @@ class GraphAnalyzer:
             self.schedules = df.values.tolist()
         else:
             #try:
-            #    self.schedules = topo_sort_random_start_node(G=self.graph.get_Graph(), n=num_topos, seed=0, as_ndarray=True, progress=self.progress)
+            #    self.schedules = topo_sort_random_start_node(G=self.graph.get_graph(), n=num_topos, seed=0, as_ndarray=True, progress=self.progress)
             #except:
-            #    topo_sorts = nx.all_topological_sorts(self.graph.get_Graph())
+            #    topo_sorts = nx.all_topological_sorts(self.graph.get_graph())
             #    self.schedules = self._iter_sample_fast(topo_sorts, num_topos)
 
             self.schedules = []
-            self.schedules.append(list(nx.topological_sort(self.graph.get_Graph())))
+            self.schedules.append(list(nx.topological_sort(self.graph.get_graph())))
 
             self.schedules = np.unique(self.schedules, axis=0)
             df = pd.DataFrame(self.schedules)

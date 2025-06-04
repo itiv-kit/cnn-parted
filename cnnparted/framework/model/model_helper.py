@@ -1,6 +1,6 @@
 from onnx2pytorch import ConvertModel
 
-class modelHelper:
+class ModelHelper:
 
     def __init__(self):
         pass
