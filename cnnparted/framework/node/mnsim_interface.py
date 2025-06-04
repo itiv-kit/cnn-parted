@@ -222,6 +222,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
         mod_a = Model_area(struct_file,self.SimConfig)
         mod_l.calculate_model_latency()
         area_list=mod_a.area_output_CNNParted()
+        self.node_config["bits"] = self.ADC_quantize_bit #TODO Check if this is the correct bit width
         design = DesignResult(self.hardware_config)
         node_res = NodeResult(self.node_config)
         for idx, layer in enumerate(struct_file):
