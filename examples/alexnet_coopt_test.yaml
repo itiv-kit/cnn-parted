@@ -38,8 +38,9 @@ components:
   dse:
     min_pe: [10, 10]
     max_pe: [32, 32]
-    min_size_mem_shared: [512]   #in byte
-    max_size_mem_shared: [1024]   #in byte 
+    step_mem_shared: [8]
+    min_size_mem_shared: [512]   #in kbyte
+    max_size_mem_shared: [1024]   #in kbyte 
     min_size_mem_local: [128, 128, 128]
     max_size_mem_local: [128, 128, 128]
   evaluation:
