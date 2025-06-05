@@ -69,7 +69,8 @@ setup(
             'pandas',
             'joblib',
             'onnx2pytorch',
-            'ruamel.yaml'
+            'ruamel.yaml',
+            "plotly",
             ],
       python_requires = '>=3.11',
       include_package_data = True,
