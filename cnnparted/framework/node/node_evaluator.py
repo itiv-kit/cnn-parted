@@ -234,8 +234,8 @@ class NodeResult:
 
     
     @classmethod
-    def from_csv(cls, in_path: str):
-        node_res = cls()
+    def from_csv(cls, in_path: str, node_config: dict):
+        node_res = cls(node_config)
 
         design_result = DesignResult()
         with open(in_path, 'r', newline="") as f:
