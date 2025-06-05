@@ -19,7 +19,7 @@ class TreeModel:
         self.new_model_path = os.path.join(MODEL_PATH, run_name, "new_model.onnx")
         onnx.save(self._model, self.new_model_path)
 
-    def get_torchModel(self):
+    def get_torch_model(self):
         return self.model_helper.convert_to_pytorch(self._model)
 
     def get_tree(self):

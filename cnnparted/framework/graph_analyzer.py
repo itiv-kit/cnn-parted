@@ -17,7 +17,7 @@ class GraphAnalyzer:
         self.progress = progress
         self._tree_model = TreeModel(self.run_name, self.input_size)
         self._tree = self._tree_model.get_tree()
-        self.torchmodel = self._tree_model.get_torchModel()
+        self.torchmodel = self._tree_model.get_torch_model()
 
         self.graph = LayersGraph(self._tree)
         self.conv_layers = self.get_conv2d_layers()
