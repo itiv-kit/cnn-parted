@@ -8,7 +8,7 @@ general:
   work_dir: runs/regnet_x_400mf_run
 
 workload:
-  name: regnet_x_400mf
+- name: regnet_x_400mf
   input-size: [1, 3, 227, 227]
 
 pipeline:

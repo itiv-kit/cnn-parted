@@ -8,7 +8,7 @@ general:
   work_dir: runs/resnet34_run
 
 workload:
-  name: resnet34
+- name: resnet34
   input-size: [1, 3, 227, 227]
 
 pipeline:

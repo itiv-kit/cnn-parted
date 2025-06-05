@@ -9,7 +9,7 @@ general:
   keep_dir: false
 
 workload:
-  name: resnet18
+- name: resnet18
   input-size: [1, 3, 227, 227]
 
 pipeline:

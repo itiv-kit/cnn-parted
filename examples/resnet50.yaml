@@ -8,7 +8,7 @@ general:
   work_dir: runs/resnet50_run
 
 workload:
-  name: resnet50
+- name: resnet50
   input-size: [1, 3, 227, 227]
 
 pipeline:

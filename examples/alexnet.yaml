@@ -9,7 +9,7 @@ general:
   keep_dir: false
 
 workload:
-  name: alexnet
+- name: alexnet
   input-size: [1, 3, 227, 227]
 
 pipeline:

@@ -8,7 +8,7 @@ general:
   work_dir: runs/yolov5_run
 
 workload:
-  name: yolov5
+- name: yolov5
   input-size: [1, 3, 224, 224]
 
 pipeline:

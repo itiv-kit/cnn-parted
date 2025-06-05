@@ -8,7 +8,7 @@ general:
   work_dir: runs/efficientnet_run
 
 workload:
-  name: efficientnet
+- name: efficientnet
   input-size: [1, 3, 227, 227]
 
 pipeline:

@@ -8,7 +8,7 @@ general:
   work_dir: runs/googlenet_run
 
 workload:
-  name: googlenet
+- name: googlenet
   input-size: [1, 3, 224, 224]
 
 pipeline:

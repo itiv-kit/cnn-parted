@@ -8,7 +8,7 @@ general:
   work_dir: runs/vgg13_run
 
 workload:
-  name: vgg13
+- name: vgg13
   input-size: [1, 3, 227, 227]
 
 pipeline:

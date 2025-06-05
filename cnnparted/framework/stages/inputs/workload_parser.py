@@ -51,7 +51,7 @@ class WorkloadParser(Stage):
 
     def _take_artifacts(self, artifacts: Artifacts):
         self.run_name = artifacts.args["run_name"]
-        self.model_settings = artifacts.config["workload"]
+        self.model_settings = artifacts.config["workload"][0] #TODO Currently only considers one workload
         
     def _update_artifacts(self, artifacts: Artifacts, accuracy_func):
         artifacts.set_stage_result(WorkloadParser, "accuracy_function", accuracy_func)

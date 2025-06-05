@@ -8,7 +8,7 @@ general:
   work_dir: runs/fcnresnet101_dir
 
 workload:
-  name: fcnresnet101
+- name: fcnresnet101
   input-size: [1, 3, 224, 224]
 
 pipeline:

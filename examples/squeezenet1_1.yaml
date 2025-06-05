@@ -8,7 +8,7 @@ general:
   work_dir: runs/squeezenet1_1_run
 
 workload:
-  name: squeezenet1_1
+- name: squeezenet1_1
   input-size: [1, 3, 227, 227]
 
 pipeline:

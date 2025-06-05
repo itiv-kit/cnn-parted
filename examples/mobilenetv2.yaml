@@ -8,7 +8,7 @@ general:
   work_dir: runs/mobilenetv2_run
 
 workload:
-  name: mobilenetv2
+- name: mobilenetv2
   input-size: [1, 3, 227, 227]
 
 pipeline:

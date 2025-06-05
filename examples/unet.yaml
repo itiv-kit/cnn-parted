@@ -9,7 +9,7 @@ general:
   keep_dir: false
 
 workload:
-  name: unet
+- name: unet
   input-size: [1, 3, 256, 256]
 
 pipeline:
