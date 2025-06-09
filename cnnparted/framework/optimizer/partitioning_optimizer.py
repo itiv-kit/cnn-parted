@@ -23,19 +23,21 @@ class PartitioningOptimizer(Optimizer):
     def __init__(self, ga : GraphAnalyzer, num_pp : int, node_stats : dict, link_components : list, progress : bool) -> None:
         self.work_dir = ga.work_dir
         self.run_name = ga.run_name
-        self.schedules = ga.schedules
+        assert len(ga.networks) == 1, "PartitioningOptmizer does not support evaluation of multiple neural networks"
+        network = ga.networks[0]
+        self.schedules = ga.schedules[network]
         self.num_pp = num_pp
         self.node_stats = node_stats
         self.link_confs = link_components
         self.progress = progress
-        nodes = len(ga.schedules[0])
+        nodes = len(ga.schedules[network][0])
 
         self.layer_dict = {}
         for l in self.schedules[0]:
             self.layer_dict[l] = {}
-            self.layer_dict[l]["predecessors"] = list(ga.graph.get_graph().predecessors(l))
-            self.layer_dict[l]["successors"] = [s for s in ga.graph.get_successors(l)]
-            self.layer_dict[l]["output_size"] = ga.graph.output_sizes[l]
+            self.layer_dict[l]["predecessors"] = list(ga.graphs[network].get_graph().predecessors(l))
+            self.layer_dict[l]["successors"] = [s for s in ga.graphs[network].get_successors(l)]
+            self.layer_dict[l]["output_size"] = ga.graphs[network].output_sizes[l]
 
         self.layer_params = self._set_layer_params(ga)
 
@@ -49,9 +51,10 @@ class PartitioningOptimizer(Optimizer):
 
     def _set_layer_params(self, ga : GraphAnalyzer) -> dict:
         params = {}
-        for layer in ga.get_conv2d_layers():
+        network = ga.networks[0]
+        for layer in ga.get_conv2d_layers(network):
             params[layer['name']] = layer['conv_params']['weights']
-        for layer in ga.get_gemm_layers():
+        for layer in ga.get_gemm_layers(network):
             params[layer['name']] = layer['gemm_params']['weights']
 
         return params

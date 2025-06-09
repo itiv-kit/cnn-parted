@@ -4,43 +4,54 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 
+#from framework.stages.inputs.workload_parser import WorkloadInfo
 from framework.model.model import TreeModel
 from framework.model.graph import LayersGraph
 
 from framework.model.scheduling import topo_sort_random_start_node
 
 class GraphAnalyzer:
-    def __init__(self, work_dir: str, run_name : str, input_size : tuple, progress : bool) -> None:
+    def __init__(self, work_dir: str, run_name : str, input_size : tuple, 
+                 workloads: dict, progress : bool) -> None:
         self.work_dir = work_dir
         self.run_name = run_name
         self.input_size = input_size
+        self.workloads = workloads
+        self.networks = [nw for nw in workloads.keys()]
         self.progress = progress
-        self._tree_model = TreeModel(self.run_name, self.input_size)
-        self._tree = self._tree_model.get_tree()
-        self.torchmodel = self._tree_model.get_torch_model()
 
-        self.graph = LayersGraph(self._tree)
-        self.conv_layers = self.get_conv2d_layers()
+        self._tree_models: dict[str, TreeModel] = {}
+        self._trees: dict[str, list] = {}
+        self.torchmodels  = {}
+        self.graphs: dict[str, LayersGraph] = {}
+        for network, info in self.workloads.items():
+            self._tree_models[network] = TreeModel(self.run_name, network, tuple(info.input_shape))
+            self._trees[network] = self._tree_models[network].get_tree()
+            self.torchmodels[network] = self._tree_models[network].get_torch_model()
+            self.graphs[network] = LayersGraph(self._trees[network])
+        self.schedules: dict[str, list] = {}
+
 
     def find_schedules(self, num_topos : int) -> list:
         #fname_csv = os.path.join(self.work_dir, self.run_name + "_" + "schedules.csv")
-        fname_csv = os.path.join(self.work_dir, "schedules.csv")
-        if os.path.isfile(fname_csv):
-            df = pd.read_csv(fname_csv, header=None, index_col=0)
-            self.schedules = df.values.tolist()
-        else:
-            #try:
-            #    self.schedules = topo_sort_random_start_node(G=self.graph.get_graph(), n=num_topos, seed=0, as_ndarray=True, progress=self.progress)
-            #except:
-            #    topo_sorts = nx.all_topological_sorts(self.graph.get_graph())
-            #    self.schedules = self._iter_sample_fast(topo_sorts, num_topos)
+        for network in self.networks:
+            fname_csv = os.path.join(self.work_dir, network + "_schedules.csv")
+            if os.path.isfile(fname_csv):
+                df = pd.read_csv(fname_csv, header=None, index_col=0)
+                self.schedules[network] = df.values.tolist()
+            else:
+                #try:
+                #    self.schedules = topo_sort_random_start_node(G=self.graphs[network].get_graph(), n=num_topos, seed=0, as_ndarray=True, progress=self.progress)
+                #except:
+                #    topo_sorts = nx.all_topological_sorts(self.graphs[network].get_graph())
+                #    self.schedules = self._iter_sample_fast(topo_sorts, num_topos)
 
-            self.schedules = []
-            self.schedules.append(list(nx.topological_sort(self.graph.get_graph())))
+                self.schedules[network] = []
+                self.schedules[network].append(list(nx.topological_sort(self.graphs[network].get_graph())))
 
-            self.schedules = np.unique(self.schedules, axis=0)
-            df = pd.DataFrame(self.schedules)
-            df.to_csv(fname_csv, header=False)
+                self.schedules[network] = np.unique(self.schedules[network], axis=0)
+                df = pd.DataFrame(self.schedules[network])
+                df.to_csv(fname_csv, header=False)
         return self.schedules
 
     # https://stackoverflow.com/questions/12581437/python-random-sample-with-a-generator-iterable-iterator
@@ -59,17 +70,17 @@ class GraphAnalyzer:
             raise ValueError("Sample larger than population.")
         return results
 
-    def get_timeloop_layers(self):
-        output = [layer for layer in self._tree if layer.get("op_type") == "Conv" or layer.get("op_type") == "Gemm" or layer.get("op_type") == "MatMul"]
+    def get_timeloop_layers(self, network: str):
+        output = [layer for layer in self._trees[network] if layer.get("op_type") == "Conv" or layer.get("op_type") == "Gemm" or layer.get("op_type") == "MatMul"]
         return output
 
-    def get_mnsim_layers(self):
-        return self._tree
+    def get_mnsim_layers(self, network: str):
+        return self._trees[network]
 
-    def get_conv2d_layers(self):
-        output = [layer for layer in self._tree if layer.get("op_type") == "Conv"]
+    def get_conv2d_layers(self, network: str):
+        output = [layer for layer in self._trees[network] if layer.get("op_type") == "Conv"]
         return output
 
-    def get_gemm_layers(self):
-        output = [layer for layer in self._tree if layer.get("op_type") == "Gemm" or layer.get("op_type") == "MatMul"]
+    def get_gemm_layers(self, network: str):
+        output = [layer for layer in self._trees[network] if layer.get("op_type") == "Gemm" or layer.get("op_type") == "MatMul"]
         return output

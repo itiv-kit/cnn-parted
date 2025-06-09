@@ -35,7 +35,9 @@ class VisualizeSchedule(Stage):
             for i, p in enumerate(sol["dom"]): # achieving aligned csv file
                 sol["dom"][i] = np.append(p, float(0))
         self.sol = sol
-        self.schedules = artifacts.get_stage_result(GraphAnalysis, "ga").schedules
+        self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
+        network = self.ga.networks[0] #TODO Multiple networks
+        self.schedules = self.ga.schedules[network]
         self.num_platforms = self.config["num_platforms"]
         self.num_pp = artifacts.config["num_pp"]
         self.n_var_part = (self.num_pp + 1) + (self.num_pp) # platform IDs + mapping partition to platform

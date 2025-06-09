@@ -103,7 +103,7 @@ class DesignProblem(ElementwiseProblem):
         print("Done evaluating fixed nodes!")
 
         num_platforms = sum([node.get("instances", 1) for node in self.node_components])
-        part_opt_cfg = PartitioningOptConfig(num_platforms, self.num_pp, len(self.ga.schedules) )
+        part_opt_cfg = PartitioningOptConfig(num_platforms, self.num_pp, len(self.ga.schedules[self.ga.networks[0]]) ) #TODO Mulitple networks
 
         self.design_opt_config = DesignOptConfig(self.n_var_per_node,
                                                  node_constraints,

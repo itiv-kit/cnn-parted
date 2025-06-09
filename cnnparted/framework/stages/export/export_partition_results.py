@@ -38,7 +38,10 @@ class ExportPartitionResults(Stage):
                 sol["dom"][i] = np.append(p, float(0))
         self.sol = sol
 
-        self.schedules = artifacts.get_stage_result(GraphAnalysis, "ga").schedules
+        #TODO Multiple networks
+        ga = artifacts.get_stage_result(GraphAnalysis, "ga")
+        network = ga.networks[0]
+        self.schedules = ga.schedules[network]
         self.num_platforms = self.config["num_platforms"]
 
     def _update_artifacts(self, artifacts: Artifacts):

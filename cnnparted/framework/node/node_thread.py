@@ -21,13 +21,15 @@ class NodeThread(ModuleThreadInterface):
         self.stats["fault_rates"] = [float(i) for i in self.config.get("fault_rates") or [0.0, 0.0]]
         self.stats["faulty_bits"] = self.config.get("faulty_bits") or 0
 
+        network = self.ga.networks[0] #TODO Multiple networks
+
         # Select which simulator should be used
         if "timeloop" == self.config["evaluation"]["simulator"]:
-            layers = self.ga.get_timeloop_layers()
+            layers = self.ga.get_timeloop_layers(network)
             simulator = Timeloop(self.config, self.dse_system_config)
             self.stats["type"] = 'tl'
         elif "mnsim" in self.config["evaluation"]["simulator"]:
-            layers = self.ga.get_mnsim_layers()
+            layers = self.ga.get_mnsim_layers(network)
             simulator = MNSIMInterface(self.config, self.ga.input_size)
             self.stats["type"] = 'mnsim'
         elif "zigzag" in self.config["evaluation"]["simulator"]:

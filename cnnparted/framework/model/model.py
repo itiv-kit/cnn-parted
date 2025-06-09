@@ -7,8 +7,8 @@ from framework.model.model_helper import ModelHelper
 
 
 class TreeModel:
-    def __init__(self, run_name, input_size):
-        _model_path = os.path.join(MODEL_PATH, run_name, "model.onnx")
+    def __init__(self, run_name, network_name, input_size):
+        _model_path = os.path.join(MODEL_PATH, run_name, network_name + "_model.onnx") #TODO Update with model name
         self.input_size = input_size
         self.model_helper = ModelHelper()
         self._model = onnx.load(_model_path)
@@ -16,7 +16,7 @@ class TreeModel:
         self._model = shape_inference.infer_shapes(self._model)
         self.output_sizes = self._get_output_sizes()
         self._layer_tree = self._get_layers_data()
-        self.new_model_path = os.path.join(MODEL_PATH, run_name, "new_model.onnx")
+        self.new_model_path = os.path.join(MODEL_PATH, run_name, network_name + "_new_model.onnx") #TODO Update with model name
         onnx.save(self._model, self.new_model_path)
 
     def get_torch_model(self):
