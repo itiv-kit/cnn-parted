@@ -15,12 +15,15 @@ from framework.quantization.generate_calibration import generate_calibration
 
 
 class AccuracyEvaluator():
-    def __init__(self, model : nn.Module, node_stats : dict, config : dict, device : str, progress : bool) -> None:
+    def __init__(self, models : dict[str, nn.Module], node_stats : dict, config : dict, device : str, progress : bool) -> None:
         self.bits = [node_stats[acc].get("bits") for acc in node_stats]
         self.fault_rates = [node_stats[acc].get("fault_rates") for acc in node_stats]
         self.faulty_bits = [node_stats[acc].get("faulty_bits") for acc in node_stats]
         self.gpu_device = torch.device(device)
         self.progress = progress
+
+        assert len(models) == 1, "AccuracyEvaluator currently only supports a single specified network"
+        model = list(models.values())[0]
 
         m = deepcopy(model)
         self.qmodel = FaultyQuantizedModel(m, self.gpu_device)
@@ -37,9 +40,12 @@ class AccuracyEvaluator():
         self.train_epochs = config.get('retraining', {'epochs' : 0})['epochs']
 
 
-    def eval(self, sols : list, n_constr : int, n_var : int, schedules : list, accuracy_function : Callable) -> list:
+    def eval(self, sols : list, n_constr : int, n_var : int, schedules : dict[str, list], accuracy_function : Callable) -> list:
         if not sols:
             return []
+
+        assert len(schedules) == 1, "AccuracyEvaluator currently only supports a single specified network"
+        schedules = list(schedules.values())[0]
 
         quants = self._gen_quant_list(sols, n_constr, n_var, schedules)
         fault_rates, faulty_bits = self._gen_fault_rate_list(sols, n_constr, n_var, schedules)

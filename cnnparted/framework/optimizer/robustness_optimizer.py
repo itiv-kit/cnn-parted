@@ -21,11 +21,14 @@ from framework.optimizer.optimizer import Optimizer
 
 
 class RobustnessOptimizer(Optimizer):
-    def __init__(self, work_dir: str, run_name: str, model: nn.Module, accuracy_function: Callable, config: dict, device : str, progress: bool):
+    def __init__(self, work_dir: str, run_name: str, models: dict[str, nn.Module], accuracy_function: Callable, config: dict, device : str, progress: bool):
         rob_conf = config.get('robustness')
         self.gpu_device = torch.device(device)
 
         self.accuracy_function = accuracy_function
+
+        assert len(models) == 1, "RobustnessOptimizer currently only supports a single specified network"
+        model = list(models.values())[0]
 
         self.qmodel = FaultyQuantizedModel(model, self.gpu_device, same_bit_for_weight_and_input=True)
         self.dataset_config = deepcopy(config['datasets'])
@@ -78,15 +81,15 @@ class RobustnessOptimizer(Optimizer):
                     acc_lut[tuple(x)] = accuracy_result
 
                 # TODO This is a workaround for hard constraints
-                accuracy_drop_constraint = 0.05
+                #accuracy_drop_constraint = 0.05
                 if ref == 0:
                     return accuracy_result
                 else:
-                    cost = self.qmodel.get_bit_weighted()
-                    if accuracy_result < abs(ref - accuracy_drop_constraint):
-                        cost = 9223372036854775807 #sys.maxsize
-                    return cost
-                    #return self.qmodel.get_bit_weighted() * abs(accuracy_result - ref)
+                    #cost = self.qmodel.get_bit_weighted()
+                    #if accuracy_result < abs(ref - accuracy_drop_constraint):
+                    #    cost = 9223372036854775807 #sys.maxsize
+                    #return cost
+                    return self.qmodel.get_bit_weighted() * abs(accuracy_result - ref)
 
             init_x = np.full(self.n_var, self.max_bits_idx[-1])
             acc_ref = f(init_x, 0) - self.delta
