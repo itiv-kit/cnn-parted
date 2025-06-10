@@ -242,6 +242,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
         # for compatibility reasons with DSE-Extension
         node_res.add_design(design)
         self.stats = node_res.to_dict()
+        return node_res
 
     #linqiushi modified
     #calculating the real ADC bit supported by pim using the formula mentioned before

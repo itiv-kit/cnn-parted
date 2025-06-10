@@ -91,6 +91,7 @@ class Zigzag(NodeEvaluator):
         
         # Convert to CNNParted stats
         self.stats = node_result.to_dict()
+        return node_result
 
 
     def _run_layer(self):

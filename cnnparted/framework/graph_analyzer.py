@@ -11,11 +11,10 @@ from framework.model.graph import LayersGraph
 from framework.model.scheduling import topo_sort_random_start_node
 
 class GraphAnalyzer:
-    def __init__(self, work_dir: str, run_name : str, input_size : tuple, 
+    def __init__(self, work_dir: str, run_name : str, 
                  workloads: dict, progress : bool) -> None:
         self.work_dir = work_dir
         self.run_name = run_name
-        self.input_size = input_size
         self.workloads = workloads
         self.networks = [nw for nw in workloads.keys()]
         self.progress = progress
@@ -24,8 +23,8 @@ class GraphAnalyzer:
         self._trees: dict[str, list] = {}
         self.torchmodels  = {}
         self.graphs: dict[str, LayersGraph] = {}
-        for network, info in self.workloads.items():
-            self._tree_models[network] = TreeModel(self.run_name, network, tuple(info.input_shape))
+        for network, workload_info in self.workloads.items():
+            self._tree_models[network] = TreeModel(self.run_name, network, tuple(workload_info.input_shape))
             self._trees[network] = self._tree_models[network].get_tree()
             self.torchmodels[network] = self._tree_models[network].get_torch_model()
             self.graphs[network] = LayersGraph(self._trees[network])

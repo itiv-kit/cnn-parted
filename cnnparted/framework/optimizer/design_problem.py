@@ -97,9 +97,9 @@ class DesignProblem(ElementwiseProblem):
         # to prevent simulating them multiple times
         fixed_nodes = [node for node in node_components if "dse" not in node]
         self.fixed_node_stats = self._eval_nodes(fixed_nodes)
-        for ((id, node_stats), node_config)  in zip(self.fixed_node_stats.items(), fixed_nodes):
-            node_results = NodeResult.from_dict(node_stats, node_config)
-            self.system_results.add_platform(id, node_results)
+        for ((id, node_stats), node_config)  in zip(self.fixed_node_stats.platforms.items(), fixed_nodes):
+            #node_results = NodeResult.from_dict(node_stats, node_config)
+            self.system_results.add_platform(id, node_stats)
         print("Done evaluating fixed nodes!")
 
         num_platforms = sum([node.get("instances", 1) for node in self.node_components])
@@ -115,7 +115,7 @@ class DesignProblem(ElementwiseProblem):
 
 
     def _eval_nodes(self, nodes, acc_adaptors=[]):
-        node_stats = {}
+        node_eval_stats = SystemResult()
         
         # If a acc_adaptors have been passed this is a DSE run. Else, init with sane default values to not break zip operation
         if not acc_adaptors:
@@ -151,18 +151,18 @@ class DesignProblem(ElementwiseProblem):
 
             instances = node_thread.config.get("instances", 1)
             if instances == 1:
-                node_stats[id] = stats
+                node_eval_stats.add_platform(id, stats)
             else:
                 # If the accelerator should be instatiated multiple times, copy the results and generate a unique id
                 for i in range(0, instances):
                     id_str = "10" + str(id) + str(i) # generate a unique id for instances
-                    node_stats[int(id_str)] = stats
+                    node_eval_stats.add_platform(int(id_str), stats)
 
         # ensure IDs are actually all unique
-        all_ids = list(node_stats.keys())
+        all_ids = list(node_eval_stats.platforms.keys())
         assert len(all_ids) == len(set(all_ids)), f"Component IDs are not unique. Found IDs: {all_ids}"
 
-        return node_stats
+        return node_eval_stats
 
     def _split_system_input(self, sys_vec: np.ndarray):
         sys_vec = sys_vec.tolist()
@@ -206,39 +206,29 @@ class DesignProblem(ElementwiseProblem):
         # Check if the simulation failed for any of the nodes and save valid results to LUT
         cost = []
         constraints = []
-        for (cfg, in_lut, (id, stats)) in zip(xs, cfgs_already_in_lut, dse_node_stats.items()):
-            if not stats["eval"]:
+        for (cfg, in_lut, (id, stats)) in zip(xs, cfgs_already_in_lut, dse_node_stats.platforms.items()):
+            if not stats.to_dict()["eval"]:
                 #simulation failed
+                breakpoint()
                 valid = False
                 cost.append(float(1000000000))
                 constraints.append([1,1,1])
             else:
                 self.dse_node_lut[id][tuple(cfg)] = dse_node_stats[id]
-                design_result = DesignResult.from_dict(stats["eval"]["design_0"])
+                design_result = stats.designs[0]
 
                 if not in_lut:
                     self.system_results[id].add_design(design_result)
 
-                layers_data = stats["eval"]["design_0"]["layers"]
-                energy = [data["energy"] for (key, data) in layers_data.items()]
-                latency = [data["latency"] for (key, data) in layers_data.items()]
-                area = [data["area"] for (key, data) in layers_data.items()][0]
+                layers_data = stats.designs[0].layers_dict
+                energy = [data.energy for (key, data) in layers_data.items()]
+                latency = [data.latency for (key, data) in layers_data.items()]
+                area = stats.designs[0].area
                 energy_total = sum(energy)
                 latency_total = sum(latency)
 
                 cost.append(float(energy_total*latency_total))
                 constraints.append([-energy_total , -latency_total, -area])
-
-        #node_stats = self.fixed_node_stats | dse_node_stats
-
-        #cost = []
-        #for id, stats in dse_node_stats.items():
-        #    layers_data = stats["eval"]["design_0"]["layers"]
-        #    energy = [data["energy"] for (key, data) in layers_data.items()]
-        #    latency = [data["latency"] for (key, data) in layers_data.items()]
-        #    energy_total = sum(energy)
-        #    latency_total = sum(latency)
-        #    cost.append(energy_total*latency_total)
 
         if self.n_obj == 1:
             out["F"] = cost[0]

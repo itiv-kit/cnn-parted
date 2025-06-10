@@ -1,6 +1,7 @@
 import os
 import csv
 from abc import ABC
+from copy import deepcopy
 
 from framework.helpers.design_metrics import calc_metric
 
@@ -46,7 +47,10 @@ class DesignResult:
         architecture:   Information about the architecture
     """
     def __init__(self, architecture: dict = {}):
+        self.tag: str = ""
         self.layers: list[LayerResult] = []
+        #self.layers_dict: dict[str, dict[str, LayerResult]] = {}
+        self.layers_dict: dict[str, LayerResult] = {}
         self.architecture: dict = architecture
 
     @classmethod
@@ -65,8 +69,16 @@ class DesignResult:
             design_res.add_layer(l)
         return design_res 
 
-    def add_layer(self, results: LayerResult):
+    def add_layer(self, results: LayerResult, network: str = "test"):
         self.layers.append(results)
+        self.layers_dict[results.name] = results
+
+        #if network in self.layers_dict:
+        #    self.layers_dict[network][results.name] = results
+        #else:
+        #    self.layers_dict[network] = {}
+        #    self.layers_dict[network][results.name] = results
+
 
     def to_dict(self) -> dict:
         res = {}
@@ -112,12 +124,15 @@ class NodeResult:
     """
     def __init__(self, config: dict):
         self.designs: list[DesignResult] = []
-        self.bits = config["bits"]
+        self._all_designs: list[DesignResult] = [] #only set by the prune_designs function for bookkeeping
+        self.design_tag = 0
+        self.bits = config.get("bits", 8)
         self.fault_rates = config.get("fault_rates", [0.0, 0.0])
         self.faulty_bits = config.get("faulty_bits", 0)
         self.max_memory_size = config["max_memory_size"]
         self.type = config["evaluation"]["simulator"]
         self.accelerator_name = config["evaluation"]["accelerator"]
+        self.sim_time = None
 
 
     @classmethod
@@ -141,7 +156,9 @@ class NodeResult:
         return node_res
 
     def add_design(self, result: DesignResult):
+        result.tag = "design_" + str(self.design_tag)
         self.designs.append(result)
+        self.design_tag += 1
 
     def to_dict(self) -> dict:
         stats = {"bits": self.bits,
@@ -152,7 +169,7 @@ class NodeResult:
                  }
 
         for i, design in enumerate(self.designs):
-            stats["eval"][f"design_{i}"] = design.to_dict()
+            stats["eval"][design.tag] = design.to_dict()
         return stats
 
     def to_csv(self, out_path: str):
@@ -183,8 +200,10 @@ class NodeResult:
 
     def prune_designs(self, top_k: int, metric: str, strict: bool=False):
         design_stats = self.to_dict()
-        if len(design_stats["eval"]) <= top_k:
-            return design_stats
+        self._all_designs = deepcopy(self.designs)
+
+        if len(design_stats["eval"]) <= top_k or top_k == -1:
+            return
 
         # The metric_per_design array has this structure, with
         # every cell holding EAP, EDP or some other metric:
@@ -230,7 +249,8 @@ class NodeResult:
 
         pruned_stats = {tag: results for tag, results in design_stats["eval"].items() if tag in design_candidates}
 
-        return pruned_stats
+        pruned_designs = [design for design in self.designs if design.tag in design_candidates]
+        self.designs = pruned_designs
 
     
     @classmethod
@@ -282,7 +302,7 @@ class SystemResult:
         return list(self.platforms.keys())
 
     def get_design_tags(self, platform_id: int):
-        return list(self.platforms[platform_id]["eval"].keys())
+        return [design.tag for design in self.platforms[platform_id].designs]
     
     def to_dict(self) -> dict:
         stats = {}
@@ -299,7 +319,7 @@ class SystemResult:
 
 class NodeEvaluator(ABC):
     """
-    Interface which all node evluators should inherit from
+    Interface which all node evaluators should inherit from
     """
     fname_result: str
     config: dict

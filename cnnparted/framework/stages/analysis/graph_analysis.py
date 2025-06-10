@@ -11,7 +11,7 @@ class GraphAnalysis(Stage):
     
     def run(self, artifacts: Artifacts):
         self._take_artifacts(artifacts)
-        ga = GraphAnalyzer(self.work_dir, self.run_name, tuple(self.input_size), self.workloads, artifacts.args["p"])
+        ga = GraphAnalyzer(self.work_dir, self.run_name, self.workloads, artifacts.args["p"])
         ga.find_schedules(self.num_topos)
 
         self._update_artifacts(artifacts, ga)
@@ -20,7 +20,6 @@ class GraphAnalysis(Stage):
     def _take_artifacts(self, artifacts: Artifacts):
         self.work_dir = artifacts.config["general"]["work_dir"]
         self.run_name = artifacts.args["run_name"]
-        self.input_size =  artifacts.config["workload"][0]["input-size"] #TODO Currently only considers one workload
         self.num_topos = artifacts.config["general"]["num_topos"]
         self.workloads = artifacts.get_stage_result(WorkloadParser, "workloads")
 

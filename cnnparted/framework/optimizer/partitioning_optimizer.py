@@ -17,10 +17,12 @@ from framework.optimizer.partitioning_problem import PartitioningProblem
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
+from framework.node.node_evaluator import SystemResult
 
 
 class PartitioningOptimizer(Optimizer):
-    def __init__(self, ga : GraphAnalyzer, num_pp : int, node_stats : dict, link_components : list, progress : bool) -> None:
+    def __init__(self, ga : GraphAnalyzer, num_pp : int, node_stats : SystemResult, link_components : list, progress : bool) -> None:
+        node_stats = node_stats.to_dict()
         self.work_dir = ga.work_dir
         self.run_name = ga.run_name
         assert len(ga.networks) == 1, "PartitioningOptmizer does not support evaluation of multiple neural networks"

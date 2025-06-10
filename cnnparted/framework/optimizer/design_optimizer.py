@@ -69,7 +69,7 @@ class DesignOptimizer(Optimizer):
         return np.array(samples)
 
 
-    def _optimize_single(self):
+    def _optimize_single(self) -> SystemResult:
         problem = self.problem
 
         if self.algorithm != "exhaustive":
@@ -118,7 +118,7 @@ class DesignOptimizer(Optimizer):
 
         # For now, continue if everything is present
         if node_eval_stats.get_num_platforms() == len(self.node_components):
-            return node_eval_stats.to_dict()
+            return node_eval_stats
 
         # Select the corresponding wrapper to perform optimization
         if self.algorithm in pymoo_algorithms:
@@ -130,7 +130,7 @@ class DesignOptimizer(Optimizer):
                         verbose=False
                         )
             
-            node_eval_stats = problem.system_results.to_dict()
+            node_eval_stats: SystemResult = problem.system_results
             problem.system_results.to_csv(self.work_dir)
             dse_accelerator_names = [node["evaluation"]["accelerator"] for node in self.node_components if "dse" in node]
             self._plot_history(res, self.work_dir, dse_accelerator_names)
@@ -147,7 +147,7 @@ class DesignOptimizer(Optimizer):
             algorithm.save(model_out_file)
         
         elif self.algorithm == "exhaustive":
-            node_eval_stats = {}
+            node_eval_stats = SystemResult()
 
             # Setup acc_adaptors
             accelerator_configs = [ACCELERATOR_CONFIG_MAP[node["evaluation"]["accelerator"]] for node in self.node_components]
@@ -180,15 +180,15 @@ class DesignOptimizer(Optimizer):
 
                 instances = node_thread.config.get("instances", 1)
                 if instances == 1:
-                    node_eval_stats[id] = stats
+                    node_eval_stats.add_platform(id, stats)
                 else:
                     # If the accelerator should be instatiated multiple times, copy the results and generate a unique id
                     for i in range(0, instances):
                         id_str = "10" + str(id) + str(i) # generate a unique id for instances
-                        node_eval_stats[int(id_str)] = stats
+                        node_eval_stats.add_platform(int(id_str), stats)
 
             # ensure IDs are actually all unique
-            all_ids = list(node_eval_stats.keys())
+            all_ids = list(node_eval_stats.platforms.keys())
             assert len(all_ids) == len(set(all_ids)), f"Component IDs are not unique. Found IDs: {all_ids}"
 
         # TODO: Return type currently does not consider res of minimize call
