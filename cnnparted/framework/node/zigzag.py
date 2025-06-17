@@ -38,7 +38,7 @@ class Zigzag(NodeEvaluator):
         self.runname = runname
         return super().set_workdir(work_dir, runname, id)
 
-    def run(self, layers: list):
+    def run(self, network: str, layers: list):
         design_runroot = pathlib.Path(self.runroot, "design"+str(1))
         zigzag_out_dir = pathlib.Path(design_runroot, "out")
 
@@ -86,6 +86,7 @@ class Zigzag(NodeEvaluator):
             l.area = 0.0 # zigzag doesn't return the area
 
             design_result.add_layer(l)
+            design_result.add_layer_to_network(l, network)
 
         node_result.add_design(design_result)
         

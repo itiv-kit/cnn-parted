@@ -213,7 +213,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
         net = NetworkGraph(hardware_config, layer_config_list, quantize_config_list, input_index_list, input_params)
         return net
 
-    def run(self, layers: list, progress : bool = False):
+    def run(self, network: str, layers: list, progress : bool = False):
         self.net = self._get_net(layers, self.hardware_config)
 
         struct_file = self.get_structure()
@@ -238,6 +238,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             l.energy = energy / 1e6 # nJ -> mJ
             l.area = area / 1e6 # um^2 -> mm^2
             design.add_layer(l)
+            design.add_layer_to_network(l, network)
 
         # for compatibility reasons with DSE-Extension
         node_res.add_design(design)

@@ -13,7 +13,7 @@ class PartitioningProblem(ElementwiseProblem):
     def __init__(self, num_pp : int, node_stats : dict, schedule : list, 
             q_constr : dict, fixed_sys : bool, acc_once : bool, max_num_platforms: int,
             layer_dict : dict, layer_params : dict, link_confs : list, 
-            system_constraints: dict, optimizer_cfg: PartitioningOptConfig):
+            system_constraints: dict, optimizer_cfg: PartitioningOptConfig, network: str):
         self.node_stats = node_stats
         self.num_platforms = len(node_stats)
         self.num_pp = num_pp
@@ -32,6 +32,7 @@ class PartitioningProblem(ElementwiseProblem):
         self.links = []
         for link_conf in link_confs:
             self.links.append(Link(link_conf))
+        self.network = network
 
         n_var, n_obj, n_constr, xl, xu = optimizer_cfg.get()
 
@@ -402,14 +403,14 @@ class PartitioningProblem(ElementwiseProblem):
         return int(tag)
 
     def _get_layer_latency(self, platform : int, design_tag: str, layer_name : str) -> float:
-        if self.node_stats[platform]["eval"][design_tag]["layers"].get(layer_name):
-            return float(self.node_stats[platform]["eval"][design_tag]["layers"][layer_name]['latency'])
+        if self.node_stats[platform]["eval"][design_tag]["networks"][self.network].get(layer_name):
+            return float(self.node_stats[platform]["eval"][design_tag]["networks"][self.network][layer_name]['latency'])
         else:
             return 0
 
     def _get_layer_energy(self, platform : int, design_tag: str,  layer_name : str) -> float:
-        if self.node_stats[platform]["eval"][design_tag]["layers"].get(layer_name):
-            return float(self.node_stats[platform]["eval"][design_tag]["layers"][layer_name]['energy'])
+        if self.node_stats[platform]["eval"][design_tag]["networks"][self.network].get(layer_name):
+            return float(self.node_stats[platform]["eval"][design_tag]["networks"][self.network][layer_name]['energy'])
         else:
             return 0
 
@@ -478,22 +479,22 @@ class PartitioningProblem(ElementwiseProblem):
             if self.node_stats[platform]['type'] == 'mnsim':
                 for part in parts[key]:
                     for l in self.schedule[part[0]+1:part[1]+1]:
-                        if l in [*self.node_stats[platform]["eval"][tag]["layers"]]:
-                            area += float(self.node_stats[platform]["eval"][tag]["layers"][l]['area'])
+                        if l in [*self.node_stats[platform]["eval"][tag]["networks"][self.network]]:
+                            area += float(self.node_stats[platform]["eval"][tag]["networks"][self.network][l]['area'])
             else: # timeloop
                 #part: partition
                 for part in parts[key]:
                     if part[0] != part[1] and part[1] != 0: #partitions stores [platform, layer_ids], here check if layers are executed on platform
                         tag = design_tag[platform]
-                        first_layer = [*self.node_stats[platform]["eval"][tag]["layers"]][0]
-                        area += float(self.node_stats[platform]["eval"][tag]["layers"][first_layer]['area'])
+                        first_layer = [*self.node_stats[platform]["eval"][tag]["networks"][self.network]][0]
+                        area += float(self.node_stats[platform]["eval"][tag]["networks"][self.network][first_layer]['area'])
                         break
 
         return area
 
     def _get_area_platform(self, platform: int, design_id: int):
-        first_layer = [*self.node_stats[platform]["eval"][design_id]["layers"]][0]
-        area = float(self.node_stats[platform]["eval"][design_id]["layers"][first_layer]['area'])
+        first_layer = [*self.node_stats[platform]["eval"][design_id]["networks"][self.network]][0]
+        area = float(self.node_stats[platform]["eval"][design_id]["networks"][self.network][first_layer]['area'])
         return area
 
     def _check_system_constraints(self, constraints, energy, latency, throughput, area) -> bool:

@@ -29,7 +29,9 @@ def plotMetricPerConfigPerLayer(stats: dict, dir: str, metric: str, type: str = 
     labels = []
 
     for tag, design in stats.items():
-        layers = design["layers"]
+        assert len(design["networks"]) == 1
+        network = list(design["networks"].keys())[0]
+        layers = design["networks"][network]
         energy_per_layer = []
         latency_per_layer = []
         for key, layer in layers.items():

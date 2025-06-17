@@ -89,12 +89,12 @@ class Timeloop(NodeEvaluator):
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
 
-    def run_from_adaptor(self, layers : dict, adaptor: TimeloopInterface, progress : bool = False) -> NodeResult:
+    def run_from_adaptor(self, network: str, layers : dict, adaptor: TimeloopInterface, progress : bool = False) -> NodeResult:
         self.adaptor = adaptor
         node_result = NodeResult(self.node_config)
 
         if not self.adaptor.design_space:
-            self._run_design(layers, progress, node_result, adaptor.config)
+            self._run_design(network, layers, progress, node_result, adaptor.config)
 
             self.stats = {tag: results for tag, results in node_result.to_dict().items()}
             self.adaptor = None
@@ -106,7 +106,7 @@ class Timeloop(NodeEvaluator):
             for i, design in enumerate(self.adaptor.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
                     shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
-                self._run_design(layers, progress, node_result, design, i)
+                self._run_design(network, layers, progress, node_result, design, i)
             
             # Plot all metrics in all combinations of line/bar, scale/log
             for m in SUPPORTED_METRICS:
@@ -119,7 +119,7 @@ class Timeloop(NodeEvaluator):
 
         return node_result
 
-    def run(self, layers : dict, progress : bool = False) -> NodeResult:
+    def run(self, network: str, layers : dict, progress : bool = False) -> NodeResult:
         node_result = NodeResult(self.node_config)
         node_result.accelerator_name = self.accname
 
@@ -130,7 +130,7 @@ class Timeloop(NodeEvaluator):
             for i, design in enumerate(self.adaptor.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
                     shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
-                self._run_design(layers, progress, node_result, design, i)
+                self._run_design(network, layers, progress, node_result, design, i)
             
             # Plot all metrics in all combinations of line/bar, scale/log
             for m in SUPPORTED_METRICS:
@@ -154,6 +154,7 @@ class Timeloop(NodeEvaluator):
                 layer_result.area = output["area_mm2"]
 
                 design_result.add_layer(layer_result)
+                design_result.add_layer_to_network(layer_result, network)
 
             node_result.add_design(design_result)
 
@@ -164,7 +165,7 @@ class Timeloop(NodeEvaluator):
 
         return node_result
 
-    def _run_design(self, layers: dict, progress: bool, stats: NodeResult,  design: ArchitectureConfig, design_id: Optional[int] = None,):
+    def _run_design(self, network: str, layers: dict, progress: bool, stats: NodeResult,  design: ArchitectureConfig, design_id: Optional[int] = None,):
         if self.adaptor and self.adaptor.tl_out_design_name:
             design_runroot = os.path.join(self.runroot, self.adaptor.tl_out_design_name)
         else:
@@ -195,6 +196,7 @@ class Timeloop(NodeEvaluator):
             layer_result.area = output["area_mm2"]
 
             design_result.add_layer(layer_result)
+            design_result.add_layer_to_network(layer_result, network)
         
         stats.add_design(design_result)
 

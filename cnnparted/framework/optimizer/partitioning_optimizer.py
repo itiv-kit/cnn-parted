@@ -27,6 +27,7 @@ class PartitioningOptimizer(Optimizer):
         self.run_name = ga.run_name
         assert len(ga.networks) == 1, "PartitioningOptmizer does not support evaluation of multiple neural networks"
         network = ga.networks[0]
+        self.network = network
         self.schedules = ga.schedules[network]
         self.num_pp = num_pp
         self.node_stats = node_stats
@@ -167,7 +168,7 @@ class PartitioningOptimizer(Optimizer):
 
         problem = PartitioningProblem(num_pp, self.node_stats, schedule, 
                     q_constr, fixed_sys, acc_once, max_num_platforms, self.layer_dict, 
-                    self.layer_params, self.link_confs, system_constraints, self.optimizer_cfg)
+                    self.layer_params, self.link_confs, system_constraints, self.optimizer_cfg, self.network)
 
         num_layers = len(schedule)
         initial_x = self._gen_initial_x(num_layers, num_pp, fixed_sys, acc_once)

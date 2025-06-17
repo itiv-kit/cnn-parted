@@ -79,6 +79,8 @@ class DesignOptimizer(Optimizer):
         pydeap_algorithms = []
         rl_algorithms = ["rl_ppo"]
 
+        network = self.ga.networks[0] #TODO Multiple networks
+
         if self.algorithm == "nsga2":
             algorithm = NSGA2(
                 pop_size=self.pop_size,
@@ -112,9 +114,9 @@ class DesignOptimizer(Optimizer):
             file_str_alt = str(node_id) + "_tl_layers.csv"
             file_str_alt = os.path.join(self.work_dir, file_str_alt)
             if os.path.isfile(file_str):
-                node_eval_stats.add_platform(node_id, NodeResult.from_csv(file_str, node_config))
+                node_eval_stats.add_platform(node_id, NodeResult.from_csv(file_str, network, node_config))
             elif os.path.isfile(file_str_alt):
-                node_eval_stats.add_platform(node_id, NodeResult.from_csv(file_str_alt, node_config))
+                node_eval_stats.add_platform(node_id, NodeResult.from_csv(file_str_alt, network, node_config))
 
         # For now, continue if everything is present
         if node_eval_stats.get_num_platforms() == len(self.node_components):

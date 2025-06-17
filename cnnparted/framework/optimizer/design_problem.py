@@ -98,7 +98,6 @@ class DesignProblem(ElementwiseProblem):
         fixed_nodes = [node for node in node_components if "dse" not in node]
         self.fixed_node_stats = self._eval_nodes(fixed_nodes)
         for ((id, node_stats), node_config)  in zip(self.fixed_node_stats.platforms.items(), fixed_nodes):
-            #node_results = NodeResult.from_dict(node_stats, node_config)
             self.system_results.add_platform(id, node_stats)
         print("Done evaluating fixed nodes!")
 

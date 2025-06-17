@@ -2,6 +2,8 @@ import os
 import csv
 from abc import ABC
 from copy import deepcopy
+from functools import reduce
+import operator
 
 from framework.helpers.design_metrics import calc_metric
 
@@ -37,6 +39,36 @@ class LayerResult:
     def __str__(self):
         return str(self.to_dict())
     
+
+class NetworkResult:
+    """
+    Information about the execution of the networks for a given design of a specific accelerator
+    """
+    def __init__(self):
+        self._networks: dict[str, list[LayerResult]] = {}
+
+    def get_networks(self):
+        return list(self._networks.keys())
+    
+    def get_network_dict(self, network: str):
+        layers_list_of_dict = [l.to_dict() for l in self._networks[network]]
+        layers = reduce(operator.ior, layers_list_of_dict, {})
+        return layers
+
+    def add_layer(self, results: LayerResult, network: str):
+        if network not in self._networks:
+            self._networks[network] = []
+
+        self._networks[network].append(results)
+    
+    def get_networks_dict(self):
+        networks = {network: self.get_network_dict(network) for network  in self._networks.keys()}
+        return networks
+    
+    def __getitem__(self, item: str):
+        return self._networks[item]
+
+    
 class DesignResult:
     """
     Information about the execution of a full network and the specific architecture it is run on.
@@ -48,9 +80,12 @@ class DesignResult:
     """
     def __init__(self, architecture: dict = {}):
         self.tag: str = ""
+        self.networks: dict[str, list[LayerResult]] = {}
+
+        #TODO Remove after networks member is implemented
         self.layers: list[LayerResult] = []
-        #self.layers_dict: dict[str, dict[str, LayerResult]] = {}
         self.layers_dict: dict[str, LayerResult] = {}
+
         self.architecture: dict = architecture
 
     @classmethod
@@ -73,22 +108,21 @@ class DesignResult:
         self.layers.append(results)
         self.layers_dict[results.name] = results
 
-        #if network in self.layers_dict:
-        #    self.layers_dict[network][results.name] = results
-        #else:
-        #    self.layers_dict[network] = {}
-        #    self.layers_dict[network][results.name] = results
-
 
     def to_dict(self) -> dict:
         res = {}
         res["arch_config"] = self.architecture
-        res["layers"] = {} 
-        for layer in self.layers:
-            ld: dict = layer.to_dict()
-            name = list(ld.keys())[0]
-            data = list(ld.values())[0]
-            res["layers"][name] = data
+        res["networks"] = {}
+
+        for nw in self.networks.keys():
+            res["networks"][nw] = self.get_network_dict(nw)
+
+        #res["layers"] = {} 
+        #for layer in self.layers:
+        #    ld: dict = layer.to_dict()
+        #    name = list(ld.keys())[0]
+        #    data = list(ld.values())[0]
+        #    res["layers"][name] = data
         return res
     
     def get_layer_dict(self) -> dict:
@@ -101,6 +135,24 @@ class DesignResult:
                 "latency": layer.latency,
                 }
         return layers
+
+    def get_networks(self):
+        return list(self.networks.keys())
+    
+    def get_network_dict(self, network: str):
+        layers_list_of_dict = [l.to_dict() for l in self.networks[network]]
+        layers = reduce(operator.ior, layers_list_of_dict, {})
+        return layers
+
+    def add_layer_to_network(self, results: LayerResult, network: str):
+        if network not in self.networks:
+            self.networks[network] = []
+
+        self.networks[network].append(results)
+    
+    def get_networks_dict(self):
+        networks = {network: self.get_network_dict(network) for network  in self.networks.keys()}
+        return networks
 
     @property
     def area(self):
@@ -202,8 +254,10 @@ class NodeResult:
         design_stats = self.to_dict()
         self._all_designs = deepcopy(self.designs)
 
-        if len(design_stats["eval"]) <= top_k or top_k == -1:
+        if len(design_stats["eval"]) <= top_k or top_k == -1 or any( [len(d.networks)>1 for d in self.designs]) :
             return
+
+        network = self.designs[0].get_networks()[0]
 
         # The metric_per_design array has this structure, with
         # every cell holding EAP, EDP or some other metric:
@@ -218,7 +272,7 @@ class NodeResult:
 
         for tag, design in design_stats["eval"].items():
             #tag = design["tag"]
-            layers = design["layers"]
+            layers = design["networks"][network]
             energy_per_layer = []
             latency_per_layer = []
             for name, layer in layers.items():
@@ -254,7 +308,7 @@ class NodeResult:
 
     
     @classmethod
-    def from_csv(cls, in_path: str, node_config: dict):
+    def from_csv(cls, in_path: str, network: str, node_config: dict):
         node_res = cls(node_config)
 
         design_result = DesignResult()
@@ -273,6 +327,7 @@ class NodeResult:
                 layer_res.energy = float(row['Energy [mJ]'])
                 layer_res.area = float(row['Area [mm2]'])
                 design_result.add_layer(layer_res)
+                design_result.add_layer_to_network(layer_res, network)
 
         # Add results for the final design
         node_res.add_design(design_result)
@@ -324,11 +379,11 @@ class NodeEvaluator(ABC):
     fname_result: str
     config: dict
 
-    def set_workdir(self, work_dir: str, runname: str, id: int):
+    def set_workdir(self, work_dir: str, network: str, id: int):
         self.workdir = work_dir
         self.runroot = os.path.join(work_dir, "system_evaluation", str(id)+"_"+self.config["accelerator"])
-        fname_csv = os.path.join(work_dir, str(id) + "_" + self.config["accelerator"] + "_" + self.fname_result)
+        fname_csv = os.path.join(work_dir, str(id) + "_" + network + "_" + self.config["accelerator"] + "_" + self.fname_result)
         return fname_csv
 
-    def run(self, layers: list):
+    def run(self, network: str, layers: list):
         ...

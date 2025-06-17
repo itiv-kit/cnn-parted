@@ -44,17 +44,17 @@ class NodeThread(ModuleThreadInterface):
             top_k = int(self.dse_system_config.get("top_k", -1))
 
         # Check if some previous results are available
-        fname_csv = simulator.set_workdir(self.work_dir, self.runname, self.id)
+        fname_csv = simulator.set_workdir(self.work_dir, network, self.id)
         if os.path.isfile(fname_csv):
-            self.stats = NodeResult.from_csv(fname_csv, self.config)
+            self.stats = NodeResult.from_csv(fname_csv, network, self.config)
             self.stats.prune_designs(top_k, metric)
             return
 
         # Perform the actual evaluation
         if self.acc_adaptor is None:
-            self.stats = simulator.run(layers)
+            self.stats = simulator.run(network, layers)
         else:
-            self.stats = simulator.run_from_adaptor(layers, self.acc_adaptor)
+            self.stats = simulator.run_from_adaptor(network, layers, self.acc_adaptor)
 
         if self.save_results:
             self.stats.to_csv(fname_csv)
