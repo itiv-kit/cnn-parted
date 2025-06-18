@@ -28,7 +28,7 @@ class Timeloop(NodeEvaluator):
     out_prefix = "timeloop-mapper."
     exec_path = os.path.join(ROOT_DIR, 'tools', 'timeloop', 'build', 'timeloop-mapper')
     configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
-    fname_result = "tl_layers.csv"
+    fname_result = "tl_layers"
 
     def __init__ (self, in_config : dict, dse_system_config: dict = {}) -> None:
         log_file_name = self.out_prefix + "log"

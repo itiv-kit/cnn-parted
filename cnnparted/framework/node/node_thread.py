@@ -8,8 +8,7 @@ from framework.node.timeloop import Timeloop
 from framework.node.mnsim_interface import MNSIMInterface
 from framework.node.generic_node import GenericNode
 from framework.node.zigzag import Zigzag
-from framework.helpers.design_metrics import calc_metric
-from framework.node.node_evaluator import LayerResult, NodeResult
+from framework.node.node_evaluator import NodeResult
 
 
 class NodeThread(ModuleThreadInterface):
@@ -49,10 +48,10 @@ class NodeThread(ModuleThreadInterface):
 
 
             # Check if some previous results are available
-            # TODO Currently NodeResults is always overwritten with every iteration. Need a way to properly merge the results
-            fname_csv = simulator.set_workdir(self.work_dir, network, self.id)
-            if os.path.isfile(fname_csv):
-                stats = NodeResult.from_csv(fname_csv, network, self.config)
+            fname_base = simulator.set_workdir(self.work_dir, network, self.id)
+            if os.path.isfile(fname_base+".csv"):
+                #stats_j = NodeResult.from_json(fname_base, network, self.config)
+                stats = NodeResult.from_csv(fname_base, network, self.config)
             else:
                 # Perform the actual evaluation
                 if self.acc_adaptor is None:
@@ -61,7 +60,8 @@ class NodeThread(ModuleThreadInterface):
                     stats = simulator.run_from_adaptor(network, layers, self.acc_adaptor)
 
                 if self.save_results:
-                    stats.to_csv(fname_csv)
+                    stats.to_csv(fname_base)
+                    stats.to_json(fname_base)
 
             node_result_networks.append(stats)
         

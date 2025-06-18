@@ -18,7 +18,7 @@ class Zigzag(NodeEvaluator):
         super().__init__()
         self.node_config = in_config
         self.config = in_config["evaluation"]
-        self.fname_result = "zigzag_layers.csv"
+        self.fname_result = "zigzag_layers"
 
         self.configs_dir = pathlib.Path(ROOT_DIR, "tools", "zigzag", "zigzag", "inputs")
         self.zigzag_hardware_configs_dir = pathlib.Path(self.configs_dir, "hardware")

@@ -1,13 +1,15 @@
 import os
 import csv
+import operator
+import json
 from abc import ABC
 from copy import deepcopy
 from functools import reduce
-import operator
+
+import numpy as np
 
 from framework.helpers.design_metrics import calc_metric
 
-import numpy as np
 
 class LayerResult:
     """ 
@@ -89,19 +91,21 @@ class DesignResult:
         self.architecture: dict = architecture
 
     @classmethod
-    def from_dict(cls, design_dict: dict):
+    def from_dict(cls, design_dict: dict, network: str = None):
         data = design_dict.values()
         arch = design_dict["arch_config"]
-        layers = design_dict["layers"]
         design_res = cls()
         design_res.architecture = arch
-        for name, layer in layers.items():
-            l = LayerResult()
-            l.name = name
-            l.area = layer["area"]
-            l.energy  = layer["energy"]
-            l.latency = layer["latency"]
-            design_res.add_layer(l)
+        for nw, layers in design_dict["networks"].items():
+            if nw == network or network is None:
+                for name, data in layers.items():
+                    l = LayerResult()
+                    l.name = name
+                    l.area = data["area"]
+                    l.energy  = data["energy"]
+                    l.latency = data["latency"]
+                    design_res.add_layer(l)
+                    design_res.add_layer_to_network(l, nw if network is None else network)
         return design_res 
 
     def add_layer(self, results: LayerResult, network: str = "test"):
@@ -117,12 +121,6 @@ class DesignResult:
         for nw in self.networks.keys():
             res["networks"][nw] = self.get_network_dict(nw)
 
-        #res["layers"] = {} 
-        #for layer in self.layers:
-        #    ld: dict = layer.to_dict()
-        #    name = list(ld.keys())[0]
-        #    data = list(ld.values())[0]
-        #    res["layers"][name] = data
         return res
     
     def get_layer_dict(self) -> dict:
@@ -166,6 +164,7 @@ class DesignResult:
     def total_energy(self):
         return sum([layer.energy for layer in self.layers])
 
+
 class NodeResult:
     """
     Complete information about a node on which the simulation is run. For the design space exploration multiple designs can be
@@ -188,22 +187,14 @@ class NodeResult:
 
 
     @classmethod
-    def from_dict(cls, node_dict: dict, node_config: dict):
+    def from_dict(cls, node_dict: dict, node_config: dict, network: str = None):
         node_res = cls(node_config)
         node_res.bits = node_dict.get("bits")
         node_res.fault_rates = node_dict.get("fault_rates")
         node_res.faulty_bits = node_dict.get("faulty_bits")
         node_res.type = node_dict.get("type")
-        for design, eval in node_dict["eval"].items():
-            des = DesignResult()
-            des.architecture = eval["arch_config"]
-            for name, layer in eval["layers"].items():
-                l = LayerResult()
-                l.name = name
-                l.area = layer["area"]
-                l.energy = layer["energy"]
-                l.latency = layer["latency"]
-                des.add_layer(l)
+        for design_tag, design_data in node_dict["eval"].items():
+            des = DesignResult.from_dict(design_data, network)
             node_res.add_design(des)
         return node_res
 
@@ -225,6 +216,7 @@ class NodeResult:
         return stats
 
     def to_csv(self, out_path: str):
+        out_path = out_path + ".csv"
         with open(out_path, "w", newline="") as f:
             writer = csv.writer(f, delimiter=";")
             header = [
@@ -309,6 +301,7 @@ class NodeResult:
     
     @classmethod
     def from_csv(cls, in_path: str, network: str, node_config: dict):
+        in_path = in_path + ".csv"
         node_res = cls(node_config)
 
         design_result = DesignResult()
@@ -332,6 +325,21 @@ class NodeResult:
         # Add results for the final design
         node_res.add_design(design_result)
         return node_res
+    
+    def to_json(self, out_path: str):
+        out_path = out_path + ".json"
+        data = self.to_dict()
+        with open(out_path, "w") as f:
+            json.dump(data, f, indent=4)
+    
+    @classmethod
+    def from_json(cls, in_path: str, network: str, node_config: dict):
+        in_path = in_path + ".json"
+        with open(in_path, "r") as f:
+            data = json.load(f)
+
+        node_result = cls.from_dict(data, node_config, network)
+        return node_result
 
     
 class SystemResult:
@@ -366,6 +374,7 @@ class SystemResult:
         return stats
     
     def to_csv(self, out_path, runname: str = ""):
+        out_path = out_path + ".csv"
         for id, node_res in self.platforms.items():
             file_str = str(id) + "_" + node_res.accelerator_name + "_tl_layers.csv"
             file_path = os.path.join(out_path,  file_str)
@@ -382,8 +391,8 @@ class NodeEvaluator(ABC):
     def set_workdir(self, work_dir: str, network: str, id: int):
         self.workdir = work_dir
         self.runroot = os.path.join(work_dir, "system_evaluation", str(id)+"_"+self.config["accelerator"])
-        fname_csv = os.path.join(work_dir, str(id) + "_" + network + "_" + self.config["accelerator"] + "_" + self.fname_result)
-        return fname_csv
+        fname_base = os.path.join(work_dir, str(id) + "_" + network + "_" + self.config["accelerator"] + "_" + self.fname_result)
+        return fname_base
 
     def run(self, network: str, layers: list):
         ...

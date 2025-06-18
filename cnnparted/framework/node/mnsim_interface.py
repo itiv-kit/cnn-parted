@@ -21,7 +21,7 @@ from MNSIM.Area_Model.Model_Area import Model_area
 from pytorch_quantization import tensor_quant
 
 class MNSIMInterface(TrainTestInterface, NodeEvaluator):
-    fname_result = "mnsim_layers.csv"
+    fname_result = "mnsim_layers"
 
     def __init__ (self, in_config : dict, input_size : list) -> None:
         mnsim_config = in_config["evaluation"]
