@@ -38,7 +38,7 @@ class NodeThread(ModuleThreadInterface):
                     simulator = Timeloop(self.config, self.dse_system_config)
                 case "mnsim":
                     layers = self.ga.get_mnsim_layers(network)
-                    simulator = MNSIMInterface(self.config, self.ga.workloads[network].input_size)
+                    simulator = MNSIMInterface(self.config, self.ga.workloads[network].input_shape)
                 case "zigzag":
                     layers = []
                     simulator = Zigzag(self.config)
