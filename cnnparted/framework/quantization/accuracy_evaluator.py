@@ -12,10 +12,12 @@ from model_explorer.utils.setup import build_dataloader_generators
 
 from framework.quantization.faulty_quantized_model import FaultyQuantizedModel
 from framework.quantization.generate_calibration import generate_calibration
+from framework.node.node_evaluator import SystemResult
 
 
 class AccuracyEvaluator():
-    def __init__(self, models : dict[str, nn.Module], node_stats : dict, config : dict, device : str, progress : bool) -> None:
+    def __init__(self, models : dict[str, nn.Module], node_stats : SystemResult, config : dict, device : str, progress : bool) -> None:
+        node_stats = node_stats.to_dict()
         self.bits = [node_stats[acc].get("bits") for acc in node_stats]
         self.fault_rates = [node_stats[acc].get("fault_rates") for acc in node_stats]
         self.faulty_bits = [node_stats[acc].get("faulty_bits") for acc in node_stats]
