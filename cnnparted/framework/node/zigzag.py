@@ -14,10 +14,11 @@ from tools.zigzag.zigzag.api import get_hardware_performance_zigzag
 from tools.zigzag.zigzag.cost_model.cost_model import CostModelEvaluation
 
 class Zigzag(NodeEvaluator):
-    def __init__(self, in_config: dict) -> None:
+    def __init__(self, in_config: dict, run_name: str) -> None:
         super().__init__()
         self.node_config = in_config
         self.config = in_config["evaluation"]
+        self.run_name = run_name
         self.fname_result = "zigzag_layers"
 
         self.configs_dir = pathlib.Path(ROOT_DIR, "tools", "zigzag", "zigzag", "inputs")
@@ -35,7 +36,6 @@ class Zigzag(NodeEvaluator):
 
 
     def set_workdir(self, work_dir: str, runname: str, id: int):
-        self.runname = runname
         return super().set_workdir(work_dir, runname, id)
 
     def run(self, network: str, layers: list):
@@ -60,7 +60,7 @@ class Zigzag(NodeEvaluator):
         
         assert accfile.exists() and mapfile.exists(), f"Could not found the specified mapping or accelerator.\nAccfile: {str(accfile)}\nMapfile: {str(mapfile)}"
 
-        modelfile = pathlib.Path(self.model_dir, self.runname, "new_model.onnx")
+        modelfile = pathlib.Path(self.model_dir, self.run_name, network + "_new_model.onnx")
 
         shutil.copy(str(accfile), str(zigzag_config_dir_arch))
         shutil.copy(str(mapfile), str(zigzag_config_dir_mapping))

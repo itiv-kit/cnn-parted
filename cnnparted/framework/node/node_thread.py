@@ -41,7 +41,7 @@ class NodeThread(ModuleThreadInterface):
                     simulator = MNSIMInterface(self.config, self.ga.workloads[network].input_shape)
                 case "zigzag":
                     layers = []
-                    simulator = Zigzag(self.config)
+                    simulator = Zigzag(self.config, self.runname)
                 case _:
                     layers = []
                     simulator = GenericNode(self.config)
