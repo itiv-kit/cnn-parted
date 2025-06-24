@@ -6,7 +6,7 @@ yaml = YAML(typ="rt")
 import shutil
 import numpy as np
 
-from framework.dse.interfaces.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
 from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
@@ -90,10 +90,11 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
         #self.glb_size = int(glb_depth * self.word_bits * self.glb_block_size // (8*1024))
 
 
-class EyerissArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
+class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch):
     def __init__(self):
         super().__init__()
         self.config: EyerissConfig = None
+        #self.design_space = []
 
     def read_space_cfg(self, cfg):
         search_space_constraints = cfg.get("constraints", {})

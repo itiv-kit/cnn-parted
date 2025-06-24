@@ -12,3 +12,8 @@ class ArchitectureConfig(ABC):
     @abstractmethod
     def get_config(self) -> dict:
         ...
+
+class ArchitectureAdaptor(ABC):
+    def __init__(self):
+        super().__init__()
+        self.config: ArchitectureConfig = None

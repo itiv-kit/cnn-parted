@@ -6,7 +6,7 @@ yaml = YAML(typ="rt")
 import shutil
 import numpy as np
 
-from framework.dse.interfaces.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
 from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
@@ -95,10 +95,11 @@ class SimbaConfig(ArchitectureConfig, GenomeInterface):
         #self.globalbuf_size = int(self.globalbuf_depth * self.word_bits * self.block_size_global_buf // (8*1024))
 
 
-class SimbaArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
+class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch):
     def __init__(self):
         super().__init__()
         self.config: SimbaConfig = None
+        self._design_space = []
         
         #Constants related to memory width
         self.word_bits = 8

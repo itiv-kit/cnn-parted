@@ -8,6 +8,7 @@ from pymoo.core.mutation import Mutation
 
 class GenomeInterface(ABC):
     def __init__(self):
+        super().__init__()
         self.crossover: Crossover = None
         self.mutation: Mutation = None
 

@@ -6,7 +6,7 @@ from ruamel.yaml import YAML
 yaml = YAML(typ="rt")
 import numpy as np
 
-from framework.dse.interfaces.architecture_config import ArchitectureConfig
+from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
 from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
@@ -119,11 +119,12 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
     
 
 
-class GemminiArchitectureAdaptor(TimeloopInterface, ExhaustiveSearch):
+class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch):
 
     def __init__(self):
         super().__init__()
         self.config: GemminiConfig = None
+        self._design_space = []
 
     def read_space_cfg(self, cfg):
         self.spad_banks = 4

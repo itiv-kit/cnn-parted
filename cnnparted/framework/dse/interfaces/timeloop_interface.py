@@ -10,10 +10,8 @@ from framework.dse.interfaces.architecture_config import ArchitectureConfig
 #  class is used to mutate the architecture configuration to evaluate different configurations.
 class TimeloopInterface(ABC):
     def __init__(self):
-        self.design_space = []
-        self.config: ArchitectureConfig = None
-        #self.cfg: dict = cfg
-        #self.tl_in_configs_dir: str = cfg["tl_in_configs_dir"]
+        super().__init__()
+
         self.tl_in_configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
         self.tl_out_configs_dir: str = ""
         self.tl_out_design_name: Option[str] = None
