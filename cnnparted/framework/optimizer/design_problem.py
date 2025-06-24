@@ -208,7 +208,6 @@ class DesignProblem(ElementwiseProblem):
         for (cfg, in_lut, (id, stats)) in zip(xs, cfgs_already_in_lut, dse_node_stats.platforms.items()):
             if not stats.to_dict()["eval"]:
                 #simulation failed
-                breakpoint()
                 valid = False
                 cost.append(float(1000000000))
                 constraints.append([1,1,1])
