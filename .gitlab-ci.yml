@@ -13,10 +13,14 @@ setup-env:
       - pythonEnv/
       - .cache/pip
   variables:
-    GIT_SUBMODULE_STRATEGY: recursive
+    GIT_SUBMODULE_STRATEGY: none
     GIT_SUBMODULE_FORCE_HTTPS: "true"
   before_script:
-    - sudo dnf -y install libstdc++-static.x86_64 ncurses-devel libconfig-devel boost-serialization boost-devel yaml-cpp-devel libstdc++ python3.11 python3.11-pip python3.11-wheel
+    - git config --global --add safe.directory '*'
+    - git config --global url."https://github.com/".insteadOf "git@github.com:"
+    - git submodule sync --recursive
+    - git submodule update --init --recursive
+    - sudo dnf -y install libstdc++-static.x86_64 ncurses-devel libconfig-devel boost-serialization boost-devel yaml-cpp-devel libstdc++ python3.11 python3.11-pip python3.11-wheel which
     - python3.11 -m venv pythonEnv
     - source pythonEnv/bin/activate
   script:
@@ -30,7 +34,7 @@ setup-env:
     - git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then  pip install .; elif [ -f setup.py ]; then pip install -e .; fi'
     - git submodule foreach --recursive 'if [ -f requirements.txt ]; then pip install -r requirements.txt; fi'
     - sudo ln -s /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so
-    - which accelergy
+    - type accelergy
     - source tools/setupTimeloop.sh
     - pip install -e .
     - pip install -r requirements.txt
