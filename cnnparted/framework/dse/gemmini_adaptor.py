@@ -1,7 +1,6 @@
 import copy
 from math import log2
 import pathlib
-from cv2 import gemm
 from ruamel.yaml import YAML
 yaml = YAML(typ="rt")
 import numpy as np
