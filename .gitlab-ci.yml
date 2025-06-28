@@ -54,7 +54,7 @@ run-test:
       - test_pipe_alexnet
   stage: test
   before_script:    
-    - sudo dnf -y install libstdc++-static.x86_64 ncurses-devel libconfig-devel boost-serialization boost-devel yaml-cpp-devel python3.11 python3.11-pip python3.11-wheel
+    - sudo dnf -y install libstdc++-static.x86_64 ncurses-devel libconfig-devel boost-serialization boost-devel yaml-cpp-devel python3.11 python3.11-pip python3.11-wheel which
     - sudo ln -s /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so
     - source env/setupEnv.sh
     - export ACCELERGYPATH=$(which accelergy)
