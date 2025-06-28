@@ -111,12 +111,8 @@ class DesignOptimizer(Optimizer):
         for node_id, accelerator_name, node_config in zip(self.node_ids, self.accelerator_names, self.node_components):
             file_str = str(node_id) + "_" + accelerator_name + "_tl_layers.csv"
             file_str = os.path.join(self.work_dir, file_str)
-            file_str_alt = str(node_id) + "_tl_layers.csv"
-            file_str_alt = os.path.join(self.work_dir, file_str_alt)
             if os.path.isfile(file_str):
                 node_eval_stats.add_platform(node_id, NodeResult.from_csv(file_str, network, node_config))
-            elif os.path.isfile(file_str_alt):
-                node_eval_stats.add_platform(node_id, NodeResult.from_csv(file_str_alt, network, node_config))
 
         # For now, continue if everything is present
         if node_eval_stats.get_num_platforms() == len(self.node_components):
