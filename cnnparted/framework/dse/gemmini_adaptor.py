@@ -1,16 +1,24 @@
 import copy
 from math import log2
 import pathlib
-import yaml
+from ruamel.yaml import YAML
+yaml = YAML(typ="rt")
+import numpy as np
 
-from framework.dse.architecture_mutator import ArchitectureMutator, ArchitectureConfig
+from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
+from framework.dse.interfaces.genome_interface import GenomeInterface
+from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 
-class GemminiConfig(ArchitectureConfig):
+class GemminiConfig(ArchitectureConfig, GenomeInterface):
     def _is_pow_2(self, n):
         return (n & (n-1) == 0) and n != 0
 
 
     def __init__(self, mesh_dim, spad_size, acc_size, enable_checks=False):
+        super().__init__()
+        self.mesh_dim_x = mesh_dim
+        self.mesh_dim_y = mesh_dim
         self.mesh_dim = mesh_dim
         self.tile_dim = 1 #const for now
         self.dim = self.mesh_dim * self.tile_dim
@@ -51,14 +59,78 @@ class GemminiConfig(ArchitectureConfig):
         cfg["acc_size"] = self.acc_size
         cfg["spad_size"] = self.spad_size
         return cfg
+
+    @classmethod
+    def from_genome(cls, genome: list[int], mem_step: list[int]):
+        pe_dims = genome[0:1]
+        spad_depth = genome[1]
+        acc_depth = genome[2]
+
+        #instatiate dummy module, then set correct values
+        gemmini = cls(1, 1, 1, enable_checks=False) 
+        gemmini.pe_array_dim = pe_dims
+        gemmini.local_mems = [spad_depth*mem_step[0], acc_depth*mem_step[1]]
+        return gemmini
+
+    def to_genome(self) -> list:
+        return self.pe_array_dim + self.pe_array_mem + self.local_mems
+
+    @property
+    def pe_array_dim(self):
+        return [self.mesh_dim_y, self.mesh_dim_x]
+
+    @pe_array_dim.setter
+    def pe_array_dim(self, dims):
+        self.mesh_dim = dims[0]
+        self.mesh_dim_y = dims[0]
+        self.mesh_dim_x = dims[0]
+        self.dim = dims[0]
+    
+    @property
+    def pe_array_mem(self):
+        return [1, 1, 1] #local memory is only registers with depth=1
+
+    @pe_array_mem.setter
+    def pe_array_mem(self, mem_depths):
+        # only registers here, so nothing will be set
+        ...
+
+    @property
+    def local_mems(self):
+        return [self.spad_rows, self.acc_rows]
+
+    @local_mems.setter
+    def local_mems(self, mem_sizes):
+        spad_size = mem_sizes[0]
+        acc_size = mem_sizes[1]
+        self.spad_size = spad_size
+        self.spad_rows = (self.spad_size*8*1024) // (self.mesh_dim_x*self.data_w)
+        self.spad_bank_rows = self.spad_rows // self.spad_banks
+
+        self.acc_size = acc_size // self.mesh_dim_x #one instance per column of the array
+        self.acc_rows = (self.acc_size*8*1024) // (self.acc_w)
+        self.acc_bank_rows = self.acc_rows // self.acc_banks
+
+        #self.spad_rows = mem_depths[0]
+        #self.spad_size = int(self.spad_rows * self.data_w * self.mesh_dim_x // (8*1024))
+        #self.acc_rows = mem_depths[1]
+        #self.acc_size = int(self.acc_rows * self.acc_w * self.mesh_dim_x // (8*1024))
     
 
 
-class GemminiArchitectureMutator(ArchitectureMutator):
+class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch):
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
+    def __init__(self):
+        super().__init__()
         self.config: GemminiConfig = None
+        self._design_space = []
+
+    def read_space_cfg(self, cfg):
+        self.spad_banks = 4
+        self.acc_banks = 2
+        self.spad_data_width = 8
+        self.acc_data_width = 32
+
         search_space_constraints = cfg.get("constraints", {})
 
         #Boundaries of scratchpad sizes
@@ -84,12 +156,6 @@ class GemminiArchitectureMutator(ArchitectureMutator):
 
         # Tile dim parameters
         self.tile_dims = [1] #search_space_constraints.get("tile_dim", [1])
-
-        self.spad_banks = 4
-        self.acc_banks = 2
-
-        self.spad_data_width = 8
-        self.acc_data_width = 32
 
         # Generate valid configuration
         self.generate_design_space() 
@@ -146,11 +212,11 @@ class GemminiArchitectureMutator(ArchitectureMutator):
                     for acc_size in acc_sizes:
                         self.design_space.append(copy.copy(GemminiConfig(mesh_dim, spad_size, acc_size) )) 
 
-    def mutate_arch_constraints(self, config=None, outdir=None):
+    def write_tl_arch_constraints(self, config=None, outdir=None):
         # no arch constraints for Gemmini-like config
         pass
     
-    def mutate_map_constraints(self, config=None, outdir=None):
+    def write_tl_map_constraints(self, config=None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -158,7 +224,7 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         base_map_constraints = pathlib.Path(self.tl_in_configs_dir, "constraints", "gemmini_like_map_constraints.yaml")
         constraints_out = pathlib.Path(outdir, "constraints", "gemmini_like_map_constraints.yaml")
         with open(base_map_constraints, "r") as f:
-            constraints = yaml.safe_load(f)
+            constraints = yaml.load(f)
 
         accumulator = constraints["mapspace_constraints"][5] #TODO Magic numbers        
         scratchpad  = constraints["mapspace_constraints"][7] #TODO Magic numbers        
@@ -167,11 +233,10 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         scratchpad["factors"] = f"R=1 S=1 P=1 Q=1 N=1 C=1 M<={config.dim}"
 
         with open(constraints_out, "w") as f:
-            y = yaml.safe_dump(constraints, sort_keys=False)
-            f.write(y)
+            y = yaml.dump(constraints, f)
 
 
-    def mutate_arch(self, config=None, outdir=None):
+    def write_tl_arch(self, config=None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -179,7 +244,7 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         base_arch = pathlib.Path(self.tl_in_configs_dir, "archs", "gemmini_like.yaml")
         arch_out = pathlib.Path(outdir, "archs", "gemmini_like.yaml")
         with open(base_arch, "r") as f:
-            arch = yaml.safe_load(f)
+            arch = yaml.load(f)
 
         chip = arch["architecture"]["subtree"][0]["subtree"][0]
         scratchpad = chip["local"][0]
@@ -212,15 +277,15 @@ class GemminiArchitectureMutator(ArchitectureMutator):
         #macc["attributes"]["word-bits"] = config.data_w
 
         with open(arch_out, "w") as f:
-            y = yaml.safe_dump(arch, sort_keys=False)
-            f.write(y)
+            y = yaml.dump(arch, f)
+            #f.write(y)
 
 
-    def run_from_config(self, config: GemminiConfig, outdir=None):
-        return super().run_from_config(config, outdir)
+    def run_tl_from_config(self, config: GemminiConfig, outdir=None):
+        return super().run_tl_from_config(config, outdir)
 
-    def run(self):
-        return super().run()
+    def run_tl(self):
+        return super().run_tl()
 
 
 if __name__ == "__main__":
@@ -233,7 +298,7 @@ if __name__ == "__main__":
     cfg = {"dse": {"constraints": None}, "work_dir": {"tl_configs": None}}
     cfg["dse"]["constraints"] = constraints
     cfg["work_dir"]["tl_configs"] = "/home/rh8588/Dokumente/git/cnn-parted/cnnparted/framework/dse/my_work_dir"
-    generator = GemminiArchitectureMutator(cfg)
+    generator = GemminiArchitectureAdaptor(cfg)
     generator.run()
 
     print("Generated Gemmini Config:")

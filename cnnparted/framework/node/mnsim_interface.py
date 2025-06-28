@@ -21,11 +21,13 @@ from MNSIM.Area_Model.Model_Area import Model_area
 from pytorch_quantization import tensor_quant
 
 class MNSIMInterface(TrainTestInterface, NodeEvaluator):
-    fname_result = "mnsim_layers.csv"
+    fname_result = "mnsim_layers"
 
-    def __init__ (self, config : dict, input_size : list) -> None:
-        self.SimConfig = ROOT_DIR + config.get('conf_path')
-        self.config = config
+    def __init__ (self, in_config : dict, input_size : list) -> None:
+        mnsim_config = in_config["evaluation"]
+        self.SimConfig = ROOT_DIR + mnsim_config.get('conf_path')
+        self.node_config = in_config
+        self.config = mnsim_config
         self.input_size = input_size
 
         # load simconfig
@@ -211,7 +213,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
         net = NetworkGraph(hardware_config, layer_config_list, quantize_config_list, input_index_list, input_params)
         return net
 
-    def run(self, layers: list, progress : bool = False):
+    def run(self, network: str, layers: list, progress : bool = False):
         self.net = self._get_net(layers, self.hardware_config)
 
         struct_file = self.get_structure()
@@ -220,8 +222,9 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
         mod_a = Model_area(struct_file,self.SimConfig)
         mod_l.calculate_model_latency()
         area_list=mod_a.area_output_CNNParted()
+        self.node_config["bits"] = self.ADC_quantize_bit #TODO Check if this is the correct bit width
         design = DesignResult(self.hardware_config)
-        node_res = NodeResult()
+        node_res = NodeResult(self.node_config)
         for idx, layer in enumerate(struct_file):
             input_l=mod_l.NetStruct[idx][0][0]['Inputindex']
             final_idx=list(map(int, input_l))
@@ -235,10 +238,12 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             l.energy = energy / 1e6 # nJ -> mJ
             l.area = area / 1e6 # um^2 -> mm^2
             design.add_layer(l)
+            design.add_layer_to_network(l, network)
 
         # for compatibility reasons with DSE-Extension
         node_res.add_design(design)
         self.stats = node_res.to_dict()
+        return node_res
 
     #linqiushi modified
     #calculating the real ADC bit supported by pim using the formula mentioned before

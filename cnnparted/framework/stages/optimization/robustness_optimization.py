@@ -5,7 +5,7 @@ from framework.stages.stage_base import Stage, register_required_stage
 from framework.optimizer.robustness_optimizer import RobustnessOptimizer
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
-@register_required_stage("GraphAnalysis", "WorkloadParser")
+@register_required_stage(GraphAnalysis, WorkloadParser)
 class RobustnessOptimization(Stage):
     def __init__(self):
         super().__init__()
@@ -13,7 +13,7 @@ class RobustnessOptimization(Stage):
     def run(self, artifacts: Artifacts):
         self._take_artifacts(artifacts)
 
-        robustnessAnalyzer = RobustnessOptimizer(self.work_dir, self.run_name, self.torch_model, 
+        robustnessAnalyzer = RobustnessOptimizer(self.work_dir, self.run_name, self.torch_models, 
                                                 self.accuracy_function, self.accuracy_cfg,
                                                 self.device, self.show_progress)
         q_constr = robustnessAnalyzer.optimize()
@@ -26,7 +26,7 @@ class RobustnessOptimization(Stage):
         self.accuracy_cfg = artifacts.config["accuracy"]
         self.run_name = artifacts.args["run_name"]
         self.show_progress = artifacts.args["p"]
-        self.torch_model = artifacts.get_stage_result(GraphAnalysis, "ga").torchmodel 
+        self.torch_models = artifacts.get_stage_result(GraphAnalysis, "ga").torchmodels
         self.accuracy_function = artifacts.get_stage_result(WorkloadParser, "accuracy_function")
 
 

@@ -1,10 +1,9 @@
-from framework.dse.eyeriss_architecture_mutator import EyerissArchitectureMutator 
-from framework.dse.gemmini_architecture_mutator import GemminiArchitectureMutator 
-from framework.dse.simba_architecture_mutator import SimbaArchitectureMutator 
+from framework.dse.eyeriss_adaptor import EyerissArchitectureAdaptor
+from framework.dse.gemmini_adaptor import GemminiArchitectureAdaptor
+from framework.dse.simba_adaptor import SimbaArchitectureAdaptor
 
-__all__ = [     
-    EyerissArchitectureMutator,     
-    GemminiArchitectureMutator,     
-    SimbaArchitectureMutator 
+__all__ = [
+    EyerissArchitectureAdaptor,
+    GemminiArchitectureAdaptor,
+    SimbaArchitectureAdaptor
 ]
-

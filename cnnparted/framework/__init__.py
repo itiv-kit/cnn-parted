@@ -1,5 +1,5 @@
 __all__ = ['ConfigHelper', 'NodeThread', 'GraphAnalyzer', 'PartitioningOptimizer', 'RobustnessOptimizer', 'AccuracyEvaluator', 
-           'GemminiArchitectureMutator', 'EyerissArchitectureMutator', 'SimbaArchitectureMutator', 'ArchitectureMutator', 'ArchitectureConfig']
+           'GemminiArchitectureAdaptor', 'EyerissArchitectureAdaptor', 'SimbaArchitectureAdaptor', 'TimeloopInterface', 'ArchitectureConfig']
 
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_thread import NodeThread
@@ -7,8 +7,9 @@ from framework.graph_analyzer import GraphAnalyzer
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 from framework.optimizer.robustness_optimizer import RobustnessOptimizer
 from framework.quantization.accuracy_evaluator import AccuracyEvaluator
-from framework.dse.gemmini_architecture_mutator import GemminiArchitectureMutator
-from framework.dse.eyeriss_architecture_mutator import EyerissArchitectureMutator
-from framework.dse.simba_architecture_mutator import SimbaArchitectureMutator
-from framework.dse.architecture_mutator import ArchitectureMutator, ArchitectureConfig
+from framework.dse.gemmini_adaptor import GemminiArchitectureAdaptor
+from framework.dse.eyeriss_adaptor import EyerissArchitectureAdaptor
+from framework.dse.simba_adaptor import SimbaArchitectureAdaptor
+from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.architecture_config import ArchitectureConfig
 

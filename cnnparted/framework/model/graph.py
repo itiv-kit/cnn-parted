@@ -7,7 +7,7 @@ class LayersGraph:
         self._create_layer_relationships()
         self.output_sizes = self._set_output_sizes()
 
-    def get_Graph(self):
+    def get_graph(self):
         return self._graph
 
     def _set_output_sizes(self) -> dict:

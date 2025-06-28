@@ -6,9 +6,10 @@ from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.stages.optimization.partitioning_optimization import PartitioningOptimization
 from framework.stages.analysis.graph_analysis import GraphAnalysis
+from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
-@register_required_stage("PartitioningOptimization", "GraphAnalysis")
+@register_required_stage(PartitioningOptimization, GraphAnalysis)
 class ExportPartitionResults(Stage):
     def __init__(self):
         super().__init__()
@@ -23,10 +24,11 @@ class ExportPartitionResults(Stage):
         self.config = artifacts.config
         self.work_dir = self.config["work_dir"]
         self.run_name = artifacts.args["run_name"]
-        self.n_constr = artifacts.get_stage_result(PartitioningOptimization, "n_constr")
-        self.n_var = artifacts.get_stage_result(PartitioningOptimization, "n_var")
-        self.optimizer_cfg = artifacts.get_stage_result(PartitioningOptimization, "optimizer_cfg")
-        self.runtime = artifacts.step_runtime
+        #self.n_constr = artifacts.get_stage_result(PartitioningOptimization, "n_constr")
+        #self.n_var = artifacts.get_stage_result(PartitioningOptimization, "n_var")
+        self.optimizer_cfg: PartitioningOptConfig = artifacts.get_stage_result(PartitioningOptimization, "optimizer_cfg")
+        self.n_constr = self.optimizer_cfg.n_constr
+        self.n_var = self.optimizer_cfg.n_var_part
 
         sol = artifacts.get_stage_result(PartitioningOptimization, "sol")
         if not "accuracy" in self.config:
@@ -36,7 +38,10 @@ class ExportPartitionResults(Stage):
                 sol["dom"][i] = np.append(p, float(0))
         self.sol = sol
 
-        self.schedules = artifacts.get_stage_result(GraphAnalysis, "ga").schedules
+        #TODO Multiple networks
+        ga = artifacts.get_stage_result(GraphAnalysis, "ga")
+        network = ga.networks[0]
+        self.schedules = ga.schedules[network]
         self.num_platforms = self.config["num_platforms"]
 
     def _update_artifacts(self, artifacts: Artifacts):
@@ -100,14 +105,6 @@ class ExportPartitionResults(Stage):
     def _write_log_file(self) -> int:
         log_file = os.path.join(self.work_dir, self.run_name + ".log")
         f = open(log_file, "a")
-
-        # Runtime of each step
-        step_runtimes = self.runtime
-        step_runtimes = [x - step_runtimes[0] for x in step_runtimes[1:]]
-        t_prev = 0
-        for i, x in enumerate(step_runtimes, 1):
-            f.write("Step " + str(i) +  ": " + str(x - t_prev) + ' s \n')
-            t_prev = x
 
         # Number of solutions found
         num_pp_schemes = 0

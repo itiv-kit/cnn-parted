@@ -2,13 +2,14 @@ from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
 from framework.stages.inputs.system_parser import SystemParser
 from framework.stages.optimization.robustness_optimization import RobustnessOptimization
+from framework.stages.optimization.design_optimization import DesignPartitioningOptimization
 
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
-@register_required_stage("GraphAnalysis", "NodeEvaluation", "SystemParser")
+@register_required_stage(GraphAnalysis, (NodeEvaluation, DesignPartitioningOptimization) , SystemParser)
 class PartitioningOptimization(Stage):
     def __init__(self):
         super().__init__()
@@ -22,7 +23,7 @@ class PartitioningOptimization(Stage):
     def _take_artifacts(self, artifacts: Artifacts):
         self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
         self.num_pp = artifacts.config["num_pp"]
-        self.node_stats = artifacts.get_stage_result(NodeEvaluation, "node_stats")
+        self.node_stats = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
         self.link_components = artifacts.get_stage_result(SystemParser, "links")
         self.show_progress = artifacts.args["p"]
         self.config = artifacts.config

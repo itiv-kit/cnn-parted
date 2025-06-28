@@ -1,12 +1,17 @@
 import copy
 from math import sqrt
 import pathlib
-import yaml
+from ruamel.yaml import YAML
+yaml = YAML(typ="rt")
 import shutil
+import numpy as np
 
-from framework.dse.architecture_mutator import ArchitectureMutator, ArchitectureConfig
+from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
+from framework.dse.interfaces.genome_interface import GenomeInterface
+from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 
-class SimbaConfig(ArchitectureConfig):
+class SimbaConfig(ArchitectureConfig, GenomeInterface):
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
         #Constants
         self.word_bits = 8
@@ -36,18 +41,65 @@ class SimbaConfig(ArchitectureConfig):
         cfg = {}
         cfg["num_pes"] = self.num_pes
         cfg["lmacs"] = self.lmacs
+        cfg["globalbuf_size"] = self.globalbuf_size
         cfg["wbuf_size"] = self.wbuf_size
         cfg["accbuf_size"] = self.accbuf_size
-        cfg["globalbuf_size"] = self.globalbuf_size
         cfg["inbuf_size"] = self.inbuf_size
         return cfg
 
+    @classmethod
+    def from_genome(cls, genome: list, mem_step=[16]):
+        pe_dims = genome[0:2]
+        local_mems = genome[2]
+        pe_mems = genome[3:6]
+        simba = cls(1, 1, 1, 1, 1, 1)
+        simba.pe_array_dim = [pe_dim*4 for pe_dim in pe_dims]
+        simba.pe_array_mem = pe_mems
+        simba.local_mems = local_mems*mem_step[0]
+        return simba
 
-class SimbaArchitectureMutator(ArchitectureMutator):
-    def __init__(self, cfg: dict):
-        super().__init__(cfg)
+    def to_genome(self) -> list:
+        return self.pe_array_dim + self.pe_array_mem + self.local_mems
+
+    @property
+    def pe_array_dim(self):
+        return [self.num_pes, self.lmacs]
+
+    @pe_array_dim.setter
+    def pe_array_dim(self, dims):
+        self.num_pes = dims[0]
+        self.lmacs = dims[1]
+    
+    @property
+    def pe_array_mem(self):
+        return [self.inbuf_depth, self.wbuf_depth, self.accbuf_depth]
+
+    @pe_array_mem.setter
+    def pe_array_mem(self, mem_depths):
+        self.inbuf_depth = mem_depths[0]
+        self.inbuf_size = int(mem_depths[0] * self.word_bits * self.block_size_input_buf // (8*1024))
+        self.wbuf_depth = mem_depths[1]
+        self.inbuf_size = int(mem_depths[1] * self.word_bits * self.block_size_weight_buf // (8*1024))
+        self.accbuf_depth = mem_depths[2]
+        self.inbuf_size = int(mem_depths[2] * self.word_bits * self.block_size_acc_buf // (8*1024))
+
+    @property
+    def local_mems(self):
+        return [self.globalbuf_depth]
+
+    @local_mems.setter
+    def local_mems(self, mem_sizes):
+        self.globalbuf_size = mem_sizes
+        self.globalbuf_depth = (mem_sizes*8*1024) // (self.word_bits * self.block_size_global_buf)
+        #self.globalbuf_depth = mem_depths
+        #self.globalbuf_size = int(self.globalbuf_depth * self.word_bits * self.block_size_global_buf // (8*1024))
+
+
+class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch):
+    def __init__(self):
+        super().__init__()
         self.config: SimbaConfig = None
-        search_space_constraints = cfg.get("constraints", {})
+        self._design_space = []
         
         #Constants related to memory width
         self.word_bits = 8
@@ -58,6 +110,10 @@ class SimbaArchitectureMutator(ArchitectureMutator):
         self.block_size_global_buf = 32
         self.weight_bufs = 4
         self.acc_bufs = 4
+
+
+    def read_space_cfg(self, cfg):
+        search_space_constraints = cfg.get("constraints", {})
 
         #Compute elements
         self.pe_nums = search_space_constraints.get("num_pes", [16])
@@ -74,19 +130,6 @@ class SimbaArchitectureMutator(ArchitectureMutator):
         self.accbuf_sizes = search_space_constraints.get("accbuf_sizes", [0.375])
         self.globalbuf_sizes = search_space_constraints.get("gbuf_sizes", [128])
 
-        #self.min_wbuf_size =   search_space_constraints.get("min_wbuf_size", 32)
-        #self.max_wbuf_size =   search_space_constraints.get("max_wbuf_size", 64)
-        #self.min_accbuf_size = search_space_constraints.get("min_accbuf_size", 0.375)
-        #self.max_accbuf_size = search_space_constraints.get("max_accbuf_size", 3)
-        #self.min_gbuf_size =   search_space_constraints.get("min_gbuf_size", 64)
-        #self.max_gbuf_size =   search_space_constraints.get("max_gbuf_size", 128)
-        #self.min_inbuf_size =  search_space_constraints.get("min_inbuf_size", 64)
-        #self.max_inbuf_size =  search_space_constraints.get("max_inbuf_size", 128)
-
-        #self.wbuf_sizes = self._calc_mem_sizes(self.min_wbuf_size, self.max_wbuf_size, self.block_size_weight_buf*self.word_bits)
-        #self.accbuf_sizes = self._calc_mem_sizes(self.min_accbuf_size, self.max_accbuf_size, self.block_size_acc_buf*self.word_bits_acc)
-        #self.globalbuf_sizes = self._calc_mem_sizes(self.min_gbuf_size, self.max_gbuf_size, self.block_size_global_buf*self.word_bits)
-        #self.inbuf_sizes = self._calc_mem_sizes(self.min_inbuf_size, self.max_inbuf_size, self.block_size_input_buf*self.word_bits)
         # Generate valid configuration
         self.generate_design_space() 
 
@@ -115,7 +158,7 @@ class SimbaArchitectureMutator(ArchitectureMutator):
                             for inbuf_size in self.inbuf_sizes:
                                 self.design_space.append(copy.copy(SimbaConfig(pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size))) 
 
-    def mutate_arch(self, config:SimbaConfig = None, outdir=None):
+    def write_tl_arch(self, config:SimbaConfig = None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -123,7 +166,7 @@ class SimbaArchitectureMutator(ArchitectureMutator):
         base_arch = pathlib.Path(self.tl_in_configs_dir, "archs", "simba_like.yaml")
         arch_out = pathlib.Path(outdir, "archs", "simba_like.yaml")
         with open(base_arch, "r") as f:
-            arch = yaml.safe_load(f)
+            arch = yaml.load(f)
 
         #Modify the arch parameters
         simba = arch["architecture"]["subtree"][0]["subtree"][0]
@@ -165,10 +208,10 @@ class SimbaArchitectureMutator(ArchitectureMutator):
         lmac["attributes"]["meshX"] = config.num_pes
 
         with open(arch_out, "w") as f:
-            y = yaml.safe_dump(arch, sort_keys=False)
-            f.write(y)
+            y = yaml.dump(arch, f)
+            #f.write(y)
 
-    def mutate_arch_constraints(self, config:SimbaConfig = None, outdir=None):
+    def write_tl_arch_constraints(self, config:SimbaConfig = None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -177,7 +220,7 @@ class SimbaArchitectureMutator(ArchitectureMutator):
         constraints_out = pathlib.Path(outdir, "constraints", "simba_like_arch_constraints.yaml")
         shutil.copy(base_arch_constraints, constraints_out)
     
-    def mutate_map_constraints(self, config:SimbaConfig = None, outdir=None):
+    def write_tl_map_constraints(self, config:SimbaConfig = None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -186,11 +229,11 @@ class SimbaArchitectureMutator(ArchitectureMutator):
         constraints_out = pathlib.Path(outdir, "constraints", "simba_like_map_constraints.yaml")
         shutil.copy(base_map_constraints, constraints_out)
 
-    def run(self):
-        return super().run()
+    def run_tl(self):
+        return super().run_tl()
 
-    def run_from_config(self, config: SimbaConfig, outdir=None):
-        return super().run_from_config(config, outdir)
+    def run_tl_from_config(self, config: SimbaConfig, outdir=None):
+        return super().run_tl_from_config(config, outdir)
 
 
 if __name__ == "__main__":

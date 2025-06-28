@@ -9,3 +9,6 @@ class OptimizerConfig:
         # Boundaries on values
         self.xl = None
         self.xu = None
+
+    def get(self):
+        return self.n_var, self.n_obj, self.n_constr, self.xl, self.xu

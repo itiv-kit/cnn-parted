@@ -2,11 +2,20 @@ import os
 import subprocess
 import importlib
 import shutil
+from dataclasses import dataclass
+from collections.abc import Callable
 import torch
 
 from framework.stages.stage_base import Stage
 from framework.stages.artifacts import Artifacts
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
+
+@dataclass
+class WorkloadInfo:
+    accuracy_function: Callable
+    input_shape: list[int]
+    onnx_filepath: str
+
 
 class WorkloadParser(Stage):
     def __init___(self):
@@ -15,43 +24,59 @@ class WorkloadParser(Stage):
     def run(self, artifacts):
 
         self._take_artifacts(artifacts)
-        try:
-            filename = os.path.join(MODEL_PATH, self.run_name, "model.onnx")
-            subprocess.check_call(['mkdir', '-p', os.path.join(MODEL_PATH, self.run_name)])
-    
-            if os.path.isfile(self.model_settings['name']) and self.model_settings['name'].endswith(".onnx"):
-                shutil.copy(self.model_settings['name'], filename)
-    
-                #TODO This is just a temporary workaround, accuracy eval currently not used
+
+        workloads: dict[str, WorkloadInfo] = {}
+        networks = [wl["name"] for wl in self.workload_array]
+        for workload in self.workload_array:
+            try:
+                wl_name = workload["name"]
+
+                filename = os.path.join(MODEL_PATH, self.run_name, wl_name + "_model.onnx")
+                subprocess.check_call(['mkdir', '-p', os.path.join(MODEL_PATH, self.run_name)])
+        
+                # Check if the model is specified as a locally available ONNX file
+                if os.path.isfile(workload['name']) and workload['name'].endswith(".onnx"):
+                    shutil.copy(workload['name'], filename)
+
+        
+                    #TODO This is just a temporary workaround, accuracy eval currently not used
+                    accuracy_function = importlib.import_module(
+                        f"{WORKLOAD_FOLDER}.alexnet", package=__package__
+                    ).accuracy_function
+
+                    workloads[wl_name] = WorkloadInfo(accuracy_function, workload["input-size"], filename)
+                    return accuracy_function
+        
+        
+                model = importlib.import_module(
+                    f"{WORKLOAD_FOLDER}.{workload['name']}", package=__package__
+                ).model
+        
                 accuracy_function = importlib.import_module(
-                    f"{WORKLOAD_FOLDER}.alexnet", package=__package__
+                    f"{WORKLOAD_FOLDER}.{workload['name']}", package=__package__
                 ).accuracy_function
-                return accuracy_function
+        
+                input_size = workload['input-size']
+                x = torch.randn(input_size)
+                torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
+
+                workloads[wl_name] = WorkloadInfo(accuracy_function, workload["input-size"], filename)
     
     
-            model = importlib.import_module(
-                f"{WORKLOAD_FOLDER}.{self.model_settings['name']}", package=__package__
-            ).model
-    
-            accuracy_function = importlib.import_module(
-                f"{WORKLOAD_FOLDER}.{self.model_settings['name']}", package=__package__
-            ).accuracy_function
-    
-            input_size= self.model_settings['input-size']
-            x = torch.randn(input_size)
-            torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
-    
-            self._update_artifacts(artifacts, accuracy_function)
-    
-        except KeyError:
-            print()
-            print('\033[1m' + 'Workload not available' + '\033[0m')
-            print()
-            quit(1)
+            except KeyError:
+                print()
+                print('\033[1m' + 'Workload not available' + '\033[0m')
+                print()
+                quit(1)
+
+            self._update_artifacts(artifacts, accuracy_function, networks, workloads)
 
     def _take_artifacts(self, artifacts: Artifacts):
         self.run_name = artifacts.args["run_name"]
-        self.model_settings = artifacts.config["workload"]
+        self.workload_array = artifacts.config["workload"]
         
-    def _update_artifacts(self, artifacts: Artifacts, accuracy_func):
+    def _update_artifacts(self, artifacts: Artifacts, accuracy_func, networks, workloads):
         artifacts.set_stage_result(WorkloadParser, "accuracy_function", accuracy_func)
+        artifacts.set_stage_result(WorkloadParser, "networks", networks)
+        artifacts.set_stage_result(WorkloadParser, "workloads", workloads)
+

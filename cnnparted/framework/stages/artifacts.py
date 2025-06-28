@@ -4,11 +4,10 @@ from framework.stages.stage_base import Stage
 
 
 class Artifacts:
-    def __init__(self, config: dict, args: dict, device: str, step_runtime: list):
+    def __init__(self, config: dict, args: dict, device: str):
         self.config = config
         self.args = args
         self.device = device
-        self.step_runtime = step_runtime
 
         self.parse_stages()
     
@@ -25,6 +24,12 @@ class Artifacts:
 
     def get_stage_result(self, stage: Stage, name: str):
         return self.stages[stage].get_result(name)
+
+    def get_oneof_stage_result(self, stage_candidates: tuple[Stage], name: str):
+        for stage_candidate in stage_candidates:
+            if stage_candidate in self.stages:
+                return self.stages[stage_candidate].get_result(name)
+        raise RuntimeError(f"Could not find any of {stage_candidates} in Artifacts")
 
     # Get all results of a stage 
     def get_stage_results(self, stage: Stage):

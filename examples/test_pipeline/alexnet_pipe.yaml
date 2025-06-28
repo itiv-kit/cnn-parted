@@ -1,6 +1,6 @@
 general:
-  fixed_sys: False
-  acc_once: False
+  fixed_sys: false
+  acc_once: false
   num_pp: -1
   num_topos: 1
   num_jobs: 1
@@ -9,8 +9,17 @@ general:
   keep_dir: True
 
 workload:
-  name: alexnet
+- name: alexnet
   input-size: [ 1, 3, 227, 227 ]
+
+dse:
+  top_k: 1
+  problem: DesignProblem
+  optimizer:
+    algorithm: exhaustive
+    num_gen: 4
+    pop_size: 25
+  optimization: edap
 
 pipeline:
   stages:
@@ -27,19 +36,20 @@ system:
       bits: 8
       fault_rates: [0, 0] # input, weight
       max_memory_size: 600000000
-      timeloop:
+      dse:
+        optimization: eap
+        top_k: 1
+        constraints:
+          mesh_dim_min: 16
+          mesh_dim_max: 16
+          min_spad_size: 64
+          max_spad_size: 128
+          min_acc_size: 64
+          max_acc_size: 128
+        mutator: GemminiArchitectureAdaptor
+      evaluation:
         accelerator: gemmini_like
-        dse:
-          optimization: eap
-          top_k: 1
-          constraints:
-            mesh_dim_min: 16
-            mesh_dim_max: 16
-            min_spad_size: 64
-            max_spad_size: 128
-            min_acc_size: 64
-            max_acc_size: 128
-          mutator: GemminiArchitectureMutator
+        simulator: timeloop
         frequency: 200000000
         layer: conv2d
         mapper:
@@ -54,8 +64,9 @@ system:
     - id: 2
       bits: 8
       max_memory_size: 600000000
-      timeloop:
+      evaluation:
         accelerator: simba_like
+        simulator: timeloop
         frequency: 200000000
         layer: conv2d
         mapper:

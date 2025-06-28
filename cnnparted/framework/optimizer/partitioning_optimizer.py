@@ -17,25 +17,30 @@ from framework.optimizer.partitioning_problem import PartitioningProblem
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
+from framework.node.node_evaluator import SystemResult
 
 
 class PartitioningOptimizer(Optimizer):
-    def __init__(self, ga : GraphAnalyzer, num_pp : int, node_stats : dict, link_components : list, progress : bool) -> None:
+    def __init__(self, ga : GraphAnalyzer, num_pp : int, node_stats : SystemResult, link_components : list, progress : bool) -> None:
+        node_stats = node_stats.to_dict()
         self.work_dir = ga.work_dir
         self.run_name = ga.run_name
-        self.schedules = ga.schedules
+        assert len(ga.networks) == 1, "PartitioningOptmizer does not support evaluation of multiple neural networks"
+        network = ga.networks[0]
+        self.network = network
+        self.schedules = ga.schedules[network]
         self.num_pp = num_pp
         self.node_stats = node_stats
         self.link_confs = link_components
         self.progress = progress
-        nodes = len(ga.schedules[0])
+        nodes = len(ga.schedules[network][0])
 
         self.layer_dict = {}
         for l in self.schedules[0]:
             self.layer_dict[l] = {}
-            self.layer_dict[l]["predecessors"] = list(ga.graph.get_Graph().predecessors(l))
-            self.layer_dict[l]["successors"] = [s for s in ga.graph.get_successors(l)]
-            self.layer_dict[l]["output_size"] = ga.graph.output_sizes[l]
+            self.layer_dict[l]["predecessors"] = list(ga.graphs[network].get_graph().predecessors(l))
+            self.layer_dict[l]["successors"] = [s for s in ga.graphs[network].get_successors(l)]
+            self.layer_dict[l]["output_size"] = ga.graphs[network].output_sizes[l]
 
         self.layer_params = self._set_layer_params(ga)
 
@@ -45,23 +50,25 @@ class PartitioningOptimizer(Optimizer):
             self.pop_size = 50 if nodes>100 else nodes//2 if nodes>30 else 15 if nodes>20 else nodes
 
         self.results = {}
-        self.optimizer_cfg = PartitioningOptConfig(self.node_stats, num_pp, len(self.schedules[0]))
+        self.optimizer_cfg = PartitioningOptConfig(len(self.node_stats), num_pp, len(self.schedules[0]))
 
     def _set_layer_params(self, ga : GraphAnalyzer) -> dict:
         params = {}
-        for layer in ga.get_conv2d_layers():
+        network = ga.networks[0]
+        for layer in ga.get_conv2d_layers(network):
             params[layer['name']] = layer['conv_params']['weights']
-        for layer in ga.get_gemm_layers():
+        for layer in ga.get_gemm_layers(network):
             params[layer['name']] = layer['gemm_params']['weights']
 
         return params
 
-    def optimize(self, q_constr : dict, conf : dict) -> tuple[int, int, dict]:
-        fixed_sys = conf["general"].get('fixed_sys')
-        acc_once = conf["general"].get('acc_once')
+    def optimize(self, q_constr : dict, conf : dict, store_results: bool = True) -> tuple[int, int, dict]:
+        fixed_sys = conf["general"].get('fixed_sys', False)
+        acc_once = conf["general"].get('acc_once', False)
         opt = conf["general"].get('optimization')
         num_jobs = conf["general"].get('num_jobs')
         system_constraints = ConfigHelper.get_system_constraints(conf)
+        max_num_platforms = conf["general"].get("max_num_platforms", None)
 
         all_paretos = []
         non_optimals = []
@@ -75,7 +82,7 @@ class PartitioningOptimizer(Optimizer):
             non_optimals = np.load(fname_n_npy)
         else:
             sorts = Parallel(n_jobs=num_jobs, backend="multiprocessing")(
-                delayed(self._optimize_single)(self.num_pp, s, q_constr, fixed_sys, acc_once, system_constraints)
+                delayed(self._optimize_single)(self.num_pp, s, q_constr, fixed_sys, acc_once, max_num_platforms, system_constraints)
                 for s in tqdm.tqdm(self.schedules, "Optimizer", disable=(not self.progress))
             )
 
@@ -100,8 +107,9 @@ class PartitioningOptimizer(Optimizer):
             all_paretos = np.unique(all_paretos, axis=0)
             non_optimals = np.unique(non_optimals, axis=0)
 
-            np.save(fname_p_npy, all_paretos)
-            np.save(fname_n_npy, non_optimals)
+            if store_results:
+                np.save(fname_p_npy, all_paretos)
+                np.save(fname_n_npy, non_optimals)
 
         self.results["nondom"] = []
         self.results["dom"] = list(np.abs(non_optimals))
@@ -135,7 +143,7 @@ class PartitioningOptimizer(Optimizer):
         num_platforms = len(self.node_stats)
         xu = num_platforms * num_layers - 1
         samples = []
-        rng = default_rng(seed=42)
+        rng = default_rng()
 
         for i in range(num_platforms):
             pps = rng.integers(low=0, high=xu+1, size=num_pp)
@@ -154,9 +162,13 @@ class PartitioningOptimizer(Optimizer):
                 samples.append(pps + accs.tolist())
         return np.array(samples)
 
-    def _optimize_single(self, num_pp : int, schedule : list, q_constr : dict, fixed_sys : bool, acc_once : bool, system_constraints: dict) -> list:
-        problem = PartitioningProblem(num_pp, self.node_stats, schedule, q_constr, fixed_sys, acc_once, self.layer_dict, 
-                                      self.layer_params, self.link_confs, system_constraints, self.optimizer_cfg)
+    def _optimize_single(self, num_pp : int, schedule : list, 
+            q_constr : dict, fixed_sys : bool, acc_once : bool, max_num_platforms : int,
+            system_constraints: dict) -> list:
+
+        problem = PartitioningProblem(num_pp, self.node_stats, schedule, 
+                    q_constr, fixed_sys, acc_once, max_num_platforms, self.layer_dict, 
+                    self.layer_params, self.link_confs, system_constraints, self.optimizer_cfg, self.network)
 
         num_layers = len(schedule)
         initial_x = self._gen_initial_x(num_layers, num_pp, fixed_sys, acc_once)
