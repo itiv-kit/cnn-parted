@@ -46,7 +46,7 @@ system:
           max_spad_size: 128
           min_acc_size: 64
           max_acc_size: 128
-        mutator: GemminiArchitectureMutator
+        mutator: GemminiArchitectureAdaptor
       evaluation:
         accelerator: gemmini_like
         simulator: timeloop
