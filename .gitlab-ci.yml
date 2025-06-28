@@ -28,7 +28,7 @@ setup-env:
     - pip install wheel
     - pip install scons
     - pip install nvidia-pyindex 
-    - pip install numpy absl-py scipy sphinx-glpi-theme prettytable pyyaml
+    - pip install numpy absl-py scipy sphinx-glpi-theme prettytable pyyaml stable-baselines3[extra]
     - pip install --no-cache-dir --index-url https://pypi.nvidia.com pytorch-quantization
     - git config --global --add safe.directory /builds/ai-hardware-accelerators/cnn-parted
     - git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then  pip install .; elif [ -f setup.py ]; then pip install -e .; fi'
