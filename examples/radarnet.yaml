@@ -1,84 +1,86 @@
 general:
-  fixed_sys: True
-  acc_once: True
+  fixed_sys: true
+  acc_once: true
   num_pp: 1
   num_topos: 1
   num_jobs: 1
   optimization: ppa
-  work_dir: debug_dir
-  keep_dir: False
+  work_dir: runs/radarnet_run
+  keep_dir: false
 
 workload:
-  name: RadarNet.onnx
-  input-size: [ 2,1,16,512,256 ]
+- name: RadarNet.onnx
+  input-size: [2, 1, 16, 512, 256]
 
 pipeline:
   stages:
-    - WorkloadParser
-    - SystemParser
-    - GraphAnalysis
-    - RobustnessOptimization
-    - NodeEvaluation
-    - PartitioningOptimization
-    - AccuracyEvaluation
-    - ExportPartitionResults
+  - WorkloadParser
+  - SystemParser
+  - GraphAnalysis
+  - RobustnessOptimization
+  - NodeEvaluation
+  - PartitioningOptimization
+  - AccuracyEvaluation
+  - ExportPartitionResults
 
 
 system:
   compute:
-    - id: 0
-      bits: 8
-      fault_rates: [0, 0] # input, weight
-      max_memory_size: 600000000
-      timeloop:
-        accelerator: gemmini_like
-        dse:
-          optimization: eap
-          top_k: 1
-          constraints:
-            mesh_dim_min: 16
-            mesh_dim_max: 16
-            min_spad_size: 64
-            max_spad_size: 128
-            min_acc_size: 64
-            max_acc_size: 128
-          mutator: GemminiArchitectureMutator
-        frequency: 200000000
-        layer: conv2d
-        mapper:
-          algorithm: random-pruned
-          live-status: false
-          max-permutations-per-if-visit: 16
-          num-threads: 200
-          optimization-metrics:
-          - edp
-          timeout: 15000
-          victory-condition: 500
-    - id: 2
-      bits: 8
-      max_memory_size: 600000000
-      timeloop:
-        accelerator: simba_like
-        frequency: 200000000
-        layer: conv2d
-        mapper:
-          algorithm: random-pruned
-          live-status: false
-          max-permutations-per-if-visit: 16
-          num-threads: 8
-          optimization-metrics:
-          - edp
-          timeout: 15000
-          victory-condition: 500
+  - id: 0
+    bits: 8
+    fault_rates: [0, 0]   # input, weight
+    max_memory_size: 600000000
+    dse:
+      optimization: eap
+      top_k: 1
+      constraints:
+        mesh_dim_min: 16
+        mesh_dim_max: 16
+        min_spad_size: 64
+        max_spad_size: 128
+        min_acc_size: 64
+        max_acc_size: 128
+      mutator: GemminiArchitectureMutator
+    evaluation:
+      accelerator: gemmini_like
+      simulator: timeloop
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 200
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+  - id: 2
+    bits: 8
+    max_memory_size: 600000000
+    evaluation:
+      accelerator: simba_like
+      simulator: timeloop
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
   link:
-    - id: 1
-      max_out_size: 20000000
-      data_bit_width: 8
-      noi:
-        noi_mode: UCIe
-        width: 16
-        data_rate_Gbps: 4
-        latency_ns: 2 # including D2D Adapter and PHY
-        power_bit_pj: 0.5
-      fps: 25
+  - id: 1
+    max_out_size: 20000000
+    data_bit_width: 8
+    noi:
+      noi_mode: UCIe
+      width: 16
+      data_rate_Gbps: 4
+      latency_ns: 2   # including D2D Adapter and PHY
+      power_bit_pj: 0.5
+    fps: 25
 

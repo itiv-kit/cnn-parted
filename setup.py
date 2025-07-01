@@ -67,9 +67,12 @@ setup(
             'pymoo',
             'onnx2pytorch',
             'pandas',
-            'joblib'
+            'joblib',
+            'onnx2pytorch',
+            'ruamel.yaml',
+            "plotly",
             ],
-      python_requires = '>=3.9',
+      python_requires = '>=3.11',
       include_package_data = True,
       scripts=['tools/setupTimeloop.sh'],
       cmdclass={'install': ToolsInstall}

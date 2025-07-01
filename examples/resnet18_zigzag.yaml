@@ -1,75 +1,46 @@
 general:
-  fixed_sys: False
-  acc_once: False
+  fixed_sys: false
+  acc_once: false
   num_pp: -1
   num_topos: 1
   num_jobs: 1
   optimization: ppa
-  work_dir: debug_zigzag
-  keep_dir: False
+  work_dir: runs/resnet18_zigzag_run
+  keep_dir: false
 
 workload:
-  name: resnet18
-  input-size: [ 1, 3, 227, 227 ]
+- name: resnet18
+  input-size: [1, 3, 227, 227]
 
 pipeline:
   stages:
-    - WorkloadParser
-    - SystemParser
-    - GraphAnalysis
-    - NodeEvaluation
-    - PartitioningOptimization
-    - ExportPartitionResults
+  - WorkloadParser
+  - SystemParser
+  - GraphAnalysis
+  - NodeEvaluation
+  - PartitioningOptimization
+  - ExportPartitionResults
 
 system:
   compute:
-    - id: 0
-      bits: 16
-      fault_rates: [0, 0] # input, weight
-      max_memory_size: 600000000
-      zigzag:
-        accelerator: ascend_like
-        mapping: ascend_like
-        optimization: EDP
-        frequency: 200000000
-    - id: 2
-      bits: 8
-      max_memory_size: 600000000
-      timeloop:
-        accelerator: simba_like
-        frequency: 200000000
-        layer: conv2d
-        mapper:
-          algorithm: random-pruned
-          live-status: false
-          max-permutations-per-if-visit: 16
-          num-threads: 8
-          optimization-metrics:
-          - edp
-          timeout: 15000
-          victory-condition: 500
-  link:
-    - id: 1
-      max_out_size: 20000000
-      data_bit_width: 8
-      noi:
-        noi_mode: UCIe
-        width: 16
-        data_rate_Gbps: 4
-        latency_ns: 2 # including D2D Adapter and PHY
-        power_bit_pj: 0.5
-      fps: 25
-
-components:
   - id: 0
     bits: 16
-    fault_rates: [0, 0] # input, weight
+    fault_rates: [0, 0]   # input, weight
     max_memory_size: 600000000
     zigzag:
       accelerator: ascend_like
       mapping: ascend_like
       optimization: EDP
       frequency: 200000000
+  - id: 2
+    bits: 8
+    max_memory_size: 600000000
+    zigzag:
+      accelerator: ascend_like
+      mapping: ascend_like
+      optimization: EDP
+      frequency: 200000000
+  link:
   - id: 1
     max_out_size: 20000000
     data_bit_width: 8
@@ -77,23 +48,46 @@ components:
       noi_mode: UCIe
       width: 16
       data_rate_Gbps: 4
-      latency_ns: 2 # including D2D Adapter and PHY
+      latency_ns: 2   # including D2D Adapter and PHY
       power_bit_pj: 0.5
     fps: 25
-  - id: 2
-    bits: 8
-    max_memory_size: 600000000
-    timeloop:
-      accelerator: simba_like
-      frequency: 200000000
-      layer: conv2d
-      mapper:
-        algorithm: random-pruned
-        live-status: false
-        max-permutations-per-if-visit: 16
-        num-threads: 8
-        optimization-metrics:
-        - edp
-        timeout: 15000
-        victory-condition: 500
 
+components:
+- id: 0
+  bits: 16
+  fault_rates: [0, 0]   # input, weight
+  max_memory_size: 600000000
+  evaluation:
+    accelerator: ascend_like
+    mapping: ascend_like
+    optimization: EDP
+    frequency: 200000000
+    simulator: zigzag
+- id: 1
+  max_out_size: 20000000
+  data_bit_width: 8
+  noi:
+    noi_mode: UCIe
+    width: 16
+    data_rate_Gbps: 4
+    latency_ns: 2   # including D2D Adapter and PHY
+    power_bit_pj: 0.5
+  fps: 25
+- id: 2
+  bits: 8
+  max_memory_size: 600000000
+  evaluation:
+    accelerator: simba_like
+    frequency: 200000000
+    layer: conv2d
+    mapper:
+      algorithm: random-pruned
+      live-status: false
+      max-permutations-per-if-visit: 16
+      num-threads: 8
+      optimization-metrics:
+      - edp
+      timeout: 15000
+      victory-condition: 500
+
+    simulator: timeloop

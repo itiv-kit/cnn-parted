@@ -8,8 +8,8 @@ import glob
 import matplotlib.pyplot as plt
 
 from framework.constants import ROOT_DIR
-from framework.helpers.DesignMetrics import calc_metric, get_metric_info, SUPPORTED_METRICS
-from framework.helpers.Visualizer import plotMetricPerConfigPerLayer, COLOR_SEQUENCE, MARKER_SEQUENCE
+from framework.helpers.design_metrics import calc_metric, get_metric_info, SUPPORTED_METRICS
+from framework.helpers.visualizer import plotMetricPerConfigPerLayer, COLOR_SEQUENCE, MARKER_SEQUENCE
 
 def objective_to_str(objective: str):
     if objective in ["latency", "energy", "throughput", "area"]:
@@ -528,11 +528,13 @@ if __name__ == "__main__":
         fname_results_all = glob.glob(os.path.join(ROOT_DIR, args.indir, "*result_all.csv"))
         fname_results_base_all = glob.glob(os.path.join(ROOT_DIR, args.basedir, "*result_all.csv"))
 
-        results_all_dse = pd.read_csv(fname_results_all[0], header=None).to_numpy()
-        results_all_base = pd.read_csv(fname_results_base_all[0], header=None).to_numpy()
+        results_all_dse = pd.read_csv(fname_results_all[0], header="infer").to_numpy()
+        results_all_base = pd.read_csv(fname_results_base_all[0], header="infer").to_numpy()
 
-        base_all_objectives = results_all_base[:, n_constr+2+n_var:-1]
-        dse_all_objectives = results_all_dse[:, n_constr+2+n_var:-1]
+        #base_all_objectives = results_all_base[:, n_constr+2+n_var:-1]
+        #dse_all_objectives = results_all_dse[:, n_constr+2+n_var:-1]
+        base_all_objectives = results_all_base[:, -7:-1]
+        dse_all_objectives = results_all_dse[:, -7:-1]
 
         base_latency, base_energy, base_throughput, base_area, base_link_latency, base_link_energy = get_individual_metrics(base_all_objectives)
         dse_latency, dse_energy, dse_throughput, dse_area, dse_link_latency, dse_link_energy = get_individual_metrics(dse_all_objectives)
