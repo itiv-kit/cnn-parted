@@ -38,27 +38,22 @@ class WorkloadParser(Stage):
                 if os.path.isfile(workload['name']) and workload['name'].endswith(".onnx"):
                     shutil.copy(workload['name'], filename)
 
-        
-                    #TODO This is just a temporary workaround, accuracy eval currently not used
-                    accuracy_function = importlib.import_module(
-                        f"{WORKLOAD_FOLDER}.alexnet", package=__package__
-                    ).accuracy_function
-
+                    #TODO Accuracy evaluation is currently not supported, if possible integrate a way to specify it
+                    accuracy_function = None
                     workloads[wl_name] = WorkloadInfo(accuracy_function, workload["input-size"], filename)
-                    return accuracy_function
         
+                else:
+                    model = importlib.import_module(
+                        f"{WORKLOAD_FOLDER}.{workload['name']}", package=__package__
+                    ).model
+            
+                    accuracy_function = importlib.import_module(
+                        f"{WORKLOAD_FOLDER}.{workload['name']}", package=__package__
+                    ).accuracy_function
         
-                model = importlib.import_module(
-                    f"{WORKLOAD_FOLDER}.{workload['name']}", package=__package__
-                ).model
-        
-                accuracy_function = importlib.import_module(
-                    f"{WORKLOAD_FOLDER}.{workload['name']}", package=__package__
-                ).accuracy_function
-        
-                input_size = workload['input-size']
-                x = torch.randn(input_size)
-                torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
+                    input_size = workload['input-size']
+                    x = torch.randn(input_size)
+                    torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
 
                 workloads[wl_name] = WorkloadInfo(accuracy_function, workload["input-size"], filename)
     
