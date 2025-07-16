@@ -9,6 +9,7 @@ import numpy as np
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
 from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.zigzag_interface import ZigzagInterface
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 
 class EyerissConfig(ArchitectureConfig, GenomeInterface):
@@ -90,7 +91,7 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
         #self.glb_size = int(glb_depth * self.word_bits * self.glb_block_size // (8*1024))
 
 
-class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch):
+class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch, ZigzagInterface):
     def __init__(self):
         super().__init__()
         self.config: EyerissConfig = None
@@ -199,6 +200,70 @@ class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         
     def run_tl_from_config(self, config: EyerissConfig, outdir=None):
         return super().run_tl_from_config(config, outdir)
+    
+    #TODO
+    def write_zigzag_arch(self, config=None, outdir=None):
+        if config is None:
+            config = self.config
+        if outdir is None:
+            outdir = self.tl_out_configs_dir
+        
+        hw_file = "eyeriss_like.yaml"
+        base_arch = self._find_config(pathlib.Path("hardware", hw_file))
+        arch_out = pathlib.Path(outdir, "hardware", hw_file)
+
+        with open(base_arch, "r") as f:
+            arch = yaml.load(f)
+
+        # Memory hierarchy        
+        sram = arch["memories"]["sram_1M"]
+        sram["size"] = config.glb_size*8*1024 #glb_size is given in kB
+
+        ifmap_spad = arch["memories"]["rf_64B_A"]
+        ifmap_spad["size"] = config.ifmap_spad_size*8 #buf size is in B
+
+        wght_spad = arch["memories"]["rf_64B_W"]
+        wght_spad["size"] = config.weight_spad_size*8 #buf size is in B
+
+        psum_spad = arch["memories"]["rf_16B"]
+        psum_spad["size"] = config.psum_spad_size*8 #buf size is in B
+
+        # PE Array
+        pe_array = arch["operational_array"]
+        pe_array["sizes"] = config.pe_array_dim
+
+        with open(arch_out, "w") as f:
+            y = yaml.dump(arch, f)
+
+
+    def write_zigzag_mapping(self, config=None, outdir=None):
+        if config is None:
+            config = self.config
+        if outdir is None:
+            outdir = self.tl_out_configs_dir
+        
+        mapping_file = "default.yaml"
+        base_mapping = self._find_config(pathlib.Path("mapping", mapping_file))
+        mapping_out = pathlib.Path(outdir, "mapping", mapping_file)
+
+        with open(base_mapping, "r") as f:
+            mapping = yaml.load(f)
+        
+        for op in mapping:
+            if op["name"] == "default":
+                op["spatial_mapping"] = {"D1": [f"K, {config.pe_array_dim[0]}"],
+                                         "D2": [f"C, {config.pe_array_dim[1]}"]}
+        
+        with open(mapping_out, "w") as f:
+            y = yaml.dump(mapping, f)
+        
+
+
+    def run_zigzag(self):
+        return super().run_zigzag()
+    
+    def run_zigzag_from_config(self, config, outdir=None):
+        return super().run_zigzag_from_config(config, outdir)
 
 if __name__ == "__main__":
     ds = {"PE": [336],

@@ -1,12 +1,18 @@
 import pathlib
 import pickle
-import yaml
+from ruamel.yaml import YAML
+yaml = YAML(typ="rt")
+import importlib
+import pickle
 import sys
 import shutil
+import os
 
 from framework.constants import ROOT_DIR
 from framework.helpers.visualizer import plotMetricPerConfigPerLayer
 from framework.helpers.design_metrics import calc_metric, SUPPORTED_METRICS
+from framework.dse.interfaces.zigzag_interface import ZigzagInterface
+from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
 
 sys.path.append(str(pathlib.Path(ROOT_DIR, "tools", "zigzag")))
@@ -17,9 +23,13 @@ class Zigzag(NodeEvaluator):
     def __init__(self, in_config: dict, run_name: str) -> None:
         super().__init__()
         self.node_config = in_config
+        self.dse_node_config = in_config.get("dse", None)
         self.config = in_config["evaluation"]
         self.run_name = run_name
         self.fname_result = "zigzag_layers"
+
+        self.zigzag_in_configs_dir_local = os.path.join(ROOT_DIR, "configs", "zigzag_configs")
+        self.zigzag_in_configs_dir_repo = os.path.join(ROOT_DIR, "tools", "zigzag", "zigzag", "inputs")
 
         self.configs_dir = pathlib.Path(ROOT_DIR, "tools", "zigzag", "zigzag", "inputs")
         self.zigzag_hardware_configs_dir = pathlib.Path(self.configs_dir, "hardware")
@@ -34,36 +44,101 @@ class Zigzag(NodeEvaluator):
         assert self.optimization in ["energy", "latency", "EDP"]
         self.freq = self.config["frequency"]
 
+        self.adaptor: ZigzagInterface = None
+        self.cur_design_id = 0
+        if self.dse_node_config and "mutator" in self.dse_node_config:
+
+            dse_package = importlib.import_module("framework.dse")
+            mutator_cls = getattr(dse_package, self.dse_node_config["mutator"])
+            self.adaptor = mutator_cls()
+
+            if self.dse_system_config["optimizer"]["algorithm"] == "exhaustive":
+                self.adaptor.read_space_cfg(self.dse_node_config)
+            elif self.dse_system_config["optimizer"]["algorithm"] == "nsga2":
+                pass
+
+    def _find_hardware_config(self, config_file: str | pathlib.Path):
+        if (local_path := pathlib.Path(self.zigzag_in_configs_dir_local, "hardware", config_file)).exists():
+            return local_path
+        elif(repo_path := pathlib.Path(self.zigzag_in_configs_dir_repo, "hardware", config_file)).exists(): 
+            return repo_path
+
+    def _find_mapping_config(self, config_file: str | pathlib.Path):
+        if (local_path := pathlib.Path(self.zigzag_in_configs_dir_local, "mapping", config_file)).exists():
+            return local_path
+        elif(repo_path := pathlib.Path(self.zigzag_in_configs_dir_repo, "mapping", config_file)).exists(): 
+            return repo_path
 
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
 
-    def run(self, network: str, layers: list):
-        design_runroot = pathlib.Path(self.runroot, "design"+str(1))
-        zigzag_out_dir = pathlib.Path(design_runroot, "out")
+    def run(self, network: str, layers: list) -> NodeResult:
+        design_runroot = pathlib.Path(self.runroot)
+        node_result = NodeResult(self.node_config)
+        self._run_network(network, design_runroot, node_result, design=None)
+        return node_result
 
-        zigzag_pickle = pathlib.Path(zigzag_out_dir, "results.pkl")
+    def run_from_adaptor(self, network: str, layers : dict, adaptor: ZigzagInterface, progress : bool = False) -> NodeResult:
+        self.adaptor = adaptor
+        node_result = NodeResult(self.node_config)
 
-        zigzag_config_dir_arch = pathlib.Path(design_runroot, "zigzag_config", "archs")
-        zigzag_config_dir_arch.mkdir(parents=True, exist_ok=True)
-        zigzag_config_dir_mapping = pathlib.Path(design_runroot, "zigzag_config", "mapping")
-        zigzag_config_dir_mapping.mkdir(parents=True, exist_ok=True)
+        if not self.adaptor.design_space:
+            self._run_design(network, layers, progress, node_result, adaptor.config, self.cur_design_id)
+            self.cur_design_id += 1
 
-        # First, look in the ZigZag repository if the architecture file exists
-        # Otherwise, check in the local folder
-        accfile = pathlib.Path(self.zigzag_hardware_configs_dir, self.accname)
-        mapfile = pathlib.Path(self.zigzag_mapping_configs_dir, self.mapname)
-        if not accfile.exists():
-            accfile = pathlib.Path(self.local_hardware_configs_dir, self.accname)
-        if not mapfile.exists():
-            mapfile = pathlib.Path(self.local_mapping_configs_dir, self.mapname)
+            self.stats = node_result.to_dict()
+            self.adaptor = None
+            return node_result
         
+        else:
+            print(f"There are a total of {len(self.adaptor.design_space)} designs to be evaluated!")
+            
+            for i, design in enumerate(self.adaptor.design_space):
+                if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
+                    shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
+                self._run_design(network, layers, progress, node_result, design, i)
+            
+        self.stats = node_result.to_dict()
+        with open(os.path.join(self.runroot, f"results_{self.accname}.pkl"), "wb") as f:
+            pickle.dump(self.stats, f)
+
+        return node_result
+
+    def _run_design(self, network: str, layers: dict, progress: bool, node_result: NodeResult,  design: ArchitectureConfig, design_id: int=None):
+        if self.adaptor and self.adaptor.zigzag_out_configs_dir:
+            design_runroot = os.path.join(self.runroot, self.adaptor.zigzag_out_configs_dir)
+        else:
+            if design_id is None:
+                design_id = 0
+            design_runroot = os.path.join(self.runroot, "design"+str(design_id))
+        zigzag_design_dir = os.path.join(design_runroot, "zigzag_config")
+        zigzag_design_dir_hw = os.path.join(design_runroot, "zigzag_config", "hardware")
+        zigzag_design_dir_mapping = os.path.join(design_runroot, "zigzag_config", "mapping")
+        os.makedirs(zigzag_design_dir_hw, exist_ok=True)
+        os.makedirs(zigzag_design_dir_mapping, exist_ok=True)
+
+        self.adaptor.run_zigzag_from_config(design, outdir=zigzag_design_dir)
+        with open(os.path.join(design_runroot, "arch_config.yaml"), "w") as f:
+            y = yaml.dump(design.get_config(), f)
+
+        self._run_network(network, design_runroot, node_result, design)
+
+    def _run_network(self, network: str, zigzag_design_workdir: str, node_result: NodeResult, design: ArchitectureConfig = None):
+        accfile = self._find_hardware_config(self.accname)
+        mapfile = self._find_mapping_config(self.mapname)
         assert accfile.exists() and mapfile.exists(), f"Could not found the specified mapping or accelerator.\nAccfile: {str(accfile)}\nMapfile: {str(mapfile)}"
+        
+        zigzag_design_workdir_hardware = pathlib.Path(zigzag_design_workdir, "hardware")
+        zigzag_design_workdir_mapping = pathlib.Path(zigzag_design_workdir, "mapping")
+        os.makedirs(zigzag_design_workdir_hardware, exist_ok=True)
+        os.makedirs(zigzag_design_workdir_mapping, exist_ok=True)
+        shutil.copy(str(accfile), zigzag_design_workdir_hardware)
+        shutil.copy(str(mapfile), zigzag_design_workdir_mapping)
+
+        zigzag_out_dir = pathlib.Path(zigzag_design_workdir, "out")
+        zigzag_pickle = pathlib.Path(zigzag_design_workdir, "out", "results.pkl")
 
         modelfile = pathlib.Path(self.model_dir, self.run_name, network + "_new_model.onnx")
-
-        shutil.copy(str(accfile), str(zigzag_config_dir_arch))
-        shutil.copy(str(mapfile), str(zigzag_config_dir_mapping))
 
         #the model does not give area
         energy, latency, cmes = get_hardware_performance_zigzag(workload=str(modelfile), 
@@ -73,9 +148,12 @@ class Zigzag(NodeEvaluator):
                                                                 pickle_filename=str(zigzag_pickle),
                                                                 opt=self.optimization)
 
-        # Get layerwise results                                                
-        node_result = NodeResult(self.node_config)
-        design_result = DesignResult()
+        if design is not None:                                         
+            design_result = DesignResult(design.get_config())
+        else:
+            design_result = DesignResult()
+
+        # Get layerwise results
         layers = cmes[0][1]
         for layer in layers:
             cme = layer[0]
@@ -90,17 +168,3 @@ class Zigzag(NodeEvaluator):
 
         node_result.add_design(design_result)
         
-        # Convert to CNNParted stats
-        self.stats = node_result.to_dict()
-        return node_result
-
-
-    def _run_layer(self):
-        ...
-
-    def _get_accelerator_config(self):
-        ...
-
-    def _get_workload(self):
-        ...
-
