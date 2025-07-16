@@ -216,7 +216,8 @@ class NodeResult:
         return stats
 
     def to_csv(self, out_path: str):
-        out_path = out_path + ".csv"
+        if not out_path.endswith(".csv"):
+            out_path = out_path + ".csv"
         with open(out_path, "w", newline="") as f:
             writer = csv.writer(f, delimiter=";")
             header = [
@@ -301,7 +302,8 @@ class NodeResult:
     
     @classmethod
     def from_csv(cls, in_path: str, network: str, node_config: dict):
-        in_path = in_path + ".csv"
+        if not in_path.endswith(".csv"):
+            in_path = in_path + ".csv"
         node_res = cls(node_config)
 
         design_result = DesignResult()
@@ -373,10 +375,9 @@ class SystemResult:
             stats[id] = node_res.to_dict()
         return stats
     
-    def to_csv(self, out_path, runname: str = ""):
-        out_path = out_path + ".csv"
+    def to_csv(self, out_path: str, runname: str = ""):
         for id, node_res in self.platforms.items():
-            file_str = str(id) + "_" + node_res.accelerator_name + "_tl_layers.csv"
+            file_str = str(id) + "_" + node_res.accelerator_name + "_dse_layers.csv"
             file_path = os.path.join(out_path,  file_str)
             node_res.to_csv(file_path)
     
