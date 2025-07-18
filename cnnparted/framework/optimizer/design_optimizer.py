@@ -1,4 +1,5 @@
 import os
+import glob
 import pickle
 
 import numpy as np
@@ -109,10 +110,11 @@ class DesignOptimizer(Optimizer):
         #   - handling of instances
         node_eval_stats = SystemResult()
         for node_id, accelerator_name, node_config in zip(self.node_ids, self.accelerator_names, self.node_components):
-            file_str = str(node_id) + "_" + accelerator_name + "_tl_layers.csv"
+            file_str = str(node_id) + "_" + accelerator_name + "*_layers.csv"
             file_str = os.path.join(self.work_dir, file_str)
-            if os.path.isfile(file_str):
-                node_eval_stats.add_platform(node_id, NodeResult.from_csv(file_str, network, node_config))
+            file_str = glob.glob(file_str)
+            if len(file_str) > 0 and os.path.isfile(file_str[0]):
+                node_eval_stats.add_platform(node_id, NodeResult.from_csv(file_str[0], network, node_config))
 
         # For now, continue if everything is present
         if node_eval_stats.get_num_platforms() == len(self.node_components):
