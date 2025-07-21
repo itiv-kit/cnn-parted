@@ -8,7 +8,7 @@ from tqdm import tqdm
 import sys
 import os
 from framework.constants import ROOT_DIR
-sys.path.append(os.path.join(ROOT_DIR, "tools", "MNSIM-2.0"))
+sys.path.append(os.path.join(ROOT_DIR, "cnnparted", "tools", "MNSIM-2.0"))
 
 from framework.node.node_evaluator import  NodeResult, DesignResult, LayerResult, NodeEvaluator
 

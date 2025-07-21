@@ -3,40 +3,45 @@
 ## About
 CNNParted is a framework for hardware-aware design space exploration of CNN inference partitioning in embedded AI applications. Thereby, not only the hardware deployed in the nodes is considered but also the impact of the link on system energy consumption and inference latency.
 
-The framework currently includes a custom Ethernet model as well as hardware accelerators models taken from Timeloop example repository (Simba, Eyeriss and Simple OS Array).
+The framework currently includes a custom Ethernet model as well as hardware accelerators models taken from Timeloop example repository (Simba, Eyeriss and Gemmini).
+Additionally, we support evaluating accelerators with ZigZag.
 
-## Instructions
-0. First, create a virtual environment to install all the dependencies:
+## Installation Instructions
+We provide an installation script with all necessary steps. To simplify the installation of all dependencies, the usage of a Docker Container is highly recommended. A devcontainer file for use with VSCode is also provided. Otherwise, Timeloop dependencies might need to be manually installed.
+To manage the dependencies for the Python module, we use uv.
     ```sh
-    python3.11 -m venv pythonEnv
-    source pythonEnv/bin/activate
-    pip install --upgrade pip
-    pip install wheel
-    pip install nvidia-pyindex 
-    pip install numpy absl-py scipy sphinx-glpi-theme prettytable pyyaml
-    pip install --no-cache-dir --index-url https://pypi.nvidia.com pytorch-quantization
+    ./install.sh
     ```
 
-1. Download submodules
+A more detailed breakdown of the installation changes
+0. First, ensure all submodules can be cloned with HTTPS instead of SSH and clone them:
     ```sh
+    git config --global url."https://github.com/".insteadOf "git@github.com:"
+    git submodule sync --recursive
     git submodule update --init --recursive
     ```
 
-2. Run installation
+1. Install all Python dependencies with uv and from the submodules:
     ```sh
-    git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then  pip install .; elif [ -f setup.py ]; then pip install -e .; fi'
-    git submodule foreach --recursive 'if [ -f requirements.txt ]; then pip install -r requirements.txt; fi'
-    pip install -e .
-    pip install -r requirements.txt
+    uv sync
+    source env/setupEnv.sh 
+    uv pip install --no-cache-dir --index-url https://pypi.nvidia.com pytorch-quantization
+    git -C cnnparted/tools/accelergy-table-based-plug-ins/ apply  ../accelergy_table_plugins.patch
+    git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then uv pip install .; elif [ -f setup.py ]; then uv pip install -e .; fi'
+    git submodule foreach --recursive 'if [ -f requirements.txt ]; then uv pip install -r requirements.txt; fi'
     ```
 
-3. Setup the environment using the script provided in env:
+2. Install remaining tools, apply patches for compatibility:
     ```sh
+    source cnnparted/tools/install_tools.sh
+    source cnnparted/tools/setupTimeloop.sh
+    ```
+
+
+3. Run the given python script:
+    ```sh
+    # If not already in virtual environment, activate it:
     source env/setupEnv.sh
-    ```
-
-4. Run the given python script:
-    ```sh
     python3.11 cnnparted/cnnparted.py examples/squeezenet1_1.yaml RunName
     ```
 

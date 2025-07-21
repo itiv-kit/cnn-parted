@@ -15,7 +15,7 @@ from framework.dse.interfaces.zigzag_interface import ZigzagInterface
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
 
-sys.path.append(str(pathlib.Path(ROOT_DIR, "tools", "zigzag")))
+sys.path.append(str(pathlib.Path(ROOT_DIR, "cnnparted", "tools", "zigzag")))
 from tools.zigzag.zigzag.api import get_hardware_performance_zigzag
 from tools.zigzag.zigzag.cost_model.cost_model import CostModelEvaluation
 
