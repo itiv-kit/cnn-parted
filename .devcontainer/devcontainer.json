@@ -1,0 +1,6 @@
+{
+  "image": "gitlab.itiv.kit.edu:1443/itiv/docker/rocky9-timeloop:latest",
+  "runArgs": ["--userns="],
+  "remoteUser": "root",
+  "securityOpt": [ "seccomp=unconfined" ]
+}

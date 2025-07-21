@@ -5,25 +5,26 @@ import os
 class ToolsInstall(install):
     def run(self):
         install.run(self)
-        path = os.getcwd().replace(" ", "\ ").replace("(","\(").replace(")","\)") + "/tools/"
-        os.system("echo 'Setting up CNNParted Tools'")
 
-        # Install CACTI
-        os.system("make -C"+path+"cacti")
-        os.system("chmod -R 777 "+path+"cacti")
+        #path = os.getcwd().replace(" ", "\ ").replace("(","\(").replace(")","\)") + "/tools/"
+        #os.system("echo 'Setting up CNNParted Tools'")
 
-        # Install Ramulator and vampire
-        os.system("echo 'Setting up ramulator and vampire")
+        ## Install CACTI
+        #os.system("make -C"+path+"cacti")
+        #os.system("chmod -R 777 "+path+"cacti")
 
-        os.system("make -j -C"+path+"ramulator")
-        os.system("make -j -C"+path+"VAMPIRE")
+        ## Install Ramulator and vampire
+        #os.system("echo 'Setting up ramulator and vampire")
 
-        # Install Timeloop
-        os.system("chmod +x "+path+"setupTimeloop.sh")
-        os.system("sh "+path+"setupTimeloop.sh")
+        #os.system("make -j -C"+path+"ramulator")
+        #os.system("make -j -C"+path+"VAMPIRE")
 
-        # Update MNSIM
-        os.system("git -C "+path+"MNSIM-2.0 apply ../mnsim.patch")
+        ## Install Timeloop
+        #os.system("chmod +x "+path+"setupTimeloop.sh")
+        #os.system("sh "+path+"setupTimeloop.sh")
+
+        ## Update MNSIM
+        #os.system("git -C "+path+"MNSIM-2.0 apply ../mnsim.patch")
 
 
 
@@ -74,6 +75,6 @@ setup(
             ],
       python_requires = '>=3.11',
       include_package_data = True,
-      scripts=['tools/setupTimeloop.sh'],
+      scripts=['cnnparted/tools/setupTimeloop.sh'],
       cmdclass={'install': ToolsInstall}
     )

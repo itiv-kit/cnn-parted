@@ -26,7 +26,7 @@ from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult,
 class Timeloop(NodeEvaluator):
     # Output file names.
     out_prefix = "timeloop-mapper."
-    exec_path = os.path.join(ROOT_DIR, 'tools', 'timeloop', 'build', 'timeloop-mapper')
+    exec_path = os.path.join(ROOT_DIR, 'cnnparted', 'tools', 'timeloop', 'build', 'timeloop-mapper')
     configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
     fname_result = "tl_layers"
 

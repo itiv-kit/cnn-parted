@@ -1,43 +1,43 @@
 [submodule "tools/timeloop"]
-	path = tools/timeloop
+	path = cnnparted/tools/timeloop
 	url = https://github.com/NVlabs/timeloop.git
     ignore = dirty
 [submodule "tools/accelergy"]
-	path = tools/accelergy
+	path = cnnparted/tools/accelergy
 	url = https://github.com/Accelergy-Project/accelergy.git
     ignore = dirty
 [submodule "tools/accelergy-aladdin-plug-in"]
-	path = tools/accelergy-aladdin-plug-in
+	path = cnnparted/tools/accelergy-aladdin-plug-in
 	url = https://github.com/Accelergy-Project/accelergy-aladdin-plug-in.git
 	ignore = dirty
 [submodule "tools/accelergy-cacti-plug-in"]
-	path = tools/accelergy-cacti-plug-in
+	path = cnnparted/tools/accelergy-cacti-plug-in
 	url = https://github.com/Accelergy-Project/accelergy-cacti-plug-in.git
 	ignore = dirty
 [submodule "tools/accelergy-table-based-plug-ins"]
-	path = tools/accelergy-table-based-plug-ins
+	path = cnnparted/tools/accelergy-table-based-plug-ins
 	url = https://github.com/Accelergy-Project/accelergy-table-based-plug-ins.git
 	ignore = dirty
 [submodule "tools/cacti"]
-	path = tools/cacti
+	path = cnnparted/tools/cacti
 	url = https://github.com/HewlettPackard/cacti.git
 	ignore = dirty
 [submodule "tools/dnn-model-exploration"]
-	path = tools/dnn-model-exploration
+	path = cnnparted/tools/dnn-model-exploration
 	url = https://github.com/itiv-kit/dnn-model-exploration.git
     ignore = dirty
 [submodule "tools/ramulator"]
-	path = tools/ramulator
+	path = cnnparted/tools/ramulator
 	url = https://github.com/CMU-SAFARI/ramulator.git
     ignore = dirty
 [submodule "tools/VAMPIRE"]
-	path = tools/VAMPIRE
+	path = cnnparted/tools/VAMPIRE
 	url = https://github.com/CMU-SAFARI/VAMPIRE.git
     ignore = dirty
 [submodule "tools/MNSIM-2.0"]
-	path = tools/MNSIM-2.0
+	path = cnnparted/tools/MNSIM-2.0
 	url = https://github.com/thu-nics/MNSIM-2.0.git
     ignore = dirty
 [submodule "tools/zigzag"]
-	path = tools/zigzag
+	path = cnnparted/tools/zigzag
 	url = https://github.com/KULeuven-MICAS/zigzag.git
