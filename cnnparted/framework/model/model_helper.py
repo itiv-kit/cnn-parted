@@ -1,4 +1,5 @@
-from onnx2pytorch import ConvertModel
+#from onnx2pytorch import ConvertModel
+from onnx2torch import convert
 
 class ModelHelper:
 
@@ -6,7 +7,8 @@ class ModelHelper:
         pass
 
     def convert_to_pytorch(self,model):
-        """Convert ONNX model to PyTorch model using onnx2pytorch."""
+        """Convert ONNX model to PyTorch model using onnx2torch."""
         # Assuming self.model is the loaded ONNX model
-        pytorch_model = ConvertModel(model,experimental=True)
+        pytorch_model = convert(model)
+        #pytorch_model = ConvertModel(model,experimental=True)
         return pytorch_model
