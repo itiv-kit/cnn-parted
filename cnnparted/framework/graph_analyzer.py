@@ -7,6 +7,7 @@ import networkx as nx
 #from framework.stages.inputs.workload_parser import WorkloadInfo
 from framework.model.model import TreeModel
 from framework.model.graph import LayersGraph
+from framework.model.execution_graph import ExecutionGraph
 
 from framework.model.scheduling import topo_sort_random_start_node
 
@@ -23,12 +24,15 @@ class GraphAnalyzer:
         self._trees: dict[str, list] = {}
         self.torchmodels  = {}
         self.graphs: dict[str, LayersGraph] = {}
+        self.exec_graphs: dict[str, LayersGraph] = {}
         for network, workload_info in self.workloads.items():
             self._tree_models[network] = TreeModel(self.run_name, network, tuple(workload_info.input_shape))
             self._trees[network] = self._tree_models[network].get_tree()
             self.torchmodels[network] = self._tree_models[network].get_torch_model()
             self.graphs[network] = LayersGraph(self._trees[network])
+            self.exec_graphs[network] = ExecutionGraph(self._trees[network])
         self.schedules: dict[str, list] = {}
+        breakpoint()
 
 
     def find_schedules(self, num_topos : int) -> list:
