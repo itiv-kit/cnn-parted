@@ -32,7 +32,6 @@ class GraphAnalyzer:
             self.graphs[network] = LayersGraph(self._trees[network])
             self.exec_graphs[network] = ExecutionGraph(self._trees[network])
         self.schedules: dict[str, list] = {}
-        breakpoint()
 
 
     def find_schedules(self, num_topos : int) -> list:
