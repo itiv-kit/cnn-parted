@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 #from framework.stages import GraphAnalysis, SystemParser
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.inputs.system_parser import SystemParser
@@ -55,21 +57,24 @@ class NodeEvaluation(Stage):
         self.dse_system_config = artifacts.config.get("dse", {})
         self.work_dir = artifacts.config["general"]["work_dir"]
         self.run_name = artifacts.args["run_name"]
-        self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
         self.show_progress = artifacts.args["p"]
-        self.node_components = artifacts.get_stage_result(SystemParser, "nodes")
+        self.ga = artifacts.graph_analysis.ga
+        self.node_components = artifacts.system_parser.nodes
 
     def _update_artifacts(self, artifacts: Artifacts, node_stats: SystemResult):
-        artifacts.set_stage_result(NodeEvaluation, "node_stats", node_stats)
+        artifacts.node_evaluation.node_stats = node_stats
         artifacts.config["num_platforms"] = node_stats.get_num_platforms()
         
         # Update number of partitioning points
-        #num_pp = artifacts.config["general"]["num_pp"]
-        #if num_pp == -1:
-        #    #num_pp = len(node_stats[list(node_stats.keys())[0]]["eval"]["design_0"]["layers"].keys()) - 1
-        #    platform_id = node_stats.get_platform_ids()[0]
-        #    num_pp = (node_stats[platform_id].designs[0].layers) - 1
-        #elif len(node_stats) == 1:
-        #    num_pp = 0
-        #artifacts.config["num_pp"] = num_pp
+        num_pp = artifacts.config["general"]["num_pp"]
+        if num_pp == -1:
+            #num_pp = len(node_stats[list(node_stats.keys())[0]]["eval"]["design_0"]["layers"].keys()) - 1
+            platform_id = node_stats.get_platform_ids()[0]
+            num_pp = len(node_stats[platform_id].designs[0].layers) - 1
+        elif len(node_stats) == 1:
+            num_pp = 0
+        artifacts.config["num_pp"] = num_pp
     
+@dataclass
+class NodeEvaluationArtifacts:
+    node_stats: SystemResult = None

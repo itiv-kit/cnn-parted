@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from framework.stages.stage_base import Stage
 from framework.stages.artifacts import Artifacts
 from framework.helpers.config_helper import ConfigHelper
@@ -17,7 +19,11 @@ class SystemParser(Stage):
         self.config = artifacts.config
 
     def _update_artifacts(self, artifacts: Artifacts, nodes, links):
-        artifacts.set_stage_result(SystemParser, "nodes", nodes)
-        artifacts.set_stage_result(SystemParser, "links", links)
+        artifacts.system_parser.nodes = nodes
+        artifacts.system_parser.links = links
 
     
+@dataclass
+class SystemParserArtifacts:
+    nodes: list[dict] = None
+    links: list[dict] = None

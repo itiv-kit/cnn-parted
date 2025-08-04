@@ -1,15 +1,18 @@
+from dataclasses import dataclass
+
 import numpy as np
 
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 from framework.stages.analysis.graph_analysis import GraphAnalysis
-from framework.stages.evaluation.node_evaluation import NodeEvaluation
+from framework.stages.evaluation.node_evaluation import SystemResult
 from framework.stages.inputs.system_parser import SystemParser
 from framework.stages.optimization.robustness_optimization import RobustnessOptimization
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 
 from framework.optimizer.design_optimizer import DesignOptimizer
+from framework.optimizer.config.design_opt_config import DesignOptConfig
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 from framework.optimizer.design_problem import DesignProblem
 
@@ -64,25 +67,25 @@ class DesignPartitioningOptimization(Stage):
     
     def _take_artifacts(self, artifacts: Artifacts):
         self.run_name = artifacts.args["run_name"]
-        self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
+        self.ga = artifacts.graph_analysis.ga
         self.show_progress = artifacts.args["p"]
         self.num_pp = artifacts.config["num_pp"]
-        self.link_components = artifacts.get_stage_result(SystemParser, "links")
+        self.link_components = artifacts.system_parser.links
         self.work_dir = artifacts.config["general"]["work_dir"]
 
         self.show_progress = artifacts.args["p"]
         self.config = artifacts.config
 
         if RobustnessOptimization in artifacts.stages:
-            self.q_constr = artifacts.get_stage_result(RobustnessOptimization, "q_constr")
+            self.q_constr = artifacts.robustness_optimization.q_constr
         else:
             self.q_constr = {}
         
 
-    def _update_artifacts(self, artifacts: Artifacts, node_stats, optimizer_config):
+    def _update_artifacts(self, artifacts: Artifacts, node_stats: SystemResult, optimizer_config):
         artifacts.config["num_platforms"] = node_stats.get_num_platforms()
-        artifacts.set_stage_result(DesignPartitioningOptimization, "node_stats", node_stats)
-        artifacts.set_stage_result(DesignPartitioningOptimization, "optimizer_cfg", optimizer_config)
+        artifacts.design_optimization.node_stats = node_stats
+        artifacts.design_optimization.optimizer_cfg = optimizer_config
 
         #num_pp = artifacts.config["general"]["num_pp"]
         #if num_pp == -1:
@@ -93,3 +96,8 @@ class DesignPartitioningOptimization(Stage):
         #elif len(node_stats) == 1:
         #    num_pp = 0
         #artifacts.config["num_pp"] = num_pp
+
+@dataclass
+class DesignOptimizationArtifacts:
+    node_stats: SystemResult = None
+    optimizer_cfg: DesignOptConfig = None

@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from framework.stages.artifacts import Artifacts
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.inputs.workload_parser import WorkloadParser
@@ -26,10 +28,14 @@ class RobustnessOptimization(Stage):
         self.accuracy_cfg = artifacts.config["accuracy"]
         self.run_name = artifacts.args["run_name"]
         self.show_progress = artifacts.args["p"]
-        self.torch_models = artifacts.get_stage_result(GraphAnalysis, "ga").torchmodels
-        self.accuracy_function = artifacts.get_stage_result(WorkloadParser, "accuracy_function")
+        self.torch_models = artifacts.graph_analysis.ga.torchmodels
+        self.accuracy_function = artifacts.workload_parser.accuracy_function
 
 
     def _update_artifacts(self, artifacts: Artifacts, q_constr):
-        artifacts.set_stage_result(RobustnessOptimization, "q_constr", q_constr)
+        artifacts.robustness_optimization.q_constr = q_constr
     
+
+@dataclass
+class RobustnessOptimizationArtifacts:
+    q_constr: dict = None

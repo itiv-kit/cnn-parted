@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.graph_analyzer import GraphAnalyzer
@@ -21,10 +23,10 @@ class GraphAnalysis(Stage):
         self.work_dir = artifacts.config["general"]["work_dir"]
         self.run_name = artifacts.args["run_name"]
         self.num_topos = artifacts.config["general"]["num_topos"]
-        self.workloads = artifacts.get_stage_result(WorkloadParser, "workloads")
+        self.workloads = artifacts.workload_parser.workloads 
 
     def _update_artifacts(self, artifacts: Artifacts, ga: GraphAnalyzer):
-        artifacts.set_stage_result(GraphAnalysis, "ga", ga)
+        artifacts.graph_analysis.ga = ga
 
         # Update number of partitioning points
         num_pp = artifacts.config["general"]["num_pp"]
@@ -34,4 +36,6 @@ class GraphAnalysis(Stage):
         #    num_pp = 0
         artifacts.config["num_pp"] = num_pp
 
-    
+
+class GraphAnalysisArtifacts:
+    ga: GraphAnalyzer = None

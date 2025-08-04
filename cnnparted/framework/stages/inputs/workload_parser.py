@@ -71,7 +71,13 @@ class WorkloadParser(Stage):
         self.workload_array = artifacts.config["workload"]
         
     def _update_artifacts(self, artifacts: Artifacts, accuracy_func, networks, workloads):
-        artifacts.set_stage_result(WorkloadParser, "accuracy_function", accuracy_func)
-        artifacts.set_stage_result(WorkloadParser, "networks", networks)
-        artifacts.set_stage_result(WorkloadParser, "workloads", workloads)
+        artifacts.workload_parser.accuracy_function = accuracy_func
+        artifacts.workload_parser.networks = networks
+        artifacts.workload_parser.workloads = workloads
 
+
+@dataclass
+class WorkloadParserArtifacts:
+    accuracy_function: callable = None
+    networks: list[str] = None
+    workloads: dict[str, WorkloadInfo] = None

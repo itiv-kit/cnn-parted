@@ -21,21 +21,21 @@ class VisualizeSchedule(Stage):
         super().__init__()
 
 
-    def _take_artifacts(self, artifacts):
+    def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
         self.work_dir = self.config["work_dir"]
         self.run_name = artifacts.args["run_name"]
-        self.n_constr = artifacts.get_stage_result(PartitioningOptimization, "n_constr")
-        self.n_var = artifacts.get_stage_result(PartitioningOptimization, "n_var")
+        self.n_constr = artifacts.partitioning_optimization.n_constr 
+        self.n_var = artifacts.partitioning_optimization.n_var
 
-        sol = artifacts.get_stage_result(PartitioningOptimization, "sol")
+        sol = artifacts.partitioning_optimization.sol
         if not "accuracy" in self.config:
             for i, p in enumerate(sol["nondom"]): # achieving aligned csv file
                 sol["nondom"][i] = np.append(p, float(0))
             for i, p in enumerate(sol["dom"]): # achieving aligned csv file
                 sol["dom"][i] = np.append(p, float(0))
         self.sol = sol
-        self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
+        self.ga = artifacts.graph_analysis.ga
         network = self.ga.networks[0] #TODO Multiple networks
         self.schedules = self.ga.schedules[network]
         self.num_platforms = self.config["num_platforms"]

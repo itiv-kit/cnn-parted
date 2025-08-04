@@ -56,7 +56,7 @@ class DesignProblem(ElementwiseProblem):
                  system_dse_config):
         self.work_dir = artifacts.config["general"]["work_dir"]
         self.run_name = artifacts.args["run_name"]
-        self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
+        self.ga = artifacts.graph_analysis.ga 
         self.show_progress = artifacts.args["p"]
         self.num_pp = artifacts.config["num_pp"]
         self.config = artifacts.config
