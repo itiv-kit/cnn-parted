@@ -40,7 +40,12 @@ def parse_pipeline(config):
                     dependencies_exist = True
                     break
             if not dependencies_exist:
-                raise RuntimeError(f"Dependencies for \"{stage_class.__name__}\" not found. Required are {deps} to be instantiated previously.")
+                error_str = f"Dependencies for {stage_class.__name__} not found. Required are:\n"
+                for dep in deps:
+                    error_str += f"\t{dep}\n"
+                error_str += "that must be instantiated previously."
+                breakpoint()
+                raise RuntimeError(error_str)
             
         stage_classes.append(stage_class())
 
