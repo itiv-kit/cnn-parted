@@ -44,7 +44,6 @@ def parse_pipeline(config):
                 for dep in deps:
                     error_str += f"\t{dep}\n"
                 error_str += "that must be instantiated previously."
-                breakpoint()
                 raise RuntimeError(error_str)
             
         stage_classes.append(stage_class())
