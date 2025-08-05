@@ -78,6 +78,28 @@ system:
           - edp
           timeout: 15000
           victory-condition: 500
+    - id: 3
+      fault_rates: [0, 1e-4] # input, weight
+      max_memory_size: 600000000
+      evaluation:
+        accelerator: MRAM_area # accelerator name
+        conf_path: /configs/mnsim_configs/MRAM_area.ini
+        simulator: mnsim
+    - id: 4
+      fault_rates: [0, 1e-4] # input, weight
+      max_memory_size: 600000000
+      evaluation:
+        accelerator: MRAM_lat # accelerator name
+        conf_path: /configs/mnsim_configs/MRAM_lat.ini
+        simulator: mnsim
+    - id: 5
+      fault_rates: [0, 1e-4] # input, weight
+      max_memory_size: 600000000
+      evaluation:
+        accelerator: RRAM_acc # accelerator name
+        conf_path: /configs/mnsim_configs/RRAM_acc.ini
+
+        simulator: mnsim
   link:
     - id: 1
       max_out_size: 20000000
