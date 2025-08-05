@@ -18,6 +18,7 @@ class Artifacts:
         self.node_evaluation: stages.NodeEvaluationArtifacts = None
         self.design_optimization: stages.DesignOptimizationArtifacts = None
         self.partitioning_optimization: stages.PartitioningOptimizationArtifacts = None
+        self.multitenancy_optimization: stages.MultiTenancyOptimizationArtifacts = None
         self.robustness_optimization: stages.RobustnessOptimizationArtifacts = None
 
         self.parse_stages()
@@ -49,8 +50,10 @@ class Artifacts:
                     self.partitioning_optimization = stages.PartitioningOptimizationArtifacts()
                 case stages.RobustnessOptimization:
                     self.robustness_optimization = stages.RobustnessOptimizationArtifacts()
+                case stages.MultiTenancyOptimization:
+                    self.multitenancy_optimization = stages.MultiTenancyOptimizationArtifacts()
 
-        # Map artifact cls to members
+        # Map artifact cls to members, needed for get_oneof method
         self.mapping = {
             stages.SystemParserArtifacts: self.system_parser,
             stages.WorkloadParserArtifacts: self.workload_parser,
@@ -58,6 +61,7 @@ class Artifacts:
             stages.NodeEvaluationArtifacts: self.node_evaluation,
             stages.DesignOptimizationArtifacts: self.design_optimization,
             stages.PartitioningOptimizationArtifacts: self.partitioning_optimization,
+            stages.MultiTenancyOptimizationArtifacts: self.multitenancy_optimization, 
             stages.RobustnessOptimizationArtifacts: self.robustness_optimization,
         }
 

@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
 from framework.stages.inputs.system_parser import SystemParser
@@ -10,7 +12,7 @@ from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 @register_required_stage(GraphAnalysis, (NodeEvaluation, DesignPartitioningOptimization) , SystemParser)
-class MultitenancyOptimization(Stage):
+class MultiTenancyOptimization(Stage):
     def __init__(self):
         super().__init__()
     
@@ -22,3 +24,7 @@ class MultitenancyOptimization(Stage):
     
     def _update_artifacts(self, artifacts):
         return super()._update_artifacts(artifacts)
+
+@dataclass
+class MultiTenancyOptimizationArtifacts():
+    ...
