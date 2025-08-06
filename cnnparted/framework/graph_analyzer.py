@@ -24,7 +24,7 @@ class GraphAnalyzer:
         self._trees: dict[str, list] = {}
         self.torchmodels  = {}
         self.graphs: dict[str, LayersGraph] = {}
-        self.exec_graphs: dict[str, LayersGraph] = {}
+        self.exec_graphs: dict[str, ExecutionGraph] = {}
         for network, workload_info in self.workloads.items():
             self._tree_models[network] = TreeModel(self.run_name, network, tuple(workload_info.input_shape))
             self._trees[network] = self._tree_models[network].get_tree()

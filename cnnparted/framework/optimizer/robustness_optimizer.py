@@ -81,7 +81,7 @@ class RobustnessOptimizer(Optimizer):
                     acc_lut[tuple(x)] = accuracy_result
 
                 # TODO This is a workaround for hard constraints
-                #accuracy_drop_constraint = 0.05
+                #accuracy_drop_constraint = 0.02
                 if ref == 0:
                     return accuracy_result
                 else:

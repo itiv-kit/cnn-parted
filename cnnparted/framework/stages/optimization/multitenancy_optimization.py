@@ -8,7 +8,7 @@ from framework.stages.optimization.design_optimization import DesignPartitioning
 
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
-from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
+from framework.optimizer.multitenancy_partitioning import MultiTenancyPartitioning
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 @register_required_stage(GraphAnalysis, (NodeEvaluation, DesignPartitioningOptimization) , SystemParser)
@@ -17,10 +17,14 @@ class MultiTenancyOptimization(Stage):
         super().__init__()
     
     def run(self, artifacts):
-        return super().run(artifacts)
+        self._take_artifacts(artifacts)
+
+        mt_optimizer = MultiTenancyPartitioning(self.node_results, self.ga)
+        mt_optimizer.optimize()
     
     def _take_artifacts(self, artifacts: Artifacts):
-        self.ga = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), )
+        self.ga = artifacts.graph_analysis.ga
+        self.node_results = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
     
     def _update_artifacts(self, artifacts):
         return super()._update_artifacts(artifacts)
