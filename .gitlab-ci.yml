@@ -7,7 +7,7 @@ variables:
 
 default:
   cache: &global_cache
-    key: $CI_COMMIT_SHA
+    key: $CI_PIPELINE_ID
     untracked: true
     paths:
       - cnnparted/tools/
@@ -45,7 +45,7 @@ run-test:
   stage: test
   cache:
     <<: *global_cache
-    policy: push
+    policy: pull
   before_script:    
     - sudo ln -s /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so
     - source env/setupEnv.sh
