@@ -233,11 +233,11 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             area=area_list[idx]
 
             l = LayerResult()
+            breakpoint()
             l.name = layer[0][0].get('name')
             l.latency = latency / 1e6 # ns -> ms
             l.energy = energy / 1e6 # nJ -> mJ
             l.area = area / 1e6 # um^2 -> mm^2
-            design.add_layer(l)
             design.add_layer_to_network(l, network)
 
         # for compatibility reasons with DSE-Extension

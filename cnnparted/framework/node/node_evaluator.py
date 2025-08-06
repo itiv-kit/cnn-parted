@@ -84,10 +84,6 @@ class DesignResult:
         self.tag: str = ""
         self.networks: dict[str, list[LayerResult]] = {}
 
-        #TODO Remove after networks member is implemented
-        self.layers: list[LayerResult] = []
-        self.layers_dict: dict[str, LayerResult] = {}
-
         self.architecture: dict = architecture
 
     @classmethod
@@ -104,13 +100,8 @@ class DesignResult:
                     l.area = data["area"]
                     l.energy  = data["energy"]
                     l.latency = data["latency"]
-                    design_res.add_layer(l)
                     design_res.add_layer_to_network(l, nw if network is None else network)
         return design_res 
-
-    def add_layer(self, results: LayerResult, network: str = "test"):
-        self.layers.append(results)
-        self.layers_dict[results.name] = results
 
 
     def to_dict(self) -> dict:
@@ -123,16 +114,6 @@ class DesignResult:
 
         return res
     
-    def get_layer_dict(self) -> dict:
-        layers = {}
-        for layer in self.layers:
-            name = layer.name
-            layers[name] = {
-                "area": layer.area,
-                "energy": layer.energy,
-                "latency": layer.latency,
-                }
-        return layers
 
     def get_networks(self):
         return list(self.networks.keys())
@@ -154,15 +135,14 @@ class DesignResult:
 
     @property
     def area(self):
-        return self.layers[0].area
+        nw = self.get_networks()[0]
+        return self.networks[nw][0].area
     
-    @property
-    def total_latency(self):
-        return sum([layer.latency for layer in self.layers])
+    def total_latency(self, network: str):
+        return sum([layer.latency for layer in self.networks[network]])
     
-    @property
-    def total_energy(self):
-        return sum([layer.energy for layer in self.layers])
+    def total_energy(self, network: str):
+        return sum([layer.energy for layer in self.networks[network ]])
 
 
 class NodeResult:
@@ -231,7 +211,8 @@ class NodeResult:
             writer.writerow(header)
             row_num = 1
             for (tag, design_result) in enumerate(self.designs):
-                for layer in design_result.layers:
+                network = design_result.get_networks()[0] #TODO Multiple networks
+                for layer in design_result.networks[network]:
                     row = [
                         row_num,
                         "design_" + str(tag),
@@ -321,7 +302,6 @@ class NodeResult:
                 layer_res.latency = float(row['Latency [ms]'])
                 layer_res.energy = float(row['Energy [mJ]'])
                 layer_res.area = float(row['Area [mm2]'])
-                design_result.add_layer(layer_res)
                 design_result.add_layer_to_network(layer_res, network)
 
         # Add results for the final design

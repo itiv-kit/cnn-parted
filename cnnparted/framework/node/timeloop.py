@@ -153,7 +153,6 @@ class Timeloop(NodeEvaluator):
                 layer_result.energy = output["energy_mJ"]
                 layer_result.area = output["area_mm2"]
 
-                design_result.add_layer(layer_result)
                 design_result.add_layer_to_network(layer_result, network)
 
             node_result.add_design(design_result)
@@ -195,7 +194,6 @@ class Timeloop(NodeEvaluator):
             layer_result.energy = output["energy_mJ"]
             layer_result.area = output["area_mm2"]
 
-            design_result.add_layer(layer_result)
             design_result.add_layer_to_network(layer_result, network)
         
         stats.add_design(design_result)
