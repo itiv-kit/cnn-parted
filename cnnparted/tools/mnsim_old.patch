@@ -1,0 +1,142 @@
+diff --git a/MNSIM/Interface/interface.py b/MNSIM/Interface/interface.py
+index b12bb3e..187b44d 100644
+--- a/MNSIM/Interface/interface.py
++++ b/MNSIM/Interface/interface.py
+@@ -141,7 +141,7 @@ class TrainTestInterface(object):
+         for i in range(len(net_structure_info)):
+             if not (len(net_structure_info[i]['Outputindex']) == 1 and net_structure_info[i]['Outputindex'][0] == 1):
+                 raise Exception('duplicate output')
+-            if net_structure_info[i]['type'] in ['conv', 'pooling', 'element_sum', 'fc']:
++            if net_structure_info[i]['type'] in ['conv', 'pooling', 'element_sum', 'concat', 'fc']:
+                 absolute_index[i] = absolute_count
+                 absolute_count = absolute_count + 1
+             else:
+@@ -150,7 +150,7 @@ class TrainTestInterface(object):
+                 absolute_index[i] = absolute_index[i + net_structure_info[i]['Inputindex'][0]]
+         graph = list()
+         for i in range(len(net_structure_info)):
+-            if net_structure_info[i]['type'] in ['conv', 'pooling', 'element_sum', 'fc']:
++            if net_structure_info[i]['type'] in ['conv', 'pooling', 'element_sum', 'concat', 'fc']:
+                 # layer num, layer type
+                 layer_num = absolute_index[i]
+                 layer_type = net_structure_info[i]['type']
+@@ -159,7 +159,7 @@ class TrainTestInterface(object):
+                 # layer output
+                 layer_output = list()
+                 for tmp_i in range(len(net_structure_info)):
+-                    if net_structure_info[tmp_i]['type'] in ['conv', 'pooling', 'element_sum', 'fc']:
++                    if net_structure_info[tmp_i]['type'] in ['conv', 'pooling', 'element_sum', 'concat', 'fc']:
+                         tmp_layer_num = absolute_index[tmp_i]
+                         tmp_layer_input = list(map(lambda x: (absolute_index[tmp_i + x] if tmp_i + x != -1 else -1), net_structure_info[tmp_i]['Inputindex']))
+                         if layer_num in tmp_layer_input:
+diff --git a/MNSIM/Interface/network.py b/MNSIM/Interface/network.py
+index 2380519..fd7f8d9 100644
+--- a/MNSIM/Interface/network.py
++++ b/MNSIM/Interface/network.py
+@@ -100,15 +100,25 @@ class NetworkGraph(nn.Module):
+         for i, layer in enumerate(self.layer_list):
+             # find the input tensor
+             input_index = self.input_index_list[i]
+-            assert len(input_index) in [1, 2]
++            assert len(input_index) in [1, 2, 4]
+             # print(tensor_list[input_index[0]+i+1].shape)
+             if len(input_index) == 1:
+                 tensor_list.append(layer.structure_forward(tensor_list[input_index[0] + i + 1]))
+-            else:
++            elif len(input_index) == 2:
++                tensor_list.append(
++                    layer.structure_forward([
++                        tensor_list[input_index[0] + i + 1],
++                        tensor_list[input_index[1] + i + 1],
++                    ],
++                    )
++                )
++            elif len(input_index) == 4:
+                 tensor_list.append(
+                     layer.structure_forward([
+                         tensor_list[input_index[0] + i + 1],
+                         tensor_list[input_index[1] + i + 1],
++                        tensor_list[input_index[2] + i + 1],
++                        tensor_list[input_index[3] + i + 1],
+                     ],
+                     )
+                 )
+diff --git a/MNSIM/Interface/quantize.py b/MNSIM/Interface/quantize.py
+index 3e7da17..3aa04f2 100644
+--- a/MNSIM/Interface/quantize.py
++++ b/MNSIM/Interface/quantize.py
+@@ -142,6 +142,7 @@ class QuantizeLayer(nn.Module):
+         output_shape = output.shape
+         # layer_info
+         self.layer_info = collections.OrderedDict()
++        self.layer_info['name'] = self.layer_config['name']
+         if self.layer_config['type'] == 'conv':
+             self.layer_info['type'] = 'conv'
+             self.layer_info['Inputchannel'] = int(input_shape[1])
+@@ -337,6 +338,12 @@ class ViewLayer(nn.Module):
+     def forward(self, x):
+         return x.view(x.size(0), -1)
+
++class ConcatLayer(nn.Module):
++    def __init__(self):
++        super(ConcatLayer, self).__init__()
++    def forward(self, x):
++        return torch.cat([xi for xi in x], 1)
++
+ class EleSumLayer(nn.Module):
+     def __init__(self):
+         super(EleSumLayer, self).__init__()
+@@ -368,12 +375,16 @@ class StraightLayer(nn.Module):
+                     stride = self.layer_config['stride'], \
+                     padding = self.layer_config['padding']
+                 )
++            elif self.layer_config['mode'] == 'ADA':
++                self.layer = nn.AdaptiveAvgPool2d((1, 1))
+             else:
+                 assert 0, f'not support {self.layer_config["mode"]}'
+         elif self.layer_config['type'] == 'relu':
+             self.layer = nn.ReLU()
+         elif self.layer_config['type'] == 'view':
+             self.layer = ViewLayer()
++        elif self.layer_config['type'] == 'concat':
++            self.layer = ConcatLayer()
+         elif self.layer_config['type'] == 'bn':
+             self.layer = nn.BatchNorm2d(self.layer_config['features'])
+         elif self.layer_config['type'] == 'dropout':
+@@ -387,13 +398,14 @@ class StraightLayer(nn.Module):
+         # self.last_value[0] = 1
+         self.layer_info = None
+     def structure_forward(self, input):
+-        if self.layer_config['type'] != 'element_sum':
++        if self.layer_config['type'] != 'element_sum' and self.layer_config['type'] != 'concat':
+             # generate input shape and output shape
+             self.input_shape = input.shape
+             output = self.layer.forward(input)
+             self.output_shape = output.shape
+             # generate layer_info
+             self.layer_info = collections.OrderedDict()
++            self.layer_info['name'] = self.layer_config['name']
+             if self.layer_config['type'] == 'pooling':
+                 self.layer_info['type'] = 'pooling'
+                 self.layer_info['Inputchannel'] = int(self.input_shape[1])
+@@ -415,11 +427,12 @@ class StraightLayer(nn.Module):
+             else:
+                 assert 0, f'not support {self.layer_config["type"]}'
+         else:
+-            self.input_shape = (input[0].shape, input[1].shape)
++            self.input_shape = (i.shape for i in input)
+             output = self.layer.forward(input)
+             self.output_shape = output.shape
+             self.layer_info = collections.OrderedDict()
+-            self.layer_info['type'] = 'element_sum'
++            self.layer_info['name'] = self.layer_config['name']
++            self.layer_info['type'] = self.layer_config['type']
+         self.layer_info['Inputbit'] = self.quantize_config['activation_bit']
+         self.layer_info['Weightbit'] = self.quantize_config['weight_bit']
+         self.layer_info['outputbit'] = self.quantize_config['activation_bit']
+@@ -448,4 +461,4 @@ class StraightLayer(nn.Module):
+         return None
+     def extra_repr(self):
+         return str(self.hardware_config) + ' ' + str(self.layer_config) + ' ' + str(self.quantize_config)
+-StraightLayerStr = ['pooling', 'relu', 'view', 'bn', 'dropout', 'element_sum']
++StraightLayerStr = ['pooling', 'relu', 'view', 'concat', 'bn', 'dropout', 'element_sum']
