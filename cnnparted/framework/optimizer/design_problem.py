@@ -218,9 +218,9 @@ class DesignProblem(ElementwiseProblem):
                 if not in_lut:
                     self.system_results[id].add_design(design_result)
 
-                layers_data = stats.designs[0].networks[self.ga.networks[0]] #TODO Multiple networks
-                energy = [data.energy for data in layers_data]
-                latency = [data.latency for data in layers_data]
+                network_result = stats.designs[0].networks[self.ga.networks[0]] #TODO Multiple networks
+                energy = [data.energy for _, data in network_result]
+                latency = [data.latency for _, data in network_result]
                 area = stats.designs[0].area
                 energy_total = sum(energy)
                 latency_total = sum(latency)

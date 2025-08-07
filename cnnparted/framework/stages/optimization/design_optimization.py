@@ -92,7 +92,7 @@ class DesignPartitioningOptimization(Stage):
             #platform_id = node_stats.get_platform_ids()[0]
             #design = node_stats[platform_id].designs[0]
             #network =  node_stats[platform_id].designs[0].get_networks()[0] #TODO Multiple networks
-            #num_pp = len(design.networks[network]) - 1
+            #num_pp = len(design.networks[network].layers) - 1
         #elif len(node_stats) == 1:
         #    num_pp = 0
         #artifacts.config["num_pp"] = num_pp

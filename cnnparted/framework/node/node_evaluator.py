@@ -47,28 +47,30 @@ class NetworkResult:
     Information about the execution of the networks for a given design of a specific accelerator
     """
     def __init__(self):
-        self._networks: dict[str, list[LayerResult]] = {}
+        self.layers: dict[str, LayerResult] = {}
 
-    def get_networks(self):
-        return list(self._networks.keys())
-    
-    def get_network_dict(self, network: str):
-        layers_list_of_dict = [l.to_dict() for l in self._networks[network]]
+    def to_dict(self):
+        layers_list_of_dict = [l.to_dict() for l in self.layers.values()]
         layers = reduce(operator.ior, layers_list_of_dict, {})
         return layers
 
-    def add_layer(self, results: LayerResult, network: str):
-        if network not in self._networks:
-            self._networks[network] = []
-
-        self._networks[network].append(results)
-    
-    def get_networks_dict(self):
-        networks = {network: self.get_network_dict(network) for network  in self._networks.keys()}
-        return networks
+    def add_layer(self, results: LayerResult):
+        name = results.name
+        self.layers[name] = results
     
     def __getitem__(self, item: str):
-        return self._networks[item]
+        return self.layers[item]
+    
+    def __iter__(self):
+        return iter(self.layers.items())
+
+    @property
+    def total_latency(self):
+        return sum([layer.latency for layer in self.layers.values()])
+    
+    @property
+    def total_energy(self):
+        return sum([layer.energy for layer in self.layers.values()])
 
     
 class DesignResult:
@@ -82,7 +84,7 @@ class DesignResult:
     """
     def __init__(self, architecture: dict = {}):
         self.tag: str = ""
-        self.networks: dict[str, list[LayerResult]] = {}
+        self.networks: dict[str, NetworkResult] = {}
 
         self.architecture: dict = architecture
 
@@ -109,8 +111,8 @@ class DesignResult:
         res["arch_config"] = self.architecture
         res["networks"] = {}
 
-        for nw in self.networks.keys():
-            res["networks"][nw] = self.get_network_dict(nw)
+        for nw, data in self.networks.items():
+            res["networks"][nw] = data.to_dict() #self.get_network_dict(nw)
 
         return res
     
@@ -118,19 +120,19 @@ class DesignResult:
     def get_networks(self):
         return list(self.networks.keys())
     
-    def get_network_dict(self, network: str):
+    def get_network_dict(self, network: str): #TODO
         layers_list_of_dict = [l.to_dict() for l in self.networks[network]]
         layers = reduce(operator.ior, layers_list_of_dict, {})
         return layers
 
     def add_layer_to_network(self, results: LayerResult, network: str):
         if network not in self.networks:
-            self.networks[network] = []
+            self.networks[network] = NetworkResult()
 
-        self.networks[network].append(results)
+        self.networks[network].add_layer(results)
     
     def get_networks_dict(self):
-        networks = {network: self.get_network_dict(network) for network  in self.networks.keys()}
+        networks = {network: data.to_dict() for (network, data) in self.networks.items()}
         return networks
 
     @property
@@ -139,10 +141,10 @@ class DesignResult:
         return self.networks[nw][0].area
     
     def total_latency(self, network: str):
-        return sum([layer.latency for layer in self.networks[network]])
+        return self.networks[network].total_latency
     
     def total_energy(self, network: str):
-        return sum([layer.energy for layer in self.networks[network ]])
+        return self.networks[network].total_energy
 
 
 class NodeResult:
@@ -212,11 +214,11 @@ class NodeResult:
             row_num = 1
             for (tag, design_result) in enumerate(self.designs):
                 network = design_result.get_networks()[0] #TODO Multiple networks
-                for layer in design_result.networks[network]:
+                for name, layer in design_result.networks[network]:
                     row = [
                         row_num,
                         "design_" + str(tag),
-                        layer.name,
+                        name,
                         str(layer.latency),
                         str(layer.energy),
                         str(layer.area),
