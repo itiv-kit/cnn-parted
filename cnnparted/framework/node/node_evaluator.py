@@ -29,12 +29,31 @@ class LayerResult:
         self.energy: float #must be in mJ
         self.cycles: int 
 
+        # Information relevant for scheduling
+        self.binding: int = None
+        self.start_time: float = None
+        self.end_time: float = None
+
     def to_dict(self) -> dict :
-        return {self.name: 
-                {"latency": self.latency,
-                 "area": self.area,
-                 "energy": self.energy}}
+        ret = {
+            self.name: 
+                {   "latency": self.latency,
+                    "area": self.area,
+                    "energy": self.energy,
+                    "binding": self.binding,
+                    "start_time": self.start_time,
+                    "end_time": self.end_time}
+            }         
+        return ret
     
+    @property
+    def edp(self):
+        return self.latency * self.energy
+    
+    @property
+    def edap(self):
+        return self.latency * self.energy * self.area
+
     def __repr__(self):
         return str(self.to_dict())
     
