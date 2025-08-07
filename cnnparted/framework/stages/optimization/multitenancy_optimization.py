@@ -19,12 +19,13 @@ class MultiTenancyOptimization(Stage):
     def run(self, artifacts):
         self._take_artifacts(artifacts)
 
-        mt_optimizer = MultiTenancyPartitioning(self.node_results, self.ga)
+        mt_optimizer = MultiTenancyPartitioning(self.work_dir, self.node_results, self.ga)
         mt_optimizer.optimize()
     
     def _take_artifacts(self, artifacts: Artifacts):
         self.ga = artifacts.graph_analysis.ga
         self.node_results = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
+        self.work_dir = artifacts.config["general"]["work_dir"]
     
     def _update_artifacts(self, artifacts):
         return super()._update_artifacts(artifacts)

@@ -9,9 +9,10 @@ import networkx as nx
 import numpy as np
 
 from typing import Optional, Union
-
 from copy import deepcopy
 
+from framework.model.execution_graph import ExecutionGraph
+from framework.node.node_evaluator import SystemResult
 
 def topo_sort_starting_node(
     G: nx.DiGraph, strating_node: int, seed: Optional[int] = None, as_ndarray: bool = False
@@ -155,6 +156,9 @@ def topo_sort_random_start_node(G, n: int = 1, seed: int = None, as_ndarray: boo
     else:
         return list(sorts)
 
+def list_scheduling(exec_graph: dict[str, ExecutionGraph], node_stats: SystemResult):
+    # For every node we must determine a starting time
+    ...
 
 def check_sort(G, L):
     for i, n in enumerate(L):
