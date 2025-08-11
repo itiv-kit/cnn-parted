@@ -79,9 +79,18 @@ class NetworkResult:
     
     def __getitem__(self, item: str):
         return self.layers[item]
+
+    def __setitem__(self, key: str, value: LayerResult):
+        self.layers[key] = value
     
     def __iter__(self):
         return iter(self.layers.items())
+    
+    def __contains__(self, item: str):
+        return item in self.layers
+    
+    def __len__(self):
+        return len(self.layers)
 
     @property
     def total_latency(self):
@@ -365,6 +374,10 @@ class SystemResult:
         ...
 
     def get_platform_ids(self):
+        return list(self.platforms.keys())
+    
+    @property
+    def ids(self):
         return list(self.platforms.keys())
 
     def get_design_tags(self, platform_id: int):

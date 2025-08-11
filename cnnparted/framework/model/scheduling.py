@@ -12,7 +12,7 @@ from typing import Optional, Union
 from copy import deepcopy
 
 from framework.model.execution_graph import ExecutionGraph
-from framework.node.node_evaluator import SystemResult
+from framework.node.node_evaluator import SystemResult, LayerResult
 
 def topo_sort_starting_node(
     G: nx.DiGraph, strating_node: int, seed: Optional[int] = None, as_ndarray: bool = False
@@ -156,9 +156,69 @@ def topo_sort_random_start_node(G, n: int = 1, seed: int = None, as_ndarray: boo
     else:
         return list(sorts)
 
-def list_scheduling(exec_graph: dict[str, ExecutionGraph], node_stats: SystemResult):
-    # For every node we must determine a starting time
-    ...
+class PlatformSchedule:
+    def __init__(self, id: int):
+        self.id = id
+        self.layers: list[LayerResult] = []
+        self.cur_time = 0.0
+        self.busy_intervals: list[tuple[float, float]] = []
+    
+    def get_time(self):
+        return self.cur_time
+    
+    def assign_layer(self, layer: LayerResult):
+        layer.start_time = self.get_time()
+        layer.binding = self.id
+        layer.end_time = self.get_time() + layer.latency
+        self.cur_time = self.cur_time + layer.latency
+        self.layers.append(layer)
+        return layer
+
+        
+
+def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemResult):
+    """Used for MultiTenancy partitioning. After the layers have been assigned to cores,
+    we must determine a start time for each layer"""
+
+
+    # Define helper functions to find layers
+    def find_layer_info(id: int, nw_name: str, layer_name: str):
+        network = node_stats[id].designs[0].networks[nw_name]
+        if layer_name in network:
+            return network[layer_name]
+        return False
+
+    def update_layer_info(id: int, nw_name: str, layer_name: str, data: LayerResult):
+        network = node_stats[id].designs[0].networks[nw_name]
+        network[layer_name] = data
+
+    node_schedules = {id: PlatformSchedule(id) for id in node_stats.get_platform_ids()}
+
+    # While not all nodes have been assigned
+    all_assigned = False
+    while not all_assigned:
+        #Determine all nodes that can be scheduled (all that have no predecessor)
+        V_ready = []
+        for network, exec_graph in exec_graphs.items():
+            for node_name in exec_graph.reduced_graph.nodes:
+                if exec_graph.reduced_graph.in_degree(node_name) == 0:
+                    node = exec_graph.reduced_graph.nodes[node_name]
+                    V_ready.append( (network, node_name, node) )
+        
+        for network, layer_name, layer_data in V_ready:
+            binding = layer_data["binding"]
+            layer_result = find_layer_info(binding, network, layer_name) #should be name
+            if layer_result:
+                layer_result = node_schedules[binding].assign_layer(layer_result)
+                update_layer_info(binding, network, layer_name, layer_result)
+                exec_graphs[network].reduced_graph.remove_node(layer_name)
+
+        num_remaining_nodes = sum([graph.reduced_graph.number_of_nodes() for graph in exec_graphs.values()])
+        all_assigned = (num_remaining_nodes == 0)
+
+    breakpoint()
+    return node_stats
+
 
 def check_sort(G, L):
     for i, n in enumerate(L):

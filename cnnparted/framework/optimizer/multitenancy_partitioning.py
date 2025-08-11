@@ -15,6 +15,7 @@ from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
 from framework.model.execution_graph import ExecutionGraph
+from framework.model.scheduling import list_scheduling, PlatformSchedule
 
 
 # What this should do:
@@ -34,7 +35,8 @@ class MultiTenancyPartitioning(Optimizer):
         self._gen_initial_binding()
 
         algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga)
-        algorithm.minimize()
+        node_stats = algorithm.minimize()
+        return node_stats
 
     
     def _gen_initial_binding(self):
@@ -108,7 +110,7 @@ class MultiTenancyProblem():
         self.num_iter = self.num_nodes * 100
         self.initial_cost, _ ,_ = self._score_binding(self.layer_tracker)
         self.t_start =self.initial_cost*8
-        self.convergence_counter = 3
+        self.convergence_counter = 0
         self.cost_history = []
     
     def _simulated_annealing(self) -> tuple[int, LayerTracker]:
@@ -155,27 +157,35 @@ class MultiTenancyProblem():
 
     
     def _random_modify(self, current_state: LayerTracker):
-        # For testing: randomly swap two bindings
-        decision = self.rng.random()
         layer_tracker = copy.deepcopy(current_state)
+        action_space = [layer_tracker.swap_layers, layer_tracker.move_layer, layer_tracker.swap_platforms]
+        action = self.rng.choice(a=action_space, p=[0.45, 0.45, 0.1])
 
-        if decision <= 0.5:
-            platforms_to_swap = self.rng.choice(self.node_ids, size=2, replace=False)
-            layers_to_swap = []
-            for platform in platforms_to_swap:
-                found = np.array(layer_tracker.get_all_on_platform(platform))
-                layers = layer_tracker.get_layer_names()[found] # These are all layers on this platform
-                layers_to_swap.append(self.rng.choice(layers))
-            layer_tracker.swap_layers(layers_to_swap)
-        elif decision <= 0.6:
-            # Move one layer to other platform
-            platform_from, platform_to = self.rng.choice(self.node_ids, size=2, replace=False)
-            layer_to_move = np.array(layer_tracker.get_all_on_platform(platform_from))
-            layer_to_move = self.rng.choice(layer_tracker.get_layer_names()[layer_to_move])
-            layer_tracker.move_layer(layer_to_move, platform_to)
-        else:
-            platform_a, platform_b = self.rng.choice(self.node_ids, size=2, replace=False)
-            layer_tracker.swap_platforms(platform_a, platform_b)
+        match action:
+            case layer_tracker.swap_layers:
+                platforms_to_swap = self.rng.choice(self.node_ids, size=2, replace=False)
+                layers_to_swap = []
+                for platform in platforms_to_swap:
+                    found = np.array(layer_tracker.get_all_on_platform(platform))
+                    layers = layer_tracker.get_layer_names()[found] # These are all layers on this platform
+                    if layers.size == 0:
+                        return layer_tracker
+                    layers_to_swap.append(self.rng.choice(layers))
+                action(layers_to_swap)
+
+            case layer_tracker.move_layer:
+                # Move one layer to other platform
+                platform_from, platform_to = self.rng.choice(self.node_ids, size=2, replace=False)
+                layer_to_move_sel = np.array(layer_tracker.get_all_on_platform(platform_from)) 
+                if layer_to_move_sel.size == 0:
+                    return layer_tracker
+                layer_to_move = self.rng.choice(layer_tracker.get_layer_names()[layer_to_move_sel])
+                action(layer_to_move, platform_to)
+
+            case layer_tracker.swap_platforms:
+                platform_a, platform_b = self.rng.choice(self.node_ids, size=2, replace=False)
+                action(platform_a, platform_b)
+
         return layer_tracker
 
 
@@ -190,6 +200,8 @@ class MultiTenancyProblem():
         #TODO: Between binding and scheduling, the design must be fixed and a new node_stats must be created with the single design
 
         # Perform the scheduling
+        scheduled_graphs = list_scheduling(self.execution_graphs, self.node_stats)
+        return scheduled_graphs
 
     def _score_binding(self, tracker: LayerTracker) -> tuple[float, dict[int, float], dict[int, float]]:
         total_edp = 0.0    
