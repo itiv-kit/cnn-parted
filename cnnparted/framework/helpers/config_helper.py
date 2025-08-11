@@ -1,5 +1,6 @@
 from ast import Lambda
 import yaml
+from .config import *
 
 class ConfigHelper:
     def __init__(self, conf_in : str | dict):
@@ -12,6 +13,12 @@ class ConfigHelper:
         else:
             raise RuntimeError(f"Invalid argument to ConfigHelper. Expected str or dict but received {type(conf_in)}")
         
+        # Parse the configuration
+        self.general = GeneralConfig(self.config["general"])
+        self.workload = WorkloadConfig(self.config["workload"])
+        self.pipeline = PipelineConfig(self.config["pipeline"])
+        self.dse = DseStageConfig(self.config["dse"]) if "dse" in self.config else None
+        self.system = SystemConfig(self.config["system"])
 
     def __load_config(self) -> dict:
         with open(self.fname) as f:
