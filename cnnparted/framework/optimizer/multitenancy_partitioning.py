@@ -1,5 +1,6 @@
 import os
 import copy
+import itertools as it
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -107,9 +108,11 @@ class MultiTenancyProblem():
         self.num_nodes = len(layers)
 
         # SA configuration
+        self.initial_edp, _ ,self.initial_platform_latencies = self._score_binding(self.layer_tracker)
+
         self.num_iter = self.num_nodes * 100
-        self.initial_cost, _ ,_ = self._score_binding(self.layer_tracker)
-        self.t_start =self.initial_cost*8
+        self.initial_cost = self.initial_edp
+        self.t_start = self.initial_cost*8
         self.convergence_counter = 0
         self.cost_history = []
     
@@ -126,7 +129,13 @@ class MultiTenancyProblem():
             for i in range(self.num_iter):
                 t = self.t_start / (i+1)
                 new_state = self._random_modify(current_state)
-                new_cost, _, _ = self._score_binding(new_state)
+                new_edp, _, platform_latencies = self._score_binding(new_state)
+
+                latency_pairs = list(it.combinations(platform_latencies.values(), r=2))
+                latency_diffs = np.abs([np.diff(diff_pair) for diff_pair in latency_pairs])
+                latency_cost = np.sum(latency_diffs)
+                
+                new_cost = latency_cost**0.5 + new_edp**0.8
                 
                 if self.rng.random() <= np.exp( -(new_cost - old_cost) / t ):
                     current_state = new_state

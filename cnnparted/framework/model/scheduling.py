@@ -216,7 +216,6 @@ def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemRe
         num_remaining_nodes = sum([graph.reduced_graph.number_of_nodes() for graph in exec_graphs.values()])
         all_assigned = (num_remaining_nodes == 0)
 
-    breakpoint()
     return node_stats
 
 
