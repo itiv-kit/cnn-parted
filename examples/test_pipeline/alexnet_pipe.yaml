@@ -36,17 +36,17 @@ system:
       bits: 8
       fault_rates: [0, 0] # input, weight
       max_memory_size: 600000000
-      dse:
-        optimization: eap
-        top_k: 1
-        constraints:
-          mesh_dim_min: 16
-          mesh_dim_max: 16
-          min_spad_size: 64
-          max_spad_size: 128
-          min_acc_size: 64
-          max_acc_size: 128
-        mutator: GemminiArchitectureAdaptor
+      #dse:
+      #  optimization: eap
+      #  top_k: 1
+      #  constraints:
+      #    mesh_dim_min: 16
+      #    mesh_dim_max: 16
+      #    min_spad_size: 64
+      #    max_spad_size: 128
+      #    min_acc_size: 64
+      #    max_acc_size: 128
+      #  mutator: GemminiArchitectureAdaptor
       evaluation:
         accelerator: gemmini_like
         simulator: timeloop
