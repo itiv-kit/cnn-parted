@@ -10,6 +10,7 @@ from framework.dse.interfaces.architecture_config import ArchitectureConfig, Arc
 from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
+from framework.helpers.config import DseNodeConfig
 
 class SimbaConfig(ArchitectureConfig, GenomeInterface):
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
@@ -112,12 +113,12 @@ class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaustiv
         self.acc_bufs = 4
 
 
-    def read_space_cfg(self, cfg):
-        search_space_constraints = cfg.get("constraints", {})
+    def read_space_cfg(self, cfg: DseNodeConfig):
+        search_space = cfg
 
         #Compute elements
-        self.pe_nums = search_space_constraints.get("num_pes", [16])
-        self.lmac_nums = search_space_constraints.get("num_lmacs", [16])
+        self.pe_nums =  list(range(search_space.min_pe[0], search_space.max_pe[0]))
+        self.lmac_nums = list(range(search_space.min_pe[0], search_space.max_pe[1]))
 
         #weight and accumulator buffers are in equal numbers
         self.num_bufs = 4
@@ -125,10 +126,11 @@ class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaustiv
         self.lmac_nums = list(filter(lambda x: x % self.num_bufs == 0, self.lmac_nums))
         assert self.lmac_nums, f"No valid number of LMAC specified, must be multiple of num_bufs={self.num_bufs}"
 
-        self.inbuf_sizes = search_space_constraints.get("inbuf_sizes", [64])
-        self.wbuf_sizes = search_space_constraints.get("wbuf_sizes", [32])
-        self.accbuf_sizes = search_space_constraints.get("accbuf_sizes", [0.375])
-        self.globalbuf_sizes = search_space_constraints.get("gbuf_sizes", [128])
+        self.inbuf_sizes = list(range(search_space.min_size_mem_local[0], search_space.max_size_mem_local[0], search_space.step_mem_local)) #search_space_constraints.get("inbuf_sizes", [64])
+        self.wbuf_sizes =  list(range(search_space.min_size_mem_local[1], search_space.max_size_mem_local[1], search_space.step_mem_local)) #search_space_constraints.get("wbuf_sizes", [32])
+        self.accbuf_sizes = list(range(search_space.min_size_mem_local[2], search_space.max_size_mem_local[2], search_space.step_mem_local))#search_space_constraints.get("accbuf_sizes", [0.375])
+
+        self.globalbuf_sizes = list(range(search_space.min_size_mem_shared[0], search_space.max_size_mem_shared[0], search_space.step_mem_shared[0])) #search_space_constraints.get("gbuf_sizes", [128])
 
         # Generate valid configuration
         self.generate_design_space() 

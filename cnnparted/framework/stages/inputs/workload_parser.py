@@ -26,36 +26,36 @@ class WorkloadParser(Stage):
         self._take_artifacts(artifacts)
 
         workloads: dict[str, WorkloadInfo] = {}
-        networks = [wl["name"] for wl in self.workload_array]
-        for workload in self.workload_array:
+        networks = [wl.name for wl in self.workload_array.workload_spec]
+        for workload in self.workload_array.workload_spec:
             try:
-                wl_name = workload["name"]
+                wl_name = workload.name
 
                 filename = os.path.join(MODEL_PATH, self.run_name, wl_name + "_model.onnx")
                 subprocess.check_call(['mkdir', '-p', os.path.join(MODEL_PATH, self.run_name)])
         
                 # Check if the model is specified as a locally available ONNX file
-                if os.path.isfile(workload['name']) and workload['name'].endswith(".onnx"):
-                    shutil.copy(workload['name'], filename)
+                if os.path.isfile(workload.name) and workload.name.endswith(".onnx"):
+                    shutil.copy(workload.name, filename)
 
                     #TODO Accuracy evaluation is currently not supported, if possible integrate a way to specify it
                     accuracy_function = None
-                    workloads[wl_name] = WorkloadInfo(accuracy_function, workload["input-size"], filename)
+                    workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, filename)
         
                 else:
                     model = importlib.import_module(
-                        f"{WORKLOAD_FOLDER}.{workload['name']}", package=__package__
+                        f"{WORKLOAD_FOLDER}.{workload.name}", package=__package__
                     ).model
             
                     accuracy_function = importlib.import_module(
-                        f"{WORKLOAD_FOLDER}.{workload['name']}", package=__package__
+                        f"{WORKLOAD_FOLDER}.{workload.name}", package=__package__
                     ).accuracy_function
         
-                    input_size = workload['input-size']
+                    input_size = workload.input_size
                     x = torch.randn(input_size)
                     torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
 
-                workloads[wl_name] = WorkloadInfo(accuracy_function, workload["input-size"], filename)
+                workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, filename)
     
     
             except KeyError:
@@ -68,7 +68,7 @@ class WorkloadParser(Stage):
 
     def _take_artifacts(self, artifacts: Artifacts):
         self.run_name = artifacts.args["run_name"]
-        self.workload_array = artifacts.config["workload"]
+        self.workload_array = artifacts.config.workload #["workload"]
         
     def _update_artifacts(self, artifacts: Artifacts, accuracy_func, networks, workloads):
         artifacts.workload_parser.accuracy_function = accuracy_func

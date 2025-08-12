@@ -23,21 +23,24 @@ from framework.node.node_evaluator import SystemResult, NodeResult, DesignResult
 from framework.node.node_thread import NodeThread
 from framework.graph_analyzer import GraphAnalyzer
 from framework.optimizer.design_problem import ACCELERATOR_ADAPTOR_MAP, ACCELERATOR_CONFIG_MAP
+from framework.helpers.config import *
 
 #TODO Can this be unified with NodeEvaluation?
 class DesignOptimizer(Optimizer):
 
-    def __init__(self, node_components, problem, dse_system_config: dict, work_dir: str, ga: GraphAnalyzer, run_name: str, show_progress: bool):
+    def __init__(self, node_components: list[NodeConfig], 
+                 problem, dse_system_config: DseStageConfig, 
+                 work_dir: str, ga: GraphAnalyzer, run_name: str, show_progress: bool):
         self.dse_system_config = dse_system_config
-        self.num_gen =  dse_system_config["optimizer"].get("num_gen")
-        self.pop_size = dse_system_config["optimizer"].get("pop_size")
+        self.num_gen =  dse_system_config.optimizer.num_gen #["optimizer"].get("num_gen")
+        self.pop_size = dse_system_config.optimizer.pop_size #["optimizer"].get("pop_size")
 
-        self.node_components = node_components
-        self.node_ids = [node["id"] for node in self.node_components]
-        self.accelerator_names = [node["evaluation"]["accelerator"] for node in self.node_components]
+        self.node_components = node_components #TODO cfg
+        self.node_ids = [node.id for node in self.node_components]
+        self.accelerator_names = [node.evaluation.accelerator for node in self.node_components]
         
         self.problem = problem
-        self.algorithm = dse_system_config["optimizer"]["algorithm"]
+        self.algorithm = dse_system_config.optimizer.algorithm
         self.work_dir = work_dir
         self.ga = ga
         self.run_name = run_name
@@ -53,7 +56,7 @@ class DesignOptimizer(Optimizer):
     def _gen_initial_x(self):
         samples = []
         rng = default_rng()
-        dse_nodes = [node for node in self.node_components if "dse" in node]
+        dse_nodes = [node for node in self.node_components if node.dse is not None]
 
         while(len(samples) < self.pop_size):
             sys_cfg = []
@@ -132,7 +135,7 @@ class DesignOptimizer(Optimizer):
             
             node_eval_stats: SystemResult = problem.system_results
             problem.system_results.to_csv(self.work_dir)
-            dse_accelerator_names = [node["evaluation"]["accelerator"] for node in self.node_components if "dse" in node]
+            dse_accelerator_names = [node.evaluation.accelerator for node in self.node_components if node.dse is not None]
             self._plot_history(res, self.work_dir, dse_accelerator_names)
 
         elif self.algorithm in rl_algorithms:
@@ -150,27 +153,27 @@ class DesignOptimizer(Optimizer):
             node_eval_stats = SystemResult()
 
             # Setup acc_adaptors
-            accelerator_configs = [ACCELERATOR_CONFIG_MAP[node["evaluation"]["accelerator"]] for node in self.node_components]
+            accelerator_configs = [ACCELERATOR_CONFIG_MAP[node.evaluation.accelerator] for node in self.node_components if node.dse is not None] #TODO Is the check necessary?
             accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg]() for cfg in accelerator_configs]
             for acc_adaptor, node_cfg in zip(accelerator_adaptors, self.node_components):
-                if "dse" in node_cfg:
-                    acc_adaptor.read_space_cfg(node_cfg["dse"])
+                if node_cfg.dse is not None:
+                    acc_adaptor.read_space_cfg(node_cfg.dse)
             for i, node_cfg in enumerate(self.node_components):
-                if "dse" not in node_cfg:
+                if node_cfg.dse is not None:
                     accelerator_adaptors[i] = None
 
             node_threads = [
-                    NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress, 
+                    NodeThread(component.id, self.ga, component, self.work_dir, self.run_name, self.show_progress, 
                             dse_system_config=self.dse_system_config, acc_adaptor=acc_adaptor)
                     for component, acc_adaptor in zip(self.node_components, accelerator_adaptors)
                 ]
 
             for t in node_threads:
-                if t.config["evaluation"]["simulator"] not in ["timeloop", "zigzag"]:
+                if t.config.evaluation.simulator not in ["timeloop", "zigzag"]:
                     t.start()
 
             for t in node_threads:
-                if t.config["evaluation"]["simulator"] in ["timeloop", "zigzag"]: # run them simply on main thread
+                if t.config.evaluation.simulator in ["timeloop", "zigzag"]: # run them simply on main thread
                     t.run()
                 else:
                     t.join()

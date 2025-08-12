@@ -17,7 +17,7 @@ class RetrainingConfig:
     epochs: int
 
     def __init__(self, cfg: dict):
-        self.epochs = cfg["epochs"]
+        self.epochs = cfg.get("epochs", None)
 
 
 @dataclass
@@ -36,7 +36,7 @@ class DatasetConfig:
         self.path = cfg["path"]
         self.sample_limit = cfg.get("sample_limit", None)
         self.batch_size = cfg["batch_size"]
-        self.randomize = cfg["randomize"]
+        self.randomize = cfg.get("randomize", False)
         self.file = cfg.get("file", None)
 
 
@@ -49,11 +49,11 @@ class AccuracyConfig:
     train: DatasetConfig
 
     def __init__(self, cfg: dict):
-        self.robustness = cfg["robustness"]
-        self.retraining = cfg["retraining"]
-        self.calibrate = cfg["calibrate"]
-        self.validation = cfg["validation"]
-        self.train = cfg["train"]
+        self.robustness = RobustnessConfig(cfg["robustness"])
+        self.retraining = RetrainingConfig(cfg["retraining"])
+        self.calibrate = DatasetConfig(cfg["datasets"]["calibrate"])
+        self.validation = DatasetConfig(cfg["datasets"]["validation"])
+        self.train = DatasetConfig(cfg["datasets"]["train"])
     
     def get_datasets_dict(self):
         return {"calibrate": asdict(self.calibrate),

@@ -24,7 +24,7 @@ class VisualizeSchedule(Stage):
 
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
-        self.work_dir = self.config["work_dir"]
+        self.work_dir = self.config.general.work_dir
         self.run_name = artifacts.args["run_name"]
         self.fig_dir = os.path.join(self.work_dir, "figures", "schedule")
         os.makedirs(self.fig_dir, exist_ok=True)
@@ -33,7 +33,7 @@ class VisualizeSchedule(Stage):
             self.n_constr = artifacts.partitioning_optimization.n_constr 
             self.n_var = artifacts.partitioning_optimization.n_var
             sol = artifacts.partitioning_optimization.sol
-            if not "accuracy" in self.config:
+            if self.config.accuracy is not None:
                 for i, p in enumerate(sol["nondom"]): # achieving aligned csv file
                     sol["nondom"][i] = np.append(p, float(0))
                 for i, p in enumerate(sol["dom"]): # achieving aligned csv file
@@ -42,8 +42,8 @@ class VisualizeSchedule(Stage):
             self.ga = artifacts.graph_analysis.ga
             network = self.ga.networks[0] #TODO Multiple networks
             self.schedules = self.ga.schedules[network]
-            self.num_platforms = self.config["num_platforms"]
-            self.num_pp = artifacts.config["num_pp"]
+            self.num_platforms = self.config.system.num_platforms
+            self.num_pp = artifacts.config.general.num_pp
             self.n_var_part = (self.num_pp + 1) + (self.num_pp) # platform IDs + mapping partition to platform
             if self.num_pp == 0:
                 self.n_var_part_metrics = 1

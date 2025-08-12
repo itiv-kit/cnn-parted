@@ -9,9 +9,7 @@ class Stage(ABC):
 
     @abstractmethod
     def _update_artifacts(self, artifacts: dict):
-        artifacts["stages"][self.name] = {}
-        artifacts["stages"][self.name]["out"] = {}
-        
+        ...
 
     @abstractmethod
     def _take_artifacts(self, artifacts: dict):

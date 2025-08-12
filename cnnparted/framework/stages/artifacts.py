@@ -1,11 +1,13 @@
 import importlib
 
 from framework.stages.stage_base import Stage
+from framework.helpers.config import *
+from framework import ConfigHelper
 
 import framework.stages as stages
 
 class Artifacts:
-    def __init__(self, config: dict, args: dict, device: str):
+    def __init__(self, config: ConfigHelper, args: dict, device: str):
         self.config = config
         self.args = args
         self.device = device
@@ -28,7 +30,7 @@ class Artifacts:
         package = importlib.import_module("framework.stages")
         name_to_class_map = {stage.__name__: stage for stage in package.__all__}
 
-        self.stage_names = self.config["pipeline"]["stages"]
+        self.stage_names = self.config.pipeline.stages
         self.stages = [name_to_class_map[stage] for stage in self.stage_names]
         for stage in self.stage_names:
 

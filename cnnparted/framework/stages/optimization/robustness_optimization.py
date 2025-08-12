@@ -24,8 +24,8 @@ class RobustnessOptimization(Stage):
     
     def _take_artifacts(self, artifacts: Artifacts):
         self.device = artifacts.device 
-        self.work_dir = artifacts.config["general"]["work_dir"]
-        self.accuracy_cfg = artifacts.config["accuracy"]
+        self.work_dir = artifacts.config.general.work_dir
+        self.accuracy_cfg = artifacts.config.accuracy
         self.run_name = artifacts.args["run_name"]
         self.show_progress = artifacts.args["p"]
         self.torch_models = artifacts.graph_analysis.ga.torchmodels

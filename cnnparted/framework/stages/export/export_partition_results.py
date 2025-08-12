@@ -22,14 +22,14 @@ class ExportPartitionResults(Stage):
 
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
-        self.work_dir = self.config["work_dir"]
+        self.work_dir = self.config.general.work_dir
         self.run_name = artifacts.args["run_name"]
         self.optimizer_cfg: PartitioningOptConfig = artifacts.partitioning_optimization.optimizer_cfg
         self.n_constr = self.optimizer_cfg.n_constr
         self.n_var = self.optimizer_cfg.n_var_part
 
         sol = artifacts.partitioning_optimization.sol
-        if not "accuracy" in self.config:
+        if self.config.accuracy is not None:
             for i, p in enumerate(sol["nondom"]): # achieving aligned csv file
                 sol["nondom"][i] = np.append(p, float(0))
             for i, p in enumerate(sol["dom"]): # achieving aligned csv file
@@ -40,7 +40,7 @@ class ExportPartitionResults(Stage):
         ga =  artifacts.graph_analysis.ga
         network = ga.networks[0]
         self.schedules = ga.schedules[network]
-        self.num_platforms = self.config["num_platforms"]
+        self.num_platforms = self.config.system.num_platforms
 
     def _update_artifacts(self, artifacts: Artifacts):
         ...

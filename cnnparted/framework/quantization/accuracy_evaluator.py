@@ -13,12 +13,13 @@ from model_explorer.utils.setup import build_dataloader_generators
 from framework.quantization.faulty_quantized_model import FaultyQuantizedModel
 from framework.quantization.generate_calibration import generate_calibration
 from framework.node.node_evaluator import SystemResult
+from framework.helpers.config import *
 
 
 class AccuracyEvaluator():
-    def __init__(self, models : dict[str, nn.Module], node_stats : SystemResult, config : dict, device : str, progress : bool) -> None:
+    def __init__(self, models : dict[str, nn.Module], node_stats : SystemResult, config : AccuracyConfig, device : str, progress : bool) -> None:
         node_stats = node_stats.to_dict()
-        self.bits = [node_stats[acc].get("bits") for acc in node_stats]
+        self.bits = [node_stats[acc].get("bits") for acc in node_stats] #TODO cfg
         self.fault_rates = [node_stats[acc].get("fault_rates") for acc in node_stats]
         self.faulty_bits = [node_stats[acc].get("faulty_bits") for acc in node_stats]
         self.gpu_device = torch.device(device)
@@ -30,16 +31,18 @@ class AccuracyEvaluator():
         m = deepcopy(model)
         self.qmodel = FaultyQuantizedModel(m, self.gpu_device)
 
-        dataloaders = build_dataloader_generators(config['datasets'])
+        dataloaders = build_dataloader_generators(config.get_datasets_dict())
         self.calib_dataloadergen = dataloaders['calibrate']
         self.train_dataloadergen = dataloaders['train']
         self.val_dataloadergen = dataloaders['validation']
 
-        self.param_path = config.get('datasets').get('calibrate').get('file')
+        #self.param_path = config.get('datasets').get('calibrate').get('file')
+        self.param_path = config.calibrate.file
         if not os.path.exists(self.param_path):
             generate_calibration(model, self.calib_dataloadergen, True, self.param_path)
 
-        self.train_epochs = config.get('retraining', {'epochs' : 0})['epochs']
+        #self.train_epochs = config.get('retraining', {'epochs' : 0})['epochs']
+        self.train_epochs = config.retraining.epochs
 
 
     def eval(self, sols : list, n_constr : int, n_var : int, schedules : dict[str, list], accuracy_function : Callable) -> list:

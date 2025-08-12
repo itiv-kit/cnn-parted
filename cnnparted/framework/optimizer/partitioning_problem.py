@@ -476,7 +476,7 @@ class PartitioningProblem(ElementwiseProblem):
             #platform = [*self.node_stats][key]
             platform = list(self.node_stats.keys())[key]
             tag = design_tag[platform]
-            if self.node_stats[platform]['type'] == 'mnsim':
+            if self.node_stats[platform]['simulator'] == 'mnsim':
                 for part in parts[key]:
                     for l in self.schedule[part[0]+1:part[1]+1]:
                         if l in [*self.node_stats[platform]["eval"][tag]["networks"][self.network]]:

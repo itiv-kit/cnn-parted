@@ -22,6 +22,7 @@ from framework.constants import ROOT_DIR
 from framework.helpers.visualizer import plotMetricPerConfigPerLayer
 from framework.helpers.design_metrics import calc_metric, SUPPORTED_METRICS
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
+from framework.helpers.config import *
 
 class Timeloop(NodeEvaluator):
     # Output file names.
@@ -30,7 +31,7 @@ class Timeloop(NodeEvaluator):
     configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
     fname_result = "tl_layers"
 
-    def __init__ (self, in_config : dict, dse_system_config: dict = {}) -> None:
+    def __init__ (self, in_config : NodeConfig, dse_system_config: DseStageConfig = None) -> None:
         log_file_name = self.out_prefix + "log"
         stats_file_name = self.out_prefix + "stats.txt"
         xml_file_name = self.out_prefix + "map+stats.xml"
@@ -59,31 +60,29 @@ class Timeloop(NodeEvaluator):
 
         self.dse_system_config = dse_system_config
         self.node_config = in_config
-        tl_config = in_config["evaluation"]
-        self.dse_node_config = in_config.get("dse", None)
+        tl_config = in_config.evaluation
+        self.dse_node_config = in_config.dse
 
-        self.accname = tl_config['accelerator']
-        self.prob_name = tl_config['layer']
-        self.freq = tl_config['frequency']
-        self.mapper_cfg = {} if not tl_config.get('mapper') else tl_config['mapper']
+        self.accname = tl_config.accelerator
+        self.prob_name = tl_config.simulator_cfg.layer
+        self.freq = tl_config.frequency
+        #self.mapper_cfg = {} if not tl_config.get('mapper') else tl_config['mapper']
+        self.mapper_cfg =  tl_config.simulator_cfg.mapper
         self.type_cfg = '.yaml'
         self.config = tl_config
         self.stats = {}
 
         self.adaptor: TimeloopInterface = None
         self.dse_mode = "off"
-        if self.dse_node_config and "mutator" in self.dse_node_config:
-            adaptor_cfg = self.dse_node_config
-            adaptor_cfg["tl_in_configs_dir"] = self.configs_dir
-
+        if self.dse_node_config and self.dse_node_config.mutator is not None:
             dse_package = importlib.import_module("framework.dse")
-            mutator_cls = getattr(dse_package, self.dse_node_config["mutator"])
+            mutator_cls = getattr(dse_package, self.dse_node_config.mutator) #["mutator"])
             self.adaptor = mutator_cls()
 
-            if self.dse_system_config["optimizer"]["algorithm"] == "exhaustive":
+            if self.dse_system_config.optimizer.algorithm == "exhaustive":
                 self.adaptor.read_space_cfg(self.dse_node_config)
                 self.dse_mode = "exhaustive"
-            elif self.dse_system_config["optimizer"]["algorithm"] == "nsga2":
+            elif self.dse_system_config.optimizer.algorithm == "nsga2":
                 self.dse_mode = "nsga2"
 
     def set_workdir(self, work_dir: str, runname: str, id: int):

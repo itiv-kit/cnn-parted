@@ -6,16 +6,18 @@ from typing import Literal, TypedDict
 class GeneralConfig:
     fixed_sys: bool
     acc_once: bool
+    max_num_platforms: int | None
     num_pp: int
     num_topos: int
     num_jobs: int
     optimization: Literal["all", "edp", "ppa"]
-    work_dir: str
+    work_dir: str | None
     keep_dir: bool
 
     def __init__(self, general_cfg: dict):
         self.fixed_sys = general_cfg.get("fixed_sys", False)
         self.acc_once = general_cfg.get("acc_once", False)
+        self.max_num_platforms = general_cfg.get("max_num_platforms", None)
         self.num_pp = general_cfg.get("num_pp", -1)
         self.num_topos = general_cfg.get("num_topos", 1)
         self.num_jobs = general_cfg.get("num_jobs", 1)

@@ -11,6 +11,7 @@ from framework.constants import ROOT_DIR
 sys.path.append(os.path.join(ROOT_DIR, "cnnparted", "tools", "MNSIM-2.0"))
 
 from framework.node.node_evaluator import  NodeResult, DesignResult, LayerResult, NodeEvaluator
+from framework.helpers.config import *
 
 from MNSIM.Interface.network import NetworkGraph
 from MNSIM.Interface.interface import TrainTestInterface
@@ -23,9 +24,9 @@ from pytorch_quantization import tensor_quant
 class MNSIMInterface(TrainTestInterface, NodeEvaluator):
     fname_result = "mnsim_layers"
 
-    def __init__ (self, in_config : dict, input_size : list) -> None:
-        mnsim_config = in_config["evaluation"]
-        self.SimConfig = ROOT_DIR + mnsim_config.get('conf_path')
+    def __init__ (self, in_config : NodeConfig, input_size : list) -> None:
+        mnsim_config = in_config.evaluation
+        self.SimConfig = ROOT_DIR + mnsim_config.simulator_cfg.conf_path
         self.node_config = in_config
         self.config = mnsim_config
         self.input_size = input_size
@@ -222,7 +223,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
         mod_a = Model_area(struct_file,self.SimConfig)
         mod_l.calculate_model_latency()
         area_list=mod_a.area_output_CNNParted()
-        self.node_config["bits"] = self.ADC_quantize_bit #TODO Check if this is the correct bit width
+        self.node_config.bits = self.ADC_quantize_bit #TODO Check if this is the correct bit width
         design = DesignResult(self.hardware_config)
         node_res = NodeResult(self.node_config)
         for idx, layer in enumerate(struct_file):

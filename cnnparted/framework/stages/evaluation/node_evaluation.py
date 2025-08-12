@@ -20,17 +20,17 @@ class NodeEvaluation(Stage):
 
         node_eval_stats = SystemResult()
         node_threads = [
-                NodeThread(component.get('id'), self.ga, component, self.work_dir, self.run_name, self.show_progress, 
+                NodeThread(component.id, self.ga, component, self.work_dir, self.run_name, self.show_progress, 
                            dse_system_config=self.dse_system_config)
                 for component in self.node_components
             ]
 
         for t in node_threads:
-            if t.config["evaluation"]["simulator"] not in ["timeloop", "zigzag"]:
+            if t.config.evaluation.simulator not in ["timeloop", "zigzag"]:
                 t.start()
 
         for t in node_threads:
-            if t.config["evaluation"]["simulator"] in ["timeloop", "zigzag"]: # run them simply on main thread
+            if t.config.evaluation.simulator in ["timeloop", "zigzag"]: # run them simply on main thread
                 t.run()
             else:
                 t.join()
@@ -38,7 +38,7 @@ class NodeEvaluation(Stage):
         for node_thread in node_threads:
             id,stats = node_thread.getStats()
 
-            instances = node_thread.config.get("instances", 1)
+            instances = node_thread.config.instances
             if instances == 1:
                 node_eval_stats.add_platform(id, stats)
             else:
@@ -54,8 +54,8 @@ class NodeEvaluation(Stage):
         self._update_artifacts(artifacts, node_eval_stats)
     
     def _take_artifacts(self, artifacts: Artifacts):
-        self.dse_system_config = artifacts.config.get("dse", {})
-        self.work_dir = artifacts.config["general"]["work_dir"]
+        self.dse_system_config = artifacts.config.dse
+        self.work_dir = artifacts.config.general.work_dir
         self.run_name = artifacts.args["run_name"]
         self.show_progress = artifacts.args["p"]
         self.ga = artifacts.graph_analysis.ga
@@ -63,18 +63,18 @@ class NodeEvaluation(Stage):
 
     def _update_artifacts(self, artifacts: Artifacts, node_stats: SystemResult):
         artifacts.node_evaluation.node_stats = node_stats
-        artifacts.config["num_platforms"] = node_stats.get_num_platforms()
+        artifacts.config.system.num_platforms = node_stats.get_num_platforms()
         
         # Update number of partitioning points
-        num_pp = artifacts.config["general"]["num_pp"]
+        num_pp = artifacts.config.general.num_pp
         if num_pp == -1:
             platform_id = node_stats.get_platform_ids()[0]
             design = node_stats[platform_id].designs[0]
             network =  node_stats[platform_id].designs[0].get_networks()[0] #TODO Multiple networks
             num_pp = len(design.networks[network].layers) - 1
-        elif len(node_stats) == 1:
-            num_pp = 0
-        artifacts.config["num_pp"] = num_pp
+        #elif len(node_stats) == 1:
+        #    num_pp = 0
+        artifacts.config.general.num_pp = num_pp
     
 @dataclass
 class NodeEvaluationArtifacts:

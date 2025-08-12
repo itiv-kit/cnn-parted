@@ -11,6 +11,7 @@ from model_explorer.utils.setup import build_dataloader_generators
 
 from framework.quantization.faulty_quantized_model import FaultyQuantizedModel
 from framework.quantization.generate_calibration import generate_calibration
+from framework.helpers.config import *
 
 from scipy.optimize import dual_annealing
 
@@ -21,8 +22,8 @@ from framework.optimizer.optimizer import Optimizer
 
 
 class RobustnessOptimizer(Optimizer):
-    def __init__(self, work_dir: str, run_name: str, models: dict[str, nn.Module], accuracy_function: Callable, config: dict, device : str, progress: bool):
-        rob_conf = config.get('robustness')
+    def __init__(self, work_dir: str, run_name: str, models: dict[str, nn.Module], accuracy_function: Callable, config: AccuracyConfig, device : str, progress: bool):
+        rob_conf = config.robustness
         self.gpu_device = torch.device(device)
 
         self.accuracy_function = accuracy_function
@@ -31,7 +32,7 @@ class RobustnessOptimizer(Optimizer):
         model = list(models.values())[0]
 
         self.qmodel = FaultyQuantizedModel(model, self.gpu_device, same_bit_for_weight_and_input=True)
-        self.dataset_config = deepcopy(config['datasets'])
+        self.dataset_config = deepcopy(config.get_datasets_dict())
 
         dataloaders = build_dataloader_generators(self.dataset_config)
         calib_dataloadergen = dataloaders['calibrate']
@@ -45,10 +46,10 @@ class RobustnessOptimizer(Optimizer):
         self.qmodel.load_parameters_file(calibration_file)
 
         self.n_var = self.qmodel.get_explorable_parameter_count()
-        self.bits = rob_conf.get('bits')
+        self.bits = rob_conf.bits
         self.max_bits_idx = [len(self.bits) - 2, len(self.bits) - 1]
 
-        self.delta = rob_conf.get('delta')
+        self.delta = rob_conf.delta
 
         self.fname_csv = os.path.join(work_dir, run_name + "_" + "robustness.csv")
         self.progress = progress

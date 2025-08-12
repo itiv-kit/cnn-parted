@@ -11,6 +11,7 @@ from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.zigzag_interface import ZigzagInterface
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
+from framework.helpers.config import DseNodeConfig
 
 class EyerissConfig(ArchitectureConfig, GenomeInterface):
     def __init__(self, pe_dim_y, pe_dim_x, glb_size, ifmap_spad_size, weight_spad_size, psum_spad_size):
@@ -97,17 +98,17 @@ class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         self.config: EyerissConfig = None
         #self.design_space = []
 
-    def read_space_cfg(self, cfg):
-        search_space_constraints = cfg.get("constraints", {})
+    def read_space_cfg(self, cfg: DseNodeConfig):
+        search_space = cfg
 
-        self.pe_dims_y = search_space_constraints.get("pe_dims_y", [12])
-        self.pe_dims_x = search_space_constraints.get("pe_dims_x", [14])
+        self.pe_dims_y = [search_space.min_pe[0], search_space.max_pe[0]] #get("pe_dims_y", [12])
+        self.pe_dims_x = [search_space.max_pe[1], search_space.max_pe[1]] #get("pe_dims_x", [14])
 
-        self.ifmap_spad_sizes = search_space_constraints.get("ifmap_spad_sizes", [24]) #Byte
-        self.weight_spad_sizes = search_space_constraints.get("weight_spad_sizes", [384]) #Byte
-        self.psum_spad_sizes = search_space_constraints.get("psum_spad_sizes", [32]) #Byte
+        self.ifmap_spad_sizes = [search_space.min_size_mem_local[0], search_space.max_size_mem_local[0]]  #Byte
+        self.weight_spad_sizes =  [search_space.min_size_mem_local[1], search_space.max_size_mem_local[1]] #Byte
+        self.psum_spad_sizes = [search_space.min_size_mem_local[2], search_space.max_size_mem_local[2]] #Byte
 
-        self.glb_sizes = search_space_constraints.get("gbuf_sizes", [128]) #kB
+        self.glb_sizes = [search_space.min_size_mem_shared[0], search_space.max_size_mem_shared[0]]  #kB
 
         # Generate valid configuration
         self.generate_design_space() 

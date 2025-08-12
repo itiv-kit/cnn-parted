@@ -4,12 +4,13 @@ import time
 from framework.graph_analyzer import GraphAnalyzer
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.node.node_evaluator import NodeResult
+from framework.helpers.config import *
 
 class ModuleThreadInterface(threading.Thread):
-    def __init__(self, id : str, ga : GraphAnalyzer, node_config : dict, 
+    def __init__(self, id : str, ga : GraphAnalyzer, node_config : NodeConfig, 
                  work_dir: str, runname : str, progress : bool, 
                  acc_adaptor = None, save_results = True,
-                 dse_system_config = {}) -> None:
+                 dse_system_config: DseStageConfig = None) -> None:
         threading.Thread.__init__(self)
         self.id = id
         self.ga = ga

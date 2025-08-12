@@ -14,17 +14,18 @@ from framework.helpers.design_metrics import calc_metric, SUPPORTED_METRICS
 from framework.dse.interfaces.zigzag_interface import ZigzagInterface
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
+from framework.helpers.config import *
 
 sys.path.append(str(pathlib.Path(ROOT_DIR, "cnnparted", "tools", "zigzag")))
 from tools.zigzag.zigzag.api import get_hardware_performance_zigzag
 from tools.zigzag.zigzag.cost_model.cost_model import CostModelEvaluation
 
 class Zigzag(NodeEvaluator):
-    def __init__(self, in_config: dict, run_name: str) -> None:
+    def __init__(self, in_config: NodeConfig, run_name: str) -> None:
         super().__init__()
         self.node_config = in_config
-        self.dse_node_config = in_config.get("dse", None)
-        self.config = in_config["evaluation"]
+        self.dse_node_config = in_config.dse
+        self.config: EvaluationConfig = in_config.evaluation
         self.run_name = run_name
         self.fname_result = "zigzag_layers"
 
@@ -38,23 +39,23 @@ class Zigzag(NodeEvaluator):
         self.local_mapping_configs_dir = pathlib.Path(ROOT_DIR, "configs", "zigzag_configs", "mapping")
         self.model_dir= pathlib.Path(ROOT_DIR, "onnx_models")
 
-        self.accname = self.config["accelerator"] + ".yaml"
-        self.mapname = self.config["mapping"] + ".yaml"
-        self.optimization = self.config.get("optimization", "latency")
+        self.accname = self.config.accelerator + ".yaml"
+        self.mapname = self.config.simulator_cfg.mapping + ".yaml"
+        self.optimization = self.config.simulator_cfg.optimization
         assert self.optimization in ["energy", "latency", "EDP"]
-        self.freq = self.config["frequency"]
+        self.freq = self.config.frequency
 
         self.adaptor: ZigzagInterface = None
         self.cur_design_id = 0
-        if self.dse_node_config and "mutator" in self.dse_node_config:
+        if self.dse_node_config is not None and self.dse_node_config.mutator is not None:
 
             dse_package = importlib.import_module("framework.dse")
-            mutator_cls = getattr(dse_package, self.dse_node_config["mutator"])
+            mutator_cls = getattr(dse_package, self.dse_node_config.mutator)
             self.adaptor = mutator_cls()
 
-            if self.dse_system_config["optimizer"]["algorithm"] == "exhaustive":
+            if self.dse_system_config.optimizer.algorithm == "exhaustive": #== "exhaustive":
                 self.adaptor.read_space_cfg(self.dse_node_config)
-            elif self.dse_system_config["optimizer"]["algorithm"] == "nsga2":
+            elif self.dse_system_config.optimizer.algorithm == "nsga2":
                 pass
 
     def _find_hardware_config(self, config_file: str | pathlib.Path):

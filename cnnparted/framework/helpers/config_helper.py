@@ -18,6 +18,7 @@ class ConfigHelper:
         self.workload = WorkloadConfig(self.config["workload"])
         self.pipeline = PipelineConfig(self.config["pipeline"])
         self.dse = DseStageConfig(self.config["dse"]) if "dse" in self.config else None
+        self.accuracy = AccuracyConfig(self.config["accuracy"]) if "accuracy" in self.config else None
         self.system = SystemConfig(self.config["system"])
 
     def __load_config(self) -> dict:
@@ -28,30 +29,7 @@ class ConfigHelper:
         return self.config
 
     def get_system_components(self):
-        if "components" in self.config.keys():
-            # Old config style: determine compute vs link by content of the entry
-            components = self.config.get('components', [])
-            sorted_components = sorted(components, key=lambda x: x.get('id', -1))
-
-            node_components = []
-            link_components = []
-            for component in sorted_components:
-                if "evaluation" in component:
-                    node_components.append(component)
-                else:
-                    link_components.append(component)
-        elif system := self.config.get("system"):
-            # New config style: dedicated fields for compute and link nodes
-            nodes = system.get("compute", [])
-            links = system.get("link", [])
-            node_components = sorted(nodes, key=lambda x: x.get("id", -1))
-            link_components = sorted(links, key=lambda x: x.get("id", -1))
-        else:
-            # No system config found
-            node_components = []
-            link_components = []
-
-        return node_components,link_components
+        return self.system.compute, self.system.link
 
     def get_node_constraints(self):
         node_components, _ = self.get_system_components()
@@ -59,19 +37,19 @@ class ConfigHelper:
         for node in node_components:
             xl = []
             xu = []
-            if "dse" in node:
-                dse_cfg = node["dse"]
-                mem_steps = dse_cfg["step_mem_shared"]
+            if node.dse is not None:
+                dse_cfg = node.dse
+                mem_steps = dse_cfg.step_mem_shared
 
-                xl += dse_cfg["min_pe"]
-                min_size_mem_shared = dse_cfg["min_size_mem_shared"]
+                xl += dse_cfg.min_pe #["min_pe"]
+                min_size_mem_shared = dse_cfg.min_size_mem_shared #["min_size_mem_shared"]
                 xl += [min_size // step for (min_size, step) in zip(min_size_mem_shared, mem_steps)]
-                xl += dse_cfg["min_size_mem_local"]
+                xl += dse_cfg.min_size_mem_local #["min_size_mem_local"]
 
-                xu += dse_cfg["max_pe"]
-                max_size_mem_shared = dse_cfg["max_size_mem_shared"]
+                xu += dse_cfg.max_pe #["max_pe"]
+                max_size_mem_shared = dse_cfg.max_size_mem_shared #["max_size_mem_shared"]
                 xu += [max_size // step for (max_size, step) in zip(max_size_mem_shared, mem_steps)]
-                xu += dse_cfg["max_size_mem_local"]
+                xu += dse_cfg.max_size_mem_local #["max_size_mem_local"]
 
                 constr_sys += [[xl, xu]]
 
@@ -93,16 +71,15 @@ class ConfigHelper:
             else:
                 print(f"{indent}{key}")
 
-    @staticmethod
-    def get_system_constraints(config):
+    def get_system_constraints(self):
         default_constraints = {
             "latency": None,
             "energy": None,
             "area": None,
             "throughput": None,
         }
-        constraints = config.get("system_constraints", default_constraints)
-        return constraints
+        #constraints = config.get("system_constraints", default_constraints)
+        return default_constraints #TODO Integrate these
 
     def get_node_memory_sizes(self, node_components ):
         memories=[]

@@ -9,6 +9,7 @@ from functools import reduce
 import numpy as np
 
 from framework.helpers.design_metrics import calc_metric
+from framework.helpers.config import *
 
 
 class LayerResult:
@@ -183,26 +184,26 @@ class NodeResult:
     Attributes:
         designs:         Results for each design point
     """
-    def __init__(self, config: dict):
+    def __init__(self, config: NodeConfig):
         self.designs: list[DesignResult] = []
         self._all_designs: list[DesignResult] = [] #only set by the prune_designs function for bookkeeping
         self.design_tag = 0
-        self.bits = config.get("bits", 8)
-        self.fault_rates = config.get("fault_rates", [0.0, 0.0])
-        self.faulty_bits = config.get("faulty_bits", 0)
-        self.max_memory_size = config["max_memory_size"]
-        self.type = config["evaluation"]["simulator"]
-        self.accelerator_name = config["evaluation"]["accelerator"]
+        self.bits = config.bits
+        self.fault_rates = config.fault_rates
+        self.faulty_bits = config.faulty_bits
+        self.max_memory_size = config.max_memory_size
+        self.simulator = config.evaluation.simulator
+        self.accelerator_name = config.evaluation.accelerator
         self.sim_time = None
 
 
     @classmethod
-    def from_dict(cls, node_dict: dict, node_config: dict, network: str = None):
+    def from_dict(cls, node_dict: dict, node_config: NodeConfig, network: str = None):
         node_res = cls(node_config)
-        node_res.bits = node_dict.get("bits")
-        node_res.fault_rates = node_dict.get("fault_rates")
-        node_res.faulty_bits = node_dict.get("faulty_bits")
-        node_res.type = node_dict.get("type")
+        #node_res.bits = node_dict .get("bits")
+        #node_res.fault_rates = node_dict.get("fault_rates")
+        #node_res.faulty_bits = node_dict.get("faulty_bits")
+        #node_res.type = node_dict.get("type")
         for design_tag, design_data in node_dict["eval"].items():
             des = DesignResult.from_dict(design_data, network)
             node_res.add_design(des)
@@ -218,7 +219,7 @@ class NodeResult:
                  "eval": {},
                  "fault_rates": self.fault_rates,
                  "faulty_bits": self.faulty_bits,
-                 "type": self.type,
+                 "simulator": self.simulator,
                  }
 
         for i, design in enumerate(self.designs):
@@ -312,7 +313,7 @@ class NodeResult:
 
     
     @classmethod
-    def from_csv(cls, in_path: str, network: str, node_config: dict):
+    def from_csv(cls, in_path: str, network: str, node_config: NodeConfig):
         if not in_path.endswith(".csv"):
             in_path = in_path + ".csv"
         node_res = cls(node_config)
@@ -345,7 +346,7 @@ class NodeResult:
             json.dump(data, f, indent=4)
     
     @classmethod
-    def from_json(cls, in_path: str, network: str, node_config: dict):
+    def from_json(cls, in_path: str, network: str, node_config: NodeConfig):
         in_path = in_path + ".json"
         with open(in_path, "r") as f:
             data = json.load(f)
@@ -361,7 +362,7 @@ class SystemResult:
     def __getitem__(self, item: int) -> NodeResult:
         return self.platforms[item]
 
-    def register_platform(self, id: int, node_config):
+    def register_platform(self, id: int, node_config: NodeConfig):
         self.platforms[id] = NodeResult(node_config)
 
     def add_platform(self, id: int, result: NodeResult):
@@ -401,12 +402,12 @@ class NodeEvaluator(ABC):
     Interface which all node evaluators should inherit from
     """
     fname_result: str
-    config: dict
+    config: NodeConfig
 
     def set_workdir(self, work_dir: str, network: str, id: int):
         self.workdir = work_dir
-        self.runroot = os.path.join(work_dir, "system_evaluation", str(id)+"_"+self.config["accelerator"])
-        fname_base = os.path.join(work_dir, str(id) + "_" + network + "_" + self.config["accelerator"] + "_" + self.fname_result)
+        self.runroot = os.path.join(work_dir, "system_evaluation", str(id)+"_"+self.config.accelerator)
+        fname_base = os.path.join(work_dir, str(id) + "_" + network + "_" + self.config.accelerator + "_" + self.fname_result)
         return fname_base
 
     def run(self, network: str, layers: list):

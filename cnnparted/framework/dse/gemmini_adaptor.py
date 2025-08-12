@@ -9,6 +9,7 @@ from framework.dse.interfaces.architecture_config import ArchitectureConfig, Arc
 from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
+from framework.helpers.config import DseNodeConfig
 
 class GemminiConfig(ArchitectureConfig, GenomeInterface):
     def _is_pow_2(self, n):
@@ -125,37 +126,34 @@ class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         self.config: GemminiConfig = None
         self._design_space = []
 
-    def read_space_cfg(self, cfg):
+    def read_space_cfg(self, cfg: DseNodeConfig):
         self.spad_banks = 4
         self.acc_banks = 2
         self.spad_data_width = 8
         self.acc_data_width = 32
 
-        search_space_constraints = cfg.get("constraints", {})
+        search_space = cfg
 
         #Boundaries of scratchpad sizes
-        self.min_spad_size = search_space_constraints.get("min_spad_size", 256)
-        self.max_spad_size = search_space_constraints.get("max_spad_size", 256)
+        self.min_spad_size = search_space.min_size_mem_shared[0]
+        self.max_spad_size = search_space.max_size_mem_shared[0]
 
         #Boundaries of accumulator sizes 
-        self.min_acc_size = search_space_constraints.get("min_acc_size", 64)
-        self.max_acc_size = search_space_constraints.get("max_acc_size", 64)
+        self.min_acc_size = search_space.min_size_mem_shared[1]
+        self.max_acc_size = search_space.max_size_mem_shared[1]
 
         self.spad_sizes = []
         self.acc_sizes = []
     
         # Mesh dim parameters
-        self.mesh_dim_min = search_space_constraints.get("mesh_dim_min", 16)
-        self.mesh_dim_max = search_space_constraints.get("mesh_dim_max", 16)
+        self.mesh_dim_min = search_space.min_pe[0]
+        self.mesh_dim_max = search_space.max_pe[0]
         _min = int(log2(self.mesh_dim_min))
         _max = int(log2(self.mesh_dim_max))
         self.mesh_dims = [2**x for x in range(_min, _max+1) ]
 
-        if mesh_dim_fix := search_space_constraints.get("mesh_dims_fix"):
-            self.mesh_dims = mesh_dim_fix
-
         # Tile dim parameters
-        self.tile_dims = [1] #search_space_constraints.get("tile_dim", [1])
+        self.tile_dims = [1]
 
         # Generate valid configuration
         self.generate_design_space() 

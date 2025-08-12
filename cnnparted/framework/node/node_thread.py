@@ -9,6 +9,7 @@ from framework.node.mnsim_interface import MNSIMInterface
 from framework.node.generic_node import GenericNode
 from framework.node.zigzag import Zigzag
 from framework.node.node_evaluator import NodeResult
+from framework.helpers.config import *
 
 
 class NodeThread(ModuleThreadInterface):
@@ -19,12 +20,12 @@ class NodeThread(ModuleThreadInterface):
         # Check if design is DSE enabled
         top_k = -1
         metric = "edp"
-        if "dse" in self.config:
+        if self.config.dse is not None:
             # Check if dse_system_config is empty. If it is, raise an error here
-            assert self.dse_system_config, "Cannot specify DSE for a node if it is not also configured on system level"
+            assert self.dse_system_config is not None, "Cannot specify DSE for a node if it is not also configured on system level"
         
-            metric = self.dse_system_config.get("optimization", "edp")
-            top_k = int(self.dse_system_config.get("top_k", -1))
+            metric = self.dse_system_config.optimization
+            top_k = int(self.dse_system_config.top_k)
 
         node_result_networks = []
 
@@ -32,7 +33,7 @@ class NodeThread(ModuleThreadInterface):
         for network in self.ga.networks:
 
             # Select which simulator should be used
-            match self.config["evaluation"]["simulator"]:
+            match self.config.evaluation.simulator:
                 case "timeloop":
                     layers = self.ga.get_timeloop_layers(network)
                     simulator = Timeloop(self.config, self.dse_system_config)

@@ -28,7 +28,7 @@ class MultiTenancyOptimization(Stage):
     def _take_artifacts(self, artifacts: Artifacts):
         self.ga = artifacts.graph_analysis.ga
         self.node_results = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
-        self.work_dir = artifacts.config["general"]["work_dir"]
+        self.work_dir = artifacts.config.general.work_dir
     
     def _update_artifacts(self, artifacts: Artifacts, node_stats: SystemResult):
         artifacts.multitenancy_optimization.node_stats = node_stats

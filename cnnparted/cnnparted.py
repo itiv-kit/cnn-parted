@@ -12,12 +12,13 @@ import numpy as np
 from timeit import default_timer as timer
 
 from framework import ConfigHelper
+from framework.helpers.config import *
 from framework.stages.artifacts import Artifacts
 from framework.stages.stage_base import STAGE_DEPENDENCIES;
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
-def parse_pipeline(config):
-    stages = config["pipeline"]["stages"]
+def parse_pipeline(config: PipelineConfig):
+    stages = config.stages
     
     stage_classes = []
     enabled_stages = []
@@ -104,21 +105,21 @@ if __name__ == '__main__':
     config = conf_helper.get_config()
 
     if args.top_k is not None:
-        if "dse" in config:
-            config["dse"]["top_k"] = args.top_k
+        if conf_helper.dse is not None:
+            conf_helper.dse.top_k = args.top_k #TODO
     if args.prune_strict is not None:
-        if "dse" in config:
-            config["dse"]["prune_strict"] = args.prune_strict
+        if conf_helper.dse is not None:
+            conf_helper.dse.prune_strict = args.prune_strict
 
-    main_conf = config.get('general')
-    if work_dir_str := main_conf.get('work_dir'):
-        work_dir = work_dir_str
-        if os.path.isdir(work_dir) and not main_conf.get("keep_dir", True):
+    if conf_helper.general.work_dir is not None:
+        work_dir = conf_helper.general.work_dir
+        if os.path.isdir(work_dir) and not conf_helper.general.keep_dir:
             shutil.rmtree(work_dir, ignore_errors=True)
         os.makedirs(work_dir, exist_ok=True)
     else:
         work_dir_tmp = tempfile.TemporaryDirectory(dir=ROOT_DIR)
         work_dir = work_dir_tmp.name.split(os.path.sep)[-1]
+        conf_helper.general.work_dir = work_dir
     
     if args.clear_partitioning:
         rn = args.run_name
@@ -138,11 +139,10 @@ if __name__ == '__main__':
 
         
     # Determine stages that should be run
-    stages = parse_pipeline(config)
+    stages = parse_pipeline(conf_helper.pipeline)
         
     # Setup a class to keep track of results of stages
-    artifacts = Artifacts(config, vars(args), device)
-    artifacts.config["work_dir"] = work_dir
+    artifacts = Artifacts(conf_helper, vars(args), device)
 
     local_runtime = []
 

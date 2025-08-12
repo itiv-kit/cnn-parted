@@ -20,21 +20,21 @@ class GraphAnalysis(Stage):
         
     
     def _take_artifacts(self, artifacts: Artifacts):
-        self.work_dir = artifacts.config["general"]["work_dir"]
+        self.work_dir = artifacts.config.general.work_dir
         self.run_name = artifacts.args["run_name"]
-        self.num_topos = artifacts.config["general"]["num_topos"]
+        self.num_topos = artifacts.config.general.num_topos
         self.workloads = artifacts.workload_parser.workloads 
 
     def _update_artifacts(self, artifacts: Artifacts, ga: GraphAnalyzer):
         artifacts.graph_analysis.ga = ga
 
         # Update number of partitioning points
-        num_pp = artifacts.config["general"]["num_pp"]
+        num_pp = artifacts.config.general.num_pp
         if num_pp == -1:
             num_pp = len(ga.schedules[ga.networks[0]][0]) - 1
         #elif len(node_stats) == 1:
         #    num_pp = 0
-        artifacts.config["num_pp"] = num_pp
+        artifacts.config.general.num_pp = num_pp
 
 
 class GraphAnalysisArtifacts:

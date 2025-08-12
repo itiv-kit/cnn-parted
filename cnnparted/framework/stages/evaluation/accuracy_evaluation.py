@@ -9,6 +9,7 @@ from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.quantization.accuracy_evaluator import AccuracyEvaluator
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
+from framework.helpers.config import *
 
 import numpy as np
 
@@ -19,7 +20,8 @@ class AccuracyEvaluation(Stage):
 
     def run(self, artifacts: Artifacts):
         self._take_artifacts(artifacts)
-        if accuracy_cfg := self.config["accuracy"]:
+        if self.config.accuracy is not None:
+            accuracy_cfg = self.config.accuracy
             print("Found: ")
             for pareto, sched in self.sol.items():
                 print(pareto, len(sched))
