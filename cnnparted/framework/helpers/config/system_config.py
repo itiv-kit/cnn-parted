@@ -31,22 +31,23 @@ class TimeloopConfig:
 @dataclass
 class EvaluationConfig:
     accelerator: str
-    frequency: int
+    frequency: int | None
     simulator: Literal["timeloop", "zigzag", "mnsim"]
     simulator_cfg : MnsimConfig | ZigzagConfig | TimeloopConfig
 
     def __init__(self, cfg: dict):
         self.accelerator = cfg["accelerator"]
-        self.frequency = cfg["frequency"]
 
         self.simulator = cfg["simulator"]
         match cfg["simulator"]:
             case "timeloop":
                 self.simulator_cfg = TimeloopConfig(cfg)
+                self.frequency = cfg["frequency"]
             case "mnsim":
                 self.simulator_cfg = MnsimConfig(cfg)
             case "zigzag":
                 self.simulator_cfg = ZigzagConfig(cfg)
+                self.frequency = cfg["frequency"]
 
 @dataclass
 class DseNodeConfig:
