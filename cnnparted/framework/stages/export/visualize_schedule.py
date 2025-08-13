@@ -172,7 +172,7 @@ class VisualizeSchedule(Stage):
         fig_file_json = os.path.join(self.fig_dir, "mt_schedule.json")
         fig_file_png = os.path.join(self.fig_dir, "mt_schedule.png")
         fig.write_html(fig_file_html)
-        #fig.write_image(fig_file_png)
+        fig.write_image(fig_file_png)
         fig.write_json(fig_file_json)
 
     def _visualize_partitioning_schedule(self):
@@ -239,7 +239,7 @@ class VisualizeSchedule(Stage):
         fig_file_json = os.path.join(self.fig_dir, "schedule.json")
         fig_file_png = os.path.join(self.fig_dir, "schedule.png")
         fig.write_html(fig_file_html)
-        #fig.write_image(fig_file_png)
+        fig.write_image(fig_file_png)
         fig.write_json(fig_file_json)
 
 
