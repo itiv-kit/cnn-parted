@@ -27,5 +27,6 @@ dependencies = [
     "setuptools==75.8.2",
     "sphinx-glpi-theme>=0.6",
     "stable-baselines3[extra]>=2.6.0",
+    "ultralytics>=8.3.178",
     "wheel>=0.45.1",
 ]
