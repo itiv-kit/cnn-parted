@@ -51,6 +51,7 @@ run-test:
     - sudo ln -s /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so
     - source env/setupEnv.sh
     - export ACCELERGYPATH=$(which accelergy)
+    - plotly_get_chrome
   script:
     - python3.11 cnnparted/cnnparted.py examples/test_pipeline/alexnet_pipe.yaml test
   timeout: 12 hours
