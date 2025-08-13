@@ -41,10 +41,12 @@ class LayerResult:
                 {   "latency": self.latency,
                     "area": self.area,
                     "energy": self.energy,
-                    "binding": self.binding,
-                    "start_time": self.start_time,
-                    "end_time": self.end_time}
-            }         
+                }
+            }   
+        if self.binding is not None:
+            ret[self.name]["binding"] = self.binding
+            ret[self.name]["start_time"] = self.start_time
+            ret[self.name]["end_time"] = self.end_time
         return ret
     
     @property
