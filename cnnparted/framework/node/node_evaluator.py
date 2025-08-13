@@ -396,6 +396,9 @@ class SystemResult:
             file_path = os.path.join(out_path,  file_str)
             node_res.to_csv(file_path)
     
+    def __len__(self):
+        return len(self.platforms)
+    
 
 class NodeEvaluator(ABC):
     """

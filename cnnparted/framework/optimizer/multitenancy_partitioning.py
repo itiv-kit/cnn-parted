@@ -188,7 +188,11 @@ class MultiTenancyProblem():
                 layer_to_move_sel = np.array(layer_tracker.get_all_on_platform(platform_from)) 
                 if layer_to_move_sel.size == 0:
                     return layer_tracker
-                layer_to_move = self.rng.choice(layer_tracker.get_layer_names()[layer_to_move_sel])
+                layer_names = layer_tracker.get_layer_names()
+                layer_candidates = layer_names[layer_to_move_sel]
+                if layer_candidates.size == 0:
+                    return layer_tracker
+                layer_to_move = self.rng.choice(layer_names[layer_to_move_sel])
                 action(layer_to_move, platform_to)
 
             case layer_tracker.swap_platforms:

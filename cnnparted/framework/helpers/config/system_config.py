@@ -141,4 +141,4 @@ class SystemConfig:
         for link in links:
             self.link.append(LinkConfig(link))
         
-        self.num_platforms = len(self.compute)
+        self.num_platforms = sum([c.instances for c in self.compute])

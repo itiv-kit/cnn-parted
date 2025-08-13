@@ -5,7 +5,7 @@ from itertools import cycle
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.express.colors import sample_colorscale
+from plotly.express.colors import qualitative
 import yaml
 
 from framework.helpers.config_helper import ConfigHelper
@@ -20,10 +20,22 @@ from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 class VisualizeSchedule(Stage):
     def __init__(self):
         super().__init__()
+        self.color_schemes = {
+                1: ["#636efa"],
+                2: ["#636efa", "#ef553b"],
+                3: ['#edf8b1','#7fcdbb','#2c7fb8'], #from here on these are taken from colorbrewer
+                4: ['#ffffcc','#a1dab4','#41b6c4','#225ea8'],
+                5: ['#ffffcc','#a1dab4','#41b6c4','#2c7fb8','#253494'],
+                6: ['#ffffcc','#c7e9b4','#7fcdbb','#41b6c4','#2c7fb8','#253494'],
+                7: ['#ffffcc','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#0c2c84'],
+                8: ['#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#0c2c84'],
+                9: ['#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58']
+            }
 
 
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
+        self.num_networks = len(artifacts.config.workload.workload_spec)
         self.work_dir = self.config.general.work_dir
         self.run_name = artifacts.args["run_name"]
         self.fig_dir = os.path.join(self.work_dir, "figures", "schedule")
@@ -102,7 +114,10 @@ class VisualizeSchedule(Stage):
 
         # Setup a dict here to map platform ids to continuous integers
         # E.g. create a dict : {0:1, 2:2}
-        platform_lut = {platform_id: mapping for platform_id, mapping in zip(self.mt_node_stats.ids, range(1, len(self.mt_node_stats.ids)+1 )) } 
+        platform_lut = {platform_id: mapping for platform_id, mapping in zip(self.mt_node_stats.ids, range(1, len(self.mt_node_stats.ids)+1 )) }
+        nw_color_palette = self.color_schemes[self.num_networks]
+        nw_color_lut = {workload_spec.name: nw_color for workload_spec, nw_color in zip(self.config.workload.workload_spec, nw_color_palette)}
+        nw_legend_lut = {workload_spec.name: False for workload_spec in self.config.workload.workload_spec}
 
         for platform, node_data in self.mt_node_stats.platforms.items():
             networks = node_data.designs[0].get_networks()
@@ -110,30 +125,44 @@ class VisualizeSchedule(Stage):
                 for layer_name, layer_data in nw_data:
                     
                     if layer_data.binding is not None:
+
+                        hovertext = (
+                            f"<b>Network:</b> {nw_name}<br>"
+                            f"<b>Name:</b> {layer_data.name}<br>"
+                            f"<b>Latency:</b> {layer_data.latency:.2e}<br>"
+                            f"<b>Start:</b> {layer_data.start_time:.2e}<br>"
+                            f"<b>End:</b> {layer_data.end_time:.2e}<br>"
+                        )
+
                         bar = go.Bar(
                             base=[layer_data.start_time],
                             x=[layer_data.latency],
                             y=[platform_lut[platform]],
                             orientation="h",
                             width=0.25,
+                            hovertext=hovertext,
+                            marker_color=nw_color_lut[nw_name],
+                            legendgroup=nw_name,
+                            name = nw_name,
+                            showlegend=not nw_legend_lut[nw_name],
                         )
                         fig.add_trace(bar)
+
+                        nw_legend_lut[nw_name] = True #workaround to show network only once in legend
 
         fig.update_layout(
             title_text=( f"Execution Schedule"),
             barmode="stack",
-            showlegend=False,
+            showlegend=True,
         )
 
-        sys, _ = ConfigHelper(self.config).get_system_components()
-        platform_names = []
-        for node in sys:
-            name = node["evaluation"]["accelerator"]
-            platform_names.append(name)
+        sys, _ = self.config.get_system_components()
+        platform_names = [node.evaluation.accelerator for node in sys]
+
         fig.update_yaxes(
             title="Platform [-]",
-            tickvals=list(range(self.mt_node_stats.get_num_platforms())),
-            ticktext=platform_names,
+            tickvals=list(range(self.mt_node_stats.get_num_platforms()+2)),
+            ticktext=[""] + platform_names + [""],
         )
         fig.update_xaxes(
             title="Time [ms]",
@@ -157,11 +186,8 @@ class VisualizeSchedule(Stage):
         eval_dir = os.path.join(self.work_dir, "system_evaluation")
 
         cur_time = 0
-        sys, _ = ConfigHelper(self.config).get_system_components()
-        platform_names = []
-        for node in sys:
-            name = node["evaluation"]["accelerator"]
-            platform_names.append(name)
+        sys, _ = self.config.get_system_components()
+        platform_names = [node.evaluation.accelerator for node in sys]
         
         fig = go.Figure()
         for lat, pp, mapping in zip(part_latency, part_points, part_mapping):

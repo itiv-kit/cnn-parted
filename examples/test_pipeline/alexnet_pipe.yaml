@@ -29,6 +29,7 @@ pipeline:
     - NodeEvaluation
     - PartitioningOptimization
     - ExportPartitionResults
+    - VisualizeSchedule
 
 system:
   compute:
