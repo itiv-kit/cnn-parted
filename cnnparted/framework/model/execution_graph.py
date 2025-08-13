@@ -1,3 +1,5 @@
+import itertools as it
+
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
@@ -44,8 +46,19 @@ class ExecutionGraph:
             node = self.full_graph.nodes[node_key]
             successors = self.full_graph.succ[node_key]
             if successors is not None:
+
+                # Check if there are multiple successors that produce different output shapes
+                # If that is the case, we can't currently process this
                 if node["data"]["op_type"] in self.evaluated_layer_types and len(successors) != 1:
-                    raise RuntimeError("Conv with multiple outputs is not supported")
+                    tmp_out_shapes = []
+                    for succ in successors:
+                        succ_node = self.full_graph.nodes[succ]
+                        tmp_out_shapes.append(succ_node["data"]["output_size"])
+                    shape_pairs = np.array(list(it.combinations(tmp_out_shapes, r=2)))
+                    pairs_equal = all([np.array_equiv(pair[0], pair[1]) for pair in shape_pairs])
+
+                    if not pairs_equal:
+                        raise RuntimeError("Conv with multiple outputs is not supported")
 
                 for succ in successors:
                     succ_node = self.full_graph.nodes[succ]

@@ -166,11 +166,12 @@ class PlatformSchedule:
     def get_time(self):
         return self.cur_time
     
-    def assign_layer(self, layer: LayerResult):
-        layer.start_time = self.get_time()
+    def assign_layer(self, layer: LayerResult, earliest_start: float):
         layer.binding = self.id
-        layer.end_time = self.get_time() + layer.latency
-        self.cur_time = self.cur_time + layer.latency
+        layer.start_time = earliest_start #self.get_time()
+        layer.end_time = earliest_start + layer.latency #self.get_time() + layer.latency
+
+        self.cur_time = earliest_start + layer.latency
         self.layers.append(layer)
         return layer
 
@@ -194,23 +195,40 @@ def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemRe
 
     node_schedules = {id: PlatformSchedule(id) for id in node_stats.get_platform_ids()}
 
+    # TODO: We need to keep in mind the finish time of the previous layer here
+
+    # Need to keep track of earliest valid starting time for each node here
+    for network, exec_graph in exec_graphs.items():
+        for node_name in exec_graph.reduced_graph.nodes:
+            if exec_graph.reduced_graph.in_degree(node_name) == 0:
+                node = exec_graph.reduced_graph.nodes[node_name]
+                node["earliest_start"] = 0.0
+
     # While not all nodes have been assigned
     all_assigned = False
     while not all_assigned:
         #Determine all nodes that can be scheduled (all that have no predecessor)
-        V_ready = []
+        V_ready: list[tuple] = []
         for network, exec_graph in exec_graphs.items():
             for node_name in exec_graph.reduced_graph.nodes:
                 if exec_graph.reduced_graph.in_degree(node_name) == 0:
                     node = exec_graph.reduced_graph.nodes[node_name]
                     V_ready.append( (network, node_name, node) )
         
+        V_ready = sorted(V_ready, key=lambda data: data[2]["earliest_start"])
+        
         for network, layer_name, layer_data in V_ready:
             binding = layer_data["binding"]
             layer_result = find_layer_info(binding, network, layer_name) #should be name
             if layer_result:
-                layer_result = node_schedules[binding].assign_layer(layer_result)
+                layer_result = node_schedules[binding].assign_layer(layer_result, layer_data["earliest_start"])
                 update_layer_info(binding, network, layer_name, layer_result)
+
+                # Before we remove the node, set the earliest start for all successory
+                for succ_name in exec_graphs[network].reduced_graph.successors(layer_name):
+                    succ_node = exec_graphs[network].reduced_graph.nodes[succ_name]
+                    succ_node["earliest_start"] = layer_result.end_time
+
                 exec_graphs[network].reduced_graph.remove_node(layer_name)
 
         num_remaining_nodes = sum([graph.reduced_graph.number_of_nodes() for graph in exec_graphs.values()])
