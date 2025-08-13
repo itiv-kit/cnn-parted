@@ -151,7 +151,7 @@ class DesignResult:
     def get_networks(self):
         return list(self.networks.keys())
     
-    def get_network_dict(self, network: str): #TODO
+    def get_network_dict(self, network: str):
         layers_list_of_dict = [data.to_dict() for name, data in self.networks[network]]
         layers = reduce(operator.ior, layers_list_of_dict, {})
         return layers

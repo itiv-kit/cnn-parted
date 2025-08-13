@@ -35,7 +35,7 @@ class DesignOptimizer(Optimizer):
         self.num_gen =  dse_system_config.optimizer.num_gen #["optimizer"].get("num_gen")
         self.pop_size = dse_system_config.optimizer.pop_size #["optimizer"].get("pop_size")
 
-        self.node_components = node_components #TODO cfg
+        self.node_components = node_components
         self.node_ids = [node.id for node in self.node_components]
         self.accelerator_names = [node.evaluation.accelerator for node in self.node_components]
         

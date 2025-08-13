@@ -202,7 +202,6 @@ class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
     def run_tl_from_config(self, config: EyerissConfig, outdir=None):
         return super().run_tl_from_config(config, outdir)
     
-    #TODO
     def write_zigzag_arch(self, config=None, outdir=None):
         if config is None:
             config = self.config
