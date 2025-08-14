@@ -157,7 +157,6 @@ class MultiTenancyProblem():
             if improvement_counter <= 0:
                 convergence = True
             
-        print(self.node_stats[0].designs[0].networks["alexnet"].layers['/features/features.0/Conv'])
         fig = px.line(self.cost_history, title="EDP History for SA")
         fig.update_yaxes(title_text="EDP")
         fig.update_xaxes(title_text="Iteration")
@@ -211,7 +210,6 @@ class MultiTenancyProblem():
         # Move binding to graphs
         for network, layer, binding in best_solution:
             self.execution_graphs[network].reduced_graph.nodes(data=True)[layer]["binding"] = binding
-            print(self.execution_graphs[network].reduced_graph.nodes(data=True)[layer]["binding"])
         
         # For node_stats: when a layer was not bound to a specific platform, reset scheduling information
         for platform, data in self.node_stats.platforms.items():
