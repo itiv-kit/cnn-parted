@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 
-#from framework.stages.inputs.workload_parser import WorkloadInfo
+#import framework.stages.inputs.workload_parser as wlparse
 from framework.model.model import TreeModel
 from framework.model.graph import LayersGraph
 from framework.model.execution_graph import ExecutionGraph
@@ -30,7 +30,7 @@ class GraphAnalyzer:
             self._trees[network] = self._tree_models[network].get_tree()
             self.torchmodels[network] = self._tree_models[network].get_torch_model()
             self.graphs[network] = LayersGraph(self._trees[network])
-            self.exec_graphs[network] = ExecutionGraph(self._trees[network])
+            self.exec_graphs[network] = ExecutionGraph(self._trees[network], workload_info)
         self.schedules: dict[str, list] = {}
 
 
