@@ -20,7 +20,7 @@ class MultiTenancyOptimization(Stage):
     def run(self, artifacts):
         self._take_artifacts(artifacts)
 
-        mt_optimizer = MultiTenancyPartitioning(self.work_dir, self.node_results, self.ga)
+        mt_optimizer = MultiTenancyPartitioning(self.work_dir, self.node_results, self.ga) #not it
         node_stats = mt_optimizer.optimize()
 
         self._update_artifacts(artifacts, node_stats)

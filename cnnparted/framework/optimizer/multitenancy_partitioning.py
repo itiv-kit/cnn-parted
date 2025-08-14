@@ -33,9 +33,9 @@ class MultiTenancyPartitioning(Optimizer):
         os.makedirs(self.plot_dir, exist_ok=True)
 
     def optimize(self):
-        self._gen_initial_binding()
+        self._gen_initial_binding() #not it
 
-        algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga)
+        algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga) #not it
         node_stats = algorithm.minimize()
         return node_stats
 
@@ -106,12 +106,11 @@ class MultiTenancyProblem():
 
         self.layer_tracker = LayerTracker(networks, layers)
         self.num_nodes = len(layers)
+        _, self.initial_schedule = list_scheduling(copy.deepcopy(ga.exec_graphs), self.node_stats, writeback_layer_info=False)
 
         # SA configuration
-        self.initial_edp, _ ,self.initial_platform_latencies = self._score_binding(self.layer_tracker)
-
+        self.initial_cost = self._calc_cost(self.layer_tracker, self.initial_schedule)
         self.num_iter = self.num_nodes * 100
-        self.initial_cost = self.initial_edp
         self.t_start = self.initial_cost*8
         self.convergence_counter = 0
         self.cost_history = []
@@ -124,18 +123,19 @@ class MultiTenancyProblem():
         improvement_counter = self.convergence_counter
         convergence = False
 
+
         while not convergence:
             solution_improved = False
             for i in range(self.num_iter):
                 t = self.t_start / (i+1)
                 new_state = self._random_modify(current_state)
-                new_edp, _, platform_latencies = self._score_binding(new_state)
 
-                latency_pairs = list(it.combinations(platform_latencies.values(), r=2))
-                latency_diffs = np.abs([np.diff(diff_pair) for diff_pair in latency_pairs])
-                latency_cost = np.sum(latency_diffs)
+                new_exec_graphs = copy.deepcopy(self.execution_graphs)
+                self._write_binding_to_graph(new_state, new_exec_graphs)
                 
-                new_cost = latency_cost**0.5 + new_edp**0.8
+                _, node_schedules = list_scheduling(new_exec_graphs, self.node_stats, writeback_layer_info=False)
+                
+                new_cost = self._calc_cost(new_state, node_schedules)
                 
                 if self.rng.random() <= np.exp( -(new_cost - old_cost) / t ):
                     current_state = new_state
@@ -157,6 +157,7 @@ class MultiTenancyProblem():
             if improvement_counter <= 0:
                 convergence = True
             
+        print(self.node_stats[0].designs[0].networks["alexnet"].layers['/features/features.0/Conv'])
         fig = px.line(self.cost_history, title="EDP History for SA")
         fig.update_yaxes(title_text="EDP")
         fig.update_xaxes(title_text="Iteration")
@@ -204,28 +205,55 @@ class MultiTenancyProblem():
 
     def minimize(self):
         # Distribute workload between platforms with SA
+
         best_cost, best_solution =  self._simulated_annealing()
 
         # Move binding to graphs
         for network, layer, binding in best_solution:
             self.execution_graphs[network].reduced_graph.nodes(data=True)[layer]["binding"] = binding
+            print(self.execution_graphs[network].reduced_graph.nodes(data=True)[layer]["binding"])
+        
+        # For node_stats: when a layer was not bound to a specific platform, reset scheduling information
+        for platform, data in self.node_stats.platforms.items():
+            for nw_name, nw_data in data.designs[0].networks.items():
+                for layer_name, layer_data in nw_data.layers.items():
+                    binding = best_solution.layer[layer_name]
+                    if binding != platform:
+                        layer_data.reset_scheduling()
 
         #TODO: Between binding and scheduling, the design must be fixed and a new node_stats must be created with the single design
 
         # Perform the scheduling
-        scheduled_graphs = list_scheduling(self.execution_graphs, self.node_stats)
-        return scheduled_graphs
+        scheduled_node_stats, _ = list_scheduling(self.execution_graphs, self.node_stats, writeback_layer_info=True)
+        return scheduled_node_stats
 
-    def _score_binding(self, tracker: LayerTracker) -> tuple[float, dict[int, float], dict[int, float]]:
+    def _score_binding(self, tracker: LayerTracker) -> float:
         total_edp = 0.0    
-        edp_per_platform = defaultdict(int)
-        latency_per_platform = defaultdict(int)
         for nw, layer, bind in tracker:
             # TODO Currently assumes that there is only one design
             layer_data = self.node_stats[bind].designs[0].networks[nw].layers[layer]
             total_edp += layer_data.edp
-            edp_per_platform[bind] += layer_data.edp
-            latency_per_platform[bind]  += layer_data.latency
         
-        return total_edp, edp_per_platform, latency_per_platform
+        return total_edp
+    
+    def _score_utilization(self, schedules: dict[int, PlatformSchedule]) -> float:
+        idle_times = [sched.get_idle_time() for sched in schedules.values()]
+        return sum(idle_times)
+    
+    def _score_scheduling(self, schedules: dict[int, PlatformSchedule]) -> float:
+        end_times = [sched.cur_time for sched in schedules.values()]
+        end_times_pairs = it.combinations(end_times, r=2)
+        end_times_diffs = [abs(pair[0]-pair[1]) for pair in end_times_pairs]
+        return sum(end_times_diffs)
+
+    def _calc_cost(self, tracker: LayerTracker, schedules: dict[int, PlatformSchedule]) -> float:
+        edp_cost = self._score_binding(tracker)
+        lat_cost = self._score_scheduling(schedules)
+        util_cost = self._score_utilization(schedules)
+
+        return edp_cost**1.0 + lat_cost**1.0 + util_cost**2.8
+    
+    def _write_binding_to_graph(self, tracker: LayerTracker, exec_graphs: dict[str, ExecutionGraph]):
+        for nw, layer, binding in tracker:
+            exec_graphs[nw].reduced_graph.nodes[layer]["binding"] = binding
 

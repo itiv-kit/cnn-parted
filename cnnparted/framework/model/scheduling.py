@@ -2,6 +2,8 @@
 # Taken from: https://github.com/akshay-k2/m5
 ##
 
+from dataclasses import dataclass
+import itertools as it
 import random
 from joblib import Parallel, delayed
 import tqdm
@@ -156,28 +158,46 @@ def topo_sort_random_start_node(G, n: int = 1, seed: int = None, as_ndarray: boo
     else:
         return list(sorts)
 
+
+@dataclass
+class ComputeTask:
+    start_time: float
+    end_time: float
+
+@dataclass
+class TransferTask:
+    start_time: float
+    end_time: float
+
+
 class PlatformSchedule:
     def __init__(self, id: int):
         self.id = id
         self.layers: list[LayerResult] = []
         self.cur_time = 0.0
-        self.busy_intervals: list[tuple[float, float]] = []
+
+        self.tasks: list[ComputeTask | TransferTask] = []
     
     def get_time(self):
         return self.cur_time
     
     def assign_layer(self, layer: LayerResult, earliest_start: float):
         layer.binding = self.id
-        layer.start_time = earliest_start #self.get_time()
-        layer.end_time = earliest_start + layer.latency #self.get_time() + layer.latency
+        layer.start_time = max(earliest_start, self.cur_time)
+        layer.end_time = max(earliest_start, self.cur_time) + layer.latency
 
-        self.cur_time = earliest_start + layer.latency
+        self.cur_time = layer.start_time + layer.latency
         self.layers.append(layer)
+        self.tasks.append(ComputeTask(layer.start_time, layer.end_time))
         return layer
+    
+    def get_idle_time(self) -> float:
+        idle_time = [(nxt.end_time-cur.start_time)  for cur, nxt in it.pairwise(self.tasks)]
+        return sum(idle_time)
 
-        
 
-def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemResult):
+
+def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemResult, writeback_layer_info: bool) -> tuple[SystemResult, dict[int, PlatformSchedule]]:
     """Used for MultiTenancy partitioning. After the layers have been assigned to cores,
     we must determine a start time for each layer"""
 
@@ -195,8 +215,6 @@ def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemRe
 
     node_schedules = {id: PlatformSchedule(id) for id in node_stats.get_platform_ids()}
 
-    # TODO: We need to keep in mind the finish time of the previous layer here
-
     # Need to keep track of earliest valid starting time for each node here
     for network, exec_graph in exec_graphs.items():
         for node_name in exec_graph.reduced_graph.nodes:
@@ -213,16 +231,29 @@ def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemRe
             for node_name in exec_graph.reduced_graph.nodes:
                 if exec_graph.reduced_graph.in_degree(node_name) == 0:
                     node = exec_graph.reduced_graph.nodes[node_name]
-                    V_ready.append( (network, node_name, node) )
+                    platform = node["binding"]
+                    introduced_delay = abs(node_schedules[platform].cur_time - node["earliest_start"])
+                    V_ready.append( (network, node_name, node, introduced_delay) )
         
         V_ready = sorted(V_ready, key=lambda data: data[2]["earliest_start"])
+        #V_ready = sorted(V_ready, key=lambda data: data[3])
+
+        V_sched = V_ready[0]
+
+        #for network, layer_name, layer_data, introduced_delay in [V_sched]:
+        #    es = layer_data["earliest_start"]
+        #    print(f"\n{network}/{layer_name}: {es}\n")
+        #for pid, sched in node_schedules.items():
+        #    print(f"{pid}: {sched.cur_time}")
         
-        for network, layer_name, layer_data in V_ready:
+        for network, layer_name, layer_data, introduced_delay in [V_sched]:
             binding = layer_data["binding"]
             layer_result = find_layer_info(binding, network, layer_name) #should be name
             if layer_result:
                 layer_result = node_schedules[binding].assign_layer(layer_result, layer_data["earliest_start"])
-                update_layer_info(binding, network, layer_name, layer_result)
+
+                if writeback_layer_info:
+                    update_layer_info(binding, network, layer_name, layer_result)
 
                 # Before we remove the node, set the earliest start for all successory
                 for succ_name in exec_graphs[network].reduced_graph.successors(layer_name):
@@ -234,7 +265,7 @@ def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemRe
         num_remaining_nodes = sum([graph.reduced_graph.number_of_nodes() for graph in exec_graphs.values()])
         all_assigned = (num_remaining_nodes == 0)
 
-    return node_stats
+    return node_stats, node_schedules
 
 
 def check_sort(G, L):

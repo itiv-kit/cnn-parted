@@ -5,6 +5,7 @@ import json
 from abc import ABC
 from copy import deepcopy
 from functools import reduce
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -12,23 +13,29 @@ from framework.helpers.design_metrics import calc_metric
 from framework.helpers.config import *
 
 
+@dataclass
 class LayerResult:
     """ 
     Contains basic information about a single layer of a neural network
-
-    Attributes:
-        name:           A name that must be unique in the network
-        area:           Area of the accelerator this layer runs on
-        latency:        Latency when this layer is executed
-        energy:         Energy required to run this layer on an accelerator
-        cycles          Latency in clock cycles
     """
+
+    name: str
+    area: float  #must be in mm2
+    latency: float #must be in ms
+    energy: float #must be in mJ
+    cycles: int 
+
+    #Information relevant for scheduling
+    binding: int = None
+    start_time: float = None
+    end_time: float = None
+
     def __init__(self):
-        self.name: str
-        self.area: float  #must be in mm2
-        self.latency: float #must be in ms
-        self.energy: float #must be in mJ
-        self.cycles: int 
+        self.name: str = ""
+        self.area: float = 0.0  #must be in mm2
+        self.latency: float = 0.0 #must be in ms
+        self.energy: float = 0.0 #must be in mJ
+        self.cycles: int = None
 
         # Information relevant for scheduling
         self.binding: int = None
@@ -49,6 +56,11 @@ class LayerResult:
             ret[self.name]["end_time"] = self.end_time
         return ret
     
+    def reset_scheduling(self):
+        self.binding = None
+        self.start_time = None
+        self.end_time = None
+    
     @property
     def edp(self):
         return self.latency * self.energy
@@ -57,12 +69,6 @@ class LayerResult:
     def edap(self):
         return self.latency * self.energy * self.area
 
-    def __repr__(self):
-        return str(self.to_dict())
-    
-    def __str__(self):
-        return str(self.to_dict())
-    
 
 class NetworkResult:
     """
