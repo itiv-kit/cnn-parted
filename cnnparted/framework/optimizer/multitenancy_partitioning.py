@@ -3,6 +3,7 @@ import copy
 import itertools as it
 from collections import defaultdict
 from dataclasses import dataclass
+import time
 
 import numpy as np
 import tqdm
@@ -33,9 +34,9 @@ class MultiTenancyPartitioning(Optimizer):
         os.makedirs(self.plot_dir, exist_ok=True)
 
     def optimize(self):
-        self._gen_initial_binding() #not it
+        self._gen_initial_binding()
 
-        algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga) #not it
+        algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga)
         node_stats = algorithm.minimize()
         return node_stats
 
@@ -52,38 +53,44 @@ class MultiTenancyPartitioning(Optimizer):
 
 @dataclass
 class LayerTracker:
-    network: list[str]
-    layer: dict[str, int]
+    network_info: dict[str, dict[str, int]]
 
     def __iter__(self):
-        return zip(self.network, list(self.layer.keys()), list(self.layer.values()))
+        return iter([ (nw,layer_name,binding) for nw, layers in self.network_info.items() for layer_name, binding in layers.items()])
 
-    def get_all_on_platform(self, node_id: int):
-        found = [binding == node_id for binding in self.layer.values()]
-        return found
+    def get_all_layers_on_platform(self, platform: int):
+        nw_layer = [ (nw,layer_name) for nw, layers in self.network_info.items() for layer_name, binding in layers.items() if binding == platform]
+        return nw_layer
     
-    def get_layer_names(self):
-        return np.array(list(self.layer.keys()))
+    def get_all_layer_names(self):
+        nw_layer = [ (nw,layer_name) for nw, layers in self.network_info.items() for layer_name, binding in layers.items()]
+        return nw_layer
+    
+    def get_num_layers(self):
+        layer_ctr = [ len(layers) for layers in self.network_info.values() ]
+        return sum(layer_ctr)
     
     # Swap the binding of two layers that are on different platforms
-    def swap_layers(self, layers: list[str]):
-        bindings = np.array([self.layer[layer] for layer in layers])
-        first_l, second_l = layers
+    def swap_layers(self, nws_layers: list[tuple[str,str]]):
+        bindings = np.array([self.network_info[nw][layer] for nw, layer in nws_layers])
+        (first_nw, first_layer), (second_nw, second_layer) = nws_layers
         first_b, second_b = bindings
-        self.layer[first_l] = second_b
-        self.layer[second_l] = first_b
+        self.network_info[first_nw][first_layer] = second_b
+        self.network_info[second_nw][second_layer] = first_b
     
     # Move one layer to another platform
-    def move_layer(self, layer: str, to: int):
-        self.layer[layer] = to
+    def move_layer(self, nw_layer: tuple[str,str], to: int):
+        nw, layer = nw_layer
+        self.network_info[nw][layer] = to
     
     # Swap ALL layers assigned to two different platforms
     def swap_platforms(self, platform_a: int, platform_b: int):
-        for name, binding in self.layer.items():
-            if binding == platform_a:
-                self.layer[name] = platform_b
-            elif binding == platform_b:
-                self.layer[name] = platform_a
+        for nw, layer_bindings in self.network_info.items():
+            for layer_name, binding in layer_bindings.items():
+                if binding == platform_a:
+                    self.network_info[nw][layer_name] = platform_b
+                elif binding == platform_b:
+                    self.network_info[nw][layer_name] = platform_a
 
 
 class MultiTenancyProblem():
@@ -97,15 +104,13 @@ class MultiTenancyProblem():
         self.rng = np.random.default_rng()
 
         # Parse execution graphs into LayerTracker
-        networks = []
-        layers = defaultdict(int)
+        network_info = defaultdict(lambda: defaultdict(int))
         for network, graph in ga.exec_graphs.items():
             for node, data in graph.reduced_graph.nodes(data=True):
-                networks.append(network)
-                layers[node] = data["binding"]
+                network_info[network][node] = data["binding"]
 
-        self.layer_tracker = LayerTracker(networks, layers)
-        self.num_nodes = len(layers)
+        self.layer_tracker = LayerTracker(network_info)
+        self.num_nodes = self.layer_tracker.get_num_layers()
         _, self.initial_schedule = list_scheduling(copy.deepcopy(ga.exec_graphs), self.node_stats, writeback_layer_info=False)
 
         # SA configuration
@@ -122,7 +127,6 @@ class MultiTenancyProblem():
         current_state = copy.deepcopy(self.layer_tracker)
         improvement_counter = self.convergence_counter
         convergence = False
-
 
         while not convergence:
             solution_improved = False
@@ -148,7 +152,7 @@ class MultiTenancyProblem():
                         best_state = copy.deepcopy(new_state)
                         solution_improved = True
             
-            #Check convergence: No solution in three cooling cycles
+            #Check convergence: No better solution in three cooling cycles
             if solution_improved:
                 improvement_counter = self.convergence_counter
             else:
@@ -175,8 +179,7 @@ class MultiTenancyProblem():
                 platforms_to_swap = self.rng.choice(self.node_ids, size=2, replace=False)
                 layers_to_swap = []
                 for platform in platforms_to_swap:
-                    found = np.array(layer_tracker.get_all_on_platform(platform))
-                    layers = layer_tracker.get_layer_names()[found] # These are all layers on this platform
+                    layers = np.array(layer_tracker.get_all_layers_on_platform(platform))
                     if layers.size == 0:
                         return layer_tracker
                     layers_to_swap.append(self.rng.choice(layers))
@@ -185,14 +188,10 @@ class MultiTenancyProblem():
             case layer_tracker.move_layer:
                 # Move one layer to other platform
                 platform_from, platform_to = self.rng.choice(self.node_ids, size=2, replace=False)
-                layer_to_move_sel = np.array(layer_tracker.get_all_on_platform(platform_from)) 
-                if layer_to_move_sel.size == 0:
-                    return layer_tracker
-                layer_names = layer_tracker.get_layer_names()
-                layer_candidates = layer_names[layer_to_move_sel]
+                layer_candidates = np.array(layer_tracker.get_all_layers_on_platform(platform_from))
                 if layer_candidates.size == 0:
                     return layer_tracker
-                layer_to_move = self.rng.choice(layer_names[layer_to_move_sel])
+                layer_to_move = self.rng.choice(layer_candidates)
                 action(layer_to_move, platform_to)
 
             case layer_tracker.swap_platforms:
@@ -204,7 +203,6 @@ class MultiTenancyProblem():
 
     def minimize(self):
         # Distribute workload between platforms with SA
-
         best_cost, best_solution =  self._simulated_annealing()
 
         # Move binding to graphs
@@ -215,7 +213,7 @@ class MultiTenancyProblem():
         for platform, data in self.node_stats.platforms.items():
             for nw_name, nw_data in data.designs[0].networks.items():
                 for layer_name, layer_data in nw_data.layers.items():
-                    binding = best_solution.layer[layer_name]
+                    binding = best_solution.network_info[nw_name][layer_name]
                     if binding != platform:
                         layer_data.reset_scheduling()
 
@@ -226,6 +224,7 @@ class MultiTenancyProblem():
         return scheduled_node_stats
 
     def _score_binding(self, tracker: LayerTracker) -> float:
+        # For each layer we want to find the most efficient platform
         total_edp = 0.0    
         for nw, layer, bind in tracker:
             # TODO Currently assumes that there is only one design
@@ -235,21 +234,34 @@ class MultiTenancyProblem():
         return total_edp
     
     def _score_utilization(self, schedules: dict[int, PlatformSchedule]) -> float:
+        # Prevent idle times during execution
         idle_times = [sched.get_idle_time() for sched in schedules.values()]
-        return sum(idle_times)
+        
+        # When platforms finish at different times, one of them is in idle. 
+        # Here, we get these idle values
+        end_times = [sched.cur_time for sched in schedules.values()]
+        end_times_pairs = it.combinations(end_times, r=2)
+        end_times_diffs = [abs(pair[0]-pair[1]) for pair in end_times_pairs]
+        return sum(idle_times+end_times_diffs)
     
     def _score_scheduling(self, schedules: dict[int, PlatformSchedule]) -> float:
+        # Ideally, all platforms finish at the same time
         end_times = [sched.cur_time for sched in schedules.values()]
         end_times_pairs = it.combinations(end_times, r=2)
         end_times_diffs = [abs(pair[0]-pair[1]) for pair in end_times_pairs]
         return sum(end_times_diffs)
+    
+    def _score_latency(self, schedules: dict[int, PlatformSchedule]) -> float:
+        latencies = [sched.cur_time for sched in schedules.values()]
+        return sum(latencies)
 
     def _calc_cost(self, tracker: LayerTracker, schedules: dict[int, PlatformSchedule]) -> float:
         edp_cost = self._score_binding(tracker)
-        lat_cost = self._score_scheduling(schedules)
+        #diff_cost = self._score_scheduling(schedules)
         util_cost = self._score_utilization(schedules)
+        lat_cost = self._score_latency(schedules)
 
-        return edp_cost**1.0 + lat_cost**1.0 + util_cost**2.8
+        return edp_cost**0.4 +  util_cost**2.5 + lat_cost*2
     
     def _write_binding_to_graph(self, tracker: LayerTracker, exec_graphs: dict[str, ExecutionGraph]):
         for nw, layer, binding in tracker:

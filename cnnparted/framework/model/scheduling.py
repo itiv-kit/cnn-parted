@@ -236,17 +236,8 @@ def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemRe
                     V_ready.append( (network, node_name, node, introduced_delay) )
         
         V_ready = sorted(V_ready, key=lambda data: data[2]["earliest_start"])
-        #V_ready = sorted(V_ready, key=lambda data: data[3])
 
-        V_sched = V_ready[0]
-
-        #for network, layer_name, layer_data, introduced_delay in [V_sched]:
-        #    es = layer_data["earliest_start"]
-        #    print(f"\n{network}/{layer_name}: {es}\n")
-        #for pid, sched in node_schedules.items():
-        #    print(f"{pid}: {sched.cur_time}")
-        
-        for network, layer_name, layer_data, introduced_delay in [V_sched]:
+        for network, layer_name, layer_data, introduced_delay in V_ready:
             binding = layer_data["binding"]
             layer_result = find_layer_info(binding, network, layer_name) #should be name
             if layer_result:
