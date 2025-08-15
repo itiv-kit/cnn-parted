@@ -41,6 +41,9 @@ class VisualizeSchedule(Stage):
         self.fig_dir = os.path.join(self.work_dir, "figures", "schedule")
         os.makedirs(self.fig_dir, exist_ok=True)
 
+        sys, _ = self.config.get_system_components()
+        self.platform_names = [str(node.id) + "_" + node.evaluation.accelerator for node in sys]
+
         if artifacts.partitioning_optimization is not None:
             self.n_constr = artifacts.partitioning_optimization.n_constr 
             self.n_var = artifacts.partitioning_optimization.n_var
@@ -156,13 +159,11 @@ class VisualizeSchedule(Stage):
             showlegend=True,
         )
 
-        sys, _ = self.config.get_system_components()
-        platform_names = [node.evaluation.accelerator for node in sys]
 
         fig.update_yaxes(
             title="Platform [-]",
             tickvals=list(range(self.mt_node_stats.get_num_platforms()+2)),
-            ticktext=[""] + platform_names + [""],
+            ticktext=[""] + self.platform_names + [""],
         )
         fig.update_xaxes(
             title="Time [ms]",
@@ -186,8 +187,6 @@ class VisualizeSchedule(Stage):
         eval_dir = os.path.join(self.work_dir, "system_evaluation")
 
         cur_time = 0
-        sys, _ = self.config.get_system_components()
-        platform_names = [node.evaluation.accelerator for node in sys]
         
         fig = go.Figure()
         for lat, pp, mapping in zip(part_latency, part_points, part_mapping):
@@ -229,7 +228,7 @@ class VisualizeSchedule(Stage):
         fig.update_yaxes(
             title="Platform [-]",
             tickvals=list(range(self.num_platforms)),
-            ticktext=platform_names,
+            ticktext=self.platform_names,
         )
         fig.update_xaxes(
             title="Time [ms]",
