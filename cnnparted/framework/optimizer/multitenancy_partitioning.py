@@ -8,7 +8,9 @@ import time
 import numpy as np
 import tqdm
 import plotly.express as px
+import plotly.graph_objects as go
 
+import optuna
 
 from framework.optimizer.optimizer import Optimizer
 from framework.optimizer.partitioning_problem import PartitioningProblem
@@ -25,10 +27,11 @@ from framework.model.scheduling import list_scheduling, PlatformSchedule
 #   - try to optimize EDP by moving partitions between accelerators
 
 class MultiTenancyPartitioning(Optimizer):
-    def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer):
+    def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper):
         self.work_dir = work_dir
         self.plot_dir = os.path.join(work_dir, "figures")
         self.ga = ga
+        self.conf = global_conf
         self.system_result = node_stats
 
         os.makedirs(self.plot_dir, exist_ok=True)
@@ -36,7 +39,7 @@ class MultiTenancyPartitioning(Optimizer):
     def optimize(self):
         self._gen_initial_binding()
 
-        algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga)
+        algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga, self.conf)
         node_stats = algorithm.minimize()
         return node_stats
 
@@ -70,6 +73,14 @@ class LayerTracker:
         layer_ctr = [ len(layers) for layers in self.network_info.values() ]
         return sum(layer_ctr)
     
+    def set_all_bindings(self, new_bindings: list[int]):
+        idx = 0
+        for nw, layers in self.network_info.items():
+            for layer in layers:
+                self.network_info[nw][layer] = new_bindings[idx]
+                idx += 1
+
+    
     # Swap the binding of two layers that are on different platforms
     def swap_layers(self, nws_layers: list[tuple[str,str]]):
         bindings = np.array([self.network_info[nw][layer] for nw, layer in nws_layers])
@@ -94,7 +105,7 @@ class LayerTracker:
 
 
 class MultiTenancyProblem():
-    def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer):
+    def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper):
         self.work_dir = work_dir
         self.plot_dir = os.path.join(work_dir, "figures")
         self.node_stats = node_stats
@@ -102,6 +113,7 @@ class MultiTenancyProblem():
         self.ga = ga
         self.execution_graphs = copy.deepcopy(ga.exec_graphs)
         self.rng = np.random.default_rng()
+        self.conf = global_conf
 
         # Parse execution graphs into LayerTracker
         network_info = defaultdict(lambda: defaultdict(int))
@@ -169,6 +181,43 @@ class MultiTenancyProblem():
         return best_cost, best_state
 
     
+    def _optuna_optimizer(self) -> tuple[int, LayerTracker]:
+        
+        # We want optuna to suggest continuous ints from [0, num_platforms-1], 
+        # but afterwards we have to convert them to the correct id
+        platform_lut = {mapping: platform_id for platform_id, mapping in zip(self.conf.system.platform_ids, range(0, self.conf.system.num_platforms)) }
+        work_layer_tracker = copy.deepcopy(self.layer_tracker)
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+        def objective(trial: optuna.trial.Trial):
+            bindings_int = []
+            for i in range(self.num_nodes):
+                layer_bind = trial.suggest_int(f"binding_{i}", low=0, high=self.conf.system.num_platforms-1)
+                bindings_int.append(layer_bind)
+
+            bindings = [platform_lut[b] for b in bindings_int]
+            work_layer_tracker.set_all_bindings(bindings)
+
+            new_exec_graphs = copy.deepcopy(self.execution_graphs)
+            self._write_binding_to_graph(work_layer_tracker, new_exec_graphs)
+            _, node_schedules = list_scheduling(new_exec_graphs, self.node_stats, writeback_layer_info=False)
+
+            return self._score_binding(work_layer_tracker), self._score_utilization(node_schedules), self._score_latency(node_schedules), self._score_scheduling(node_schedules)
+
+        sampler = optuna.samplers.TPESampler()
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize", "minimize"])
+
+        target_func_names = ["EDP", "Util", "Latency", "Scheduling"]
+        study.set_metric_names(target_func_names)
+        study.optimize(objective, n_trials=self.conf.mt.optimizer.n_trials)
+        
+        fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["EDP", "Latency"], targets=lambda t: (t.values[0], t.values[2]))
+        fig.write_html(os.path.join(self.plot_dir, "paretos_edp_latency_optuna.html"))
+        best_bindings = [ [platform_lut[param] for param in trial.params.values()] for trial in study.best_trials]
+        breakpoint()
+
+
+    
     def _random_modify(self, current_state: LayerTracker):
         layer_tracker = copy.deepcopy(current_state)
         action_space = [layer_tracker.swap_layers, layer_tracker.move_layer, layer_tracker.swap_platforms]
@@ -203,7 +252,11 @@ class MultiTenancyProblem():
 
     def minimize(self):
         # Distribute workload between platforms with SA
-        best_cost, best_solution =  self._simulated_annealing()
+
+        if self.conf.mt.algorithm == "optuna":
+            best_cost, best_solution = self._optuna_optimizer()
+        elif self.conf.mt.algorithm == "sa":
+            best_cost, best_solution =  self._simulated_annealing()
 
         # Move binding to graphs
         for network, layer, binding in best_solution:
@@ -236,13 +289,7 @@ class MultiTenancyProblem():
     def _score_utilization(self, schedules: dict[int, PlatformSchedule]) -> float:
         # Prevent idle times during execution
         idle_times = [sched.get_idle_time() for sched in schedules.values()]
-        
-        # When platforms finish at different times, one of them is in idle. 
-        # Here, we get these idle values
-        end_times = [sched.cur_time for sched in schedules.values()]
-        end_times_pairs = it.combinations(end_times, r=2)
-        end_times_diffs = [abs(pair[0]-pair[1]) for pair in end_times_pairs]
-        return sum(idle_times+end_times_diffs)
+        return sum(idle_times)
     
     def _score_scheduling(self, schedules: dict[int, PlatformSchedule]) -> float:
         # Ideally, all platforms finish at the same time
@@ -253,7 +300,7 @@ class MultiTenancyProblem():
     
     def _score_latency(self, schedules: dict[int, PlatformSchedule]) -> float:
         latencies = [sched.cur_time for sched in schedules.values()]
-        return sum(latencies)
+        return max(latencies)
 
     def _calc_cost(self, tracker: LayerTracker, schedules: dict[int, PlatformSchedule]) -> float:
         edp_cost = self._score_binding(tracker)

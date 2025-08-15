@@ -24,6 +24,13 @@ class SimulatedAnnealingConfig:
         self.edp_weight = cfg["edp_weight"]
         self.util_weight = cfg["util_weight"]
 
+@dataclass
+class OptunaConfig:
+    n_trials: int
+
+    def __init__(self, cfg: dict):
+        self.n_trials = cfg["n_trials"]
+
 
 @dataclass
 class DseStageConfig:
@@ -44,8 +51,16 @@ class DseStageConfig:
 
 @dataclass
 class MultiTenancyStageConfig:
-    optimizer: GeneticAlgConfig | SimulatedAnnealingConfig
-    algorithm: str
+    optimizer: GeneticAlgConfig | SimulatedAnnealingConfig | OptunaConfig
+    algorithm: Literal["sa", "genetic", "optuna"]
 
     def __init__(self, cfg: dict):
-        ...
+        self.algorithm = cfg["algorithm"]
+
+        match self.algorithm:
+            case "sa":
+                self.optimizer = SimulatedAnnealingConfig(cfg["optimizer"])
+            case "genetic":
+                self.optimizer = GeneticAlgConfig(cfg["optimizer"])
+            case "optuna":
+                self.optimizer = OptunaConfig(cfg["optimizer"])

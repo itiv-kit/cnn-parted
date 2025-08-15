@@ -142,3 +142,4 @@ class SystemConfig:
             self.link.append(LinkConfig(link))
         
         self.num_platforms = sum([c.instances for c in self.compute])
+        self.platform_ids = [c.id for c in self.compute]
