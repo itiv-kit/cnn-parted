@@ -13,6 +13,17 @@ class GeneticAlgConfig:
         self.num_gen = cfg["num_gen"]
         self.pop_size = cfg["pop_size"]
 
+@dataclass
+class SimulatedAnnealingConfig:
+    latency_weight: float
+    edp_weight: float
+    util_weight: float
+
+    def __init__(self, cfg: dict):
+        self.latency_weight = cfg["latency_weight"]
+        self.edp_weight = cfg["edp_weight"]
+        self.util_weight = cfg["util_weight"]
+
 
 @dataclass
 class DseStageConfig:
@@ -30,3 +41,11 @@ class DseStageConfig:
         self.problem = cfg["problem"]
         self.optimizer = GeneticAlgConfig(cfg["optimizer"])
         self.algorithm = self.optimizer.algorithm
+
+@dataclass
+class MultiTenancyStageConfig:
+    optimizer: GeneticAlgConfig | SimulatedAnnealingConfig
+    algorithm: str
+
+    def __init__(self, cfg: dict):
+        ...
