@@ -234,35 +234,6 @@ class NodeResult:
             stats["eval"][design.tag] = design.to_dict()
         return stats
 
-    def to_csv(self, out_path: str):
-        if not out_path.endswith(".csv"):
-            out_path = out_path + ".csv"
-        with open(out_path, "w", newline="") as f:
-            writer = csv.writer(f, delimiter=";")
-            header = [
-                "No.",
-                "Design Tag",
-                "Layer",
-                "Latency [ms]",
-                "Energy [mJ]",
-                'Area [mm2]'
-            ]
-            writer.writerow(header)
-            row_num = 1
-            for (tag, design_result) in enumerate(self.designs):
-                network = design_result.get_networks()[0] #TODO Multiple networks
-                for name, layer in design_result.networks[network]:
-                    row = [
-                        row_num,
-                        "design_" + str(tag),
-                        name,
-                        str(layer.latency),
-                        str(layer.energy),
-                        str(layer.area),
-                    ]
-                    writer.writerow(row)
-                    row_num += 1
-
     def prune_designs(self, top_k: int, metric: str, strict: bool=False):
         design_stats = self.to_dict()
         self._all_designs = deepcopy(self.designs)
@@ -318,8 +289,36 @@ class NodeResult:
 
         pruned_designs = [design for design in self.designs if design.tag in design_candidates]
         self.designs = pruned_designs
-
     
+    def to_csv(self, out_path: str):
+        if not out_path.endswith(".csv"):
+            out_path = out_path + ".csv"
+        with open(out_path, "w", newline="") as f:
+            writer = csv.writer(f, delimiter=";")
+            header = [
+                "No.",
+                "Design Tag",
+                "Layer",
+                "Latency [ms]",
+                "Energy [mJ]",
+                'Area [mm2]'
+            ]
+            writer.writerow(header)
+            row_num = 1
+            for (tag, design_result) in enumerate(self.designs):
+                network = design_result.get_networks()[0] #TODO Multiple networks
+                for name, layer in design_result.networks[network]:
+                    row = [
+                        row_num,
+                        "design_" + str(tag),
+                        name,
+                        str(layer.latency),
+                        str(layer.energy),
+                        str(layer.area),
+                    ]
+                    writer.writerow(row)
+                    row_num += 1
+
     @classmethod
     def from_csv(cls, in_path: str, network: str, node_config: NodeConfig):
         if not in_path.endswith(".csv"):
@@ -355,7 +354,9 @@ class NodeResult:
     
     @classmethod
     def from_json(cls, in_path: str, network: str, node_config: NodeConfig):
-        in_path = in_path + ".json"
+        if not in_path.endswith(".json"):
+            in_path = in_path + ".json"
+
         with open(in_path, "r") as f:
             data = json.load(f)
 
@@ -403,6 +404,12 @@ class SystemResult:
             file_str = str(id) + "_" + node_res.accelerator_name + "_dse_layers.csv"
             file_path = os.path.join(out_path,  file_str)
             node_res.to_csv(file_path)
+
+    def to_json(self, out_path: str, runname: str = ""):
+        for id, node_res in self.platforms.items():
+            file_str = str(id) + "_" + node_res.accelerator_name + "_dse_layers.json"
+            file_path = os.path.join(out_path,  file_str)
+            node_res.to_json(file_path)
     
     def __len__(self):
         return len(self.platforms)

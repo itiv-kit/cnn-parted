@@ -51,8 +51,8 @@ class NodeThread(ModuleThreadInterface):
             # Check if some previous results are available
             fname_base = simulator.set_workdir(self.work_dir, network, self.id)
             if os.path.isfile(fname_base+".csv"):
-                #stats_j = NodeResult.from_json(fname_base, network, self.config)
-                stats = NodeResult.from_csv(fname_base, network, self.config)
+                stats = NodeResult.from_json(fname_base, network, self.config)
+                #stats = NodeResult.from_csv(fname_base, network, self.config)
             else:
                 # Perform the actual evaluation
                 if self.acc_adaptor is None:
@@ -61,7 +61,7 @@ class NodeThread(ModuleThreadInterface):
                     stats = simulator.run_from_adaptor(network, layers, self.acc_adaptor)
 
                 if self.save_results:
-                    stats.to_csv(fname_base)
+                    #stats.to_csv(fname_base)
                     stats.to_json(fname_base)
 
             node_result_networks.append(stats)

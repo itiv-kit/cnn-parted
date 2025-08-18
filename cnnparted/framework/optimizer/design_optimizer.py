@@ -107,18 +107,18 @@ class DesignOptimizer(Optimizer):
         elif self.algorithm == "exhaustive":
             pass
         else:
-            raise RuntimeError("Invalid algorithm {self.algorithm}")
+            raise RuntimeError(f"Invalid algorithm {self.algorithm}")
         
         # TODO This is a very hacky way to go about it, needs proper integration of
         #   - support only partial evaluation if only one node is present
         #   - handling of instances
         node_eval_stats = SystemResult()
         for node_id, accelerator_name, node_config in zip(self.node_ids, self.accelerator_names, self.node_components):
-            file_str = str(node_id) + "_" + accelerator_name + "*_layers.csv"
+            file_str = str(node_id) + "_" + accelerator_name + "*_layers.json"
             file_str = os.path.join(self.work_dir, file_str)
             file_str = glob.glob(file_str)
             if len(file_str) > 0 and os.path.isfile(file_str[0]):
-                node_eval_stats.add_platform(node_id, NodeResult.from_csv(file_str[0], network, node_config))
+                node_eval_stats.add_platform(node_id, NodeResult.from_json(file_str[0], network, node_config))
 
         # For now, continue if everything is present
         if node_eval_stats.get_num_platforms() == len(self.node_components):
