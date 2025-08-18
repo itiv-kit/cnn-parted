@@ -41,8 +41,7 @@ class VisualizeSchedule(Stage):
         self.fig_dir = os.path.join(self.work_dir, "figures", "schedule")
         os.makedirs(self.fig_dir, exist_ok=True)
 
-        sys, _ = self.config.get_system_components()
-        self.platform_names = [str(node.id) + "_" + node.evaluation.accelerator for node in sys]
+        self.platform_names = self.config.system.platform_names
 
         if artifacts.partitioning_optimization is not None:
             self.n_constr = artifacts.partitioning_optimization.n_constr 
@@ -122,6 +121,7 @@ class VisualizeSchedule(Stage):
         nw_color_lut = {workload_spec.name: nw_color for workload_spec, nw_color in zip(self.config.workload.workload_spec, nw_color_palette)}
         nw_legend_lut = {workload_spec.name: False for workload_spec in self.config.workload.workload_spec}
 
+        breakpoint()
         for platform, node_data in self.mt_node_stats.platforms.items():
             networks = node_data.designs[0].get_networks()
             for nw_name, nw_data in node_data.designs[0].networks.items():

@@ -132,7 +132,7 @@ class MultiTenancyProblem():
         self.convergence_counter = 0
         self.cost_history = []
     
-    def _simulated_annealing(self) -> tuple[int, LayerTracker]:
+    def _simulated_annealing(self) -> tuple[float, LayerTracker]:
         old_cost = self.initial_cost
         best_cost = np.inf
         best_state = None
@@ -181,7 +181,7 @@ class MultiTenancyProblem():
         return best_cost, best_state
 
     
-    def _optuna_optimizer(self) -> tuple[int, LayerTracker]:
+    def _optuna_optimizer(self) -> tuple[float, LayerTracker]:
         
         # We want optuna to suggest continuous ints from [0, num_platforms-1], 
         # but afterwards we have to convert them to the correct id
@@ -201,6 +201,7 @@ class MultiTenancyProblem():
             new_exec_graphs = copy.deepcopy(self.execution_graphs)
             self._write_binding_to_graph(work_layer_tracker, new_exec_graphs)
             _, node_schedules = list_scheduling(new_exec_graphs, self.node_stats, writeback_layer_info=False)
+            #trial.set_user_attr("schedule", copy.deepcopy(node_schedules))
 
             return self._score_binding(work_layer_tracker), self._score_utilization(node_schedules), self._score_latency(node_schedules), self._score_scheduling(node_schedules)
 
@@ -214,8 +215,13 @@ class MultiTenancyProblem():
         fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["EDP", "Latency"], targets=lambda t: (t.values[0], t.values[2]))
         fig.write_html(os.path.join(self.plot_dir, "paretos_edp_latency_optuna.html"))
         best_bindings = [ [platform_lut[param] for param in trial.params.values()] for trial in study.best_trials]
-        breakpoint()
+        trial_least_idle = max(study.best_trials, key=lambda t: t.values[0])
+        #schedule = trial_least_idle.user_attrs["schedule"]
 
+        # Update the layer tracker with the results
+        trial_least_idle_params = [platform_lut[b] for b in trial_least_idle.params.values()]
+        work_layer_tracker.set_all_bindings(trial_least_idle_params)
+        return None, work_layer_tracker
 
     
     def _random_modify(self, current_state: LayerTracker):

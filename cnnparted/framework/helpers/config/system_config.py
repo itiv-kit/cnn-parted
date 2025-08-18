@@ -83,6 +83,7 @@ class NodeConfig:
     max_memory_size: int
     accelerator: str
     instances: int
+    virtual_ids: dict[str, int] | None
     evaluation: EvaluationConfig
     dse: DseNodeConfig
 
@@ -96,6 +97,13 @@ class NodeConfig:
         self.accelerator = self.evaluation.accelerator
         self.instances = cfg.get("instances", 1)
         self.dse = DseNodeConfig(cfg["dse"]) if "dse" in cfg else None
+        self.virtual_ids = {} if self.instances > 1 else None
+
+        # Check if we need to assign virtual IDs, assign them to None. System config assigns actual int ID
+        if self.instances > 1:
+            for i in range(1, self.instances):
+                v_id = "v" + str(i)
+                self.virtual_ids[v_id] = None
 
 
 @dataclass
@@ -129,6 +137,8 @@ class SystemConfig:
     compute: list[NodeConfig]
     link: list[LinkConfig]
     num_platforms: int
+    platform_ids: list[int]
+    platform_names: list[str]
 
     def __init__(self, cfg):
         self.compute = []
@@ -142,4 +152,17 @@ class SystemConfig:
             self.link.append(LinkConfig(link))
         
         self.num_platforms = sum([c.instances for c in self.compute])
-        self.platform_ids = [c.id for c in self.compute]
+        self.max_id = max([c.id for c in self.compute] + [l.id for l in self.link])
+        self.platform_ids = []
+        self.platform_names = []
+
+        # Assign int IDs for all nodes
+        for c in self.compute:
+            self.platform_ids.append(c.id)
+            self.platform_names.append(str(c.id)+"_"+c.accelerator)
+            if c.virtual_ids is not None:
+                for v_ids in c.virtual_ids.keys():
+                    self.max_id += 1
+                    c.virtual_ids[v_ids] = self.max_id
+                    self.platform_ids.append(c.virtual_ids[v_ids])
+                    self.platform_names.append(str(c.virtual_ids[v_ids])+"_"+c.accelerator)

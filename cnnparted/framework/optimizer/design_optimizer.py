@@ -1,5 +1,6 @@
 import os
 import glob
+import copy
 import pickle
 
 import numpy as np
@@ -181,18 +182,11 @@ class DesignOptimizer(Optimizer):
             for node_thread in node_threads:
                 id,stats = node_thread.getStats()
 
-                instances = node_thread.config.get("instances", 1)
-                if instances == 1:
-                    node_eval_stats.add_platform(id, stats)
-                else:
-                    # If the accelerator should be instatiated multiple times, copy the results and generate a unique id
-                    for i in range(0, instances):
-                        id_str = "10" + str(id) + str(i) # generate a unique id for instances
-                        node_eval_stats.add_platform(int(id_str), stats)
-
-            # ensure IDs are actually all unique
-            all_ids = list(node_eval_stats.platforms.keys())
-            assert len(all_ids) == len(set(all_ids)), f"Component IDs are not unique. Found IDs: {all_ids}"
+                node_eval_stats.add_platform(id, stats)
+                if node_thread.config.virtual_ids is not None:
+                    # If the accelerator should be instatiated multiple times, copy the results and look-up the unique id
+                    for v_id_int in node_thread.config.virtual_ids.values():
+                        node_eval_stats.add_platform(v_id_int, copy.deepcopy(stats))
 
         # TODO: Return type currently does not consider res of minimize call
         return node_eval_stats
