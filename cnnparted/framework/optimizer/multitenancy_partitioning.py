@@ -11,6 +11,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 import optuna
+from optuna.storages import JournalStorage
+from optuna.storages.journal import JournalFileBackend
 
 from framework.optimizer.optimizer import Optimizer
 from framework.optimizer.partitioning_problem import PartitioningProblem
@@ -108,6 +110,7 @@ class MultiTenancyProblem():
     def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper):
         self.work_dir = work_dir
         self.plot_dir = os.path.join(work_dir, "figures")
+        self.optuna_out_dir = os.path.join(work_dir, "optuna")
         self.node_stats = node_stats
         self.node_ids = node_stats.get_platform_ids()
         self.ga = ga
@@ -182,6 +185,24 @@ class MultiTenancyProblem():
 
     
     def _optuna_optimizer(self) -> tuple[float, LayerTracker]:
+
+        match self.conf.mt.optimizer.sampler:
+            case "grid":
+                sampler = optuna.samplers.GridSampler()
+            case "tpe":
+                sampler = optuna.samplers.TPESampler()
+            case "cmaes":
+                sampler = optuna.samplers.CmaEsSampler()
+            case "nsga2":
+                sampler = optuna.samplers.NSGAIISampler()
+            case "random":
+                sampler = optuna.samplers.RandomSampler()
+            case "qmc":
+                sampler = optuna.samplers.QMCSampler()
+            case "gp":
+                sampler = optuna.samplers.GPSampler()
+            case _:
+                raise RuntimeError(f"Unknow selection for Optuna sampler, found: {self.conf.mt.optimizer.sampler}")
         
         # We want optuna to suggest continuous ints from [0, num_platforms-1], 
         # but afterwards we have to convert them to the correct id
@@ -205,20 +226,24 @@ class MultiTenancyProblem():
 
             return self._score_binding(work_layer_tracker), self._score_utilization(node_schedules), self._score_latency(node_schedules), self._score_scheduling(node_schedules)
 
-        sampler = optuna.samplers.TPESampler()
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize", "minimize"])
+        # Start the optimization, setup everything for Optuna run
+        os.makedirs(self.optuna_out_dir, exist_ok=True)
+        storage=JournalStorage(JournalFileBackend(file_path=os.path.join(self.optuna_out_dir,"journal.log")))
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize", "minimize"], )
 
-        target_func_names = ["EDP", "Util", "Latency", "Scheduling"]
-        study.set_metric_names(target_func_names)
-        study.optimize(objective, n_trials=self.conf.mt.optimizer.n_trials)
+        study.optimize(objective, n_trials=self.conf.mt.optimizer.n_trials, n_jobs=1, show_progress_bar=True)
         
+        # Plotting to make sense of the results
         fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["EDP", "Latency"], targets=lambda t: (t.values[0], t.values[2]))
-        fig.write_html(os.path.join(self.plot_dir, "paretos_edp_latency_optuna.html"))
-        best_bindings = [ [platform_lut[param] for param in trial.params.values()] for trial in study.best_trials]
-        trial_least_idle = max(study.best_trials, key=lambda t: t.values[0])
-        #schedule = trial_least_idle.user_attrs["schedule"]
+        file_name = "paretos_edp_latency_optuna"
+        fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
 
-        # Update the layer tracker with the results
+        fig_hv: go.Figure = optuna.visualization.plot_hypervolume_history(study, [0,0,0,0])
+        file_name_hv = "hypervolume_optuna"
+        fig_hv.write_html(os.path.join(self.plot_dir, file_name_hv+".html"))
+
+        # Update the layer tracker with the results #TODO Multi-objective opt
+        trial_least_idle = max(study.best_trials, key=lambda t: t.values[0])
         trial_least_idle_params = [platform_lut[b] for b in trial_least_idle.params.values()]
         work_layer_tracker.set_all_bindings(trial_least_idle_params)
         return None, work_layer_tracker

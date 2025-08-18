@@ -27,9 +27,11 @@ class SimulatedAnnealingConfig:
 @dataclass
 class OptunaConfig:
     n_trials: int
+    sampler: Literal["random", "grid", "tpe", "cmaes", "nsga2", "qmc", "gp"]
 
     def __init__(self, cfg: dict):
-        self.n_trials = cfg["n_trials"]
+        self.n_trials = int(cfg["n_trials"])
+        self.sampler = cfg["sampler"]
 
 
 @dataclass

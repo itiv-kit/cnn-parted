@@ -34,7 +34,8 @@ pipeline:
 mt:
   algorithm: optuna
   optimizer:
-    n_trials: 100
+    n_trials: 500
+    sampler: gp
 
 system:
   compute:
@@ -42,6 +43,7 @@ system:
     bits: 16
     fault_rates: [0, 0] # input, weight
     max_memory_size: 600000000
+    instances: 1
     evaluation:
       accelerator: eyeriss_like
       frequency: 200000000
@@ -60,6 +62,7 @@ system:
   - id: 2
     bits: 8
     max_memory_size: 600000000
+    instances: 1
     evaluation:
       accelerator: simba_like
       frequency: 200000000
