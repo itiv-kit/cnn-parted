@@ -126,7 +126,7 @@ class MultiTenancyProblem():
 
         self.layer_tracker = LayerTracker(network_info)
         self.num_nodes = self.layer_tracker.get_num_layers()
-        _, self.initial_schedule = list_scheduling(copy.deepcopy(ga.exec_graphs), self.node_stats, writeback_layer_info=False)
+        _, self.initial_schedule = list_scheduling(copy.deepcopy(ga.exec_graphs), self.node_stats, writeback_layer_info=False, priority=self.conf.mt.scheduling)
 
         # SA configuration
         self.initial_cost = self._calc_cost(self.layer_tracker, self.initial_schedule)
@@ -152,7 +152,7 @@ class MultiTenancyProblem():
                 new_exec_graphs = copy.deepcopy(self.execution_graphs)
                 self._write_binding_to_graph(new_state, new_exec_graphs)
                 
-                _, node_schedules = list_scheduling(new_exec_graphs, self.node_stats, writeback_layer_info=False)
+                _, node_schedules = list_scheduling(new_exec_graphs, self.node_stats, writeback_layer_info=False, priority=self.conf.mt.scheduling)
                 
                 new_cost = self._calc_cost(new_state, node_schedules)
                 
@@ -221,7 +221,7 @@ class MultiTenancyProblem():
 
             new_exec_graphs = copy.deepcopy(self.execution_graphs)
             self._write_binding_to_graph(work_layer_tracker, new_exec_graphs)
-            _, node_schedules = list_scheduling(new_exec_graphs, self.node_stats, writeback_layer_info=False)
+            _, node_schedules = list_scheduling(new_exec_graphs, self.node_stats, writeback_layer_info=False, priority=self.conf.mt.scheduling)
             #trial.set_user_attr("schedule", copy.deepcopy(node_schedules))
 
             return self._score_binding(work_layer_tracker), self._score_utilization(node_schedules), self._score_latency(node_schedules), self._score_scheduling(node_schedules)
@@ -304,7 +304,7 @@ class MultiTenancyProblem():
         #TODO: Between binding and scheduling, the design must be fixed and a new node_stats must be created with the single design
 
         # Perform the scheduling
-        scheduled_node_stats, _ = list_scheduling(self.execution_graphs, self.node_stats, writeback_layer_info=True)
+        scheduled_node_stats, _ = list_scheduling(self.execution_graphs, self.node_stats, writeback_layer_info=True, priority=self.conf.mt.scheduling)
         return scheduled_node_stats
 
     def _score_binding(self, tracker: LayerTracker) -> float:

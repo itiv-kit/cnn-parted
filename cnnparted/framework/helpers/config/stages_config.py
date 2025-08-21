@@ -55,9 +55,11 @@ class DseStageConfig:
 class MultiTenancyStageConfig:
     optimizer: GeneticAlgConfig | SimulatedAnnealingConfig | OptunaConfig
     algorithm: Literal["sa", "genetic", "optuna"]
+    scheduling: Literal["earliest_start", "shortest_job", "earliest_finish"]
 
     def __init__(self, cfg: dict):
         self.algorithm = cfg["algorithm"]
+        self.scheduling = cfg["scheduling"]
 
         match self.algorithm:
             case "sa":

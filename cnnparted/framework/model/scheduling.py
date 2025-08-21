@@ -10,7 +10,7 @@ import tqdm
 import networkx as nx
 import numpy as np
 
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 from copy import deepcopy
 
 from framework.model.execution_graph import ExecutionGraph
@@ -197,7 +197,8 @@ class PlatformSchedule:
 
 
 
-def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemResult, writeback_layer_info: bool) -> tuple[SystemResult, dict[int, PlatformSchedule]]:
+def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemResult, writeback_layer_info: bool, 
+                    priority: Literal["earliest_start", "shortest_job", "earliest_finish"]) -> tuple[SystemResult, dict[int, PlatformSchedule]]:
     """Used for MultiTenancy partitioning. After the layers have been assigned to cores,
     we must determine a start time for each layer"""
 
@@ -232,10 +233,20 @@ def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemRe
                 if exec_graph.reduced_graph.in_degree(node_name) == 0:
                     node = exec_graph.reduced_graph.nodes[node_name]
                     platform = node["binding"]
+                    node["eval_data"] = find_layer_info(platform, network, node_name)
                     introduced_delay = abs(node_schedules[platform].cur_time - node["earliest_start"])
                     V_ready.append( (network, node_name, node, introduced_delay) )
         
-        V_ready = sorted(V_ready, key=lambda data: data[2]["earliest_start"])
+        match priority:
+            case "earliest_start":
+                V_ready = sorted(V_ready, key=lambda data: data[2]["earliest_start"])
+            case "shortest_job":
+                V_ready = sorted(V_ready, key=lambda data: data[2]["eval_data"].latency)
+            case "earliest_finish":
+                V_ready = sorted(V_ready, key=lambda data: data[2]["earliest_start"]+data[2]["eval_data"].latency)
+            case _:
+                raise RuntimeError(f"Found an unknown {priority}")
+
 
         for network, layer_name, layer_data, introduced_delay in V_ready:
             binding = layer_data["binding"]
