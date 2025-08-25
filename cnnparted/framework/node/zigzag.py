@@ -30,7 +30,7 @@ class Zigzag(NodeEvaluator):
         self.fname_result = "zigzag_layers"
 
         self.zigzag_in_configs_dir_local = os.path.join(ROOT_DIR, "configs", "zigzag_configs")
-        self.zigzag_in_configs_dir_repo = os.path.join(ROOT_DIR, "tools", "zigzag", "zigzag", "inputs")
+        self.zigzag_in_configs_dir_repo = os.path.join(ROOT_DIR, "cnnparted", "tools", "zigzag", "zigzag", "inputs")
 
         self.configs_dir = pathlib.Path(ROOT_DIR, "tools", "zigzag", "zigzag", "inputs")
         self.zigzag_hardware_configs_dir = pathlib.Path(self.configs_dir, "hardware")
@@ -158,13 +158,15 @@ class Zigzag(NodeEvaluator):
         layers = cmes[0][1]
         for layer in layers:
             cme = layer[0]
-            l = LayerResult()
-            l.name = cme.layer.name
-            l.energy = cme.energy_total / 1e9 # pJ -> mJ
-            l.latency = cme.latency_total2  / self.freq * 1e3 # cycles -> ms
-            l.area = 0.0 # zigzag doesn't return the area
+            #TODO Is this check necessary?
+            if cme.layer.type in ["Conv", "Gemm"]:
+                l = LayerResult()
+                l.name = cme.layer.name
+                l.energy = cme.energy_total / 1e9 # pJ -> mJ
+                l.latency = cme.latency_total2  / self.freq * 1e3 # cycles -> ms
+                l.area = 0.0 # zigzag doesn't return the area
 
-            design_result.add_layer_to_network(l, network)
+                design_result.add_layer_to_network(l, network)
 
         node_result.add_design(design_result)
         
