@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from framework.model.scheduling import SystemSchedule
+from framework.optimizer.multitenancy_partitioning import LayerTracker
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
 from framework.stages.inputs.system_parser import SystemParser
@@ -21,9 +23,9 @@ class MultiTenancyOptimization(Stage):
         self._take_artifacts(artifacts)
 
         mt_optimizer = MultiTenancyPartitioning(self.work_dir, self.node_results, self.ga, self.config)
-        node_stats = mt_optimizer.optimize()
+        solutions = mt_optimizer.optimize()
 
-        self._update_artifacts(artifacts, node_stats)
+        self._update_artifacts(artifacts, solutions)
     
     def _take_artifacts(self, artifacts: Artifacts):
         self.ga = artifacts.graph_analysis.ga
@@ -31,10 +33,10 @@ class MultiTenancyOptimization(Stage):
         self.work_dir = artifacts.config.general.work_dir
         self.config = artifacts.config
     
-    def _update_artifacts(self, artifacts: Artifacts, node_stats: SystemResult):
-        artifacts.multitenancy_optimization.node_stats = node_stats
+    def _update_artifacts(self, artifacts: Artifacts, solutions):
+        artifacts.multitenancy_optimization.solutions = solutions
 
 
 @dataclass
 class MultiTenancyOptimizationArtifacts():
-    node_stats: SystemResult = None
+    solutions: list[tuple[LayerTracker, SystemSchedule]] = None

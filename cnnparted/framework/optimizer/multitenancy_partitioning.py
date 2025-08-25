@@ -21,7 +21,7 @@ from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
 from framework.model.execution_graph import ExecutionGraph
-from framework.model.scheduling import list_scheduling, PlatformSchedule
+from framework.model.scheduling import SystemSchedule, list_scheduling, PlatformSchedule
 
 
 # What this should do:
@@ -42,8 +42,8 @@ class MultiTenancyPartitioning(Optimizer):
         self._gen_initial_binding()
 
         algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga, self.conf)
-        node_stats = algorithm.minimize()
-        return node_stats
+        solutions = algorithm.minimize()
+        return solutions
 
     
     def _gen_initial_binding(self):
@@ -58,6 +58,11 @@ class MultiTenancyPartitioning(Optimizer):
 
 @dataclass
 class LayerTracker:
+    """
+    This class is used to keep track of all layers of all networks that are being evaluated. 
+    For each layer, it keeps the name of the layer and the binding, i.e. the assignment to a platform.
+    Detailed layer stats, like energy or latency, must be retrieved from the SystemResult class.
+    """
     network_info: dict[str, dict[str, int]]
 
     def __iter__(self):
@@ -126,7 +131,7 @@ class MultiTenancyProblem():
 
         self.layer_tracker = LayerTracker(network_info)
         self.num_nodes = self.layer_tracker.get_num_layers()
-        _, self.initial_schedule = list_scheduling(copy.deepcopy(ga.exec_graphs), self.node_stats, writeback_layer_info=False, priority=self.conf.mt.scheduling)
+        self.initial_schedule = list_scheduling(copy.deepcopy(ga.exec_graphs), self.node_stats, priority=self.conf.mt.scheduling)
 
         # SA configuration
         self.initial_cost = self._calc_cost(self.layer_tracker, self.initial_schedule)
@@ -135,10 +140,11 @@ class MultiTenancyProblem():
         self.convergence_counter = 0
         self.cost_history = []
     
-    def _simulated_annealing(self) -> tuple[float, LayerTracker]:
+    def _simulated_annealing(self) -> list[tuple[LayerTracker, SystemSchedule]]:
         old_cost = self.initial_cost
         best_cost = np.inf
         best_state = None
+        best_schedule = None
         current_state = copy.deepcopy(self.layer_tracker)
         improvement_counter = self.convergence_counter
         convergence = False
@@ -152,7 +158,7 @@ class MultiTenancyProblem():
                 new_exec_graphs = copy.deepcopy(self.execution_graphs)
                 self._write_binding_to_graph(new_state, new_exec_graphs)
                 
-                _, node_schedules = list_scheduling(new_exec_graphs, self.node_stats, writeback_layer_info=False, priority=self.conf.mt.scheduling)
+                node_schedules = list_scheduling(new_exec_graphs, self.node_stats, priority=self.conf.mt.scheduling)
                 
                 new_cost = self._calc_cost(new_state, node_schedules)
                 
@@ -165,6 +171,7 @@ class MultiTenancyProblem():
                     if new_cost < best_cost:
                         best_cost = new_cost
                         best_state = copy.deepcopy(new_state)
+                        best_schedule = copy.deepcopy(node_schedules)
                         solution_improved = True
             
             #Check convergence: No better solution in three cooling cycles
@@ -181,10 +188,12 @@ class MultiTenancyProblem():
         fig.update_xaxes(title_text="Iteration")
         fig.write_html(os.path.join(self.plot_dir, "edp_history_sa.html"))
 
-        return best_cost, best_state
+        # Result is a list for compatibility with Multi-Objective Opt
+        result = (best_state, best_schedule)
+        return [result]
 
     
-    def _optuna_optimizer(self) -> tuple[float, LayerTracker]:
+    def _optuna_optimizer(self) -> list[tuple[LayerTracker, SystemSchedule]]:
 
         match self.conf.mt.optimizer.sampler:
             case "grid":
@@ -219,10 +228,13 @@ class MultiTenancyProblem():
             bindings = [platform_lut[b] for b in bindings_int]
             work_layer_tracker.set_all_bindings(bindings)
 
-            new_exec_graphs = copy.deepcopy(self.execution_graphs)
+            new_exec_graphs = copy.deepcopy(self.execution_graphs) #TODO How to remove deepcopy?
             self._write_binding_to_graph(work_layer_tracker, new_exec_graphs)
-            _, node_schedules = list_scheduling(new_exec_graphs, self.node_stats, writeback_layer_info=False, priority=self.conf.mt.scheduling)
-            #trial.set_user_attr("schedule", copy.deepcopy(node_schedules))
+            node_schedules = list_scheduling(new_exec_graphs, self.node_stats, priority=self.conf.mt.scheduling)
+            
+            # Add information to be later retrieved
+            trial.set_user_attr("schedule", node_schedules)
+            trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
 
             return self._score_binding(work_layer_tracker), self._score_utilization(node_schedules), self._score_latency(node_schedules), self._score_scheduling(node_schedules)
 
@@ -246,7 +258,12 @@ class MultiTenancyProblem():
         trial_least_idle = max(study.best_trials, key=lambda t: t.values[0])
         trial_least_idle_params = [platform_lut[b] for b in trial_least_idle.params.values()]
         work_layer_tracker.set_all_bindings(trial_least_idle_params)
-        return None, work_layer_tracker
+
+        results: list[tuple[LayerTracker, SystemSchedule]] = []
+        for trial in study.best_trials:
+            results.append( (trial.user_attrs["bindings"], trial.user_attrs["schedule"]) )
+
+        return results
 
     
     def _random_modify(self, current_state: LayerTracker):
@@ -282,30 +299,29 @@ class MultiTenancyProblem():
 
 
     def minimize(self):
-        # Distribute workload between platforms with SA
-
+        # Distribute workload between platforms
         if self.conf.mt.algorithm == "optuna":
-            best_cost, best_solution = self._optuna_optimizer()
+            solutions = self._optuna_optimizer()
         elif self.conf.mt.algorithm == "sa":
-            best_cost, best_solution =  self._simulated_annealing()
+            solutions =  self._simulated_annealing()
 
         # Move binding to graphs
-        for network, layer, binding in best_solution:
-            self.execution_graphs[network].reduced_graph.nodes(data=True)[layer]["binding"] = binding
+        #for solution in solutions:
+        #    for network, layer, binding in solution:
+        #        self.execution_graphs[network].reduced_graph.nodes(data=True)[layer]["binding"] = binding
         
         # For node_stats: when a layer was not bound to a specific platform, reset scheduling information
-        for platform, data in self.node_stats.platforms.items():
-            for nw_name, nw_data in data.designs[0].networks.items():
-                for layer_name, layer_data in nw_data.layers.items():
-                    binding = best_solution.network_info[nw_name][layer_name]
-                    if binding != platform:
-                        layer_data.reset_scheduling()
+        #for platform, data in self.node_stats.platforms.items():
+        #    for nw_name, nw_data in data.designs[0].networks.items():
+        #        for layer_name, layer_data in nw_data.layers.items():
+        #            binding = best_solution.network_info[nw_name][layer_name]
+        #            if binding != platform:
+        #                layer_data.reset_scheduling()
+
 
         #TODO: Between binding and scheduling, the design must be fixed and a new node_stats must be created with the single design
 
-        # Perform the scheduling
-        scheduled_node_stats, _ = list_scheduling(self.execution_graphs, self.node_stats, writeback_layer_info=True, priority=self.conf.mt.scheduling)
-        return scheduled_node_stats
+        return solutions
 
     def _score_binding(self, tracker: LayerTracker) -> float:
         # For each layer we want to find the most efficient platform
@@ -317,23 +333,23 @@ class MultiTenancyProblem():
         
         return total_edp
     
-    def _score_utilization(self, schedules: dict[int, PlatformSchedule]) -> float:
+    def _score_utilization(self, schedules: SystemSchedule) -> float:
         # Prevent idle times during execution
-        idle_times = [sched.get_idle_time() for sched in schedules.values()]
+        idle_times = [sched.get_idle_time() for sched in schedules.node_schedules.values()]
         return sum(idle_times)
     
-    def _score_scheduling(self, schedules: dict[int, PlatformSchedule]) -> float:
+    def _score_scheduling(self, schedules: SystemSchedule) -> float:
         # Ideally, all platforms finish at the same time
-        end_times = [sched.cur_time for sched in schedules.values()]
+        end_times = [sched.cur_time for sched in schedules.node_schedules.values()]
         end_times_pairs = it.combinations(end_times, r=2)
         end_times_diffs = [abs(pair[0]-pair[1]) for pair in end_times_pairs]
         return sum(end_times_diffs)
     
-    def _score_latency(self, schedules: dict[int, PlatformSchedule]) -> float:
-        latencies = [sched.cur_time for sched in schedules.values()]
+    def _score_latency(self, schedules: SystemSchedule) -> float:
+        latencies = [sched.cur_time for sched in schedules.node_schedules.values()]
         return max(latencies)
 
-    def _calc_cost(self, tracker: LayerTracker, schedules: dict[int, PlatformSchedule]) -> float:
+    def _calc_cost(self, tracker: LayerTracker, schedules: SystemSchedule) -> float:
         edp_cost = self._score_binding(tracker)
         #diff_cost = self._score_scheduling(schedules)
         util_cost = self._score_utilization(schedules)

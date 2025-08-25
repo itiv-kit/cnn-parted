@@ -14,6 +14,9 @@ from framework.stages.artifacts import Artifacts
 from framework.stages.optimization.partitioning_optimization import PartitioningOptimization
 from framework.stages.optimization.multitenancy_optimization import MultiTenancyOptimization
 from framework.stages.analysis.graph_analysis import GraphAnalysis
+from framework.model.scheduling import ComputeTask, TransferTask
+from framework.stages.evaluation.node_evaluation import NodeEvaluation
+from framework.stages.optimization.design_optimization import DesignPartitioningOptimization
 from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 @register_required_stage((PartitioningOptimization, MultiTenancyOptimization), GraphAnalysis)
@@ -100,7 +103,8 @@ class VisualizeSchedule(Stage):
             self.idx_design_ids = np.s_[2:2+self.num_platforms]
         
         if artifacts.multitenancy_optimization is not None:
-            self.mt_node_stats = artifacts.multitenancy_optimization.node_stats
+            self.mt_node_stats = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
+            self.mt_solutions = artifacts.multitenancy_optimization.solutions
 
     def run(self, artifacts: Artifacts):
         self._take_artifacts(artifacts)
@@ -112,33 +116,33 @@ class VisualizeSchedule(Stage):
             self._visualize_mt_schedule()
 
     def _visualize_mt_schedule(self):
-        fig = go.Figure()
 
         # Setup a dict here to map platform ids to continuous integers
         # E.g. create a dict : {0:1, 2:2}
-        platform_lut = {platform_id: mapping for platform_id, mapping in zip(self.mt_node_stats.ids, range(1, len(self.mt_node_stats.ids)+1 )) }
+        #platform_lut = {platform_id: mapping for platform_id, mapping in zip(self.mt_node_stats.ids, range(1, len(self.mt_node_stats.ids)+1 )) }
+        platform_lut = {platform_id: mapping for platform_id, mapping in zip(self.config.system.platform_ids, range(1, self.config.system.num_platforms+1)) }
         nw_color_palette = self.color_schemes[self.num_networks]
         nw_color_lut = {workload_spec.name: nw_color for workload_spec, nw_color in zip(self.config.workload.workload_spec, nw_color_palette)}
-        nw_legend_lut = {workload_spec.name: False for workload_spec in self.config.workload.workload_spec}
 
-        for platform, node_data in self.mt_node_stats.platforms.items():
-            networks = node_data.designs[0].get_networks()
-            for nw_name, nw_data in node_data.designs[0].networks.items():
-                for layer_name, layer_data in nw_data:
-                    
-                    if layer_data.binding is not None:
-
+        for i, (tracker, schedule) in enumerate(self.mt_solutions):
+            fig = go.Figure()
+            nw_legend_lut = {workload_spec.name: False for workload_spec in self.config.workload.workload_spec}
+            for platform, node_schedule in schedule.node_schedules.items():
+                for task in node_schedule.tasks:
+                    if isinstance(task, ComputeTask):
+                        task_latency = task.end_time - task.start_time
                         hovertext = (
-                            f"<b>Network:</b> {nw_name}<br>"
-                            f"<b>Name:</b> {layer_data.name}<br>"
-                            f"<b>Latency:</b> {layer_data.latency:.2e}<br>"
-                            f"<b>Start:</b> {layer_data.start_time:.2e}<br>"
-                            f"<b>End:</b> {layer_data.end_time:.2e}<br>"
+                            f"<b>Network:</b> {task.network}<br>"
+                            f"<b>Name:</b> {task.layer}<br>"
+                            f"<b>Latency:</b> {task_latency:.2e}<br>"
+                            f"<b>Start:</b> {task.start_time:.2e}<br>"
+                            f"<b>End:</b> {task.end_time:.2e}<br>"
                         )
 
+                        nw_name = task.network
                         bar = go.Bar(
-                            base=[layer_data.start_time],
-                            x=[layer_data.latency],
+                            base=[task.start_time],
+                            x=[task_latency],
                             y=[platform_lut[platform]],
                             orientation="h",
                             width=0.25,
@@ -149,31 +153,27 @@ class VisualizeSchedule(Stage):
                             showlegend=not nw_legend_lut[nw_name],
                         )
                         fig.add_trace(bar)
-
                         nw_legend_lut[nw_name] = True #workaround to show network only once in legend
 
-        fig.update_layout(
-            title_text=( f"Execution Schedule"),
-            barmode="stack",
-            showlegend=True,
-        )
+            fig.update_layout(
+                title_text=( f"Execution Schedule"),
+                barmode="stack",
+                showlegend=True,
+            )
 
 
-        fig.update_yaxes(
-            title="Platform [-]",
-            tickvals=list(range(self.mt_node_stats.get_num_platforms()+2)),
-            ticktext=[""] + self.platform_names + [""],
-        )
-        fig.update_xaxes(
-            title="Time [ms]",
-        )
-        
-        fig_file_html = os.path.join(self.fig_dir, "mt_schedule.html")
-        fig_file_json = os.path.join(self.fig_dir, "mt_schedule.json")
-        fig_file_png = os.path.join(self.fig_dir, "mt_schedule.png")
-        fig.write_html(fig_file_html)
-        fig.write_image(fig_file_png, scale=8)
-        fig.write_json(fig_file_json)
+            fig.update_yaxes(
+                title="Platform [-]",
+                tickvals=list(range(self.config.system.num_platforms+2)),
+                ticktext=[""] + self.platform_names + [""],
+            )
+            fig.update_xaxes(
+                title="Time [ms]",
+            )
+            
+            fig_file = os.path.join(self.fig_dir, f"mt_schedule_{i}")
+            fig.write_html(fig_file + ".html")
+            fig.write_image(fig_file + ".png", scale=8)
 
     def _visualize_partitioning_schedule(self):
         solution = random.choice(self.res)
