@@ -3,5 +3,15 @@
   "runArgs": ["--userns="],
   "remoteUser": "root",
   "securityOpt": [ "seccomp=unconfined" ],
-  "postCreateCommand": "echo \"source /usr/share/bash-completion/completions/git\" >> ~/.bashrc"
+  "postCreateCommand": "echo \"source /usr/share/bash-completion/completions/git\" >> ~/.bashrc",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.vscode-pylance",
+        "ms-python.python",
+        "ms-python.debugpy",
+        "mechatroner.rainbow-csv"
+      ]
+    }
+  }
 }
