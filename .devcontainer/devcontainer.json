@@ -10,7 +10,8 @@
         "ms-python.vscode-pylance",
         "ms-python.python",
         "ms-python.debugpy",
-        "mechatroner.rainbow-csv"
+        "mechatroner.rainbow-csv",
+        "ms-vscode.live-server"
       ]
     }
   }
