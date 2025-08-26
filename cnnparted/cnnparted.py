@@ -90,7 +90,6 @@ if __name__ == '__main__':
                         help="Overwrite strict-mode parameter of DSE config")
     argsn = parser.parse_args()
     
-    breakpoint()
     args = CnnpartedArguments(vars(argsn))
 
     if args.cuda:
