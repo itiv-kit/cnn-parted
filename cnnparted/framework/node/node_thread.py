@@ -50,7 +50,7 @@ class NodeThread(ModuleThreadInterface):
 
             # Check if some previous results are available
             fname_base = simulator.set_workdir(self.work_dir, network, self.id)
-            if os.path.isfile(fname_base+".csv"):
+            if os.path.isfile(fname_base+".json"):
                 stats = NodeResult.from_json(fname_base, network, self.config)
                 #stats = NodeResult.from_csv(fname_base, network, self.config)
             else:
