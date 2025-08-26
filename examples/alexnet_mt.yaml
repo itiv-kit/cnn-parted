@@ -33,9 +33,10 @@ pipeline:
 
 mt:
   algorithm: optuna
+  scheduling: earliest_finish
   optimizer:
-    n_trials: 500
-    sampler: gp
+    n_trials: 50
+    sampler: nsga2
 
 system:
   compute:

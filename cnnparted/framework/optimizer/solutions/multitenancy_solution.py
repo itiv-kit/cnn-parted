@@ -1,5 +1,6 @@
 import copy
 import json
+from dataclasses import dataclass
 from pprint import pprint
 from collections import defaultdict
 import numpy as np
@@ -10,12 +11,22 @@ from framework import ConfigHelper
 from framework.model.scheduling import SystemSchedule
 from framework.optimizer.multitenancy_partitioning import LayerTracker
 
+@dataclass
+class MultiTenancySolutionElem:
+    network_res: dict[str, NetworkResult]
+    total_energy: float
+    total_latency: float
+
+
 class MultitenancySolution:
-    ...
     def __init__(self, node_stats: SystemResult, mt_solutions:list[tuple[LayerTracker, SystemSchedule]],  config: ConfigHelper):
         self.nw_names = [wl.name for wl in config.workload.workload_spec]
 
         self.res: list[dict[str, NetworkResult]] = []
+        self.res_summary: list[tuple[float, float]] = [] #Energy, Latency
+
+        self.res: list[MultiTenancySolutionElem] = []
+
         for tracker, schedule in mt_solutions:
             nw_results_init = {nw_name: NetworkResult() for nw_name in self.nw_names} #initial value to copy layer data over
             nw_results_sorted = {nw_name: NetworkResult() for nw_name in self.nw_names} 
@@ -33,7 +44,11 @@ class MultitenancySolution:
                 sorted_layers = sorted(nw_data.layers.values(), key=lambda layer_data: layer_data.start_time)
                 for layer in sorted_layers:
                     nw_results_sorted[nw_name].add_layer(layer)
-            self.res.append(nw_results_sorted)
+            
+            elem = MultiTenancySolutionElem(network_res=nw_results_sorted, 
+                                            total_energy=schedule.get_system_energy(node_stats),
+                                            total_latency=schedule.system_latency)
+            self.res.append(elem)
 
         #From system_config: get hardware parameters of the resulting architecture
         self.system = defaultdict(str)
@@ -50,10 +65,14 @@ class MultitenancySolution:
         result_json = []
         for res in self.res:
             result_item = {
+                "summary": {
+                    "total_energy": res.total_energy,
+                    "total_latency": res.total_latency,
+                },
                 "network_data": {},
                 "system_hardware": {},
             }
-            for nw_name, nw_data in res.items():
+            for nw_name, nw_data in res.network_res.items():
                 result_item["network_data"][nw_name] = nw_data.to_dict()
             result_json.append(result_item)
 

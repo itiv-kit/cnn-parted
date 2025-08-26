@@ -212,6 +212,20 @@ class SystemSchedule:
         # Keep a dict to make searching for a specifc layer easier
         self.layers[platform_id][network][task.layer] = task 
 
+    @property
+    def system_latency(self):
+        latencies = [sched.cur_time for sched in self.node_schedules.values()]
+        return max(latencies)
+    
+    def get_system_energy(self, node_stats: SystemResult):
+        total_energy = 0.0
+        for platform, sched in self.node_schedules.items():
+            for task in sched.tasks:
+                layer_result = node_stats.platforms[platform].designs[0].networks[task.network].layers[task.layer]
+                total_energy += layer_result.energy
+        return total_energy
+    
+
 
 def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemResult, 
                     priority: Literal["earliest_start", "shortest_job", "earliest_finish"]) -> SystemSchedule:
