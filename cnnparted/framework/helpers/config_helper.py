@@ -3,7 +3,9 @@ import yaml
 from .config import *
 
 class ConfigHelper:
-    def __init__(self, conf_in : str | dict):
+    def __init__(self, args: CnnpartedArguments):
+        self.args = args
+        conf_in = args.conf_file_path
         if isinstance(conf_in, str):
             self.fname = conf_in
             self.config = self.__load_config()

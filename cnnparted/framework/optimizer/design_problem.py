@@ -57,9 +57,9 @@ class DesignProblem(ElementwiseProblem):
                  partitioning_optimizer_cls,
                  system_dse_config: DseStageConfig):
         self.work_dir = artifacts.config.general.work_dir
-        self.run_name = artifacts.args["run_name"]
+        self.run_name = artifacts.config.args.run_name
         self.ga = artifacts.graph_analysis.ga 
-        self.show_progress = artifacts.args["p"]
+        self.show_progress = artifacts.config.args.show_progress
         self.num_pp = artifacts.config.general.num_pp
         self.config = artifacts.config
         self.q_constr = q_constr

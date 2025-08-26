@@ -26,8 +26,8 @@ class RobustnessOptimization(Stage):
         self.device = artifacts.device 
         self.work_dir = artifacts.config.general.work_dir
         self.accuracy_cfg = artifacts.config.accuracy
-        self.run_name = artifacts.args["run_name"]
-        self.show_progress = artifacts.args["p"]
+        self.run_name = artifacts.config.args.run_name
+        self.show_progress = artifacts.config.args.show_progress
         self.torch_models = artifacts.graph_analysis.ga.torchmodels
         self.accuracy_function = artifacts.workload_parser.accuracy_function
 

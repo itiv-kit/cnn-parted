@@ -67,7 +67,7 @@ class WorkloadParser(Stage):
             self._update_artifacts(artifacts, accuracy_function, networks, workloads)
 
     def _take_artifacts(self, artifacts: Artifacts):
-        self.run_name = artifacts.args["run_name"]
+        self.run_name = artifacts.config.args.run_name
         self.workload_array = artifacts.config.workload #["workload"]
         
     def _update_artifacts(self, artifacts: Artifacts, accuracy_func, networks, workloads):

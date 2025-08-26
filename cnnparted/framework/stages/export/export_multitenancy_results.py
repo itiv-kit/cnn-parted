@@ -19,7 +19,7 @@ class ExportMultiTenancyResults(Stage):
         self.node_results = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
         self.mt_solutions = artifacts.multitenancy_optimization.solutions
         self.config = artifacts.config
-        self.run_name = artifacts.args["run_name"]
+        self.run_name = artifacts.config.args.run_name
     
     def run(self, artifacts: Artifacts):
         self._take_artifacts(artifacts)

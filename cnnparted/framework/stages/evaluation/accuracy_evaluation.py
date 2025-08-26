@@ -39,7 +39,7 @@ class AccuracyEvaluation(Stage):
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
         self.device = artifacts.device
-        self.show_progress = artifacts.args["p"]
+        self.show_progress = artifacts.config.args.show_progress
 
         self.accuracy_function = artifacts.workload_parser.accuracy_function
         self.torch_models = artifacts.graph_analysis.ga.torchmodels

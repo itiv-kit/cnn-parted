@@ -7,9 +7,8 @@ from framework import ConfigHelper
 import framework.stages as stages
 
 class Artifacts:
-    def __init__(self, config: ConfigHelper, args: dict, device: str):
+    def __init__(self, config: ConfigHelper, device: str):
         self.config = config
-        self.args = args
         self.device = device
 
         # Set type hints and initialize all values to None, if a stage

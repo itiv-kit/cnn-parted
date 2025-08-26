@@ -23,7 +23,7 @@ class ExportPartitionResults(Stage):
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
         self.work_dir = self.config.general.work_dir
-        self.run_name = artifacts.args["run_name"]
+        self.run_name = artifacts.config.args.run_name
         self.optimizer_cfg: PartitioningOptConfig = artifacts.partitioning_optimization.optimizer_cfg
         self.n_constr = self.optimizer_cfg.n_constr
         self.n_var = self.optimizer_cfg.n_var_part

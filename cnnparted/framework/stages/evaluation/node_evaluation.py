@@ -50,8 +50,8 @@ class NodeEvaluation(Stage):
     def _take_artifacts(self, artifacts: Artifacts):
         self.dse_system_config = artifacts.config.dse
         self.work_dir = artifacts.config.general.work_dir
-        self.run_name = artifacts.args["run_name"]
-        self.show_progress = artifacts.args["p"]
+        self.run_name = artifacts.config.args.run_name
+        self.show_progress = artifacts.config.args.show_progress
         self.ga = artifacts.graph_analysis.ga
         self.node_components = artifacts.system_parser.nodes
 

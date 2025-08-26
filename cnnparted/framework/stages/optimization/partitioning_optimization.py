@@ -28,7 +28,7 @@ class PartitioningOptimization(Stage):
         self.num_pp = artifacts.config.general.num_pp
         self.node_stats = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
         self.link_components = artifacts.system_parser.links
-        self.show_progress = artifacts.args["p"]
+        self.show_progress = artifacts.config.args.show_progress
         self.config = artifacts.config
         if RobustnessOptimization in artifacts.stages:
             self.q_constr = artifacts.robustness_optimization.q_constr

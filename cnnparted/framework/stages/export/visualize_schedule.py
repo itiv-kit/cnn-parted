@@ -40,7 +40,7 @@ class VisualizeSchedule(Stage):
         self.config = artifacts.config
         self.num_networks = len(artifacts.config.workload.workload_spec)
         self.work_dir = self.config.general.work_dir
-        self.run_name = artifacts.args["run_name"]
+        self.run_name = artifacts.config.args.run_name
         self.fig_dir = os.path.join(self.work_dir, "figures", "schedule")
         os.makedirs(self.fig_dir, exist_ok=True)
 

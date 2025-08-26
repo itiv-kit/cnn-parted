@@ -88,10 +88,13 @@ if __name__ == '__main__':
     parser.add_argument("--prune-strict",
                         action = "store_true",
                         help="Overwrite strict-mode parameter of DSE config")
-    args = parser.parse_args()
+    argsn = parser.parse_args()
+    
+    breakpoint()
+    args = CnnpartedArguments(vars(argsn))
 
     if args.cuda:
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.cid)
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.cuda_id)
         device = "cuda" if torch.cuda.is_available() else "cpu"
     else:
         device = "cpu"
@@ -101,8 +104,7 @@ if __name__ == '__main__':
 
 
     # Setup working directory based on configuration file
-    conf_helper = ConfigHelper(args.conf_file_path)
-    config = conf_helper.get_config()
+    conf_helper = ConfigHelper(args)
 
     if args.top_k is not None:
         if conf_helper.dse is not None:
@@ -142,7 +144,7 @@ if __name__ == '__main__':
     stages = parse_pipeline(conf_helper.pipeline)
         
     # Setup a class to keep track of results of stages
-    artifacts = Artifacts(conf_helper, vars(args), device)
+    artifacts = Artifacts(conf_helper, device)
 
     local_runtime = []
 
@@ -161,7 +163,7 @@ if __name__ == '__main__':
 
     # write log with runtimes of individual steps
     if not args.no_log:
-        log_file = os.path.join(work_dir, artifacts.args["run_name"] + "_timing" + ".log" )
+        log_file = os.path.join(work_dir, conf_helper.args.run_name + "_timing" + ".log" )
         with open(log_file, "w") as f:
             for stage, time in zip(stages, local_runtime):
                 f.write("Step " + type(stage).__name__ + ":" + str(time) + " s\n" )

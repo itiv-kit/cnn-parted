@@ -66,14 +66,13 @@ class DesignPartitioningOptimization(Stage):
 
     
     def _take_artifacts(self, artifacts: Artifacts):
-        self.run_name = artifacts.args["run_name"]
+        self.run_name = artifacts.config.args.run_name
         self.ga = artifacts.graph_analysis.ga
-        self.show_progress = artifacts.args["p"]
+        self.show_progress = artifacts.config.args.show_progress
         self.num_pp = artifacts.config.general.num_pp
         self.link_components = artifacts.system_parser.links
         self.work_dir = artifacts.config.general.work_dir
 
-        self.show_progress = artifacts.args["p"]
         self.config = artifacts.config
 
         if RobustnessOptimization in artifacts.stages:

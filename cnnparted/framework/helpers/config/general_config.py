@@ -25,6 +25,32 @@ class GeneralConfig:
         self.work_dir = general_cfg.get("work_dir", None)
         self.keep_dir = general_cfg.get("keep_dir", True)
 
+@dataclass
+class CnnpartedArguments:
+    conf_file_path: str
+    run_name: str
+    show_progress: bool
+    num_runs: int
+    cuda: bool
+    cuda_id: int
+    clear_partitioning: bool
+    top_k: int
+    prune_strict: bool
+    no_log: bool
+
+    def __init__(self, args: dict):
+        self.conf_file_path = args["conf_file_path"]
+        self.run_name = args["run_name"]
+        self.show_progress = args["p"]
+        self.num_runs = args["num_runs"]
+        self.cuda = args["cuda"]
+        self.cuda_id = args["cid"]
+        self.clear_partitioning = args["clear_partitioning"]
+        self.top_k = args["top_k"]
+        self.no_log = args["no_log"]
+        self.prune_strict = args["prune_strict"]
+
+
 ### Everything related to the workload configuration
 @dataclass
 class WorkloadSpec:
