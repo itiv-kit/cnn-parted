@@ -1,4 +1,3 @@
-
 class OptimizerConfig:
     def __init__(self):
         # Number of variables, objectives and constraints

@@ -3,7 +3,7 @@ compound_components:
   classes:
   - name: smartbuffer_SRAM
     attributes:
-      technology: 45nm
+      technology: "45nm"
       memory_depth: 12
       memory_width: 16
       n_rdwr_ports: 2
@@ -68,7 +68,7 @@ compound_components:
               - name: idle
   - name: smartbuffer_RF
     attributes:
-      technology: 45nm
+      technology: "45nm"
       memory_depth: 12
       memory_width: 16
       n_rdwr_ports: 2
@@ -142,14 +142,14 @@ architecture:
         - name: DRAM
           class: DRAM
           attributes:
-            type: LPDDR4
+            type: "LPDDR4"
             width: 64
             block-size: 4
             word-bits: 16
       subtree:
         - name: eyeriss
           attributes:
-            technology: 45nm
+            technology: "45nm"
           local:
             - name: shared_glb
               class: smartbuffer_SRAM

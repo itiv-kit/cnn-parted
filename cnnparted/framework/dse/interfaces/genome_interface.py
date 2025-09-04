@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
-
 from pymoo.core.crossover import Crossover
 from pymoo.core.mutation import Mutation
 
@@ -21,7 +20,7 @@ class GenomeInterface(ABC):
     @abstractmethod
     def pe_array_mem(self):
         ...
-    
+
     @property
     @abstractmethod
     def local_mems(self):

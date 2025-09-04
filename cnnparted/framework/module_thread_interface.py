@@ -1,15 +1,24 @@
 import threading
 import time
 
-from framework.graph_analyzer import GraphAnalyzer
-from framework.dse.interfaces.architecture_config import ArchitectureConfig
-from framework.node.node_evaluator import NodeResult
+from cnnparted.framework.dse.interfaces.architecture_config import ArchitectureConfig
+from cnnparted.framework.graph_analyzer import GraphAnalyzer
+from cnnparted.framework.node.node_evaluator import NodeResult
+
 
 class ModuleThreadInterface(threading.Thread):
-    def __init__(self, id : str, ga : GraphAnalyzer, node_config : dict, 
-                 work_dir: str, runname : str, progress : bool, 
-                 acc_adaptor = None, save_results = True,
-                 dse_system_config = {}) -> None:
+    def __init__(
+        self,
+        id: str,
+        ga: GraphAnalyzer,
+        node_config: dict,
+        work_dir: str,
+        runname: str,
+        progress: bool,
+        acc_adaptor=None,
+        save_results=True,
+        dse_system_config={},
+    ) -> None:
         threading.Thread.__init__(self)
         self.id = id
         self.ga = ga
@@ -31,9 +40,9 @@ class ModuleThreadInterface(threading.Thread):
 
     def _eval(self) -> None:
         raise NotImplementedError
-    
+
     def eval_node(self):
         raise NotImplementedError
 
     def getStats(self) -> tuple[str, NodeResult]:
-        return self.id ,self.stats
+        return self.id, self.stats

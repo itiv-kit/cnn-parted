@@ -19,7 +19,7 @@ compound_components:
                 - name: mac_random
     - name: reg_storage
       attributes:
-        technology: 45nm
+        technology: "45nm"
         latency: 1ns
         width: 16
         depth: 1
@@ -38,7 +38,7 @@ compound_components:
                 - name: access
     - name: smartbuffer_RF
       attributes:
-        technology: 45nm
+        technology: "45nm"
         memory_depth: 12
         memory_width: 16
         n_rdwr_ports: 2
@@ -103,7 +103,7 @@ compound_components:
                 - name: idle
     - name: smartbuffer_SRAM
       attributes:
-        technology: 45nm
+        technology: "45nm"
         memory_depth: 12
         memory_width: 16
         n_rdwr_ports: 2
@@ -174,12 +174,12 @@ architecture:
       attributes:
         datawidth: 8
         word-bits: 8
-        technology: 45nm
+        technology: "45nm"
       local:
         - name: DRAM
           class: DRAM
           attributes:
-            type: LPDDR4
+            type: "LPDDR4"
             width: 64
             block-size: 8
             word-bits: 8

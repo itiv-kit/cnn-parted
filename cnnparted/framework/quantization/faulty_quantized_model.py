@@ -1,21 +1,57 @@
-import torch
 import numpy as np
 import pandas as pd
-
-
-from tqdm import tqdm
+import torch
 from torch import nn as torch_nn
-
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-import framework.quantization.faulty_quantized_modules as qmodules
-from pytorch_quantization import nn as quant_nn
-from pytorch_quantization import calib
-from pytorch_quantization import tensor_quant
-from pytorch_quantization.tensor_quant import QuantDescriptor
+import cnnparted.framework.quantization.faulty_quantized_modules as qmodules
 
-from model_explorer.exploration.weighting_functions import bits_weighted_linear
-from framework.quantization.custom_model import CustomModel
+try:
+    from pytorch_quantization import calib
+    from pytorch_quantization import nn as quant_nn
+    from pytorch_quantization import tensor_quant
+    from pytorch_quantization.tensor_quant import QuantDescriptor
+
+    PYTORCH_QUANTIZATION_AVAILABLE = True
+except ImportError:
+    PYTORCH_QUANTIZATION_AVAILABLE = False
+
+    # Create dummy modules
+    class DummyQuantNN:
+        pass
+
+    class DummyCalib:
+        pass
+
+    class DummyTensorQuant:
+        QUANT_DESC_8BIT_PER_TENSOR = None
+
+        @staticmethod
+        def fake_quantize_affine(*args, **kwargs):
+            return args[0] if args else None
+
+    class DummyQuantDescriptor:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    quant_nn = DummyQuantNN()
+    calib = DummyCalib()
+    tensor_quant = DummyTensorQuant()
+    QuantDescriptor = DummyQuantDescriptor
+
+try:
+    from model_explorer.exploration.weighting_functions import bits_weighted_linear
+
+    MODEL_EXPLORER_AVAILABLE = True
+except ImportError:
+    MODEL_EXPLORER_AVAILABLE = False
+
+    def bits_weighted_linear(*args, **kwargs):
+        return 0
+
+
+from cnnparted.framework.quantization.custom_model import CustomModel
 
 
 class FaultyQuantizedModel(CustomModel):
@@ -23,13 +59,15 @@ class FaultyQuantizedModel(CustomModel):
     with quantizeable counterparts from the nvidia-quantization library.
     """
 
-    def __init__(self,
-                 base_model: torch_nn.Module,
-                 device: torch.device,
-                 same_bit_for_weight_and_input = False,
-                 weighting_function: callable = bits_weighted_linear,
-                 quantization_descriptor: QuantDescriptor = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR,
-                 dram_analysis_file: str = "") -> None:
+    def __init__(
+        self,
+        base_model: torch_nn.Module,
+        device: torch.device,
+        same_bit_for_weight_and_input=False,
+        weighting_function: callable = bits_weighted_linear,
+        quantization_descriptor: QuantDescriptor = tensor_quant.QUANT_DESC_8BIT_PER_TENSOR,
+        dram_analysis_file: str = "",
+    ) -> None:
         super().__init__(base_model, device)
 
         self._fault_rates = []
@@ -59,8 +97,8 @@ class FaultyQuantizedModel(CustomModel):
     @fault_rates.setter
     def fault_rates(self, new_fault_rates):
         assert isinstance(new_fault_rates, list) or isinstance(
-            new_fault_rates,
-            np.ndarray), "fault_rates have to be a list or ndarray"
+            new_fault_rates, np.ndarray
+        ), "fault_rates have to be a list or ndarray"
         assert len(new_fault_rates) == len(
             self.faulty_modules
         ), "fault_rates list has to match the amount of quantization layers"
@@ -78,8 +116,8 @@ class FaultyQuantizedModel(CustomModel):
     @faulty_bits.setter
     def faulty_bits(self, new_faulty_bits):
         assert isinstance(new_faulty_bits, list) or isinstance(
-            new_faulty_bits,
-            np.ndarray), "faulty_bits have to be a list or ndarray"
+            new_faulty_bits, np.ndarray
+        ), "faulty_bits have to be a list or ndarray"
         assert len(new_faulty_bits) == len(
             self.faulty_modules
         ), "faulty_bits list has to match the amount of quantization layers"
@@ -97,10 +135,11 @@ class FaultyQuantizedModel(CustomModel):
     @bit_widths.setter
     def bit_widths(self, new_bit_widths):
         assert isinstance(new_bit_widths, list) or isinstance(
-            new_bit_widths,
-            np.ndarray), "bit_width have to be a list or ndarray"
-        assert len(new_bit_widths) == self.get_explorable_parameter_count(
-            ), "bit_width list has to match the amount of quantizable layers"
+            new_bit_widths, np.ndarray
+        ), "bit_width have to be a list or ndarray"
+        assert (
+            len(new_bit_widths) == self.get_explorable_parameter_count()
+        ), "bit_width list has to match the amount of quantizable layers"
 
         # Update Model ...
         if self.same_bit_for_weight_and_input:
@@ -121,8 +160,9 @@ class FaultyQuantizedModel(CustomModel):
             return len(self.explorable_modules)
 
     def get_bit_weighted(self) -> int:
-        return self.weighting_function(self.explorable_modules,
-                                       self.explorable_module_names)
+        return self.weighting_function(
+            self.explorable_modules, self.explorable_module_names
+        )
 
     def get_forward_pass_dram_energy(self) -> float:
         dram_energy_sum = 0.0
@@ -135,14 +175,14 @@ class FaultyQuantizedModel(CustomModel):
                 i_bits = module._input_quantizer.num_bits
 
                 if i > 0:
-                    dram_energy_sum += self.dram_data[i-1]['o_energy'] * (i_bits / 16)
+                    dram_energy_sum += self.dram_data[i - 1]["o_energy"] * (i_bits / 16)
 
-                dram_energy_sum += self.dram_data[i]['i_energy'] * (i_bits / 16)
-                dram_energy_sum += self.dram_data[i]['w_energy'] * (w_bits / 16)
+                dram_energy_sum += self.dram_data[i]["i_energy"] * (i_bits / 16)
+                dram_energy_sum += self.dram_data[i]["w_energy"] * (w_bits / 16)
 
                 # Last layer has always 16 bit
                 if i == len(self.dram_data) - 1:
-                    dram_energy_sum += self.dram_data[i]['o_energy'] * 1
+                    dram_energy_sum += self.dram_data[i]["o_energy"] * 1
 
                 i += 1
 
@@ -160,12 +200,18 @@ class FaultyQuantizedModel(CustomModel):
         self.dram_data = {}
         for i, row in dram_data_df.iterrows():
             # realign values to 16 bit
-            scale_factor = 16 / row['bitwidth']
+            scale_factor = 16 / row["bitwidth"]
 
             self.dram_data[i] = {
-                'w_energy': (row['w_reads'] + row['w_updates'] + row['w_fills']) * row['w_energy'] * scale_factor,
-                'i_energy': (row['i_reads'] + row['i_updates'] + row['i_fills']) * row['i_energy'] * scale_factor,
-                'o_energy': (row['o_reads'] + row['o_updates'] + row['o_fills']) * row['o_energy'] * scale_factor
+                "w_energy": (row["w_reads"] + row["w_updates"] + row["w_fills"])
+                * row["w_energy"]
+                * scale_factor,
+                "i_energy": (row["i_reads"] + row["i_updates"] + row["i_fills"])
+                * row["i_energy"]
+                * scale_factor,
+                "o_energy": (row["o_reads"] + row["o_updates"] + row["o_fills"])
+                * row["o_energy"]
+                * scale_factor,
             }
 
     def _create_quantized_model(self) -> None:
@@ -189,7 +235,7 @@ class FaultyQuantizedModel(CustomModel):
                     bias=bias_bool,
                     padding_mode=module.padding_mode,
                     quant_desc_input=self.quantization_descriptor,
-                    quant_desc_weight=self.quantization_descriptor
+                    quant_desc_weight=self.quantization_descriptor,
                 )
 
                 # copy weights and biases
@@ -203,7 +249,7 @@ class FaultyQuantizedModel(CustomModel):
                 quant_linear = qmodules.FaultyQLinear(
                     in_features=module.in_features,
                     out_features=module.out_features,
-                    bias=bias_bool
+                    bias=bias_bool,
                 )
 
                 quant_linear.weight = module.weight
@@ -215,23 +261,30 @@ class FaultyQuantizedModel(CustomModel):
             setattr(self.base_model, name, quant_conv)
 
         for name, module in self.base_model.named_modules():
-            if isinstance(module, qmodules.FaultyQConv2d) or isinstance(module, qmodules.FaultyQLinear):
+            if isinstance(module, qmodules.FaultyQConv2d) or isinstance(
+                module, qmodules.FaultyQLinear
+            ):
                 self.faulty_module_names.append(name)
                 self.faulty_modules.append(module)
             if isinstance(module, quant_nn.TensorQuantizer):
                 self.explorable_module_names.append(name)
                 self.explorable_modules.append(module)
 
-                if name.endswith('_input_quantizer'):
+                if name.endswith("_input_quantizer"):
                     self.input_quantizers.append(module)
-                elif name.endswith('_weight_quantizer'):
+                elif name.endswith("_weight_quantizer"):
                     self.weight_quantizers.append(module)
 
-
-    def generate_calibration_file(self, dataloader: DataLoader, progress=True,
-                                  calib_method='histogram', **kwargs):
-        assert calib_method in ['max', 'histogram'], "method has to be either max or histogram"
-        assert 'method' in kwargs, "you have to specify a method for quantization calibration"
+    def generate_calibration_file(
+        self, dataloader: DataLoader, progress=True, calib_method="histogram", **kwargs
+    ):
+        assert calib_method in [
+            "max",
+            "histogram",
+        ], "method has to be either max or histogram"
+        assert (
+            "method" in kwargs
+        ), "you have to specify a method for quantization calibration"
 
         self.base_model.to(self.device)
 
@@ -244,10 +297,9 @@ class FaultyQuantizedModel(CustomModel):
                 module.disable()
 
         # Run the dataset ...
-        for data, *_ in tqdm(dataloader,
-                             desc="Calibrating",
-                             disable=not progress,
-                             ascii=True):
+        for data, *_ in tqdm(
+            dataloader, desc="Calibrating", disable=not progress, ascii=True
+        ):
             # no need for actual accuracy function ...
             self.base_model(data.to(self.device))
 
@@ -265,4 +317,4 @@ class FaultyQuantizedModel(CustomModel):
                 if isinstance(module._calibrator, calib.MaxCalibrator):
                     module.load_calib_amax(strict=False)
                 else:
-                    module.load_calib_amax(strict=False,**kwargs)
+                    module.load_calib_amax(strict=False, **kwargs)

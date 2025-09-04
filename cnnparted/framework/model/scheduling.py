@@ -3,20 +3,21 @@
 ##
 
 import random
-from joblib import Parallel, delayed
-import tqdm
-import networkx as nx
-import numpy as np
-
+from copy import deepcopy
 from typing import Optional, Union
 
-from copy import deepcopy
+import networkx as nx
+import numpy as np
+import tqdm
+from joblib import Parallel, delayed
 
 
 def topo_sort_starting_node(
-    G: nx.DiGraph, strating_node: int, seed: Optional[int] = None, as_ndarray: bool = False
+    G: nx.DiGraph,
+    strating_node: int,
+    seed: Optional[int] = None,
+    as_ndarray: bool = False,
 ) -> Union[list[int], np.ndarray]:
-
     if seed is not None:
         random.seed(seed)
 
@@ -36,7 +37,9 @@ def topo_sort_starting_node(
         predecessors = set(G.predecessors(node))
         connected_nodes_intersection = successors.intersection(predecessors)
         if len(connected_nodes_intersection) > 0:
-            raise ValueError("Found nodes that are both successors and predecessors, this is not allowed in a DAG")
+            raise ValueError(
+                "Found nodes that are both successors and predecessors, this is not allowed in a DAG"
+            )
 
         for child in G.successors(node):
             if G.nodes[child]["tag"] == "top":
@@ -114,11 +117,17 @@ def topo_sort_starting_node(
 
     remove_and_add_to_list(G_unique, L, strating_node)
     while len(L) < len(G.nodes):
-        possible_top_nodes = [node for node in G_unique.nodes if G_unique.nodes[node]["tag"] == "top"]
-        possible_bottom_nodes = [node for node in G_unique.nodes if G_unique.nodes[node]["tag"] == "bottom"]
+        possible_top_nodes = [
+            node for node in G_unique.nodes if G_unique.nodes[node]["tag"] == "top"
+        ]
+        possible_bottom_nodes = [
+            node for node in G_unique.nodes if G_unique.nodes[node]["tag"] == "bottom"
+        ]
 
         possible_top_nodes_filtered = filter_top_nodes(G_unique, possible_top_nodes)
-        possible_bottom_nodes_filtered = filter_bottom_nodes(G_unique, possible_bottom_nodes)
+        possible_bottom_nodes_filtered = filter_bottom_nodes(
+            G_unique, possible_bottom_nodes
+        )
 
         possible_node = possible_top_nodes_filtered + possible_bottom_nodes_filtered
         # randomly pick a node
@@ -138,15 +147,26 @@ def topo_sort_starting_node(
     else:
         return L
 
-def topo_sort_random_start_node(G, n: int = 1, seed: int = None, as_ndarray: bool = False, n_jobs: int = 1, progress : bool = False):
 
+def topo_sort_random_start_node(
+    G,
+    n: int = 1,
+    seed: int = None,
+    as_ndarray: bool = False,
+    n_jobs: int = 1,
+    progress: bool = False,
+):
     if seed is not None:
         random.seed(seed)
 
     starting_points = random.choices(list(G.nodes), k=n)
     sorts = Parallel(n_jobs=n_jobs, backend="multiprocessing")(
-        delayed(topo_sort_starting_node)(deepcopy(G), starting_point, seed=None, as_ndarray=as_ndarray)
-        for starting_point in tqdm.tqdm(starting_points, "Schedules", disable=(not progress))
+        delayed(topo_sort_starting_node)(
+            deepcopy(G), starting_point, seed=None, as_ndarray=as_ndarray
+        )
+        for starting_point in tqdm.tqdm(
+            starting_points, "Schedules", disable=(not progress)
+        )
     )
 
     if as_ndarray:

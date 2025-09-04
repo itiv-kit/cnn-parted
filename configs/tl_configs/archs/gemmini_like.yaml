@@ -19,7 +19,7 @@ architecture:
       attributes:
         technology: 40nm
       local:
-      - name: Scratchpad 
+      - name: Scratchpad
         class: SRAM
         attributes:
           entries: 262144

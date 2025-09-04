@@ -49,7 +49,7 @@ compound_components:
       n_banks: 1
       n_buffets: 1
       n_rdwr_ports: 2
-      technology: 45nm
+      technology: "45nm"
     name: smartbuffer_SRAM
     subcomponents:
     - attributes:
@@ -114,7 +114,7 @@ compound_components:
       n_banks: 1
       n_buffets: 1
       n_rdwr_ports: 2
-      technology: 45nm
+      technology: "45nm"
     name: smartbuffer_SRAM
     subcomponents:
     - attributes:

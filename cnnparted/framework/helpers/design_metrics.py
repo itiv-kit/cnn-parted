@@ -2,7 +2,14 @@ import numpy as np
 
 SUPPORTED_METRICS = ["edp", "eap", "adp", "edap", "eda2p", "latency", "energy", "area"]
 
-def calc_metric(energy_per_design: np.array, latency_per_design: np.array, area_per_design: np.array, metric: str, reduction = True) -> np.array:
+
+def calc_metric(
+    energy_per_design: np.array,
+    latency_per_design: np.array,
+    area_per_design: np.array,
+    metric: str,
+    reduction=True,
+) -> np.array:
     # function assumes that x_per_design arrays have this layout:
     #  x | l0 | l1 | l2 | l3 |
     # ------------------------
@@ -21,14 +28,14 @@ def calc_metric(energy_per_design: np.array, latency_per_design: np.array, area_
 
     elif metric == "eda2p":
         result = np.multiply(energy_per_design, latency_per_design)
-        result = np.multiply(result, np.power(area_per_design,2))
+        result = np.multiply(result, np.power(area_per_design, 2))
 
     elif metric == "edp":
         result = np.multiply(energy_per_design, latency_per_design)
 
     elif metric == "eap":
         result = np.multiply(energy_per_design, area_per_design)
-    
+
     elif metric == "adp":
         result = np.multiply(latency_per_design, area_per_design)
 
@@ -42,6 +49,7 @@ def calc_metric(energy_per_design: np.array, latency_per_design: np.array, area_
         result = latency_per_design
 
     return result
+
 
 # Helper Function to get name and unit of the metric for plotting
 def get_metric_info(metric: str):
@@ -70,7 +78,7 @@ def get_metric_info(metric: str):
         unit = "$ms$"
     elif metric == "power_density":
         metric_str = "Power Density"
-        unit = r'$(\frac{mJ \cdot ms}{mm^2})$'
+        unit = r"$(\frac{mJ \cdot ms}{mm^2})$"
     elif metric == "adp":
         metric_str = "ADP"
         unit = r"$mm^2 \cdot ms$"

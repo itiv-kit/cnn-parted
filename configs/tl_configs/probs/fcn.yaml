@@ -1,13 +1,13 @@
 problem:
   name: FCN-Layer
   dimensions:
-      - C 
-      - M  
-      - N  
+      - C
+      - M
+      - N
   instance:
-    M: 256 
-    C: 512  
-    N:  1   
+    M: 256
+    C: 512
+    N:  1
   shape:
     data-spaces:
       - name: Weights

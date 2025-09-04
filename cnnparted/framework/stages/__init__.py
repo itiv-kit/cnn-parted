@@ -1,18 +1,46 @@
-from framework.stages.optimization.robustness_optimization import RobustnessOptimization
-from framework.stages.analysis.graph_analysis  import GraphAnalysis
-from framework.stages.evaluation.accuracy_evaluation import AccuracyEvaluation
-from framework.stages.evaluation.node_evaluation import NodeEvaluation
-from framework.stages.export.export_partition_results import ExportPartitionResults
-from framework.stages.export.visualize_schedule import VisualizeSchedule
-from framework.stages.inputs.system_parser import SystemParser
-from framework.stages.inputs.workload_parser import WorkloadParser
-from framework.stages.optimization.partitioning_optimization import PartitioningOptimization
-from framework.stages.optimization.design_optimization import DesignPartitioningOptimization
+try:
+    from cnnparted.framework.stages.evaluation.accuracy_evaluation import (
+        AccuracyEvaluation,
+    )
+    from cnnparted.framework.stages.optimization.robustness_optimization import (
+        RobustnessOptimization,
+    )
 
+    ROBUSTNESS_AVAILABLE = True
+except ImportError:
+    # Create dummy classes if dependencies are missing
+    class RobustnessOptimization:
+        pass
 
-__all__ = [GraphAnalysis, RobustnessOptimization,
-           AccuracyEvaluation, NodeEvaluation,
-           ExportPartitionResults, VisualizeSchedule,
-           SystemParser, WorkloadParser,
-           PartitioningOptimization,
-           DesignPartitioningOptimization,]
+    class AccuracyEvaluation:
+        pass
+
+    ROBUSTNESS_AVAILABLE = False
+
+from cnnparted.framework.stages.analysis.graph_analysis import GraphAnalysis
+from cnnparted.framework.stages.evaluation.node_evaluation import NodeEvaluation
+from cnnparted.framework.stages.export.export_partition_results import (
+    ExportPartitionResults,
+)
+from cnnparted.framework.stages.export.visualize_schedule import VisualizeSchedule
+from cnnparted.framework.stages.inputs.system_parser import SystemParser
+from cnnparted.framework.stages.inputs.workload_parser import WorkloadParser
+from cnnparted.framework.stages.optimization.design_optimization import (
+    DesignPartitioningOptimization,
+)
+from cnnparted.framework.stages.optimization.partitioning_optimization import (
+    PartitioningOptimization,
+)
+
+__all__ = [
+    GraphAnalysis,
+    RobustnessOptimization,
+    AccuracyEvaluation,
+    NodeEvaluation,
+    ExportPartitionResults,
+    VisualizeSchedule,
+    SystemParser,
+    WorkloadParser,
+    PartitioningOptimization,
+    DesignPartitioningOptimization,
+]

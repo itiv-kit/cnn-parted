@@ -1,0 +1,128 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cnnparted"
+version = "1.0.0"
+description = "CNN Inference Partitioning Framework"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Fabian Kreß", email = "fabian.kress@kit.edu"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+keywords = ["cnn", "inference", "hardware", "accelerator", "partitioning"]
+requires-python = ">=3.11"
+
+dependencies = [
+    "dataclasses",
+    "libconf",
+    "numpy",
+    "Pillow",
+    "pyfiglet",
+    "PyYAML",
+    "scipy",
+    "torch>=1.13.1",
+    "torchinfo",
+    "torchvision",
+    "typing_extensions",
+    "yamlordereddictloader",
+    "tqdm",
+    "onnx",
+    "networkx",
+    "onnxruntime-gpu",
+    "traitlets",
+    "pymoo",
+    "onnx2pytorch",
+    "pandas",
+    "joblib",
+    "ruamel.yaml",
+    "plotly",
+    "webdataset>=1.0.2",
+    "matplotlib>=3.10.6",
+    "seaborn>=0.13.2",
+    "gitpython>=3.1.45",
+    "opencv-python>=4.11.0.86",
+    "timm>=1.0.19",
+    "visdom>=0.2.4",
+    "gymnasium>=0.29.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/itiv-kit/cnn-parted"
+Repository = "https://github.com/itiv-kit/cnn-parted.git"
+Issues = "https://github.com/itiv-kit/cnn-parted/issues"
+
+[project.scripts]
+cnnparted = "cnnparted.cnnparted:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy",
+    "pre-commit",
+]
+nvidia = [
+    "nvidia-pyindex",
+    # "pytorch-quantization",  # Temporarily disabled due to build issues
+]
+# Reinforcement Learning optimization features
+rl = [
+    "stable-baselines3>=2.0.0",
+    "gymnasium>=0.29.0",
+]
+# Note: accelergy tools are installed separately from git submodules
+# since they are not available in PyPI
+research-tools = [
+    # These will be installed from git submodules in install.sh:
+    # - accelergy
+    # - accelergy-aladdin-plug-in
+    # - accelergy-cacti-plug-in
+    # - accelergy-table-based-plug-ins
+]
+
+[tool.setuptools.packages.find]
+include = ["cnnparted*"]
+
+[tool.setuptools.package-data]
+cnnparted = ["**/*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# Ignore unused variables (F841) to prevent aggressive removal
+ignore = ["F841", "E203"]
+extend-ignore = ["E402"]  # Allow module level imports not at top
+
+[tool.ruff.lint.per-file-ignores]
+# Allow unused imports in __init__.py files
+"__init__.py" = ["F401"]

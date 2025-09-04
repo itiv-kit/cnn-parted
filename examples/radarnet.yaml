@@ -83,4 +83,3 @@ system:
       latency_ns: 2   # including D2D Adapter and PHY
       power_bit_pj: 0.5
     fps: 25
-

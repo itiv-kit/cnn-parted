@@ -1,5 +1,11 @@
 *.swp # VI swap files
 
+# Installation artifacts
+activate_env.sh
+activate_dev.sh
+.venv/
+pythonEnv/
+
 ### json tests
 *.json
 
@@ -75,7 +81,6 @@ CMakeCache.txt
 CMakeFiles
 CMakeScripts
 Testing
-Makefile
 cmake_install.cmake
 install_manifest.txt
 compile_commands.json
@@ -89,7 +94,11 @@ build
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Virtual environments (old and new)
 pythonEnv/
+.venv/
+venv/
 
 # C extensions
 *.so
@@ -225,8 +234,14 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+# Generated activation scripts
+activate_env.sh
+dev_activate.sh
+
+# uv lock files and build artifacts
+uv.lock
+requirements.lock
+
 # Images
 *.png
 *.jpg
-
-

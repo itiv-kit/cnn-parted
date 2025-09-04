@@ -26,14 +26,7 @@
 	path = tools/dnn-model-exploration
 	url = https://github.com/itiv-kit/dnn-model-exploration.git
     ignore = dirty
-[submodule "tools/ramulator"]
-	path = tools/ramulator
-	url = https://github.com/CMU-SAFARI/ramulator.git
-    ignore = dirty
-[submodule "tools/VAMPIRE"]
-	path = tools/VAMPIRE
-	url = https://github.com/CMU-SAFARI/VAMPIRE.git
-    ignore = dirty
+
 [submodule "tools/MNSIM-2.0"]
 	path = tools/MNSIM-2.0
 	url = https://github.com/thu-nics/MNSIM-2.0.git

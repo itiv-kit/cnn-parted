@@ -1,26 +1,26 @@
 import numpy as np
 
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
+from cnnparted.framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
+from cnnparted.framework.helpers.config_helper import ConfigHelper
+from cnnparted.framework.helpers.design_metrics import calc_metric
+from cnnparted.framework.optimizer.design_optimizer import DesignOptimizer
+from cnnparted.framework.optimizer.design_problem import DesignProblem
+from cnnparted.framework.optimizer.partitioning_optimizer import PartitioningOptimizer
+from cnnparted.framework.stages.analysis.graph_analysis import GraphAnalysis
+from cnnparted.framework.stages.artifacts import Artifacts
+from cnnparted.framework.stages.evaluation.node_evaluation import NodeEvaluation
+from cnnparted.framework.stages.inputs.system_parser import SystemParser
+from cnnparted.framework.stages.optimization.robustness_optimization import (
+    RobustnessOptimization,
+)
+from cnnparted.framework.stages.stage_base import Stage, register_required_stage
 
-from framework.stages.analysis.graph_analysis import GraphAnalysis
-from framework.stages.evaluation.node_evaluation import NodeEvaluation
-from framework.stages.inputs.system_parser import SystemParser
-from framework.stages.optimization.robustness_optimization import RobustnessOptimization
-from framework.stages.stage_base import Stage, register_required_stage
-from framework.stages.artifacts import Artifacts
-
-from framework.optimizer.design_optimizer import DesignOptimizer
-from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
-from framework.optimizer.design_problem import DesignProblem
-
-from framework.helpers.design_metrics import calc_metric
-from framework.helpers.config_helper import ConfigHelper
 
 @register_required_stage(GraphAnalysis, SystemParser)
 class DesignPartitioningOptimization(Stage):
     def __init__(self):
         super().__init__()
-    
+
     def run(self, artifacts: Artifacts):
         self._take_artifacts(artifacts)
 
@@ -30,26 +30,33 @@ class DesignPartitioningOptimization(Stage):
         # If no exhaustive search should be performed, instantiate the
         # problem for evaluation
         design_problem = None
-        design_opt_config = None #TODO
+        design_opt_config = None  # TODO
         if self.config["dse"]["optimizer"]["algorithm"] != "exhaustive":
             node_constraints = cfg_helper.get_node_constraints()
             node_mem_steps = cfg_helper.get_node_mem_steps()
 
             # TODO: Design Problem and Optimizer selected by config
-            design_problem = DesignProblem(node_components, link_components, 
-                                        node_constraints, node_mem_steps,
-                                        self.q_constr,
-                                        artifacts, PartitioningOptimizer,
-                                        self.config["dse"])
+            design_problem = DesignProblem(
+                node_components,
+                link_components,
+                node_constraints,
+                node_mem_steps,
+                self.q_constr,
+                artifacts,
+                PartitioningOptimizer,
+                self.config["dse"],
+            )
             design_opt_config = design_problem.design_opt_config
 
-        design_optimizer = DesignOptimizer(node_components, 
-                                           design_problem, 
-                                           self.config["dse"], 
-                                           self.work_dir,
-                                           self.ga,
-                                           self.run_name,
-                                           self.show_progress)
+        design_optimizer = DesignOptimizer(
+            node_components,
+            design_problem,
+            self.config["dse"],
+            self.work_dir,
+            self.ga,
+            self.run_name,
+            self.show_progress,
+        )
 
         node_stats = design_optimizer.optimize(self.q_constr, artifacts.config)
 
@@ -61,7 +68,6 @@ class DesignPartitioningOptimization(Stage):
 
         self._update_artifacts(artifacts, node_stats, design_opt_config)
 
-    
     def _take_artifacts(self, artifacts: Artifacts):
         self.run_name = artifacts.args["run_name"]
         self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
@@ -74,22 +80,27 @@ class DesignPartitioningOptimization(Stage):
         self.config = artifacts.config
 
         if RobustnessOptimization in artifacts.stages:
-            self.q_constr = artifacts.get_stage_result(RobustnessOptimization, "q_constr")
+            self.q_constr = artifacts.get_stage_result(
+                RobustnessOptimization, "q_constr"
+            )
         else:
             self.q_constr = {}
-        
 
     def _update_artifacts(self, artifacts: Artifacts, node_stats, optimizer_config):
         artifacts.config["num_platforms"] = node_stats.get_num_platforms()
-        artifacts.set_stage_result(DesignPartitioningOptimization, "node_stats", node_stats)
-        artifacts.set_stage_result(DesignPartitioningOptimization, "optimizer_cfg", optimizer_config)
+        artifacts.set_stage_result(
+            DesignPartitioningOptimization, "node_stats", node_stats
+        )
+        artifacts.set_stage_result(
+            DesignPartitioningOptimization, "optimizer_cfg", optimizer_config
+        )
 
-        #num_pp = artifacts.config["general"]["num_pp"]
-        #if num_pp == -1:
+        # num_pp = artifacts.config["general"]["num_pp"]
+        # if num_pp == -1:
         #    #num_pp = len(node_stats[list(node_stats.keys())[0]]["eval"]["design_0"]["layers"].keys()) - 1
         #    platform_id = node_stats.get_platform_ids()[0]
         #    breakpoint()
         #    num_pp = len(node_stats[platform_id].designs[0].layers) - 1
-        #elif len(node_stats) == 1:
+        # elif len(node_stats) == 1:
         #    num_pp = 0
-        #artifacts.config["num_pp"] = num_pp
+        # artifacts.config["num_pp"] = num_pp

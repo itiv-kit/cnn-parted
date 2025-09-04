@@ -16,10 +16,8 @@ pipeline:
   - WorkloadParser
   - SystemParser
   - GraphAnalysis
-  - RobustnessOptimization
   - NodeEvaluation
   - PartitioningOptimization
-  - AccuracyEvaluation
   - ExportPartitionResults
 
 accuracy:

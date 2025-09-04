@@ -1,6 +1,7 @@
 import numpy as np
 from pymoo.core.mutation import Mutation
 
+
 class PartitioningMutation(Mutation):
     def __init__(self, num_layers, prob=0.9, **kwargs):
         super().__init__(prob=prob, **kwargs)

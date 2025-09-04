@@ -1,6 +1,8 @@
-from abc import ABC, abstractmethod
 import os
+from abc import ABC, abstractmethod
+
 import yaml
+
 
 class ArchitectureConfig(ABC):
     def to_yaml(self, dir: str):
@@ -12,6 +14,7 @@ class ArchitectureConfig(ABC):
     @abstractmethod
     def get_config(self) -> dict:
         ...
+
 
 class ArchitectureAdaptor(ABC):
     def __init__(self):

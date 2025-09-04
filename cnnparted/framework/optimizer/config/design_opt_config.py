@@ -1,19 +1,25 @@
 import itertools
+
 import numpy as np
 
-from framework.optimizer.config.optimizer_config import OptimizerConfig
-from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
+from cnnparted.framework.optimizer.config.optimizer_config import OptimizerConfig
+from cnnparted.framework.optimizer.config.partitioning_opt_config import (
+    PartitioningOptConfig,
+)
+
 
 class DesignOptConfig(OptimizerConfig):
-    def __init__(self, 
-                n_var_per_node, 
-                node_constraints, 
-                part_opt_cfg: PartitioningOptConfig,
-                dse_config: dict):
+    def __init__(
+        self,
+        n_var_per_node,
+        node_constraints,
+        part_opt_cfg: PartitioningOptConfig,
+        dse_config: dict,
+    ):
         self.n_var_per_node = n_var_per_node
         self.n_var = sum(n_var_per_node)
 
-        #match dse_config["optimization"]:
+        # match dse_config["optimization"]:
         #    case "edp":
         #        self.n_obj = 1
         #    case "edap":
@@ -24,11 +30,10 @@ class DesignOptConfig(OptimizerConfig):
         #        raise RuntimeError(f"Invalid optimization option for DSE")
 
         self.part_opt_cfg = part_opt_cfg
-        #self.n_constr = part_opt_cfg.x_len + part_opt_cfg.g_len + part_opt_cfg.f_len + 1 + 1
+        # self.n_constr = part_opt_cfg.x_len + part_opt_cfg.g_len + part_opt_cfg.f_len + 1 + 1
 
         self.n_obj = len(n_var_per_node)
-        self.n_constr = 3*len(n_var_per_node)
-
+        self.n_constr = 3 * len(n_var_per_node)
 
         xl_tmp = [node_constraint[0] for node_constraint in node_constraints]
         xu_tmp = [node_constraint[1] for node_constraint in node_constraints]

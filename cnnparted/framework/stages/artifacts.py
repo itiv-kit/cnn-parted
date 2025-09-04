@@ -1,6 +1,6 @@
 import importlib
 
-from framework.stages.stage_base import Stage
+from cnnparted.framework.stages.stage_base import Stage
 
 
 class Artifacts:
@@ -10,9 +10,9 @@ class Artifacts:
         self.device = device
 
         self.parse_stages()
-    
+
     def parse_stages(self):
-        package = importlib.import_module("framework.stages")
+        package = importlib.import_module("cnnparted.framework.stages")
         name_to_class_map = {stage.__name__: stage for stage in package.__all__}
 
         self.stage_names = self.config["pipeline"]["stages"]
@@ -31,13 +31,12 @@ class Artifacts:
                 return self.stages[stage_candidate].get_result(name)
         raise RuntimeError(f"Could not find any of {stage_candidates} in Artifacts")
 
-    # Get all results of a stage 
+    # Get all results of a stage
     def get_stage_results(self, stage: Stage):
         return self.stages[stage]
 
     def set_stage_result(self, stage: Stage, name: str, value):
         self.stages[stage].set_result(name, value)
-
 
 
 class StageArtifacts:
@@ -49,7 +48,9 @@ class StageArtifacts:
             return getattr(self, name)
         else:
             k = vars(self).keys()
-            raise AttributeError(f"Field {name} not found in artifacts for \"{self.name}\". Fields are: {k}")
+            raise AttributeError(
+                f'Field {name} not found in artifacts for "{self.name}". Fields are: {k}'
+            )
 
     def set_result(self, name: str, value):
         setattr(self, name, value)
