@@ -255,12 +255,15 @@ If you use CNNParted in your research, please cite our work:
 ### Original Framework Publication (2023)
 ```bibtex
 @article{kress2023cnnparted,
-  title = {{CNNParted}: An open source framework for efficient Convolutional Neural Network inference partitioning in embedded systems},
-  author = {Fabian Kreß and Vladimir Sidorenko and Patrick Schmidt and Julian Hoefer and Tim Hotfilter and Iris Walter and Tanja Harbaum and Jürgen Becker},
-  journal = {SoftwareX},
-  year = {2023},
-  issn = {2352-7110},
-  doi = {10.1016/j.softx.2023.101419}
+    title = {{CNNParted}: An open source framework for efficient Convolutional Neural Network inference partitioning in embedded systems},
+    author = {Fabian Kreß and Vladimir Sidorenko and Patrick Schmidt and Julian Hoefer and Tim Hotfilter and Iris Walter and Tanja Harbaum and Jürgen Becker},
+    journal = {Computer Networks},
+    volume = {229},
+    pages = {109759},
+    year = {2023},
+    issn = {1389-1286},
+    doi = {https://doi.org/10.1016/j.comnet.2023.109759},
+    url = {https://www.sciencedirect.com/science/article/pii/S1389128623002049}
 }
 ```
 
