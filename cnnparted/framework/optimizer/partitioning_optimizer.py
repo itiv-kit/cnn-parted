@@ -56,9 +56,9 @@ class PartitioningOptimizer(Optimizer):
         params = {}
         network = ga.networks[0]
         for layer in ga.get_conv2d_layers(network):
-            params[layer['name']] = layer['conv_params']['weights']
+            params[layer.name] = layer.params.weights
         for layer in ga.get_gemm_layers(network):
-            params[layer['name']] = layer['gemm_params']['weights']
+            params[layer.name] = layer.params.weights
 
         return params
 
