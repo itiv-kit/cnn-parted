@@ -6,8 +6,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 
+from framework.model.model import LayerParameters 
+
 class ExecutionGraph:
-    def __init__(self, model_tree, workload_info):
+    def __init__(self, model_tree: list[LayerParameters], workload_info):
         self.model_tree = model_tree
         self.workload_info = workload_info
 
@@ -23,8 +25,8 @@ class ExecutionGraph:
         return self.reduced_graph
 
     def _set_output_sizes(self) -> dict:
-        layer_names = [layer['name'] for layer in self.model_tree]
-        layer_outputs = [layer['output_size'] for layer in self.model_tree]
+        layer_names = [layer.name for layer in self.model_tree]
+        layer_outputs = [layer.output_size for layer in self.model_tree]
         return {key: value for key, value in zip(layer_names, layer_outputs)}
 
     def _create_full_graph(self):
@@ -40,16 +42,15 @@ class ExecutionGraph:
     def _create_layer_relationships(self):
         graph = nx.DiGraph()
         for layer in self.model_tree:
-            if layer['op_type']!= 'Constant':
+            if layer.op_type != 'Constant':
                 tmp = copy.deepcopy(layer)
-                del tmp["children"]
-                graph.add_node(layer["name"], 
+                tmp.children = None
+                graph.add_node(layer.name, 
                                          data=tmp, 
                                          pooling={"fused_pooling": False}, 
-                                         children=[], 
                                          binding=None)
-                for child in layer["children"]:
-                    graph.add_edge(layer["name"], child["name"], weight=np.prod(layer["output_size"]) )
+                for child in layer.children:
+                    graph.add_edge(layer.name, child.name, weight=np.prod(layer.output_size) )
         return graph
     
     def _propagate_shape_info(self, graph: nx.DiGraph):
@@ -57,16 +58,16 @@ class ExecutionGraph:
         for node_name in graph.nodes:
             if graph.in_degree(node_name) == 0:
                 node = graph.nodes[node_name]
-                node["data"]["input_size"] = self.workload_info.input_shape
+                node["data"].input_size = self.workload_info.input_shape
         
         # Next, propagate info about output shape to all successors
         for node_name in graph.nodes:
             node = graph.nodes[node_name]
-            node_out_size = node["data"]["output_size"]
+            node_out_size = node["data"].output_size
 
             for succ_name  in graph.successors(node_name):
                 succ_node = graph.nodes[succ_name]
-                succ_node["data"]["input_size"] = node_out_size
+                succ_node["data"].input_size = node_out_size
 
         return graph
         
@@ -80,11 +81,11 @@ class ExecutionGraph:
 
                 # Check if there are multiple successors that produce different output shapes
                 # If that is the case, we can't currently process this
-                if node["data"]["op_type"] in self.evaluated_layer_types and len(successors) != 1:
+                if node["data"].op_type in self.evaluated_layer_types and len(successors) != 1:
                     tmp_out_shapes = []
                     for succ in successors:
                         succ_node = graph.nodes[succ]
-                        tmp_out_shapes.append(succ_node["data"]["output_size"])
+                        tmp_out_shapes.append(succ_node["data"].output_size)
                     shape_pairs = np.array(list(it.combinations(tmp_out_shapes, r=2)))
                     pairs_equal = all([np.array_equiv(pair[0], pair[1]) for pair in shape_pairs])
 
@@ -95,9 +96,9 @@ class ExecutionGraph:
                     succ_node = graph.nodes[succ]
                     
                     # Store information about pooling as pooling nodes will later be deleted
-                    if succ_node["data"]["op_type"] in self.pooling_types:
+                    if succ_node["data"].op_type in self.pooling_types:
                         node["pooling"]["fused_pooling"] = True
-                        node["pooling"]["pooling_output_size"] = succ_node["data"]["output_size"]
+                        node["pooling"]["pooling_output_size"] = succ_node["data"].output_size
         return graph
 
     def _delete_not_simulated_nodes(self):
@@ -105,11 +106,11 @@ class ExecutionGraph:
         node_keys = list(graph)
         for node_key in node_keys:
             node = graph.nodes[node_key]
-            if node["data"]["op_type"] not in self.evaluated_layer_types:
+            if node["data"].op_type not in self.evaluated_layer_types:
                 for in_src, _ in graph.in_edges(node_key):
                     for _, out_dst in graph.out_edges(node_key):
                         in_node = graph.nodes[in_src]
-                        weight = np.prod(in_node["data"]["output_size"]) if not in_node["pooling"]["fused_pooling"] else np.prod(in_node["data"]["pooling"]["pooling_output_size"])
+                        weight = np.prod(in_node["data"].output_size) if not in_node["pooling"]["fused_pooling"] else np.prod(in_node["pooling"]["pooling_output_size"])
                         graph.add_edge(in_src, out_dst, weight=weight)
                 graph.remove_node(node_key)
         return graph

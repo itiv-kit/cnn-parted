@@ -12,6 +12,7 @@ import re
 import tqdm
 import shutil
 
+from framework.model.model import ConvParameters, GemmParameters, LayerParameters
 from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
@@ -88,7 +89,7 @@ class Timeloop(NodeEvaluator):
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
 
-    def run_from_adaptor(self, network: str, layers : dict, adaptor: TimeloopInterface, progress : bool = False) -> NodeResult:
+    def run_from_adaptor(self, network: str, layers : list[LayerParameters], adaptor: TimeloopInterface, progress : bool = False) -> NodeResult:
         self.adaptor = adaptor
         node_result = NodeResult(self.node_config)
 
@@ -118,7 +119,7 @@ class Timeloop(NodeEvaluator):
 
         return node_result
 
-    def run(self, network: str, layers : dict, progress : bool = False) -> NodeResult:
+    def run(self, network: str, layers : list[LayerParameters], progress : bool = False) -> NodeResult:
         node_result = NodeResult(self.node_config)
         node_result.accelerator_name = self.accname
 
@@ -139,7 +140,7 @@ class Timeloop(NodeEvaluator):
         else:
             design_result = DesignResult()
             for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
-                layer_name = layer.get("name")
+                layer_name = layer.name
                 output, valid = self._run_layer(self.runroot, layer, tl_files_path=None)
 
                 if not valid:
@@ -163,7 +164,7 @@ class Timeloop(NodeEvaluator):
 
         return node_result
 
-    def _run_design(self, network: str, layers: dict, progress: bool, stats: NodeResult,  design: ArchitectureConfig, design_id: Optional[int] = None,):
+    def _run_design(self, network: str, layers: list[LayerParameters], progress: bool, stats: NodeResult,  design: ArchitectureConfig, design_id: Optional[int] = None,):
         if self.adaptor and self.adaptor.tl_out_design_name:
             design_runroot = os.path.join(self.runroot, self.adaptor.tl_out_design_name)
         else:
@@ -199,14 +200,14 @@ class Timeloop(NodeEvaluator):
 
     def _run_layer(self,
             runroot: str,
-            layer : dict,
+            layer : LayerParameters,
             logfile : str = 'timeloop.log',
             tl_files_path: str = None
         ) -> dict:
         if os.path.isfile(os.path.join(self.configs_dir, 'archs', (self.accname + '.cfg'))):
             self.type_cfg = '.cfg'
 
-        runname = layer.get('name')[1:]
+        runname = layer.name[1:]
         dirname = os.path.join(ROOT_DIR, runroot, runname)
         subprocess.check_call(['mkdir', '-p', dirname])
 
@@ -246,12 +247,12 @@ class Timeloop(NodeEvaluator):
         # just perform each batch/group separately. Since they then all have the same
         # shape the mapping is also the same and we can just multiply the results of one batch.
         # For acclerators where this is not the case, a new mapping configuration must be designed
-        if gemm_params := layer.get('gemm_params'):
-            if batch_size := gemm_params.get('b'):
+        if isinstance(layer.params, GemmParameters):
+            if (batch_size := layer.params.b) is not None:
                 timeloop_stats["energy_mJ"] = timeloop_stats["energy_mJ"] * batch_size
                 timeloop_stats["latency_ms"] = timeloop_stats["latency_ms"] * batch_size
-        elif conv_params := layer.get('conv_params'):
-            if (groups := conv_params.get('groups')) and groups > 1: 
+        elif isinstance(layer.params, ConvParameters):
+            if (groups := layer.params.groups) and groups > 1: 
                 timeloop_stats["energy_mJ"] = timeloop_stats["energy_mJ"] * groups
                 timeloop_stats["latency_ms"] = timeloop_stats["latency_ms"] * groups
         return timeloop_stats, valid
@@ -281,29 +282,31 @@ class Timeloop(NodeEvaluator):
             elif "yaml" in src:
                 f.write(yaml.dump(config))
 
-    def _get_timeloop_params(self, config: dict, layer: dict) -> list:
-        if layer.get('conv_params'):
-            conv_params = layer.get('conv_params')
-            q = conv_params.get('q')
-            p = conv_params.get('p')
-            c = conv_params.get('c')  # input channels
-            n = conv_params.get('n')  # input batch_size
-            m = conv_params.get('m')
-            s = conv_params.get('s')
-            r = conv_params.get('r')
-            wstride = conv_params.get('wstride')
-            hstride = conv_params.get('hstride')
-        else:
-            gemm_params = layer.get('gemm_params')
-            c = gemm_params.get('c')
-            n = gemm_params.get('n')
-            m = gemm_params.get('m')
+    def _get_timeloop_params(self, config: dict, layer: LayerParameters) -> list:
+        if isinstance(layer.params, ConvParameters):
+            conv_params = layer.params
+            q = conv_params.q
+            p = conv_params.p
+            c = conv_params.c  # input channels
+            n = conv_params.n  # input batch_size
+            m = conv_params.m
+            s = conv_params.s
+            r = conv_params.r
+            wstride = conv_params.wstride
+            hstride = conv_params.hstride
+        elif isinstance(layer.params, GemmParameters):
+            gemm_params = layer.params
+            c = gemm_params.c
+            n = gemm_params.n
+            m = gemm_params.m
             q = 1
             p = 1
             s = 1
             r = 1
             wstride = 1
             hstride = 1
+        else:
+            raise RuntimeError(f"Invalid layer type for Timeloopsimulation. Found layer with op_type={layer.op_type}")
 
 
         config['problem']['instance']['R'] = r
@@ -321,7 +324,7 @@ class Timeloop(NodeEvaluator):
         config['problem']['instance']['Wdilation'] = 1
         config['problem']['instance']['Hdilation'] = 1
 
-    def _rewrite_workload_bounds(self, src : str, dst : str, layer : dict) -> None:
+    def _rewrite_workload_bounds(self, src : str, dst : str, layer : LayerParameters) -> None:
         with open(src, "r") as f:
             if "cfg" in src:
                 config = libconf.load(f)

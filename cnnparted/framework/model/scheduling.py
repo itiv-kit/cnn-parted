@@ -13,8 +13,10 @@ import numpy as np
 from typing import Literal, Optional, Union
 from copy import deepcopy
 
+from framework.noc.noc import NocTopology
 from framework.model.execution_graph import ExecutionGraph
 from framework.node.node_evaluator import SystemResult, LayerResult
+from framework.helpers.dtypes import ComputeTask, TransferTask
 
 def topo_sort_starting_node(
     G: nx.DiGraph, strating_node: int, seed: Optional[int] = None, as_ndarray: bool = False
@@ -159,19 +161,6 @@ def topo_sort_random_start_node(G, n: int = 1, seed: int = None, as_ndarray: boo
         return list(sorts)
 
 
-@dataclass
-class ComputeTask:
-    network: str
-    layer: str
-    start_time: float
-    end_time: float
-
-@dataclass
-class TransferTask:
-    start_time: float
-    end_time: float
-
-
 class PlatformSchedule:
     def __init__(self, id: int):
         self.id = id
@@ -192,6 +181,10 @@ class PlatformSchedule:
         task = ComputeTask(network, layer.name, start_time, end_time)
         self.tasks.append(task)
         return task
+    
+    def assign_tensor(self, network: str, tensor):
+        ...
+        n_bytes = 1000
     
     def get_idle_time(self) -> float:
         idle_time = [(nxt.end_time-cur.start_time)  for cur, nxt in it.pairwise(self.tasks)]
@@ -224,7 +217,6 @@ class SystemSchedule:
                 layer_result = node_stats.platforms[platform].designs[0].networks[task.network].layers[task.layer]
                 total_energy += layer_result.energy
         return total_energy
-    
 
 
 def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemResult, 
@@ -291,6 +283,11 @@ def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemRe
         all_assigned = (num_remaining_nodes == 0)
 
     return schedule
+
+
+def noc_scheduling(noc: NocTopology, execution_graph: dict[str, ExecutionGraph]):
+    # If the noc is given and we have the relations between tensors and computes, perform the scheduling
+    ...
 
 
 def check_sort(G, L):

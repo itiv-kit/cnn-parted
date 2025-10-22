@@ -1,9 +1,129 @@
 import os
+from dataclasses import dataclass
+
 import onnx
 from onnx import shape_inference
 import numpy as np
+
 from framework.constants import MODEL_PATH
 from framework.model.model_helper import ModelHelper
+
+@dataclass
+class ConvParameters:
+    #h: int
+    #w: int
+    n: int
+    m: int
+    q: int
+    p: int
+    c: int
+    s: int
+    r: int
+    wpad: int
+    hpad: int
+    wstride: int
+    hstride: int
+    ifms: int
+    ofms: int
+    weights: int
+    groups: int
+    depthwise: bool
+
+    def __init__(self, cfg: dict):
+        #self.h = cfg["h"]
+        #self.w = cfg["w"]
+        self.n = cfg["n"]
+        self.m = cfg["m"]
+        self.q = cfg["q"]
+        self.p = cfg["p"]
+        self.c = cfg["c"]
+        self.s = cfg["s"]
+        self.r = cfg["r"]
+        self.wpad = cfg["wpad"]
+        self.hpad = cfg["hpad"]
+        self.wstride = cfg["wstride"]
+        self.hstride = cfg["hstride"]
+        self.ifms = cfg["ifms"]
+        self.ofms = cfg["ofms"]
+        self.weights = cfg["weights"]
+        self.groups = cfg["groups"]
+        self.depthwise = False #TODO Figure this out
+
+    @property
+    def dimensions(self):
+        return ["N", "M", "P", "Q", "C", "R", "S"]
+
+@dataclass
+class GemmParameters:
+    b: int | None
+    n: int
+    m: int
+    c: int
+    weights: int
+
+    def __init__(self, cfg: dict):
+        self.b = cfg.get("b")
+        self.n = cfg["n"]
+        self.m = cfg["m"]
+        self.c = cfg["c"]
+        self.weights = cfg["weights"]
+    
+    @property
+    def dimensions(self):
+        dims = ["N", "M", "C"]
+        if self.b is not None:
+            dims = ["B"] + dims
+        return dims
+    
+@dataclass
+class PoolParameters:
+    kernel_shape: np.ndarray
+    padding: np.ndarray | None
+    stride: np.ndarray
+
+    def __init__(self, cfg: dict):
+        self.kernel_shape = cfg["kernel"]
+        self.padding = cfg["padding"]
+        self.stride = cfg["stride"]
+    
+    @property
+    def dimensions(self):
+        return []
+
+
+@dataclass
+class TensorParameters:
+    name: str
+    shape: np.ndarray
+    dimensions: list[str]
+
+type ComputeParameters = ConvParameters | GemmParameters | PoolParameters
+
+@dataclass
+class LayerParameters:
+    # A layer consists of the computational parameters and the input and output tensors
+    name: str
+    inputs: list[str]
+    op_type: str
+    outputs: list[str]
+    output_size: np.ndarray
+    params: ComputeParameters | None
+    dimensions: list[str]
+    children: list["LayerParameters"]
+
+    def __init__(self, cfg: dict, params: ComputeParameters | None):
+        self.name = cfg["name"]
+        self.inputs = cfg["input"] 
+        self.op_type = cfg["op_type"]
+        self.outputs = cfg["output"]
+        self.output_size = cfg["output_size"]
+        self.params = params
+        if params is not None:
+            self.dimensions = params.dimensions
+        else:
+            self.dimensions = None
+        
+        self.children = None
 
 
 class TreeModel:
@@ -33,7 +153,7 @@ class TreeModel:
 
         nodes = graph_def.node
         output = []
-        output.append(self.in_layer)
+        output.append(LayerParameters(self.in_layer, None))
 
         for node in nodes:
             if node.op_type == 'Identity':
@@ -57,20 +177,29 @@ class TreeModel:
 
             if node.op_type =='Conv':
                 conv_params = self._get_conv_params(node)
-                layer['conv_params'] = conv_params
+                params = ConvParameters(conv_params)
+                #layer['conv_params'] = conv_params
             elif node.op_type =='MaxPool':
                 pool_params = self._get_pool_params(node)
-                layer['pool_params'] = pool_params
+                #layer['pool_params'] = pool_params
+                params = PoolParameters(pool_params)
             elif node.op_type =='AveragePool':
                 pool_params = self._get_pool_params(node)
-                layer['pool_params'] = pool_params
+                #layer['pool_params'] = pool_params
+                params = PoolParameters(pool_params)
             elif node.op_type =='Gemm' or node.op_type == "MatMul":
                 gemm_params = self._get_gemm_params(node)
-                layer['gemm_params'] = gemm_params
+                #layer['gemm_params'] = gemm_params
+                params = GemmParameters(gemm_params)
+            else:
+                params = None
+            
+            layer_params = LayerParameters(layer, params)
 
-            output.append(layer)
+            output.append(layer_params)
 
-        output.append(self.out_layer)
+        output.append(LayerParameters(self.out_layer, None))
+
         self._create_layer_relationships(output)
 
         return output
@@ -179,17 +308,17 @@ class TreeModel:
 
         return output
 
-    def _create_layer_relationships(self, layers_data):
+    def _create_layer_relationships(self, layers_data: list[LayerParameters]):
         for layer in layers_data:
 
-            layer['children'] = []
+            layer.children = []
             for other_layer in layers_data:
                 #  input.output.name == output.input.name leads to error in the the tree
                 # (needs to be solved in another way for graphs with direct connection between input and output(if any))
-                if ( layer['name']=='input' and other_layer['name']=='output'):
+                if ( layer.name == 'input' and other_layer.name == 'output'):
                     continue
-                if layer['name'] != other_layer['name'] and set(layer['output']) & set(other_layer['input']):
-                    layer['children'].append(other_layer)
+                if layer.name != other_layer.name and set(layer.outputs) & set(other_layer.inputs):
+                    layer.children.append(other_layer)
 
     def _get_output_sizes(self):
         output_sizes = {}

@@ -11,6 +11,7 @@ from framework.constants import ROOT_DIR
 sys.path.append(os.path.join(ROOT_DIR, "cnnparted", "tools", "MNSIM-2.0"))
 
 from framework.node.node_evaluator import  NodeResult, DesignResult, LayerResult, NodeEvaluator
+from framework.model.model import LayerParameters
 from framework.helpers.config import *
 
 from MNSIM.Interface.network import NetworkGraph
@@ -100,7 +101,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             if layers[i].get('output')[0] == name:
                 return i - l_idx
 
-    def _get_net(self, layers : list, hardware_config : dict = None) -> NetworkGraph:
+    def _get_net(self, layers : list[LayerParameters], hardware_config : dict = None) -> NetworkGraph:
         if hardware_config == None:
             hardware_config = {'xbar_size': 512, 'input_bit': 2, 'weight_bit': 1, 'quantize_bit': 10}
         layer_config_list = []
@@ -108,7 +109,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
         input_index_list = []
 
         for l in layers:
-            op_type = l.get('op_type')
+            op_type = l.op_type
             lyr = None
             #linqiushi modified
             # if op_type == "Conv":
@@ -123,13 +124,13 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             # if depthwise==True we will add the depthwise-conv,
             # if depthwise==False we will add the normal conv
             if op_type =='Conv':
-                conv_params = l.get('conv_params')
-                ich = conv_params.get('c')
-                och = conv_params.get('m')
-                krl = conv_params.get('r')
-                pad = conv_params.get('wpad')
-                srd = conv_params.get('wstride')
-                depthwise=  conv_params.get('depthwise')
+                conv_params = l.params
+                ich = conv_params.c
+                och = conv_params.m
+                krl = conv_params.r
+                pad = conv_params.wpad
+                srd = conv_params.wstride
+                depthwise =  conv_params.depthwise
                 if depthwise==True:
                     lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd,'depthwise':'separable'}
                 else:
@@ -137,18 +138,18 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             #linqiushi above
 
             elif op_type == "MaxPool":
-                pool_params = l.get('pool_params')
-                krl = pool_params.get('kernel')[0]
-                pad = pool_params.get('padding')[0]
-                srd = pool_params.get('stride')[0]
+                pool_params = l.params
+                krl = pool_params.kernel_shape[0]
+                pad = pool_params.padding[0]
+                srd = pool_params.stride[0]
                 lyr = {'type': 'pooling', 'mode': 'MAX', 'kernel_size': krl,  'padding': pad, 'stride': srd}
             elif op_type == "AveragePool":
-                pool_params = l.get('pool_params')
-                krl = pool_params.get('kernel')[0]
-                srd = pool_params.get('stride')[0]
+                pool_params = l.params
+                krl = pool_params.kernel_shape[0]
+                srd = pool_params.stride[0]
                 lyr = {'type': 'pooling', 'mode': 'AVE', 'kernel_size': krl, 'stride': srd}
             elif op_type == "GlobalAveragePool":
-                input_size = layers[layers.index(l) - 1].get('output_size')
+                input_size = layers[layers.index(l) - 1].output_size
                 lyr = {'type': 'pooling', 'mode': 'ADA', 'kernel_size': input_size[2], 'stride': 1}
             elif op_type == "Relu":
                 lyr = {'type': 'relu'}
@@ -157,8 +158,8 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             elif op_type == "Flatten":
                 lyr = {'type': 'view'}
             elif op_type == "Gemm":
-                input_size = layers[layers.index(l) - 1].get('output_size')
-                num_classes = l.get('output_size')[1]
+                input_size = layers[layers.index(l) - 1].output_size
+                num_classes = l.output_size[1]
                 lyr = {'type': 'fc', 'in_features': input_size[1], 'out_features': num_classes}
             elif op_type == "Concat":
                 lyr = {'type': 'concat'}
@@ -179,7 +180,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
                 print("[MNSIMInterface] Warning: unknown Op_type ", op_type)
                 continue
 
-            inputs = l.get('input')
+            inputs = l.inputs
             l_idx = layers.index(l)
             input_idx = []
             for i in inputs:
@@ -188,7 +189,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             if len(input_idx) != 0:
                 lyr['input_index'] = sorted(input_idx, reverse=True)
 
-            lyr['name'] = l.get('name')
+            lyr['name'] = l.name
 
             layer_config_list.append(lyr)
 

@@ -5,7 +5,7 @@ import pandas as pd
 import networkx as nx
 
 #import framework.stages.inputs.workload_parser as wlparse
-from framework.model.model import TreeModel
+from framework.model.model import LayerParameters, TreeModel
 from framework.model.graph import LayersGraph
 from framework.model.execution_graph import ExecutionGraph
 
@@ -21,7 +21,7 @@ class GraphAnalyzer:
         self.progress = progress
 
         self._tree_models: dict[str, TreeModel] = {}
-        self._trees: dict[str, list] = {}
+        self._trees: dict[str, list[LayerParameters]] = {}
         self.torchmodels  = {}
         self.graphs: dict[str, LayersGraph] = {}
         self.exec_graphs: dict[str, ExecutionGraph] = {}
@@ -73,16 +73,16 @@ class GraphAnalyzer:
         return results
 
     def get_timeloop_layers(self, network: str):
-        output = [layer for layer in self._trees[network] if layer.get("op_type") == "Conv" or layer.get("op_type") == "Gemm" or layer.get("op_type") == "MatMul"]
+        output = [layer for layer in self._trees[network] if layer.op_type == "Conv" or layer.op_type == "Gemm" or layer.op_type == "MatMul"]
         return output
 
     def get_mnsim_layers(self, network: str):
         return self._trees[network]
 
     def get_conv2d_layers(self, network: str):
-        output = [layer for layer in self._trees[network] if layer.get("op_type") == "Conv"]
+        output = [layer for layer in self._trees[network] if layer.op_type == "Conv"]
         return output
 
     def get_gemm_layers(self, network: str):
-        output = [layer for layer in self._trees[network] if layer.get("op_type") == "Gemm" or layer.get("op_type") == "MatMul"]
+        output = [layer for layer in self._trees[network] if layer.op_type == "Gemm" or layer.op_type == "MatMul"]
         return output
