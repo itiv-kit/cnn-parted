@@ -1,4 +1,5 @@
 import itertools as it
+from pprint import pprint
 
 #import framework.stages.inputs.workload_parser as wlparse
 import networkx as nx
@@ -6,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 
-from framework.model.model import LayerParameters 
+from framework.model.model import LayerParameters, TensorParameters
 
 class ExecutionGraph:
     def __init__(self, model_tree: list[LayerParameters], workload_info):
@@ -16,7 +17,11 @@ class ExecutionGraph:
         self.evaluated_layer_types = ["Conv", "Gemm", "MatMul"] #if op_type == 1 it is an input/output layer
         self.pooling_types = ["MaxPool", "GlobalAveragePool"]
 
+        self.network_tensors: dict[str, TensorParameters] = {}
+
         self.full_graph = self._create_full_graph()
+        self._populate_tensors()
+
         self.reduced_graph = self._create_reduced_graph()
 
         self.output_sizes = self._set_output_sizes()
@@ -34,6 +39,51 @@ class ExecutionGraph:
         graph = self._propagate_shape_info(graph)
         graph = self._fuse_conv_maxpool(graph)
         return graph
+    
+    def _populate_tensors(self):
+        # Iterate twice over the network:
+        #   1) Find all definitions of output tensors
+        #   2) Gather all information used_by for each tensor, and add weight and bias tensors to the dict 
+        for node_name in self.full_graph.nodes:
+            node = self.full_graph.nodes[node_name]
+            layer_params: LayerParameters = node["data"]
+            layer_out_names = layer_params.outputs
+            layer_out_shapes = layer_params.output_size
+
+            # Layer outputs are tensor definitions
+            # Layer inputs are tensor uses (weights and biases are assumed to be created statically)
+            for name, shape in zip(layer_out_names, layer_out_shapes):
+                tensor = TensorParameters(
+                    name,
+                    shape,
+                    definition=layer_params.name,
+                )
+                self.network_tensors[name] = tensor
+
+        for node_name in self.full_graph.nodes:
+            node = self.full_graph.nodes[node_name]
+            layer_params: LayerParameters = node["data"]
+            if layer_params.name == "input" or layer_params.name == "output":
+                continue
+
+            layer_in_names = layer_params.inputs
+            layer_in_shapes = layer_params.params.construct_tensor_shapes()
+
+            for name, shape in zip(layer_in_names, layer_in_shapes):
+                if name not in self.network_tensors:
+                    if "weight" in name.lower() or "bias" in name.lower():
+                        tensor = TensorParameters(
+                            name,
+                            shape,
+                            definition="static",
+                        )
+                        self.network_tensors[name] = tensor
+
+                # The tensor should already be registered by now
+                if name not in self.network_tensors:
+                    breakpoint()
+                self.network_tensors[name].used_by.append(layer_params.name)
+                        
     
     def _create_reduced_graph(self):
         reduced_graph = self._delete_not_simulated_nodes()

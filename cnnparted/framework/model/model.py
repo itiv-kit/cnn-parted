@@ -1,6 +1,6 @@
 import os
 from enum import IntEnum, auto
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import onnx
 from onnx import shape_inference
@@ -219,13 +219,14 @@ class BinaryMiscOperationParameters:
 @dataclass
 class TensorParameters:
     name: str
-    shape: np.ndarray
-    dimensions: list[str]
+    shape: list[str]
     #elem_type: np.integer | np.floating
     definition: str = None
-    used_by: list[str] = None
+    used_by: list[str] = field(default_factory=list)
+    #dimensions: list[str] = None
 
-type ComputeParameters = ConvParameters | GemmParameters | PoolParameters | ActivationParameters | ElementwiseParameters
+type ComputeParameters = ConvParameters | GemmParameters
+type GeneralLayerParameters = ComputeParameters | PoolParameters | ActivationParameters | ElementwiseParameters | BinaryMiscOperationParameters | UnaryMiscOperationParameters
 
 @dataclass
 class LayerParameters:
@@ -235,15 +236,24 @@ class LayerParameters:
     op_type: str
     outputs: list[str]
     output_size: np.ndarray
-    params: ComputeParameters | None
+    params: GeneralLayerParameters | None
     dimensions: list[str]
     children: list["LayerParameters"]
 
     def __init__(self, cfg: dict, params: ComputeParameters | None):
         self.name = cfg["name"]
-        self.inputs = cfg["input"] 
         self.op_type = cfg["op_type"]
-        self.outputs = cfg["output"]
+
+        if isinstance(cfg["input"], list):
+            self.inputs = cfg["input"]
+        else:
+            self.inputs = [cfg["input"]]
+        print(type(self.inputs))
+        if isinstance(cfg["output"], list):
+            self.outputs = cfg["output"]
+        else:
+            self.outputs = [cfg["output"]]
+
         self.output_size = cfg["output_size"]
         self.params = params
         if params is not None:
@@ -290,7 +300,7 @@ class TreeModel:
             layer = {
                 "name": node.name,
                 "op_type": node.op_type,
-                "input": node.input,
+                "input": list(node.input),
             }
             
             # Check if any of the node's outputs match the keys in output_sizes
@@ -533,8 +543,12 @@ class TreeModel:
                 # (needs to be solved in another way for graphs with direct connection between input and output(if any))
                 if ( layer.name == 'input' and other_layer.name == 'output'):
                     continue
-                if layer.name != other_layer.name and set(layer.outputs) & set(other_layer.inputs):
-                    layer.children.append(other_layer)
+                try:
+                    if layer.name != other_layer.name and set(layer.outputs) & set(other_layer.inputs):
+                        layer.children.append(other_layer)
+                except:
+                    breakpoint()
+                    print(other_layer)
 
     def _get_output_sizes(self) -> dict[str, list[int]]:
         output_sizes = {}
