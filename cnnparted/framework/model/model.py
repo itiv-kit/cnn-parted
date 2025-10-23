@@ -1,4 +1,5 @@
 import os
+from enum import IntEnum, auto
 from dataclasses import dataclass
 
 import onnx
@@ -10,8 +11,8 @@ from framework.model.model_helper import ModelHelper
 
 @dataclass
 class ConvParameters:
-    #h: int
-    #w: int
+    h: int
+    w: int
     n: int
     m: int
     q: int
@@ -30,8 +31,8 @@ class ConvParameters:
     depthwise: bool
 
     def __init__(self, cfg: dict):
-        #self.h = cfg["h"]
-        #self.w = cfg["w"]
+        self.h = cfg["h"]
+        self.w = cfg["w"]
         self.n = cfg["n"]
         self.m = cfg["m"]
         self.q = cfg["q"]
@@ -52,6 +53,13 @@ class ConvParameters:
     @property
     def dimensions(self):
         return ["N", "M", "P", "Q", "C", "R", "S"]
+    
+    def construct_tensor_shapes(self):
+        input_shape = [self.n, self.c, self.h, self.w]
+        kernel_shape = [self.m, self.c, self.r, self.s]
+        bias_shape = [self.m]
+        return [input_shape, kernel_shape, bias_shape]
+
 
 @dataclass
 class GemmParameters:
@@ -75,6 +83,12 @@ class GemmParameters:
             dims = ["B"] + dims
         return dims
     
+    def construct_tensor_shapes(self):
+        input_shape = [self.n, self.c]
+        weight_shape = [self.c, self.m]
+        bias_shape = [self.n, self.m]
+        return [input_shape, weight_shape, bias_shape]
+    
 @dataclass
 class PoolParameters:
     kernel_shape: np.ndarray
@@ -89,6 +103,117 @@ class PoolParameters:
     @property
     def dimensions(self):
         return []
+    
+    def construct_tensor_shapes(self):
+        return []
+
+class ActivationKind(IntEnum):
+    relu = auto()
+    sigmoid = auto()
+    unknown = auto()
+
+@dataclass
+class ActivationParameters:
+    shape: list[int]
+    kind: ActivationKind
+
+    def __init__(self, cfg: dict):
+        self.shape = cfg["shape"]
+        match cfg["kind"]:
+            case "Relu":
+                self.kind = ActivationKind.relu
+            case "Sigmoid":
+                self.kind = ActivationKind.sigmoid
+            case _:
+                self.kind = ActivationKind.unknown
+    
+    @property
+    def dimensions(self):
+        return []
+    
+    def construct_tensor_shapes(self):
+        return [self.shape]
+
+class ElementwiseKind(IntEnum):
+    add = auto()
+    mul = auto()
+    unknown = auto()
+
+@dataclass
+class ElementwiseParameters:
+    shape: list[int]
+    kind: ElementwiseKind
+
+    def __init__(self, cfg: dict):
+        self.shape = cfg["shape"]
+        match cfg["kind"]:
+            case "Add":
+                self.kind = ElementwiseKind.add
+            case "Mul":
+                self.kind = ElementwiseKind.mul
+            case _:
+                self.kind = ElementwiseKind.unknown
+    
+    @property
+    def dimensions(self):
+        return []
+    
+    def construct_tensor_shapes(self):
+        return [self.shape,  self.shape]
+
+class MiscOperationsKind(IntEnum):
+    flatten = auto()
+    global_avgpool = auto()
+    concat = auto()
+    unknown = auto()
+
+@dataclass
+class UnaryMiscOperationParameters:
+    in_shape: list[int]
+    out_shape : list[int]
+    kind: MiscOperationsKind
+
+    def __init__(self, cfg: dict):
+        self.in_shape = cfg["in_shape"]
+        self.out_shape = cfg["out_shape"]
+        match cfg["kind"]:
+            case "GlobalAveragePool":
+                self.kind = MiscOperationsKind.global_avgpool
+            case "Flatten":
+                self.kind = MiscOperationsKind.flatten
+            case _:
+                self.kind = MiscOperationsKind.unknown
+
+    @property
+    def dimensions(self):
+        return []
+    
+    def construct_tensor_shapes(self):
+        return [self.in_shape]
+
+@dataclass
+class BinaryMiscOperationParameters:
+    a_shape: list[int]
+    b_shape: list[int]
+    out_shape = list[int]
+    kind: MiscOperationsKind
+
+    def __init__(self, cfg: dict):
+        self.a_shape = cfg["a_shape"]
+        self.b_shape = cfg["b_shape"]
+        self.out_shape = cfg["out_shape"]
+        match cfg["kind"]:
+            case "Concat":
+                self.kind = MiscOperationsKind.concat
+            case _:
+                self.kind = MiscOperationsKind.unknown
+
+    @property
+    def dimensions(self):
+        return []
+
+    def construct_tensor_shapes(self):
+        return [self.a_shape, self.b_shape]
 
 
 @dataclass
@@ -96,8 +221,11 @@ class TensorParameters:
     name: str
     shape: np.ndarray
     dimensions: list[str]
+    #elem_type: np.integer | np.floating
+    definition: str = None
+    used_by: list[str] = None
 
-type ComputeParameters = ConvParameters | GemmParameters | PoolParameters
+type ComputeParameters = ConvParameters | GemmParameters | PoolParameters | ActivationParameters | ElementwiseParameters
 
 @dataclass
 class LayerParameters:
@@ -145,7 +273,7 @@ class TreeModel:
     def get_tree(self):
         return self._layer_tree
 
-    def _get_layers_data(self):
+    def _get_layers_data(self) -> list[LayerParameters]:
         graph_def = self._model.graph
 
 
@@ -164,7 +292,7 @@ class TreeModel:
                 "op_type": node.op_type,
                 "input": node.input,
             }
-
+            
             # Check if any of the node's outputs match the keys in output_sizes
             matched_outputs = [output for output in node.output if output in self.output_sizes]
 
@@ -178,20 +306,29 @@ class TreeModel:
             if node.op_type =='Conv':
                 conv_params = self._get_conv_params(node)
                 params = ConvParameters(conv_params)
-                #layer['conv_params'] = conv_params
             elif node.op_type =='MaxPool':
                 pool_params = self._get_pool_params(node)
-                #layer['pool_params'] = pool_params
                 params = PoolParameters(pool_params)
             elif node.op_type =='AveragePool':
                 pool_params = self._get_pool_params(node)
-                #layer['pool_params'] = pool_params
                 params = PoolParameters(pool_params)
             elif node.op_type =='Gemm' or node.op_type == "MatMul":
                 gemm_params = self._get_gemm_params(node)
-                #layer['gemm_params'] = gemm_params
                 params = GemmParameters(gemm_params)
+            elif node.op_type in ["Relu", "Sigmoid"]:
+                activation_params = self._get_activation_params(node)
+                params = ActivationParameters(activation_params)
+            elif node.op_type in ["Mul", "Add"]:
+                eltwise_params = self._get_elementwise_params(node)
+                params = ElementwiseParameters(eltwise_params)
+            elif node.op_type in ["Flatten", "GlobalAveragePool"]:
+                misc_params = self._get_unary_misc_params(node)
+                params = UnaryMiscOperationParameters(misc_params)
+            elif node.op_type in ["Concat"]:
+                misc_params = self._get_binary_misc_params(node)
+                params = BinaryMiscOperationParameters(misc_params)
             else:
+                print(f"Unknown Op: {node}")
                 params = None
             
             layer_params = LayerParameters(layer, params)
@@ -282,6 +419,7 @@ class TreeModel:
             o_shape = [self.out_layer['output_size']]
         if matched_inputs == [] and node.input[0]=="input":
             c = self.in_layer['output_size'][1]
+            i_shape = [self.in_layer["output_size"]]
         else :
             c = i_shape[0][1]
 
@@ -289,6 +427,8 @@ class TreeModel:
         weights = o_shape[0][1]*c*attributes['kernel_shape'][0]*attributes['kernel_shape'][1]
         ifms    = o_shape[0][0]*c*((o_shape[0][3]-1)*attributes['strides'][1]+attributes['kernel_shape'][1])*((o_shape[0][2]-1)*attributes['strides'][0]+attributes['kernel_shape'][0])
         output = {
+            'h': i_shape[0][2],
+            'w': i_shape[0][3],
             'n': o_shape[0][0],
             'm': o_shape[0][1] // attributes['groups'],
             'q': o_shape[0][2],
@@ -308,6 +448,82 @@ class TreeModel:
 
         return output
 
+    def _get_activation_params(self, node) -> dict:
+        matched_outputs = [output for output in node.output if output in self.output_sizes]
+        o_shape = [self.output_sizes[i] for i in matched_outputs]
+        matched_inputs = [input for input in node.input if input in self.output_sizes]
+        i_shape = [self.output_sizes[i] for i in matched_inputs]
+
+
+        if matched_outputs == [] and node.output[0] == "output":
+            o_shape = [self.out_layer['output_size']]
+        if matched_inputs == [] and node.input[0]=="input":
+            i_shape = [self.in_layer["output_size"]]
+
+        output = {
+            "shape": i_shape[0],
+            "kind": node.op_type
+        }
+        return output
+        
+    def _get_elementwise_params(self, node) -> dict:
+        matched_outputs = [output for output in node.output if output in self.output_sizes]
+        o_shape = [self.output_sizes[i] for i in matched_outputs]
+        matched_inputs = [input for input in node.input if input in self.output_sizes]
+        i_shape = [self.output_sizes[i] for i in matched_inputs]
+
+
+        if matched_outputs == [] and node.output[0] == "output":
+            o_shape = [self.out_layer['output_size']]
+        if matched_inputs == [] and node.input[0]=="input":
+            i_shape = [self.in_layer["output_size"]]
+
+        output = {
+            "shape": i_shape[0],
+            "kind": node.op_type
+        }
+        return output
+        
+    def _get_unary_misc_params(self, node) -> dict:
+        matched_outputs = [output for output in node.output if output in self.output_sizes]
+        o_shape = [self.output_sizes[i] for i in matched_outputs]
+        matched_inputs = [input for input in node.input if input in self.output_sizes]
+        i_shape = [self.output_sizes[i] for i in matched_inputs]
+
+
+        if matched_outputs == [] and node.output[0] == "output":
+            o_shape = [self.out_layer['output_size']]
+        if matched_inputs == [] and node.input[0]=="input":
+            i_shape = [self.in_layer["output_size"]]
+
+        output = {
+            "in_shape": i_shape[0],
+            "out_shape": o_shape[0],
+            "kind": node.op_type
+        }
+        return output
+
+    def _get_binary_misc_params(self, node) -> dict:
+        matched_outputs = [output for output in node.output if output in self.output_sizes]
+        o_shape = [self.output_sizes[i] for i in matched_outputs]
+        matched_inputs = [input for input in node.input if input in self.output_sizes]
+        i_shape = [self.output_sizes[i] for i in matched_inputs]
+
+
+        if matched_outputs == [] and node.output[0] == "output":
+            o_shape = [self.out_layer['output_size']]
+        if matched_inputs == [] and node.input[0]=="input":
+            i_shape = [self.in_layer["output_size"]]
+
+        output = {
+            "a_shape": i_shape[0],
+            "b_shape": i_shape[1],
+            "out_shape": o_shape[0],
+            "kind": node.op_type
+        }
+        return output
+
+
     def _create_layer_relationships(self, layers_data: list[LayerParameters]):
         for layer in layers_data:
 
@@ -320,7 +536,7 @@ class TreeModel:
                 if layer.name != other_layer.name and set(layer.outputs) & set(other_layer.inputs):
                     layer.children.append(other_layer)
 
-    def _get_output_sizes(self):
+    def _get_output_sizes(self) -> dict[str, list[int]]:
         output_sizes = {}
         graph_def = self._model.graph
         for info in graph_def.value_info:
