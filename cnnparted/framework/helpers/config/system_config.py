@@ -3,6 +3,8 @@ import yaml
 from dataclasses import dataclass
 from typing import Literal, TypedDict
 
+from framework.helpers.dtypes import NodeId
+
 @dataclass
 class MnsimConfig:
     conf_path: str
@@ -76,7 +78,7 @@ class DseNodeConfig:
 
 @dataclass
 class NodeConfig:
-    id: int
+    id: NodeId
     bits: int
     fault_rates: list[float]
     faulty_bits: int
@@ -88,7 +90,7 @@ class NodeConfig:
     dse: DseNodeConfig
 
     def __init__(self, cfg: dict):
-        self.id = cfg["id"]
+        self.id = NodeId(cfg["id"])
         self.bits = cfg.get("bits", 8)
         self.fault_rates = cfg.get("fault_rates", [0.0, 0.0])
         self.faulty_bits = cfg.get("faulty_bits", 0)
@@ -97,7 +99,7 @@ class NodeConfig:
         self.accelerator = self.evaluation.accelerator
         self.instances = cfg.get("instances", 1)
         self.dse = DseNodeConfig(cfg["dse"]) if "dse" in cfg else None
-        self.virtual_ids = {} if self.instances > 1 else None
+        self.virtual_ids: dict[str, NodeId] | None = {} if self.instances > 1 else None
 
         # Check if we need to assign virtual IDs, assign them to None. System config assigns actual int ID
         if self.instances > 1:
@@ -163,6 +165,6 @@ class SystemConfig:
             if c.virtual_ids is not None:
                 for v_ids in c.virtual_ids.keys():
                     self.max_id += 1
-                    c.virtual_ids[v_ids] = self.max_id
+                    c.virtual_ids[v_ids] = NodeId(self.max_id)
                     self.platform_ids.append(c.virtual_ids[v_ids])
                     self.platform_names.append(str(c.virtual_ids[v_ids])+"_"+c.accelerator)
