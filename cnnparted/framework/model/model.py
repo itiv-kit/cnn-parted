@@ -54,11 +54,22 @@ class ConvParameters:
     def dimensions(self):
         return ["N", "M", "P", "Q", "C", "R", "S"]
     
-    def construct_tensor_shapes(self):
+    def get_input_tensor_shapes(self):
         input_shape = [self.n, self.c, self.h, self.w]
         kernel_shape = [self.m, self.c, self.r, self.s]
         bias_shape = [self.m]
         return [input_shape, kernel_shape, bias_shape]
+
+    def get_input_tensor_dimensions(self):
+        #(N,Cin​,H,W) and output (N,Cout,Hout,Wout)
+        # Kernel: (M, C/groups, R, S)
+        input_dimensions = ["N", "C", "H", "W"]
+        kernel_dimensions = ["M", "C", "R", "S"]
+        bias_dimensions = ["M"]
+        return [input_dimensions, kernel_dimensions, bias_dimensions]
+    
+    def get_output_tensor_dimensions(self):
+        return [["N", "M", "P", "Q"]]
 
 
 @dataclass
@@ -83,11 +94,17 @@ class GemmParameters:
             dims = ["B"] + dims
         return dims
     
-    def construct_tensor_shapes(self):
+    def get_input_tensor_shapes(self):
         input_shape = [self.n, self.c]
         weight_shape = [self.c, self.m]
         bias_shape = [self.n, self.m]
         return [input_shape, weight_shape, bias_shape]
+    
+    def get_input_tensor_dimensions(self):
+        return [["N", "C"], ["C", "M"], ["N", "M"]]
+
+    def get_output_tensor_dimensions(self):
+        return [["N", "M"]]
     
 @dataclass
 class PoolParameters:
@@ -104,8 +121,14 @@ class PoolParameters:
     def dimensions(self):
         return []
     
-    def construct_tensor_shapes(self):
-        return []
+    def get_input_tensor_shapes(self):
+        return [[]]
+
+    def get_input_tensor_dimensions(self):
+        return [[]]
+
+    def get_output_tensor_dimensions(self):
+        return [[]]
 
 class ActivationKind(IntEnum):
     relu = auto()
@@ -131,8 +154,14 @@ class ActivationParameters:
     def dimensions(self):
         return []
     
-    def construct_tensor_shapes(self):
+    def get_input_tensor_shapes(self):
         return [self.shape]
+    
+    def get_input_tensor_dimensions(self):
+        return [[]]
+
+    def get_output_tensor_dimensions(self):
+        return [[]]
 
 class ElementwiseKind(IntEnum):
     add = auto()
@@ -158,8 +187,14 @@ class ElementwiseParameters:
     def dimensions(self):
         return []
     
-    def construct_tensor_shapes(self):
+    def get_input_tensor_shapes(self):
         return [self.shape,  self.shape]
+    
+    def get_input_tensor_dimensions(self):
+        return [[], []]
+
+    def get_output_tensor_dimensions(self):
+        return [[]]
 
 class MiscOperationsKind(IntEnum):
     flatten = auto()
@@ -188,8 +223,14 @@ class UnaryMiscOperationParameters:
     def dimensions(self):
         return []
     
-    def construct_tensor_shapes(self):
+    def get_input_tensor_shapes(self):
         return [self.in_shape]
+    
+    def get_input_tensor_dimensions(self):
+        return [[]]
+
+    def get_output_tensor_dimensions(self):
+        return [[]]
 
 @dataclass
 class BinaryMiscOperationParameters:
@@ -212,8 +253,14 @@ class BinaryMiscOperationParameters:
     def dimensions(self):
         return []
 
-    def construct_tensor_shapes(self):
+    def get_input_tensor_shapes(self):
         return [self.a_shape, self.b_shape]
+    
+    def get_input_tensor_dimensions(self):
+        return [[], []]
+
+    def get_output_tensor_dimensions(self):
+        return [[]]
 
 
 @dataclass
@@ -223,7 +270,7 @@ class TensorParameters:
     #elem_type: np.integer | np.floating
     definition: str = None
     used_by: list[str] = field(default_factory=list)
-    #dimensions: list[str] = None
+    dimensions: list[str] = None
 
 type ComputeParameters = ConvParameters | GemmParameters
 type GeneralLayerParameters = ComputeParameters | PoolParameters | ActivationParameters | ElementwiseParameters | BinaryMiscOperationParameters | UnaryMiscOperationParameters
@@ -248,13 +295,17 @@ class LayerParameters:
             self.inputs = cfg["input"]
         else:
             self.inputs = [cfg["input"]]
-        print(type(self.inputs))
+
         if isinstance(cfg["output"], list):
             self.outputs = cfg["output"]
         else:
             self.outputs = [cfg["output"]]
 
-        self.output_size = cfg["output_size"]
+        if isinstance(cfg["output_size"][0], list):
+            self.output_size = cfg["output_size"]
+        else:
+            self.output_size = [cfg["output_size"]]
+
         self.params = params
         if params is not None:
             self.dimensions = params.dimensions
@@ -316,6 +367,12 @@ class TreeModel:
             if node.op_type =='Conv':
                 conv_params = self._get_conv_params(node)
                 params = ConvParameters(conv_params)
+                # We need the weight and bias as string here for later processing, some onnx models 
+                # just call them onnx::Conv_193 and similar
+                if "weight" not in layer["input"][1]:
+                    layer["input"][1] = layer["input"][1] + "_weight"
+                if "bias" not in layer["input"][1]:
+                    layer["input"][2] = layer["input"][2] + "_bias"
             elif node.op_type =='MaxPool':
                 pool_params = self._get_pool_params(node)
                 params = PoolParameters(pool_params)
@@ -360,11 +417,15 @@ class TreeModel:
                 attributes['strides'] = list(attr.ints)
             elif attr.name == 'pads':
                 attributes['pads'] = list(attr.ints)
+        
+        kernel_shape = attributes["kernel_shape"]
+        pads = attributes.get("pad", [0 for _ in kernel_shape])
+        strides = attributes.get("strides", [1 for _ in kernel_shape])
 
         output = {
-            'kernel': attributes.get('kernel_shape'),
-            'padding': attributes.get('pads'),
-            'stride': attributes.get('strides')
+            'kernel': kernel_shape,
+            'padding': pads,
+            'stride': strides,
         }
 
         return output
@@ -404,7 +465,8 @@ class TreeModel:
         return output
 
     def _get_conv_params(self,node):
-        #(N,Cin​,H,W) and output (N,Cout,Hout,Wout)(N,Cout​,Hout​,Wout​)
+        #(N,Cin​,H,W) and output (N,Cout,Hout,Wout)
+        # Kernel: (M, C/groups, R, S)
         attributes = {}
         attributes['groups'] = 1
         for attr in node.attribute:

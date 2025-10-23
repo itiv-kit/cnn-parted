@@ -47,16 +47,24 @@ class ExecutionGraph:
         for node_name in self.full_graph.nodes:
             node = self.full_graph.nodes[node_name]
             layer_params: LayerParameters = node["data"]
+
+            if layer_params.name == "output":
+                continue
+
             layer_out_names = layer_params.outputs
             layer_out_shapes = layer_params.output_size
+            layer_out_dimensions = layer_params.params.get_output_tensor_dimensions() if layer_params.params is not None else [[]]
 
             # Layer outputs are tensor definitions
             # Layer inputs are tensor uses (weights and biases are assumed to be created statically)
-            for name, shape in zip(layer_out_names, layer_out_shapes):
+            if len(set([len(layer_out_names), len(layer_out_shapes), len(layer_out_dimensions)])) != 1: 
+                breakpoint()
+            for name, shape, dimensions in zip(layer_out_names, layer_out_shapes, layer_out_dimensions, strict=True):
                 tensor = TensorParameters(
                     name,
                     shape,
                     definition=layer_params.name,
+                    dimensions=dimensions,
                 )
                 self.network_tensors[name] = tensor
 
@@ -67,15 +75,20 @@ class ExecutionGraph:
                 continue
 
             layer_in_names = layer_params.inputs
-            layer_in_shapes = layer_params.params.construct_tensor_shapes()
+            layer_in_shapes = layer_params.params.get_input_tensor_shapes()
+            layer_in_dimensions = layer_params.params.get_input_tensor_dimensions()
 
-            for name, shape in zip(layer_in_names, layer_in_shapes):
+            if len(set([len(layer_in_names), len(layer_in_shapes), len(layer_in_dimensions)])) != 1: 
+                breakpoint()
+
+            for name, shape, dimensions in zip(layer_in_names, layer_in_shapes, layer_in_dimensions, strict=True):
                 if name not in self.network_tensors:
                     if "weight" in name.lower() or "bias" in name.lower():
                         tensor = TensorParameters(
                             name,
                             shape,
                             definition="static",
+                            dimensions=dimensions,
                         )
                         self.network_tensors[name] = tensor
 
