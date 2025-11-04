@@ -50,7 +50,7 @@ class ExecutionGraph:
 
             if layer_params.name == "output":
                 continue
-
+            
             layer_out_names = layer_params.outputs
             layer_out_shapes = layer_params.output_size
             layer_out_dimensions = layer_params.params.get_output_tensor_dimensions() if layer_params.params is not None else [[]]
@@ -77,7 +77,7 @@ class ExecutionGraph:
             layer_in_names = layer_params.inputs
             layer_in_shapes = layer_params.params.get_input_tensor_shapes()
             layer_in_dimensions = layer_params.params.get_input_tensor_dimensions()
-
+        
             if len(set([len(layer_in_names), len(layer_in_shapes), len(layer_in_dimensions)])) != 1: 
                 breakpoint()
 
@@ -91,6 +91,11 @@ class ExecutionGraph:
                             dimensions=dimensions,
                         )
                         self.network_tensors[name] = tensor
+                
+                # Some Mul and Div layers have a constant that is marked as scale but is not defined
+                # as a tensor anywhere, so we ignore it here
+                if "scale" in name:
+                    continue
 
                 # The tensor should already be registered by now
                 if name not in self.network_tensors:
@@ -105,15 +110,15 @@ class ExecutionGraph:
     def _create_layer_relationships(self):
         graph = nx.DiGraph()
         for layer in self.model_tree:
-            if layer.op_type != 'Constant':
-                tmp = copy.deepcopy(layer)
-                tmp.children = None
-                graph.add_node(layer.name, 
-                                         data=tmp, 
-                                         pooling={"fused_pooling": False}, 
-                                         binding=None)
-                for child in layer.children:
-                    graph.add_edge(layer.name, child.name, weight=np.prod(layer.output_size) )
+            #if layer.op_type != 'Constant':
+            tmp = copy.deepcopy(layer)
+            tmp.children = None
+            graph.add_node(layer.name, 
+                                        data=tmp, 
+                                        pooling={"fused_pooling": False}, 
+                                        binding=None)
+            for child in layer.children:
+                graph.add_edge(layer.name, child, weight=np.prod(layer.output_size) )
         return graph
     
     def _propagate_shape_info(self, graph: nx.DiGraph):

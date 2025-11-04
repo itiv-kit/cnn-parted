@@ -78,6 +78,7 @@ class GemmParameters:
     n: int
     m: int
     c: int
+    has_bias: bool
     weights: int
 
     def __init__(self, cfg: dict):
@@ -86,6 +87,7 @@ class GemmParameters:
         self.m = cfg["m"]
         self.c = cfg["c"]
         self.weights = cfg["weights"]
+        self.has_bias = cfg["has_bias"]
     
     @property
     def dimensions(self):
@@ -98,10 +100,16 @@ class GemmParameters:
         input_shape = [self.n, self.c]
         weight_shape = [self.c, self.m]
         bias_shape = [self.n, self.m]
-        return [input_shape, weight_shape, bias_shape]
+        out = [input_shape, weight_shape, ] #bias_shape
+        if self.has_bias:
+            out.append(bias_shape)
+        return out
     
     def get_input_tensor_dimensions(self):
-        return [["N", "C"], ["C", "M"], ["N", "M"]]
+        out = [["N", "C"], ["C", "M"], ]
+        if self.has_bias:
+            out.append(["N", "M"])
+        return out
 
     def get_output_tensor_dimensions(self):
         return [["N", "M"]]
@@ -131,8 +139,9 @@ class PoolParameters:
         return [[]]
 
 class ActivationKind(IntEnum):
-    relu = auto()
-    sigmoid = auto()
+    Relu = auto()
+    Sigmoid = auto()
+    Erf = auto()
     unknown = auto()
 
 @dataclass
@@ -142,13 +151,7 @@ class ActivationParameters:
 
     def __init__(self, cfg: dict):
         self.shape = cfg["shape"]
-        match cfg["kind"]:
-            case "Relu":
-                self.kind = ActivationKind.relu
-            case "Sigmoid":
-                self.kind = ActivationKind.sigmoid
-            case _:
-                self.kind = ActivationKind.unknown
+        self.kind = ActivationKind[cfg["kind"]]
     
     @property
     def dimensions(self):
@@ -164,8 +167,9 @@ class ActivationParameters:
         return [[]]
 
 class ElementwiseKind(IntEnum):
-    add = auto()
-    mul = auto()
+    Add = auto()
+    Mul = auto()
+    Div = auto()
     unknown = auto()
 
 @dataclass
@@ -175,13 +179,7 @@ class ElementwiseParameters:
 
     def __init__(self, cfg: dict):
         self.shape = cfg["shape"]
-        match cfg["kind"]:
-            case "Add":
-                self.kind = ElementwiseKind.add
-            case "Mul":
-                self.kind = ElementwiseKind.mul
-            case _:
-                self.kind = ElementwiseKind.unknown
+        self.kind = ElementwiseKind[cfg["kind"]]
     
     @property
     def dimensions(self):
@@ -197,9 +195,12 @@ class ElementwiseParameters:
         return [[]]
 
 class MiscOperationsKind(IntEnum):
-    flatten = auto()
-    global_avgpool = auto()
-    concat = auto()
+    Flatten = auto()
+    GlobalAveragePool = auto()
+    Concat = auto()
+    Transpose = auto()
+    LayerNormalization = auto()
+    Constant = auto()
     unknown = auto()
 
 @dataclass
@@ -211,13 +212,7 @@ class UnaryMiscOperationParameters:
     def __init__(self, cfg: dict):
         self.in_shape = cfg["in_shape"]
         self.out_shape = cfg["out_shape"]
-        match cfg["kind"]:
-            case "GlobalAveragePool":
-                self.kind = MiscOperationsKind.global_avgpool
-            case "Flatten":
-                self.kind = MiscOperationsKind.flatten
-            case _:
-                self.kind = MiscOperationsKind.unknown
+        self.kind = MiscOperationsKind[cfg["kind"]]
 
     @property
     def dimensions(self):
@@ -243,11 +238,7 @@ class BinaryMiscOperationParameters:
         self.a_shape = cfg["a_shape"]
         self.b_shape = cfg["b_shape"]
         self.out_shape = cfg["out_shape"]
-        match cfg["kind"]:
-            case "Concat":
-                self.kind = MiscOperationsKind.concat
-            case _:
-                self.kind = MiscOperationsKind.unknown
+        self.kind = MiscOperationsKind[cfg["kind"]]
 
     @property
     def dimensions(self):
@@ -258,6 +249,26 @@ class BinaryMiscOperationParameters:
     
     def get_input_tensor_dimensions(self):
         return [[], []]
+
+    def get_output_tensor_dimensions(self):
+        return [[]]
+
+@dataclass
+class ConstantOperationParameters:
+    kind: MiscOperationsKind
+
+    def __init__(self):
+        self.kind = MiscOperationsKind.Constant
+
+    @property
+    def dimensions(self):
+        return []
+
+    def get_input_tensor_shapes(self):
+        return []
+    
+    def get_input_tensor_dimensions(self):
+        return []
 
     def get_output_tensor_dimensions(self):
         return [[]]
@@ -285,7 +296,7 @@ class LayerParameters:
     output_size: np.ndarray
     params: GeneralLayerParameters | None
     dimensions: list[str]
-    children: list["LayerParameters"]
+    children: list[str]
 
     def __init__(self, cfg: dict, params: ComputeParameters | None):
         self.name = cfg["name"]
@@ -301,7 +312,9 @@ class LayerParameters:
         else:
             self.outputs = [cfg["output"]]
 
-        if isinstance(cfg["output_size"][0], list):
+        if len(cfg["output_size"]) == 0 and cfg["op_type"] == "Constant":
+            self.output_size = [[]]
+        elif isinstance(cfg["output_size"][0], list):
             self.output_size = cfg["output_size"]
         else:
             self.output_size = [cfg["output_size"]]
@@ -337,6 +350,17 @@ class TreeModel:
     def _get_layers_data(self) -> list[LayerParameters]:
         graph_def = self._model.graph
 
+        def add_name_hint(layer: dict):
+            # We need the weight and bias as string here for later processing, some onnx models 
+            # just call them onnx::Conv_193 and similar
+            if "weight" not in layer["input"][1]:
+                layer["input"][1] = layer["input"][1] + "_weight"
+            
+            # MatMul has not bias tensor here, so we need to guard against that
+            if len(layer["input"]) > 2:
+                if "bias" not in layer["input"][2]:
+                    layer["input"][2] = layer["input"][2] + "_bias"
+            return layer
 
         self.in_layer, self.out_layer = self._get_in_out_layers(graph_def)
 
@@ -345,7 +369,7 @@ class TreeModel:
         output.append(LayerParameters(self.in_layer, None))
 
         for node in nodes:
-            if node.op_type == 'Identity':
+            if node.op_type == 'Identity': #or node.op_type == "Constant":
                 continue
 
             layer = {
@@ -363,37 +387,36 @@ class TreeModel:
             else:
                 layer["output_size"] = self.out_layer['output_size']
                 layer['output'] = self.out_layer['name']
-
+            
             if node.op_type =='Conv':
                 conv_params = self._get_conv_params(node)
                 params = ConvParameters(conv_params)
-                # We need the weight and bias as string here for later processing, some onnx models 
-                # just call them onnx::Conv_193 and similar
-                if "weight" not in layer["input"][1]:
-                    layer["input"][1] = layer["input"][1] + "_weight"
-                if "bias" not in layer["input"][1]:
-                    layer["input"][2] = layer["input"][2] + "_bias"
-            elif node.op_type =='MaxPool':
-                pool_params = self._get_pool_params(node)
-                params = PoolParameters(pool_params)
-            elif node.op_type =='AveragePool':
+                layer = add_name_hint(layer)
+            elif node.op_type in ['MaxPool', 'AveragePool']:
                 pool_params = self._get_pool_params(node)
                 params = PoolParameters(pool_params)
             elif node.op_type =='Gemm' or node.op_type == "MatMul":
                 gemm_params = self._get_gemm_params(node)
                 params = GemmParameters(gemm_params)
-            elif node.op_type in ["Relu", "Sigmoid"]:
+                layer = add_name_hint(layer)
+            elif node.op_type in ["Relu", "Sigmoid", "Erf"]:
                 activation_params = self._get_activation_params(node)
                 params = ActivationParameters(activation_params)
-            elif node.op_type in ["Mul", "Add"]:
+            elif node.op_type in ["Mul", "Add", "Div", ""]:
                 eltwise_params = self._get_elementwise_params(node)
                 params = ElementwiseParameters(eltwise_params)
-            elif node.op_type in ["Flatten", "GlobalAveragePool"]:
+            elif node.op_type in ["Flatten", "GlobalAveragePool", "Transpose", "LayerNormalization"]:
+                # LayerNorm has weight and bias as variables, which we ignore here
+                # and assume that they are simply statically available
+                if node.op_type == "LayerNormalization":
+                    layer["input"] = [layer["input"][0]]
                 misc_params = self._get_unary_misc_params(node)
                 params = UnaryMiscOperationParameters(misc_params)
             elif node.op_type in ["Concat"]:
                 misc_params = self._get_binary_misc_params(node)
                 params = BinaryMiscOperationParameters(misc_params)
+            elif node.op_type == "Constant":
+                params = ConstantOperationParameters()
             else:
                 print(f"Unknown Op: {node}")
                 params = None
@@ -435,6 +458,7 @@ class TreeModel:
         o_shape = [self.output_sizes[i] for i in matched_outputs]
         matched_inputs = [input for input in node.input if input in self.output_sizes]
         i_shape = [self.output_sizes[i] for i in matched_inputs]
+        has_bias = len(node.input) == 3 #input, weight, bias
 
         if matched_outputs == [] and node.output[0] == "output":
             o_shape = [self.out_layer['output_size']]
@@ -447,7 +471,8 @@ class TreeModel:
             'n': o_shape[0][0],
             'm': o_shape[0][1],
             'c': c,
-            'weights': np.prod(i_shape + o_shape)
+            'weights': np.prod(i_shape + o_shape),
+            'has_bias': has_bias 
         }
 
         # Check if this is a batch matmul
@@ -459,7 +484,8 @@ class TreeModel:
                 'n': o_shape[0][2],
                 'm': o_shape[0][3],
                 'c': i_shape[0][3],
-                'weights': np.prod(i_shape + o_shape)
+                'weights': np.prod(i_shape + o_shape),
+                'has_bias': has_bias 
             }
 
         return output
@@ -607,7 +633,7 @@ class TreeModel:
                     continue
                 try:
                     if layer.name != other_layer.name and set(layer.outputs) & set(other_layer.inputs):
-                        layer.children.append(other_layer)
+                        layer.children.append(other_layer.name)
                 except:
                     breakpoint()
                     print(other_layer)
@@ -616,6 +642,8 @@ class TreeModel:
         output_sizes = {}
         graph_def = self._model.graph
         for info in graph_def.value_info:
+            #if "Constant" in info.name:
+            #    continue
             dims = [dim.dim_value for dim in info.type.tensor_type.shape.dim]
             output_sizes[info.name] = dims
         return output_sizes

@@ -22,7 +22,7 @@ class LayersGraph:
             if layer.op_type!= 'Constant':
                 self._graph.add_node(layer.name, data=layer, children=[])
                 for child in layer.children:
-                    self._graph.add_edge(layer.name, child.name)
+                    self._graph.add_edge(layer.name, child)
 
     def get_successors(self, node):
         return list(self._graph.successors(node))
