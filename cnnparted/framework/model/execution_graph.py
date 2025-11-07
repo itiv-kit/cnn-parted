@@ -23,6 +23,7 @@ class ExecutionGraph:
         self._populate_tensors()
 
         self.reduced_graph = self._create_reduced_graph()
+        self._drop_unused_tensors()
 
         self.output_sizes = self._set_output_sizes()
     
@@ -37,7 +38,7 @@ class ExecutionGraph:
     def _create_full_graph(self):
         graph = self._create_layer_relationships()
         graph = self._propagate_shape_info(graph)
-        graph = self._fuse_conv_maxpool(graph)
+        #graph = self._fuse_conv_maxpool(graph)
         return graph
     
     def _populate_tensors(self):
@@ -174,7 +175,8 @@ class ExecutionGraph:
         node_keys = list(graph)
         for node_key in node_keys:
             node = graph.nodes[node_key]
-            if node["data"].op_type not in self.evaluated_layer_types:
+            layer_params: LayerParameters = node["data"]
+            if layer_params.op_type not in self.evaluated_layer_types:
                 for in_src, _ in graph.in_edges(node_key):
                     for _, out_dst in graph.out_edges(node_key):
                         in_node = graph.nodes[in_src]
@@ -182,3 +184,13 @@ class ExecutionGraph:
                         graph.add_edge(in_src, out_dst, weight=weight)
                 graph.remove_node(node_key)
         return graph
+    
+    def _drop_unused_tensors(self):
+        tensors_to_drop = []
+        for tensor in self.network_tensors.values():
+            all_uses = tensor.used_by + [tensor.definition]
+            if not (set(all_uses) & set(self.reduced_graph.nodes)):
+                tensors_to_drop.append(tensor.name)
+        
+        for tensor_name in tensors_to_drop:
+            del self.network_tensors[tensor_name]
