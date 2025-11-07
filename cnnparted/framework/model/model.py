@@ -277,11 +277,15 @@ class ConstantOperationParameters:
 @dataclass
 class TensorParameters:
     name: str
-    shape: list[str]
+    shape: list[int]
     #elem_type: np.integer | np.floating
     definition: str = None
     used_by: list[str] = field(default_factory=list)
     dimensions: list[str] = None
+
+    @property
+    def num_elems(self):
+        return np.prod(self.shape)
 
 type ComputeParameters = ConvParameters | GemmParameters
 type GeneralLayerParameters = ComputeParameters | PoolParameters | ActivationParameters | ElementwiseParameters | BinaryMiscOperationParameters | UnaryMiscOperationParameters
