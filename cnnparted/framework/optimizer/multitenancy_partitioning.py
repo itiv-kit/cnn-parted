@@ -323,7 +323,7 @@ class MultiTenancyProblem():
 
         return solutions
 
-    def _score_binding(self, tracker: LayerTracker) -> float:
+    def _score_edp(self, tracker: LayerTracker) -> float:
         # For each layer we want to find the most efficient platform
         total_edp = 0.0    
         for nw, layer, bind in tracker:
@@ -338,22 +338,14 @@ class MultiTenancyProblem():
         idle_times = [sched.get_idle_time() for sched in schedules.node_schedules.values()]
         return sum(idle_times)
     
-    def _score_scheduling(self, schedules: SystemSchedule) -> float:
-        # Ideally, all platforms finish at the same time
-        end_times = [sched.cur_time for sched in schedules.node_schedules.values()]
-        end_times_pairs = it.combinations(end_times, r=2)
-        end_times_diffs = [abs(pair[0]-pair[1]) for pair in end_times_pairs]
-        return sum(end_times_diffs)
-    
-    def _score_latency(self, schedules: SystemSchedule) -> float:
+    def _score_max_latency(self, schedules: SystemSchedule) -> float:
         latencies = [sched.cur_time for sched in schedules.node_schedules.values()]
         return max(latencies)
 
     def _calc_cost(self, tracker: LayerTracker, schedules: SystemSchedule) -> float:
-        edp_cost = self._score_binding(tracker)
-        #diff_cost = self._score_scheduling(schedules)
+        edp_cost = self._score_edp(tracker)
         util_cost = self._score_utilization(schedules)
-        lat_cost = self._score_latency(schedules)
+        lat_cost = self._score_max_latency(schedules)
 
         return edp_cost**0.4 +  util_cost**2.5 + lat_cost*2
     
