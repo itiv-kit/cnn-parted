@@ -8,6 +8,7 @@ import networkx as nx
 from framework.model.model import LayerParameters, TreeModel
 from framework.model.graph import LayersGraph
 from framework.model.execution_graph import ExecutionGraph
+from framework.model.onnx_model import OnnxModel, OnnxParser 
 
 from framework.model.scheduling import topo_sort_random_start_node
 
@@ -25,11 +26,18 @@ class GraphAnalyzer:
         self.torchmodels  = {}
         self.graphs: dict[str, LayersGraph] = {}
         self.exec_graphs: dict[str, ExecutionGraph] = {}
+        self.models: dict[str, OnnxModel] = {}
         for network, workload_info in self.workloads.items():
+            onnx_model = OnnxParser(self.run_name, network).parse_graph()
+            self.models[network]  = onnx_model
+
             self._tree_models[network] = TreeModel(self.run_name, network, tuple(workload_info.input_shape))
             self._trees[network] = self._tree_models[network].get_tree()
+
             self.torchmodels[network] = self._tree_models[network].get_torch_model()
+
             self.graphs[network] = LayersGraph(self._trees[network])
+
             self.exec_graphs[network] = ExecutionGraph(self._trees[network], workload_info)
         self.schedules: dict[str, list] = {}
 

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import copy
 
-from framework.model.model import LayerParameters, TensorParameters
+from framework.model.layer_parameters import LayerParameters, TensorParameters
 
 class ExecutionGraph:
     def __init__(self, model_tree: list[LayerParameters], workload_info):

@@ -9,11 +9,10 @@ import numpy as np
 from onnx2torch import convert
 
 from framework.constants import MODEL_PATH
-from framework.model.model_helper import ModelHelper
 from framework.model.layer_parameters import (LayerParameters, 
                                               ConvParameters, 
                                               GemmParameters, 
-                                              PoolParameters, 
+                                              PoolingParameters, 
                                               ActivationParameters, 
                                               ElementwiseParameters,
                                               BinaryMiscOperationParameters, 
@@ -25,7 +24,6 @@ class TreeModel:
     def __init__(self, run_name, network_name, input_size):
         _model_path = os.path.join(MODEL_PATH, run_name, network_name + "_model.onnx")
         self.input_size = input_size
-        self.model_helper = ModelHelper()
         self._model = onnx.load(_model_path)
         onnx.checker.check_model(self._model)
         self._model = shape_inference.infer_shapes(self._model)
@@ -91,7 +89,7 @@ class TreeModel:
                 layer = add_name_hint(layer)
             elif node.op_type in ['MaxPool', 'AveragePool']:
                 pool_params = self._get_pool_params(node)
-                params = PoolParameters(pool_params)
+                params = PoolingParameters(pool_params)
             elif node.op_type =='Gemm' or node.op_type == "MatMul":
                 gemm_params = self._get_gemm_params(node)
                 params = GemmParameters(gemm_params)
