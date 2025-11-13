@@ -236,12 +236,15 @@ class MultiTenancyProblem():
             trial.set_user_attr("schedule", node_schedules)
             trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
 
-            return self._score_binding(work_layer_tracker), self._score_utilization(node_schedules), self._score_latency(node_schedules), self._score_scheduling(node_schedules)
+            return (self._score_edp(work_layer_tracker), 
+                    self._score_utilization(node_schedules), 
+                    self._score_max_latency(node_schedules))
+        
 
         # Start the optimization, setup everything for Optuna run
         os.makedirs(self.optuna_out_dir, exist_ok=True)
         storage=JournalStorage(JournalFileBackend(file_path=os.path.join(self.optuna_out_dir,"journal.log")))
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize", "minimize"], )
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize"], )
 
         study.optimize(objective, n_trials=self.conf.mt.optimizer.n_trials, n_jobs=1, show_progress_bar=True)
         
@@ -250,7 +253,7 @@ class MultiTenancyProblem():
         file_name = "paretos_edp_latency_optuna"
         fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
 
-        fig_hv: go.Figure = optuna.visualization.plot_hypervolume_history(study, [0,0,0,0])
+        fig_hv: go.Figure = optuna.visualization.plot_hypervolume_history(study, [0,0,0])
         file_name_hv = "hypervolume_optuna"
         fig_hv.write_html(os.path.join(self.plot_dir, file_name_hv+".html"))
 
