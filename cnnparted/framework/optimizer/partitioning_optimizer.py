@@ -38,9 +38,12 @@ class PartitioningOptimizer(Optimizer):
         self.layer_dict = {}
         for l in self.schedules[0]:
             self.layer_dict[l] = {}
-            self.layer_dict[l]["predecessors"] = list(ga.graphs[network].get_graph().predecessors(l))
-            self.layer_dict[l]["successors"] = [s for s in ga.graphs[network].get_successors(l)]
-            self.layer_dict[l]["output_size"] = ga.graphs[network].output_sizes[l]
+            self.layer_dict[l]["predecessors"] = [layer.layer_name for layer in ga.models[network].predecessors_by_layer(l)]
+            self.layer_dict[l]["successors"] = [layer.layer_name for layer in ga.models[network].successors_by_layer(l)]
+            if l != "output":   
+                self.layer_dict[l]["output_size"] = [ga.models[network].node_by_layer(l).output.shape]
+            else:
+                self.layer_dict[l]["output_size"] = [ga.models[network].node_by_layer(l).inputs[0].shape]
 
         self.layer_params = self._set_layer_params(ga)
 
@@ -56,9 +59,9 @@ class PartitioningOptimizer(Optimizer):
         params = {}
         network = ga.networks[0]
         for layer in ga.get_conv2d_layers(network):
-            params[layer.name] = layer.params.weights
+            params[layer.layer_name] = layer.layer_params.weights
         for layer in ga.get_gemm_layers(network):
-            params[layer.name] = layer.params.weights
+            params[layer.layer_name] = layer.layer_params.weights
 
         return params
 

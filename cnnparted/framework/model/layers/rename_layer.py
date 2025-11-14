@@ -8,8 +8,17 @@ class RenameLayer(LayerBase):
 
 class InputLayer(LayerBase):
     def __init__(self, layer_name: str, output: OnnxTensor):
-        super().__init__(layer_name=layer_name, op_type="Input", layer_params=None, inputs=[], output=output)
+        super().__init__(layer_name=layer_name, 
+                         op_type="Input", 
+                         layer_params=None, 
+                         inputs=[], 
+                         output=output)
 
 class OutputLayer(LayerBase):
     def __init__(self, layer_name: str, input: list[OnnxTensor]):
-        super().__init__(layer_name=layer_name, op_type="Output", layer_params=None, inputs=input, output=[])
+        # Overwrite the output size here to make data retrieval for PartitioningOptimizer easier
+        super().__init__(layer_name=layer_name, 
+                         op_type="Output", 
+                         layer_params=None, 
+                         inputs=input, 
+                         output=[])

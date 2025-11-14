@@ -23,19 +23,20 @@ class GraphAnalyzer:
 
         self._tree_models: dict[str, TreeModel] = {}
         self._trees: dict[str, list[LayerParameters]] = {}
-        self.torchmodels  = {}
         self.graphs: dict[str, LayersGraph] = {}
         self.exec_graphs: dict[str, ExecutionGraph] = {}
+
         self.models: dict[str, OnnxModel] = {}
+        self.torchmodels  = {}
         for network, workload_info in self.workloads.items():
-            onnx_model = OnnxParser(self.run_name, network).parse_graph()
+            onnx_parser = OnnxParser(self.run_name, network)
+            onnx_model = onnx_parser.parse_graph()
             self.models[network]  = onnx_model
+            self.torchmodels[network] = onnx_parser.get_torch_model() 
 
             self._tree_models[network] = TreeModel(self.run_name, network, tuple(workload_info.input_shape))
             self._trees[network] = self._tree_models[network].get_tree()
-
             self.torchmodels[network] = self._tree_models[network].get_torch_model()
-
             self.graphs[network] = LayersGraph(self._trees[network])
 
             self.exec_graphs[network] = ExecutionGraph(self._trees[network], workload_info)
@@ -57,7 +58,9 @@ class GraphAnalyzer:
                 #    self.schedules = self._iter_sample_fast(topo_sorts, num_topos)
 
                 self.schedules[network] = []
-                self.schedules[network].append(list(nx.topological_sort(self.graphs[network].get_graph())))
+                #self.schedules[network].append(list(nx.topological_sort(self.graphs[network].get_graph())))
+                topo_sort_graph = [layer.layer_name for layer in nx.topological_sort(self.models[network])]
+                self.schedules[network].append(topo_sort_graph)
 
                 self.schedules[network] = np.unique(self.schedules[network], axis=0)
                 df = pd.DataFrame(self.schedules[network])
@@ -81,16 +84,16 @@ class GraphAnalyzer:
         return results
 
     def get_timeloop_layers(self, network: str):
-        output = [layer for layer in self._trees[network] if layer.op_type == "Conv" or layer.op_type == "Gemm" or layer.op_type == "MatMul"]
+        output = [layer for layer in self.models[network].nodes if layer.op_type == "Gemm" or layer.op_type == "MatMul" or layer.op_type == "Conv"]
         return output
 
     def get_mnsim_layers(self, network: str):
-        return self._trees[network]
+        return self.models[network], self._trees[network]
 
     def get_conv2d_layers(self, network: str):
-        output = [layer for layer in self._trees[network] if layer.op_type == "Conv"]
+        output = [layer for layer in self.models[network].nodes if layer.op_type == "Conv"]
         return output
 
     def get_gemm_layers(self, network: str):
-        output = [layer for layer in self._trees[network] if layer.op_type == "Gemm" or layer.op_type == "MatMul"]
+        output = [layer for layer in self.models[network].nodes if layer.op_type == "Gemm" or layer.op_type == "MatMul"]
         return output

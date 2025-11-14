@@ -29,14 +29,15 @@ from framework.model.parser.concat import ConcatParser
 
 class OnnxModel(nx.DiGraph):
     """Result after parsing the onnx model into an internal representation"""
-    def __init__(self, **attr: Any):
+    def __init__(self, onnx_in_model: ModelProto, **attr: Any):
         super().__init__(**attr)
+        self.onnx_in_model = onnx_in_model
         self.name_to_node_mapping: dict[str, LayerBase] = {}
     
     def add_layer(self, layer: RenameLayer | ComputationLayer):
         self.name_to_node_mapping[layer.layer_name] = layer
         self.add_node(layer)
-
+    
     def _find_consumers(self, tensor: OnnxTensor, layer_inputs: dict[str, list[OnnxTensor]]):
         consumers = []
         for layer_name, layer_input_tensors in layer_inputs.items():
@@ -51,13 +52,16 @@ class OnnxModel(nx.DiGraph):
             for consumer in consumers:
                 self.add_edge(node, consumer)
             
-    def successors_by_name(self, layer: str):
+    def successors_by_layer(self, layer: str):
         node = self.name_to_node_mapping[layer]
         return self.successors(node)
 
-    def predecessors_by_name(self, layer: str):
+    def predecessors_by_layer(self, layer: str):
         node = self.name_to_node_mapping[layer]
         return self.predecessors(node)
+    
+    def node_by_layer(self, layer: str):
+        return self.name_to_node_mapping[layer]
     
     def get_initial_layers(self):
         # Fetch all layers that can be scheduled directly at the start, 
@@ -158,7 +162,7 @@ class OnnxParser:
         return tensors
     
     def parse_graph(self) -> OnnxModel:
-        model = OnnxModel()
+        model = OnnxModel(self.onnx_model)
 
         # Remember input and output tensors
         layer_inputs: dict[str, list[OnnxTensor]] = {}

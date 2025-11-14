@@ -22,13 +22,13 @@ class PoolingParser(OnnxLayerParser):
         else:
             raise RuntimeError(f"Unexpected pooling operation of type: {self.node.op_type}")
         
-        output = {
+        cfg = {
             'kernel': kernel_shape,
             'padding': pads,
             'stride': strides,
             'dilations': dilations
         }
-        params = PoolingParameters(output)
+        params = PoolingParameters(cfg)
         pool_layer = RenameLayer(
             layer_name=self.node.name,
             layer_params=params,

@@ -224,6 +224,8 @@ def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemRe
     """Used for MultiTenancy partitioning. After the layers have been assigned to cores,
     we must determine a start time for each layer"""
 
+    from framework.model.onnx_model import OnnxModel
+    dummy = OnnxModel()
 
     # Define helper functions to find layers
     def find_layer_info(id: int, nw_name: str, layer_name: str):

@@ -29,36 +29,30 @@ class NodeThread(ModuleThreadInterface):
 
         node_result_networks = []
 
+        # Select which simulator should be used
+        match self.config.evaluation.simulator:
+            case "timeloop":
+                simulator = Timeloop(self.config, self.dse_system_config)
+            case "mnsim":
+                simulator = MNSIMInterface(self.config)
+            case "zigzag":
+                simulator = Zigzag(self.config, self.runname)
+            case _:
+                simulator = GenericNode(self.config)
+
         # Evaluate all networks
         for network in self.ga.networks:
-
-            # Select which simulator should be used
-            match self.config.evaluation.simulator:
-                case "timeloop":
-                    layers = self.ga.get_timeloop_layers(network)
-                    simulator = Timeloop(self.config, self.dse_system_config)
-                case "mnsim":
-                    layers = self.ga.get_mnsim_layers(network)
-                    simulator = MNSIMInterface(self.config, self.ga.workloads[network].input_shape)
-                case "zigzag":
-                    layers = []
-                    simulator = Zigzag(self.config, self.runname)
-                case _:
-                    layers = []
-                    simulator = GenericNode(self.config)
-
 
             # Check if some previous results are available
             fname_base = simulator.set_workdir(self.work_dir, network, self.id)
             if os.path.isfile(fname_base+".json"):
                 stats = NodeResult.from_json(fname_base, network, self.config)
-                #stats = NodeResult.from_csv(fname_base, network, self.config)
             else:
                 # Perform the actual evaluation
                 if self.acc_adaptor is None:
-                    stats = simulator.run(network, layers)
+                    stats = simulator.run(network, self.ga.models[network])
                 else:
-                    stats = simulator.run_from_adaptor(network, layers, self.acc_adaptor)
+                    stats = simulator.run_from_adaptor(network, self.ga.models[network], self.acc_adaptor)
 
                 if self.save_results:
                     #stats.to_csv(fname_base)

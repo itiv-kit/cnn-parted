@@ -12,6 +12,7 @@ from framework.constants import ROOT_DIR
 from framework.helpers.visualizer import plotMetricPerConfigPerLayer
 from framework.helpers.design_metrics import calc_metric, SUPPORTED_METRICS
 from framework.dse.interfaces.zigzag_interface import ZigzagInterface
+from framework.model.onnx_model import OnnxModel
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
 from framework.helpers.config import *
@@ -73,18 +74,18 @@ class Zigzag(NodeEvaluator):
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
 
-    def run(self, network: str, layers: list) -> NodeResult:
+    def run(self, network: str, model: OnnxModel) -> NodeResult:
         design_runroot = pathlib.Path(self.runroot)
         node_result = NodeResult(self.node_config)
-        self._run_network(network, design_runroot, node_result, design=None)
+        self._run_network(network, model, design_runroot, node_result, design=None)
         return node_result
 
-    def run_from_adaptor(self, network: str, layers : dict, adaptor: ZigzagInterface, progress : bool = False) -> NodeResult:
+    def run_from_adaptor(self, network: str, model : OnnxModel, adaptor: ZigzagInterface, progress : bool = False) -> NodeResult:
         self.adaptor = adaptor
         node_result = NodeResult(self.node_config)
 
         if not self.adaptor.design_space:
-            self._run_design(network, layers, progress, node_result, adaptor.config, self.cur_design_id)
+            self._run_design(network, model, progress, node_result, adaptor.config, self.cur_design_id)
             self.cur_design_id += 1
 
             self.stats = node_result.to_dict()
@@ -97,7 +98,7 @@ class Zigzag(NodeEvaluator):
             for i, design in enumerate(self.adaptor.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
                     shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
-                self._run_design(network, layers, progress, node_result, design, i)
+                self._run_design(network, model, progress, node_result, design, i)
             
         self.stats = node_result.to_dict()
         with open(os.path.join(self.runroot, f"results_{self.accname}.pkl"), "wb") as f:
@@ -105,7 +106,7 @@ class Zigzag(NodeEvaluator):
 
         return node_result
 
-    def _run_design(self, network: str, layers: dict, progress: bool, node_result: NodeResult,  design: ArchitectureConfig, design_id: int=None):
+    def _run_design(self, network: str, model: OnnxModel, progress: bool, node_result: NodeResult,  design: ArchitectureConfig, design_id: int=None):
         if self.adaptor and self.adaptor.zigzag_out_configs_dir:
             design_runroot = os.path.join(self.runroot, self.adaptor.zigzag_out_configs_dir)
         else:
@@ -122,9 +123,9 @@ class Zigzag(NodeEvaluator):
         with open(os.path.join(design_runroot, "arch_config.yaml"), "w") as f:
             y = yaml.dump(design.get_config(), f)
 
-        self._run_network(network, design_runroot, node_result, design)
+        self._run_network(network, model, design_runroot, node_result, design)
 
-    def _run_network(self, network: str, zigzag_design_workdir: str, node_result: NodeResult, design: ArchitectureConfig = None):
+    def _run_network(self, network: str, model: OnnxModel, zigzag_design_workdir: str, node_result: NodeResult, design: ArchitectureConfig = None):
         accfile = self._find_hardware_config(self.accname)
         mapfile = self._find_mapping_config(self.mapname)
         assert accfile.exists() and mapfile.exists(), f"Could not found the specified mapping or accelerator.\nAccfile: {str(accfile)}\nMapfile: {str(mapfile)}"
@@ -139,10 +140,10 @@ class Zigzag(NodeEvaluator):
         zigzag_out_dir = pathlib.Path(zigzag_design_workdir, "out")
         zigzag_pickle = pathlib.Path(zigzag_design_workdir, "out", "results.pkl")
 
-        modelfile = pathlib.Path(self.model_dir, self.run_name, network + "_new_model.onnx")
+        #modelfile = pathlib.Path(self.model_dir, self.run_name, network + "_new_model.onnx")
 
         #the model does not give area
-        energy, latency, cmes = get_hardware_performance_zigzag(workload=str(modelfile), 
+        energy, latency, cmes = get_hardware_performance_zigzag(workload=model.onnx_in_model, 
                                                                 accelerator=str(accfile), 
                                                                 mapping=str(mapfile), 
                                                                 dump_folder=str(zigzag_out_dir), 
