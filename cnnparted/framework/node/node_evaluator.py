@@ -363,6 +363,12 @@ class NodeResult:
         node_result = cls.from_dict(data, node_config, network)
         return node_result
 
+    @property
+    def design(self):
+        if len(self.designs) == 1:
+            return self.designs[0]
+        raise RuntimeError("Attempting to get design when more than one design is registered!")
+
     
 class SystemResult:
     def __init__(self):
