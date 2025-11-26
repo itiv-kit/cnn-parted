@@ -1,21 +1,19 @@
 import os
-from dataclasses import dataclass, field
-from typing import Any
-from enum import Enum, auto
+from typing import Any, TYPE_CHECKING, Generic, TypeVar
 
 import onnx
 from onnx import shape_inference, ModelProto, NodeProto, TypeProto, TensorProto
-from onnx.mapping import TENSOR_TYPE_MAP, TensorDtypeMap
 #from onnx2pytorch import ConvertModel
 from onnx2torch import convert
 import numpy as np
 import networkx as nx
 
-from framework.model.layers.compute_layer import ComputationLayer
 from framework.constants import MODEL_PATH
 from framework.model.onnx_tensor import OnnxTensor, OnnxTensorKind
 from framework.model.layers.abstract_layer import LayerBase
 from framework.model.layers.rename_layer import InputLayer, OutputLayer, RenameLayer
+from framework.model.layers.compute_layer import ComputationLayer 
+
 from framework.model.parser.onnx_layer import OnnxLayerParser
 from framework.model.parser.conv import ConvParser
 from framework.model.parser.elementwise import ElementwiseParser
@@ -27,7 +25,7 @@ from framework.model.parser.layer_normalization import LayerNormalizationParser
 from framework.model.parser.concat import ConcatParser
 
 
-class OnnxModel(nx.DiGraph):
+class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else nx.DiGraph):
     """Result after parsing the onnx model into an internal representation"""
     def __init__(self, onnx_in_model: ModelProto, **attr: Any):
         super().__init__(**attr)
@@ -84,12 +82,13 @@ class OnnxModel(nx.DiGraph):
         return compute_layers
     
     def get_ready_layers(self, scheduled_layers: list[LayerBase]):
-        rdy = []
+        rdy: list[LayerBase] = []
         for node in self.nodes:
-            # A node can be scheduled if all predcessors are scheduled
-            is_pred_scheduled = [(pred in scheduled_layers) for pred in self.predecessors(node)]
+            # A layer can be scheduled if all predcessors are scheduled
+            is_pred_scheduled = [(pred in scheduled_layers) 
+                                 for pred in self.predecessors(node)]
             if all(is_pred_scheduled):
-                rdy.append(is_pred_scheduled)
+                rdy.append(node)
         return rdy
 
 

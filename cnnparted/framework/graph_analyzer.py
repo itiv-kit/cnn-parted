@@ -34,12 +34,11 @@ class GraphAnalyzer:
             self.models[network]  = onnx_model
             self.torchmodels[network] = onnx_parser.get_torch_model() 
 
-            self._tree_models[network] = TreeModel(self.run_name, network, tuple(workload_info.input_shape))
-            self._trees[network] = self._tree_models[network].get_tree()
-            self.torchmodels[network] = self._tree_models[network].get_torch_model()
-            self.graphs[network] = LayersGraph(self._trees[network])
-
-            self.exec_graphs[network] = ExecutionGraph(self._trees[network], workload_info)
+            #self._tree_models[network] = TreeModel(self.run_name, network, tuple(workload_info.input_shape))
+            #self._trees[network] = self._tree_models[network].get_tree()
+            #self.torchmodels[network] = self._tree_models[network].get_torch_model()
+            #self.graphs[network] = LayersGraph(self._trees[network])
+            #self.exec_graphs[network] = ExecutionGraph(self._trees[network], workload_info)
         self.schedules: dict[str, list] = {}
 
 

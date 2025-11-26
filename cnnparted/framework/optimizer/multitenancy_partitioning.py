@@ -14,6 +14,8 @@ import optuna
 from optuna.storages import JournalStorage
 from optuna.storages.journal import JournalFileBackend
 
+from framework.model.onnx_model import OnnxModel
+from framework.model.layers.compute_layer import ComputationLayer
 from framework.optimizer.optimizer import Optimizer
 from framework.optimizer.partitioning_problem import PartitioningProblem
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
@@ -21,7 +23,7 @@ from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
 from framework.model.execution_graph import ExecutionGraph
-from framework.model.scheduling import SystemSchedule, list_scheduling, PlatformSchedule
+from framework.model.scheduling import SystemSchedule, list_scheduling, PlatformSchedule 
 
 
 # What this should do:
@@ -45,15 +47,13 @@ class MultiTenancyPartitioning(Optimizer):
         solutions = algorithm.minimize()
         return solutions
 
-    
     def _gen_initial_binding(self):
-        for network, exec_graph in self.ga.exec_graphs.items():
-            compute_graph = exec_graph.reduced_graph
-            num_nodes = compute_graph.number_of_nodes()
-            node_ids = self.system_result.get_platform_ids()
-            initial_bindings = np.random.choice(node_ids, size=num_nodes)
-            for node_name, binding in zip(compute_graph.nodes, initial_bindings):
-                compute_graph.nodes[node_name]["binding"] = binding
+        #TODO
+        node_ids = self.system_result.get_platform_ids()
+        for network, model in self.ga.models.items():
+            for layer in model.nodes:
+                if isinstance(layer, ComputationLayer):
+                    layer.scheduling.binding = np.random.choice(node_ids)
 
 
 @dataclass
@@ -119,19 +119,20 @@ class MultiTenancyProblem():
         self.node_stats = node_stats
         self.node_ids = node_stats.get_platform_ids()
         self.ga = ga
-        self.execution_graphs = copy.deepcopy(ga.exec_graphs)
+        self.models = copy.deepcopy(ga.models)
         self.rng = np.random.default_rng()
         self.conf = global_conf
 
         # Parse execution graphs into LayerTracker
         network_info = defaultdict(lambda: defaultdict(int))
-        for network, graph in ga.exec_graphs.items():
-            for node, data in graph.reduced_graph.nodes(data=True):
-                network_info[network][node] = data["binding"]
+        for network, model in ga.models.items():
+            for layer in model.nodes:
+                if isinstance(layer, ComputationLayer):
+                    network_info[network][layer.layer_name] = layer.scheduling.binding
 
         self.layer_tracker = LayerTracker(network_info)
         self.num_nodes = self.layer_tracker.get_num_layers()
-        self.initial_schedule = list_scheduling(copy.deepcopy(ga.exec_graphs), self.node_stats, priority=self.conf.mt.scheduling)
+        self.initial_schedule = list_scheduling(copy.deepcopy(ga.models), self.node_stats, priority=self.conf.mt.scheduling)
 
         # SA configuration
         self.initial_cost = self._calc_cost(self.layer_tracker, self.initial_schedule)
@@ -155,10 +156,9 @@ class MultiTenancyProblem():
                 t = self.t_start / (i+1)
                 new_state = self._random_modify(current_state)
 
-                new_exec_graphs = copy.deepcopy(self.execution_graphs)
-                self._write_binding_to_graph(new_state, new_exec_graphs)
-                
-                node_schedules = list_scheduling(new_exec_graphs, self.node_stats, priority=self.conf.mt.scheduling)
+                new_models = copy.deepcopy(self.models)
+                self._write_binding_to_graph(new_state, new_models)
+                node_schedules = list_scheduling(new_models, self.node_stats, priority=self.conf.mt.scheduling)
                 
                 new_cost = self._calc_cost(new_state, node_schedules)
                 
@@ -228,9 +228,9 @@ class MultiTenancyProblem():
             bindings = [platform_lut[b] for b in bindings_int]
             work_layer_tracker.set_all_bindings(bindings)
 
-            new_exec_graphs = copy.deepcopy(self.execution_graphs) #TODO How to remove deepcopy?
-            self._write_binding_to_graph(work_layer_tracker, new_exec_graphs)
-            node_schedules = list_scheduling(new_exec_graphs, self.node_stats, priority=self.conf.mt.scheduling)
+            new_models = copy.deepcopy(self.models)
+            self._write_binding_to_graph(work_layer_tracker, new_models)
+            node_schedules = list_scheduling(new_models, self.node_stats, priority=self.conf.mt.scheduling)
             
             # Add information to be later retrieved
             trial.set_user_attr("schedule", node_schedules)
@@ -352,7 +352,8 @@ class MultiTenancyProblem():
 
         return edp_cost**0.4 +  util_cost**2.5 + lat_cost*2
     
-    def _write_binding_to_graph(self, tracker: LayerTracker, exec_graphs: dict[str, ExecutionGraph]):
+    def _write_binding_to_graph(self, tracker: LayerTracker, models: dict[str, OnnxModel]):
         for nw, layer, binding in tracker:
-            exec_graphs[nw].reduced_graph.nodes[layer]["binding"] = binding
+            node = models[nw].node_by_layer(layer)
+            node.scheduling.binding = binding
 

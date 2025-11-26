@@ -13,8 +13,10 @@ import numpy as np
 from typing import Literal, Optional, Union
 from copy import deepcopy
 
+from framework.model.layers.rename_layer import RenameLayer
+from framework.model.layers.compute_layer import ComputationLayer
+from framework.model.onnx_model import OnnxModel
 from framework.noc.noc import NocTopology
-from framework.model.execution_graph import ExecutionGraph
 from framework.node.node_evaluator import SystemResult, LayerResult
 from framework.helpers.dtypes import ComputeTask, TransferTask
 
@@ -219,13 +221,10 @@ class SystemSchedule:
         return total_energy
 
 
-def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemResult, 
+def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, 
                     priority: Literal["earliest_start", "shortest_job", "earliest_finish"]) -> SystemSchedule:
     """Used for MultiTenancy partitioning. After the layers have been assigned to cores,
     we must determine a start time for each layer"""
-
-    from framework.model.onnx_model import OnnxModel
-    dummy = OnnxModel()
 
     # Define helper functions to find layers
     def find_layer_info(id: int, nw_name: str, layer_name: str):
@@ -234,60 +233,64 @@ def list_scheduling(exec_graphs: dict[str, ExecutionGraph], node_stats: SystemRe
             return network[layer_name]
         return False
 
-    schedule = SystemSchedule(node_stats.get_platform_ids(), list(exec_graphs.keys()) )
+    schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()) )
 
     # Need to keep track of earliest valid starting time for each node here
-    for network, exec_graph in exec_graphs.items():
-        for node_name in exec_graph.reduced_graph.nodes:
-            node = exec_graph.reduced_graph.nodes[node_name]
-            node["earliest_start"] = 0.0
+    #for network, model in models.items():
+    #    for layer in model.nodes:
+    #        if isinstance(layer, ComputationLayer):
+    #            layer.scheduling.earliest_start = 0.0
 
     # While not all nodes have been assigned
     all_assigned = False
     while not all_assigned:
         #Determine all nodes that can be scheduled (all that have no predecessor)
-        V_ready: list[tuple] = []
-        for network, exec_graph in exec_graphs.items():
-            for node_name in exec_graph.reduced_graph.nodes:
-                if exec_graph.reduced_graph.in_degree(node_name) == 0:
-                    node = exec_graph.reduced_graph.nodes[node_name]
-                    platform = node["binding"]
-                    node["eval_data"] = find_layer_info(platform, network, node_name)
-                    introduced_delay = abs(schedule.node_schedules[platform].cur_time - node["earliest_start"])
-                    V_ready.append( (network, node_name, node, introduced_delay) )
+        V_ready: list[tuple[str, LayerResult, ComputationLayer, float]] = []
+        misc_layers: list[tuple[str, RenameLayer]] = []
+        for network, model in models.items():
+            for layer in model.nodes:
+                if isinstance(layer, ComputationLayer):
+                    if model.in_degree(layer) == 0:
+                        platform = layer.scheduling.binding
+                        eval_data = find_layer_info(platform, network, layer.layer_name)
+                        introduced_delay = abs(schedule.node_schedules[platform].cur_time - layer.scheduling.earliest_start)
+                        V_ready.append( (network, eval_data, layer, introduced_delay) )
+                else:
+                    misc_layers.append((network, layer))
         
         match priority:
             case "earliest_start":
-                V_ready = sorted(V_ready, key=lambda data: data[2]["earliest_start"])
+                V_ready = sorted(V_ready, key=lambda data: data[2].scheduling.earliest_start)
             case "shortest_job":
-                V_ready = sorted(V_ready, key=lambda data: data[2]["eval_data"].latency)
+                V_ready = sorted(V_ready, key=lambda data: data[1].latency)
             case "earliest_finish":
-                V_ready = sorted(V_ready, key=lambda data: data[2]["earliest_start"]+data[2]["eval_data"].latency)
+                V_ready = sorted(V_ready, key=lambda data: data[2].scheduling.earliest_start + data[1].latency)
             case _:
                 raise RuntimeError(f"Found an unknown {priority}")
 
-
-        for network, layer_name, layer_data, introduced_delay in V_ready:
-            binding = layer_data["binding"]
-            layer_result = find_layer_info(binding, network, layer_name) #should be name
+        for network, eval_data, layer, introduced_delay in V_ready:
+            binding = layer.scheduling.binding
+            layer_result = find_layer_info(binding, network, layer.layer_name)
+            layer_name = layer.layer_name
             if layer_result:
-                schedule.assign_layer(binding, network, layer_result, layer_data["earliest_start"])
+                schedule.assign_layer(binding, network, layer_result, layer.scheduling.earliest_start)
 
                 # Before we remove the node, set the earliest start for all successory
-                for succ_name in exec_graphs[network].reduced_graph.successors(layer_name):
-                    succ_node = exec_graphs[network].reduced_graph.nodes[succ_name]
+                for succ in models[network].successors(layer):
                     succ_task = schedule.layers[binding][network][layer_name]
-                    succ_node["earliest_start"] = max(succ_node["earliest_start"], succ_task.end_time)
+                    succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, succ_task.end_time)
 
-                exec_graphs[network].reduced_graph.remove_node(layer_name)
+                models[network].remove_node(layer)
+        
+        for network, layer in misc_layers:
+            models[network].remove_node(layer)
 
-        num_remaining_nodes = sum([graph.reduced_graph.number_of_nodes() for graph in exec_graphs.values()])
+        num_remaining_nodes = sum([graph.number_of_nodes() for graph in models.values()])
         all_assigned = (num_remaining_nodes == 0)
 
     return schedule
 
-
-def noc_scheduling(noc: NocTopology, execution_graph: dict[str, ExecutionGraph]):
+def noc_scheduling(noc: NocTopology, execution_graph: dict[str, OnnxModel]):
     # If the noc is given and we have the relations between tensors and computes, perform the scheduling
     ...
 
