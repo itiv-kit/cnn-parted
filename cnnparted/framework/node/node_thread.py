@@ -3,7 +3,7 @@ import csv
 import copy
 import numpy as np
 
-from framework.module_thread_interface import ModuleThreadInterface
+from framework.helpers.module_thread_interface import ModuleThreadInterface
 from framework.node.timeloop import Timeloop
 from framework.node.mnsim_interface import MNSIMInterface
 from framework.node.generic_node import GenericNode
