@@ -235,6 +235,10 @@ class MiscOperationsKind(IntEnum):
     Transpose = auto()
     LayerNormalization = auto()
     Constant = auto()
+    Clip = auto()
+    Shape = auto()
+    Slice = auto()
+    Resize = auto()
     unknown = auto()
 
 @dataclass

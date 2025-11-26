@@ -23,6 +23,10 @@ from framework.model.parser.activation_func import ActivationFuncParser
 from framework.model.parser.transpose import TransposeParser
 from framework.model.parser.layer_normalization import LayerNormalizationParser
 from framework.model.parser.concat import ConcatParser
+from framework.model.parser.clip import ClipParser
+from framework.model.parser.shape import ShapeParser
+from framework.model.parser.slice import SliceParser
+from framework.model.parser.resize import ResizeParser
 
 
 class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else nx.DiGraph):
@@ -97,6 +101,7 @@ class OnnxParser:
         "Conv": ConvParser,
         "MatMul": GemmParser,
         "Gemm": GemmParser,
+        #"ConvTranspose",
         # Elementwise operations
         "Mul": ElementwiseParser,
         "Div": ElementwiseParser,
@@ -115,6 +120,10 @@ class OnnxParser:
         "Flatten": TransposeParser,
         "LayerNormalization": LayerNormalizationParser,
         "Concat": ConcatParser,
+        "Clip": ClipParser,
+        "Shape": ShapeParser,
+        "Slice": SliceParser,
+        "Resize": ResizeParser,
     }
 
     def __init__(self, run_name: str, network_name: str):
