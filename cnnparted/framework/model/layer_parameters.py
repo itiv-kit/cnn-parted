@@ -1,29 +1,10 @@
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
-from abc import ABC, abstractmethod
+from abc import ABC
 import numpy as np
 
 class ParametersBase(ABC):
-    @abstractmethod
-    def get_input_tensor_shapes(self):
-        ...
-
-    @abstractmethod
-    def get_input_tensor_dimensions(self):
-        ...
-
-    @abstractmethod
-    def get_output_tensor_shape(self):
-        ...
-
-    @abstractmethod
-    def get_output_tensor_dimensions(self):
-        ...
-
-    @property
-    @abstractmethod
-    def dimensions(self):
-        ...
+    ...
 
 @dataclass
 class ConvParameters(ParametersBase):
@@ -66,31 +47,6 @@ class ConvParameters(ParametersBase):
         self.groups = cfg["groups"]
         self.depthwise = False #TODO Figure this out
 
-    @property
-    def dimensions(self):
-        return ["N", "M", "P", "Q", "C", "R", "S"]
-    
-    def get_input_tensor_shapes(self):
-        input_shape = [self.n, self.c, self.h, self.w]
-        kernel_shape = [self.m, self.c, self.r, self.s]
-        bias_shape = [self.m]
-        return [input_shape, kernel_shape, bias_shape]
-
-    def get_input_tensor_dimensions(self):
-        #(N,Cin​,H,W) and output (N,Cout,Hout,Wout)
-        # Kernel: (M, C/groups, R, S)
-        input_dimensions = ["N", "C", "H", "W"]
-        kernel_dimensions = ["M", "C", "R", "S"]
-        bias_dimensions = ["M"]
-        return [input_dimensions, kernel_dimensions, bias_dimensions]
-    
-    def get_output_tensor_dimensions(self):
-        return [["N", "M", "P", "Q"]]
-    
-    def get_output_tensor_shape(self):
-        oshape = [self.n, self.c, self.p, self.q]
-        return [oshape]
-    
 
 @dataclass
 class GemmParameters(ParametersBase):
@@ -109,35 +65,6 @@ class GemmParameters(ParametersBase):
         self.weights = cfg["weights"]
         self.has_bias = cfg["has_bias"]
     
-    @property
-    def dimensions(self):
-        dims = ["N", "M", "C"]
-        if self.b is not None:
-            dims = ["B"] + dims
-        return dims
-    
-    def get_input_tensor_shapes(self):
-        input_shape = [self.n, self.c]
-        weight_shape = [self.c, self.m]
-        bias_shape = [self.n, self.m]
-        out = [input_shape, weight_shape, ] #bias_shape
-        if self.has_bias:
-            out.append(bias_shape)
-        return out
-    
-    def get_input_tensor_dimensions(self):
-        out = [["N", "C"], ["C", "M"], ]
-        if self.has_bias:
-            out.append(["N", "M"])
-        return out
-
-    def get_output_tensor_dimensions(self):
-        return [["N", "M"]]
-    
-    def get_output_tensor_shape(self):
-        oshape = [self.n, self.m]
-        return [oshape]
-    
     
 @dataclass
 class PoolingParameters(ParametersBase):
@@ -150,21 +77,6 @@ class PoolingParameters(ParametersBase):
         self.padding = cfg["padding"]
         self.stride = cfg["stride"]
     
-    @property
-    def dimensions(self):
-        return []
-    
-    def get_input_tensor_shapes(self):
-        return [[]]
-
-    def get_input_tensor_dimensions(self):
-        return [[]]
-
-    def get_output_tensor_dimensions(self):
-        return [[]]
-    
-    def get_output_tensor_shape(self):
-        return [[]]
 
 class ActivationKind(IntEnum):
     Relu = auto()
@@ -181,21 +93,6 @@ class ActivationParameters(ParametersBase):
         self.shape = cfg["shape"]
         self.kind = ActivationKind[cfg["kind"]]
     
-    @property
-    def dimensions(self):
-        return []
-    
-    def get_input_tensor_shapes(self):
-        return [self.shape]
-    
-    def get_input_tensor_dimensions(self):
-        return [[]]
-
-    def get_output_tensor_dimensions(self):
-        return [[]]
-    
-    def get_output_tensor_shape(self):
-        return [self.shape]
 
 class ElementwiseKind(IntEnum):
     Add = auto()
@@ -212,21 +109,6 @@ class ElementwiseParameters(ParametersBase):
         self.shape = cfg["shape"]
         self.kind = ElementwiseKind[cfg["kind"]]
     
-    @property
-    def dimensions(self):
-        return []
-    
-    def get_input_tensor_shapes(self):
-        return [self.shape,  self.shape]
-    
-    def get_input_tensor_dimensions(self):
-        return [[], []]
-
-    def get_output_tensor_dimensions(self):
-        return [[]]
-
-    def get_output_tensor_shape(self):
-        return [self.shape]
 
 class MiscOperationsKind(IntEnum):
     Flatten = auto()
@@ -252,22 +134,6 @@ class UnaryMiscOperationParameters:
         self.out_shape = cfg["out_shape"]
         self.kind = MiscOperationsKind[cfg["kind"]]
 
-    @property
-    def dimensions(self):
-        return []
-    
-    def get_input_tensor_shapes(self):
-        return [self.in_shape]
-    
-    def get_input_tensor_dimensions(self):
-        return [[]]
-
-    def get_output_tensor_dimensions(self):
-        return [[]]
-
-    def get_output_tensor_shape(self):
-        return [self.out_shape]
-
 @dataclass
 class BinaryMiscOperationParameters:
     a_shape: list[int]
@@ -281,21 +147,6 @@ class BinaryMiscOperationParameters:
         self.out_shape = cfg["out_shape"]
         self.kind = MiscOperationsKind[cfg["kind"]]
 
-    @property
-    def dimensions(self):
-        return []
-
-    def get_input_tensor_shapes(self):
-        return [self.a_shape, self.b_shape]
-    
-    def get_input_tensor_dimensions(self):
-        return [[], []]
-
-    def get_output_tensor_dimensions(self):
-        return [[]]
-
-    def get_output_tensor_shape(self):
-        return [self.out_shape]
 
 @dataclass
 class ConstantOperationParameters:
@@ -303,22 +154,6 @@ class ConstantOperationParameters:
 
     def __init__(self):
         self.kind = MiscOperationsKind.Constant
-
-    @property
-    def dimensions(self):
-        return []
-
-    def get_input_tensor_shapes(self):
-        return []
-    
-    def get_input_tensor_dimensions(self):
-        return []
-
-    def get_output_tensor_dimensions(self):
-        return [[]]
-
-    def get_output_tensor_shape(self):
-        return [[]]
 
 
 @dataclass
