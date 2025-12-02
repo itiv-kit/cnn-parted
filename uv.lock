@@ -270,7 +270,7 @@ requires-dist = [
     { name = "joblib", specifier = ">=1.5.1" },
     { name = "kaleido", specifier = ">=1.0.0" },
     { name = "libconf", specifier = ">=2.0.1" },
-    { name = "networkx", specifier = ">=3.2.1" },
+    { name = "networkx", specifier = ">=3.5.0" },
     { name = "numpy", specifier = ">=2.0.2" },
     { name = "onnx", specifier = ">=1.18.0" },
     { name = "onnx2pytorch", specifier = ">=0.5.1" },

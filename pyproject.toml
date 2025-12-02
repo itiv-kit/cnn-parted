@@ -3,13 +3,13 @@ name = "cnn-parted"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "absl-py>=2.3.0",
     "joblib>=1.5.1",
     "kaleido>=1.0.0",
     "libconf>=2.0.1",
-    "networkx>=3.2.1",
+    "networkx>=3.5.0",
     "numpy>=2.0.2",
     "onnx>=1.18.0",
     "onnx2pytorch>=0.5.1",
