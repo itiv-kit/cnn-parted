@@ -2,14 +2,14 @@ import copy
 from math import log2
 import pathlib
 from ruamel.yaml import YAML
-yaml = YAML(typ="rt")
-import numpy as np
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
 from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from framework.helpers.config import DseNodeConfig
+
+yaml = YAML(typ="rt")
 
 class GemminiConfig(ArchitectureConfig, GenomeInterface):
     def _is_pow_2(self, n):
@@ -231,7 +231,7 @@ class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         scratchpad["factors"] = f"R=1 S=1 P=1 Q=1 N=1 C=1 M<={config.dim}"
 
         with open(constraints_out, "w") as f:
-            y = yaml.dump(constraints, f)
+            _ = yaml.dump(constraints, f)
 
 
     def write_tl_arch(self, config=None, outdir=None):
@@ -250,7 +250,7 @@ class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         accumulator = pe_cols["local"][0]
         pe_rows = pe_cols["subtree"][0]
         registers = pe_rows["local"][0]
-        macc = pe_rows["local"][1]
+        macc = pe_rows["local"][1]  # noqa: F841
 
         scratchpad["attributes"]["depth"] = int(config.spad_rows)
         scratchpad["attributes"]["width"] = config.dim * config.data_w
@@ -275,8 +275,7 @@ class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         #macc["attributes"]["word-bits"] = config.data_w
 
         with open(arch_out, "w") as f:
-            y = yaml.dump(arch, f)
-            #f.write(y)
+            _ = yaml.dump(arch, f)
 
 
     def run_tl_from_config(self, config: GemminiConfig, outdir=None):

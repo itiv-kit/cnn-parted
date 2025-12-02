@@ -1,20 +1,18 @@
 import collections
 import configparser
 import math
-from platform import node
 import torch
 from tqdm import tqdm
 
 import sys
 import os
-from framework.model.layer_parameters import LayerParameters
 from framework.model.layers.abstract_layer import LayerBase
 from framework.model.onnx_model import OnnxModel
 from framework.constants import ROOT_DIR
 sys.path.append(os.path.join(ROOT_DIR, "cnnparted", "tools", "MNSIM-2.0"))
 
 from framework.node.node_evaluator import  NodeResult, DesignResult, LayerResult, NodeEvaluator
-from framework.helpers.config import *
+from framework.helpers.config import NodeConfig
 
 from MNSIM.Interface.network import NetworkGraph
 from MNSIM.Interface.interface import TrainTestInterface

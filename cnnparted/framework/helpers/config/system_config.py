@@ -1,7 +1,5 @@
-from ast import Lambda
-import yaml
 from dataclasses import dataclass
-from typing import Literal, TypedDict
+from typing import Literal
 
 from framework.helpers.dtypes import NodeId
 
@@ -154,7 +152,7 @@ class SystemConfig:
             self.link.append(LinkConfig(link))
         
         self.num_platforms = sum([c.instances for c in self.compute])
-        self.max_id = max([c.id for c in self.compute] + [l.id for l in self.link])
+        self.max_id = max([c.id for c in self.compute] + [lnk.id for lnk in self.link])
         self.platform_ids = []
         self.platform_names = []
 

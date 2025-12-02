@@ -2,9 +2,7 @@ from dataclasses import dataclass
 
 from framework.stages.stage_base import Stage
 from framework.stages.artifacts import Artifacts
-from framework.helpers.config_helper import ConfigHelper
-from framework.helpers.config import *
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
+from framework.helpers.config import NodeConfig, LinkConfig
 
 class SystemParser(Stage):
     def __init__(self):

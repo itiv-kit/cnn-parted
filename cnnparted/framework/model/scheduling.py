@@ -2,7 +2,6 @@
 # Taken from: https://github.com/akshay-k2/m5
 ##
 
-from dataclasses import dataclass
 import itertools as it
 import random
 from joblib import Parallel, delayed
@@ -186,7 +185,6 @@ class PlatformSchedule:
     
     def assign_tensor(self, network: str, tensor):
         ...
-        n_bytes = 1000
     
     def get_idle_time(self) -> float:
         idle_time = [(nxt.end_time-cur.start_time)  for cur, nxt in it.pairwise(self.tasks)]
@@ -235,12 +233,6 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
 
     schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()) )
 
-    # Need to keep track of earliest valid starting time for each node here
-    #for network, model in models.items():
-    #    for layer in model.nodes:
-    #        if isinstance(layer, ComputationLayer):
-    #            layer.scheduling.earliest_start = 0.0
-
     # While not all nodes have been assigned
     all_assigned = False
     while not all_assigned:
@@ -268,7 +260,7 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
             case _:
                 raise RuntimeError(f"Found an unknown {priority}")
 
-        for network, eval_data, layer, introduced_delay in V_ready:
+        for network, eval_data, layer, introduced_delay in V_ready[:1]:
             binding = layer.scheduling.binding
             layer_result = find_layer_info(binding, network, layer.layer_name)
             layer_name = layer.layer_name

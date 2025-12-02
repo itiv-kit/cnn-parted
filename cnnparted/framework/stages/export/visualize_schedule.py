@@ -1,23 +1,18 @@
 import os
 import glob
 import random
-from itertools import cycle
 import numpy as np
-import pandas as pd
 import plotly.graph_objects as go
-from plotly.express.colors import qualitative
 import yaml
 
-from framework.helpers.config_helper import ConfigHelper
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.stages.optimization.partitioning_optimization import PartitioningOptimization
 from framework.stages.optimization.multitenancy_optimization import MultiTenancyOptimization
 from framework.stages.analysis.graph_analysis import GraphAnalysis
-from framework.model.scheduling import ComputeTask, TransferTask
+from framework.model.scheduling import ComputeTask
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
 from framework.stages.optimization.design_optimization import DesignPartitioningOptimization
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 @register_required_stage((PartitioningOptimization, MultiTenancyOptimization), GraphAnalysis)
 class VisualizeSchedule(Stage):
@@ -156,7 +151,7 @@ class VisualizeSchedule(Stage):
                         nw_legend_lut[nw_name] = True #workaround to show network only once in legend
 
             fig.update_layout(
-                title_text=( f"Execution Schedule"),
+                title_text=("Execution Schedule"),
                 barmode="stack",
                 showlegend=True,
             )
@@ -220,7 +215,7 @@ class VisualizeSchedule(Stage):
             fig.add_trace(bar)
     
         fig.update_layout(
-            title_text=( f"Execution Schedule"),
+            title_text=("Execution Schedule"),
             barmode="stack",
             showlegend=False,
         )

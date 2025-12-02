@@ -1,6 +1,5 @@
-from ast import Lambda
 import yaml
-from .config import *
+from .config import CnnpartedArguments, GeneralConfig, WorkloadConfig, PipelineConfig, DseStageConfig, MultiTenancyStageConfig, AccuracyConfig, SystemConfig
 
 class ConfigHelper:
     def __init__(self, args: CnnpartedArguments):

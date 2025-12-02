@@ -1,6 +1,4 @@
 import os
-from matplotlib import legend
-from matplotlib.pylab import xlabel, ylabel, yscale
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd

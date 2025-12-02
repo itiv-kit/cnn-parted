@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from framework.helpers.design_metrics import calc_metric
-from framework.helpers.config import *
+from framework.helpers.config import NodeConfig
 
 
 @dataclass
@@ -78,7 +78,7 @@ class NetworkResult:
         self.layers: dict[str, LayerResult] = {}
 
     def to_dict(self):
-        layers_list_of_dict = [l.to_dict() for l in self.layers.values()]
+        layers_list_of_dict = [layer.to_dict() for layer in self.layers.values()]
         layers = reduce(operator.ior, layers_list_of_dict, {})
         return layers
 

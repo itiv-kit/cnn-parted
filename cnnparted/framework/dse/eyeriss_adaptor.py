@@ -1,10 +1,7 @@
 import copy
-from math import sqrt
 import pathlib
 from ruamel.yaml import YAML
-yaml = YAML(typ="rt")
 import shutil
-import numpy as np
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
 from framework.dse.interfaces.genome_interface import GenomeInterface
@@ -12,6 +9,8 @@ from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.zigzag_interface import ZigzagInterface
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from framework.helpers.config import DseNodeConfig
+
+yaml = YAML(typ="rt")
 
 class EyerissConfig(ArchitectureConfig, GenomeInterface):
     def __init__(self, pe_dim_y, pe_dim_x, glb_size, ifmap_spad_size, weight_spad_size, psum_spad_size):
@@ -165,8 +164,7 @@ class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         mac["attributes"]["meshX"] = config.pe_dim_x
 
         with open(arch_out, "w") as f:
-            y = yaml.dump(arch, f)
-            #f.write(y)
+            _ = yaml.dump(arch, f)
     
     def write_tl_arch_constraints(self, config:EyerissConfig = None, outdir=None):
         if config is None:
@@ -233,7 +231,7 @@ class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         pe_array["sizes"] = config.pe_array_dim
 
         with open(arch_out, "w") as f:
-            y = yaml.dump(arch, f)
+            _ = yaml.dump(arch, f)
 
 
     def write_zigzag_mapping(self, config=None, outdir=None):
@@ -255,7 +253,7 @@ class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
                                          "D2": [f"C, {config.pe_array_dim[1]}"]}
         
         with open(mapping_out, "w") as f:
-            y = yaml.dump(mapping, f)
+            _ = yaml.dump(mapping, f)
         
 
 

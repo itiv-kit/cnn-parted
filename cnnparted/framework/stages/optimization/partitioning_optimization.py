@@ -10,7 +10,6 @@ from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 @register_required_stage(GraphAnalysis, (NodeEvaluation, DesignPartitioningOptimization) , SystemParser)
 class PartitioningOptimization(Stage):

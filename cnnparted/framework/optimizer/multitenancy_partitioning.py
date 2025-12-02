@@ -1,29 +1,21 @@
 import os
 import copy
-import itertools as it
 from collections import defaultdict
 from dataclasses import dataclass
-import time
 
 import numpy as np
-import tqdm
 import plotly.express as px
 import plotly.graph_objects as go
 
 import optuna
-from optuna.storages import JournalStorage
-from optuna.storages.journal import JournalFileBackend
 
 from framework.model.onnx_model import OnnxModel
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.optimizer.optimizer import Optimizer
-from framework.optimizer.partitioning_problem import PartitioningProblem
-from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
-from framework.model.execution_graph import ExecutionGraph
-from framework.model.scheduling import SystemSchedule, list_scheduling, PlatformSchedule 
+from framework.model.scheduling import SystemSchedule, list_scheduling
 
 
 # What this should do:
@@ -243,7 +235,7 @@ class MultiTenancyProblem():
 
         # Start the optimization, setup everything for Optuna run
         os.makedirs(self.optuna_out_dir, exist_ok=True)
-        storage=JournalStorage(JournalFileBackend(file_path=os.path.join(self.optuna_out_dir,"journal.log")))
+        #storage=JournalStorage(JournalFileBackend(file_path=os.path.join(self.optuna_out_dir,"journal.log")))
         study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize"], )
 
         study.optimize(objective, n_trials=self.conf.mt.optimizer.n_trials, n_jobs=1, show_progress_bar=True)

@@ -1,21 +1,15 @@
 import os
 import shutil
-import pickle
 from itertools import zip_longest
 
 import numpy as np
 from pymoo.core.problem import ElementwiseProblem
 
-from framework.helpers.config import *
+from framework.helpers.config import NodeConfig, LinkConfig, DseStageConfig
 
-from framework.optimizer.config import design_opt_config
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.optimizer.config.design_opt_config import DesignOptConfig
-from framework.helpers.config_helper import ConfigHelper
 from framework.stages.artifacts import Artifacts
-from framework.stages.evaluation.node_evaluation import NodeEvaluation
-from framework.stages.analysis.graph_analysis import GraphAnalysis
-from framework.stages.inputs.system_parser import SystemParser
 from framework.node.node_thread import NodeThread
 from framework.dse.simba_adaptor import SimbaConfig, SimbaArchitectureAdaptor
 from framework.dse.eyeriss_adaptor import EyerissConfig, EyerissArchitectureAdaptor
@@ -23,7 +17,7 @@ from framework.dse.gemmini_adaptor import GemminiConfig, GemminiArchitectureAdap
 
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 
-from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, SystemResult
+from framework.node.node_evaluator import SystemResult
 
 N_VAR_ACC = {
     "gemmini_like": 6,
@@ -184,7 +178,7 @@ class DesignProblem(ElementwiseProblem):
         return False
 
     def _evaluate(self, x: np.ndarray, out: dict, *args, **kwargs):
-        valid = True
+        #valid = True
 
         xs = self._split_system_input(x)
         acc_cfgs = [cfg.from_genome(param, mem_step) for (cfg, param, mem_step) in zip(self.accelerator_configs, xs, self.node_mem_steps, strict=True)]
@@ -209,7 +203,7 @@ class DesignProblem(ElementwiseProblem):
         for (cfg, in_lut, (id, stats)) in zip(xs, cfgs_already_in_lut, dse_node_stats.platforms.items()):
             if not stats.to_dict()["eval"]:
                 #simulation failed
-                valid = False
+                #valid = False
                 cost.append(float(1000000000))
                 constraints.append([1,1,1])
             else:

@@ -1,13 +1,11 @@
 import os
 import glob
 import copy
-import pickle
 
 import numpy as np
 from numpy.random import default_rng
 
 from pymoo.algorithms.moo.nsga2 import NSGA2
-from pymoo.algorithms.soo.nonconvex.ga import GA
 from pymoo.algorithms.soo.nonconvex.pso import PSO
 
 from pymoo.operators.crossover.sbx import SBX
@@ -20,11 +18,11 @@ from stable_baselines3 import PPO
 
 from framework.optimizer.optimizer import Optimizer
 from framework.optimizer.algorithms.rl_dse import DseEnv
-from framework.node.node_evaluator import SystemResult, NodeResult, DesignResult, LayerResult
+from framework.node.node_evaluator import SystemResult, NodeResult
 from framework.node.node_thread import NodeThread
 from framework.graph_analyzer import GraphAnalyzer
 from framework.optimizer.design_problem import ACCELERATOR_ADAPTOR_MAP, ACCELERATOR_CONFIG_MAP
-from framework.helpers.config import *
+from framework.helpers.config import NodeConfig, DseStageConfig
 
 #TODO Can this be unified with NodeEvaluation?
 class DesignOptimizer(Optimizer):
@@ -81,7 +79,7 @@ class DesignOptimizer(Optimizer):
             initial_x = self._gen_initial_x()
 
         pymoo_algorithms = ["nsga2", "pso"]
-        pydeap_algorithms = []
+        #pydeap_algorithms = []
         rl_algorithms = ["rl_ppo"]
 
         network = self.ga.networks[0] #TODO Multiple networks

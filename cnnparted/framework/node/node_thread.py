@@ -1,7 +1,5 @@
 import os
-import csv
 import copy
-import numpy as np
 
 from framework.helpers.module_thread_interface import ModuleThreadInterface
 from framework.node.timeloop import Timeloop
@@ -9,7 +7,6 @@ from framework.node.mnsim_interface import MNSIMInterface
 from framework.node.generic_node import GenericNode
 from framework.node.zigzag import Zigzag
 from framework.node.node_evaluator import NodeResult
-from framework.helpers.config import *
 
 
 class NodeThread(ModuleThreadInterface):

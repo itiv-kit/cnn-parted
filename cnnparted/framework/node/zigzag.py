@@ -1,25 +1,22 @@
 import pathlib
 import pickle
 from ruamel.yaml import YAML
-yaml = YAML(typ="rt")
 import importlib
-import pickle
 import sys
 import shutil
 import os
 
 from framework.constants import ROOT_DIR
-from framework.helpers.visualizer import plotMetricPerConfigPerLayer
-from framework.helpers.design_metrics import calc_metric, SUPPORTED_METRICS
 from framework.dse.interfaces.zigzag_interface import ZigzagInterface
 from framework.model.onnx_model import OnnxModel
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
-from framework.helpers.config import *
+from framework.helpers.config import NodeConfig, EvaluationConfig
 
 sys.path.append(str(pathlib.Path(ROOT_DIR, "cnnparted", "tools", "zigzag")))
 from tools.zigzag.zigzag.api import get_hardware_performance_zigzag
-from tools.zigzag.zigzag.cost_model.cost_model import CostModelEvaluation
+
+yaml = YAML(typ="rt")
 
 class Zigzag(NodeEvaluator):
     def __init__(self, in_config: NodeConfig, run_name: str) -> None:
@@ -121,7 +118,7 @@ class Zigzag(NodeEvaluator):
 
         self.adaptor.run_zigzag_from_config(design, outdir=zigzag_design_dir)
         with open(os.path.join(design_runroot, "arch_config.yaml"), "w") as f:
-            y = yaml.dump(design.get_config(), f)
+            _ = yaml.dump(design.get_config(), f)
 
         self._run_network(network, model, design_runroot, node_result, design)
 
@@ -161,13 +158,13 @@ class Zigzag(NodeEvaluator):
             cme = layer[0]
             #TODO Is this check necessary?
             if cme.layer.type in ["Conv", "Gemm"]:
-                l = LayerResult()
-                l.name = cme.layer.name
-                l.energy = cme.energy_total / 1e9 # pJ -> mJ
-                l.latency = cme.latency_total2  / self.freq * 1e3 # cycles -> ms
-                l.area = 0.0 # zigzag doesn't return the area
+                lyr = LayerResult()
+                lyr.name = cme.layer.name
+                lyr.energy = cme.energy_total / 1e9 # pJ -> mJ
+                lyr.latency = cme.latency_total2  / self.freq * 1e3 # cycles -> ms
+                lyr.area = 0.0 # zigzag doesn't return the area
 
-                design_result.add_layer_to_network(l, network)
+                design_result.add_layer_to_network(lyr, network)
 
         node_result.add_design(design_result)
         

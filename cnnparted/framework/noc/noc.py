@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Literal
 
-from framework.model.model import TensorParameters
-from framework.helpers.config_helper import ConfigHelper
+from framework.model.layer_parameters import TensorParameters
 from framework.helpers.dtypes import ComputeTask, LinkId, NodeId, NocCoordinate, TransferTask
 from framework.link.link import Link
 from framework.link.ethernet_link import EthernetLink

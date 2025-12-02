@@ -1,5 +1,4 @@
 import os
-from dataclasses import dataclass, field
 
 import onnx
 from onnx import shape_inference

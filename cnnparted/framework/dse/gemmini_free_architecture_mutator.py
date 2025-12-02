@@ -1,9 +1,8 @@
 import copy
-from math import log2
 import pathlib
 import yaml
 
-from framework.dse.gemmini_adaptor import GemminiArchitectureAdaptor, GemminiConfig
+from framework.dse.gemmini_adaptor import GemminiConfig
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 
@@ -129,7 +128,7 @@ class GemminiFreeArchitectureMutator(TimeloopInterface):
         accumulator = pe_cols["local"][0]
         pe_rows = pe_cols["subtree"][0]
         registers = pe_rows["local"][0]
-        macc = pe_rows["local"][1]
+        macc = pe_rows["local"][1]  # noqa: F841
 
         scratchpad["attributes"]["depth"] = int(config.spad_rows)
         scratchpad["attributes"]["width"] = config.mesh_dim_x * config.data_w

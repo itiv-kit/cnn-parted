@@ -55,7 +55,7 @@ class EthernetLink(LinkModelInterface):
     return float(frame_rate / mu)
 
   def _compute_power_mW(self, slice_size : int, frame_rate : int) -> float:
-    if self.enable_eee == True:
+    if self.enable_eee:
       # Model source: https://doi.org/10.1109/TCOMM.2012.081512.120089
       util_factor = self._compute_util_factor(slice_size, frame_rate)
       n_data_bytes = self._compute_n_data_bytes(slice_size)
@@ -81,7 +81,7 @@ class EthernetLink(LinkModelInterface):
 
     r_prop_s = self.cable_len_m * 6e-9 # Cable propagation delay, 6 ns/m assumed
 
-    if self.enable_eee == True:
+    if self.enable_eee:
       tx_latency_s = (self.Tw_us / 1e6) + (n_data_bytes / self.line_rate_bytes) + r_prop_s
       return float(tx_latency_s * 1e6)
     else:

@@ -1,5 +1,3 @@
-import numpy as np
-
 from .onnx_layer import OnnxLayerParser
 from ..layer_parameters import ActivationParameters
 from framework.model.onnx_tensor import OnnxTensor

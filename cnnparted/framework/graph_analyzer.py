@@ -5,9 +5,6 @@ import pandas as pd
 import networkx as nx
 
 #import framework.stages.inputs.workload_parser as wlparse
-from framework.model.model import LayerParameters, TreeModel
-from framework.model.graph import LayersGraph
-from framework.model.execution_graph import ExecutionGraph
 from framework.model.onnx_model import OnnxModel, OnnxParser 
 
 from framework.model.scheduling import topo_sort_random_start_node
@@ -21,11 +18,6 @@ class GraphAnalyzer:
         self.networks = [nw for nw in workloads.keys()]
         self.progress = progress
 
-        self._tree_models: dict[str, TreeModel] = {}
-        self._trees: dict[str, list[LayerParameters]] = {}
-        self.graphs: dict[str, LayersGraph] = {}
-        self.exec_graphs: dict[str, ExecutionGraph] = {}
-
         self.models: dict[str, OnnxModel] = {}
         self.torchmodels  = {}
         for network, workload_info in self.workloads.items():
@@ -34,11 +26,6 @@ class GraphAnalyzer:
             self.models[network]  = onnx_model
             self.torchmodels[network] = onnx_parser.get_torch_model() 
 
-            #self._tree_models[network] = TreeModel(self.run_name, network, tuple(workload_info.input_shape))
-            #self._trees[network] = self._tree_models[network].get_tree()
-            #self.torchmodels[network] = self._tree_models[network].get_torch_model()
-            #self.graphs[network] = LayersGraph(self._trees[network])
-            #self.exec_graphs[network] = ExecutionGraph(self._trees[network], workload_info)
         self.schedules: dict[str, list] = {}
 
 
@@ -71,7 +58,8 @@ class GraphAnalyzer:
         results = []
         iterator = iter(iterable)
         # Fill in the first samplesize elements:
-        for _ in range(samplesize): results.append(next(iterator))
+        for _ in range(samplesize):
+            results.append(next(iterator))
         random.shuffle(results)  # Randomize their positions
         for i, v in enumerate(iterator, samplesize):
             r = random.randint(0, i)

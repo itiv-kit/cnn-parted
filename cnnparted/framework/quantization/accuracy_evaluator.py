@@ -13,7 +13,7 @@ from model_explorer.utils.setup import build_dataloader_generators
 from framework.quantization.faulty_quantized_model import FaultyQuantizedModel
 from framework.quantization.generate_calibration import generate_calibration
 from framework.node.node_evaluator import SystemResult
-from framework.helpers.config import *
+from framework.helpers.config import AccuracyConfig
 
 
 class AccuracyEvaluator():
@@ -108,9 +108,9 @@ class AccuracyEvaluator():
                 if (idx_b, idx_f) in [*acc_lut]:
                     acc = acc_lut[(idx_b, idx_f)]
                     print("[AccuracyEvaluator] Skipping inference due to duplicate")
-            if acc == None:
+            if acc is None:
                 self.qmodel.base_model.eval()
-                acc = accuracy_function(self.qmodel.base_model, self.val_dataloadergen, progress=self.progress, title=f"Infere")
+                acc = accuracy_function(self.qmodel.base_model, self.val_dataloadergen, progress=self.progress, title="Infere")
                 acc = acc.cpu().detach().numpy()
 
                 # store to avoid duplicate evaluations

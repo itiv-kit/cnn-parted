@@ -8,7 +8,7 @@ import torch
 
 from framework.stages.stage_base import Stage
 from framework.stages.artifacts import Artifacts
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
+from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
 
 @dataclass
 class WorkloadInfo:

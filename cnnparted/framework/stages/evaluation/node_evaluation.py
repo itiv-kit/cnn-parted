@@ -7,8 +7,7 @@ from framework.stages.inputs.system_parser import SystemParser
 from framework.stages.artifacts import Artifacts
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.node.node_thread import NodeThread
-from framework.node.node_evaluator import SystemResult, NodeResult, DesignResult, LayerResult
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
+from framework.node.node_evaluator import SystemResult
 
 @register_required_stage(GraphAnalysis, SystemParser)
 class NodeEvaluation(Stage):

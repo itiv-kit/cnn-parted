@@ -1,16 +1,15 @@
 import copy
-from math import sqrt
 import pathlib
 from ruamel.yaml import YAML
-yaml = YAML(typ="rt")
 import shutil
-import numpy as np
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
 from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from framework.helpers.config import DseNodeConfig
+
+yaml = YAML(typ="rt")
 
 class SimbaConfig(ArchitectureConfig, GenomeInterface):
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
@@ -210,8 +209,7 @@ class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaustiv
         lmac["attributes"]["meshX"] = config.num_pes
 
         with open(arch_out, "w") as f:
-            y = yaml.dump(arch, f)
-            #f.write(y)
+            _ = yaml.dump(arch, f)
 
     def write_tl_arch_constraints(self, config:SimbaConfig = None, outdir=None):
         if config is None:

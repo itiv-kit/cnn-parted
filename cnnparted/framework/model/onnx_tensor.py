@@ -1,9 +1,7 @@
-import os
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 from enum import Enum, auto
 
-from onnx import ModelProto, NodeProto, TypeProto, TensorProto
+from onnx import TypeProto, TensorProto
 from onnx.mapping import TENSOR_TYPE_MAP, TensorDtypeMap
 
 class OnnxTensorKind(Enum):

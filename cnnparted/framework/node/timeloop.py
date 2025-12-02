@@ -1,7 +1,6 @@
 import pickle
 import importlib
 import os
-import stat
 import sys
 import subprocess
 from typing import Optional
@@ -12,21 +11,18 @@ import re
 import tqdm
 import shutil
 
-from framework.model.layers.abstract_layer import LayerBase 
 from framework.model.layers.compute_layer import ComputationLayer
-from framework.model.model import ConvParameters, GemmParameters, LayerParameters
+from framework.model.model import ConvParameters, GemmParameters
 from framework.model.onnx_model import OnnxModel
-from framework.dse.interfaces.genome_interface import GenomeInterface
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.dse.interfaces.timeloop_interface import TimeloopInterface
-from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
 from framework.helpers.visualizer import plotMetricPerConfigPerLayer
-from framework.helpers.design_metrics import calc_metric, SUPPORTED_METRICS
+from framework.helpers.design_metrics import SUPPORTED_METRICS
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
-from framework.helpers.config import *
+from framework.helpers.config import NodeConfig, DseStageConfig
 
 class Timeloop(NodeEvaluator):
     # Output file names.

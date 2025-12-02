@@ -1,7 +1,6 @@
 import importlib
 
 from framework.stages.stage_base import Stage
-from framework.helpers.config import *
 from framework import ConfigHelper
 
 import framework.stages as stages

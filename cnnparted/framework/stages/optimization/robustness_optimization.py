@@ -5,7 +5,6 @@ from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.inputs.workload_parser import WorkloadParser
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.optimizer.robustness_optimizer import RobustnessOptimizer
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 @register_required_stage(GraphAnalysis, WorkloadParser)
 class RobustnessOptimization(Stage):

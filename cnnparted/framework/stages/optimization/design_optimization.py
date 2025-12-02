@@ -1,9 +1,5 @@
 from dataclasses import dataclass
 
-import numpy as np
-
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
-
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import SystemResult
 from framework.stages.inputs.system_parser import SystemParser
@@ -16,7 +12,6 @@ from framework.optimizer.config.design_opt_config import DesignOptConfig
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 from framework.optimizer.design_problem import DesignProblem
 
-from framework.helpers.design_metrics import calc_metric
 from framework.helpers.config_helper import ConfigHelper
 
 @register_required_stage(GraphAnalysis, SystemParser)

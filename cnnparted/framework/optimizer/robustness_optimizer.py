@@ -11,7 +11,7 @@ from model_explorer.utils.setup import build_dataloader_generators
 
 from framework.quantization.faulty_quantized_model import FaultyQuantizedModel
 from framework.quantization.generate_calibration import generate_calibration
-from framework.helpers.config import *
+from framework.helpers.config import AccuracyConfig
 
 from scipy.optimize import dual_annealing
 

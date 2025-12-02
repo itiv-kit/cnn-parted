@@ -1,6 +1,5 @@
-import yaml
 from dataclasses import dataclass
-from typing import Literal, TypedDict
+from typing import Literal
 
 @dataclass(init=False)
 class GeneralConfig:

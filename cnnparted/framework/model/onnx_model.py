@@ -1,11 +1,10 @@
 import os
-from typing import Any, TYPE_CHECKING, Generic, TypeVar
+from typing import Any, TYPE_CHECKING
 
 import onnx
-from onnx import shape_inference, ModelProto, NodeProto, TypeProto, TensorProto
+from onnx import shape_inference, ModelProto, NodeProto, TypeProto, TensorProto  # noqa: F401
 #from onnx2pytorch import ConvertModel
 from onnx2torch import convert
-import numpy as np
 import networkx as nx
 
 from framework.constants import MODEL_PATH

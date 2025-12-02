@@ -1,10 +1,7 @@
-from dataclasses import dataclass
-
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.graph_analyzer import GraphAnalyzer
 from framework.stages.inputs.workload_parser import WorkloadParser
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 @register_required_stage(WorkloadParser)
 class GraphAnalysis(Stage):
