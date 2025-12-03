@@ -27,7 +27,7 @@ class OnnxTensor:
     @classmethod
     def from_initializer(cls, name: str, init: TensorProto):
         shape = list(init.dims)
-        elem_type = init.data_type
+        elem_type = TENSOR_TYPE_MAP[init.data_type]
         return cls(name, shape, elem_type, OnnxTensorKind.STATIC)
     
     @property

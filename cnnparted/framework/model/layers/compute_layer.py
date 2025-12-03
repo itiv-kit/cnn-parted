@@ -2,7 +2,8 @@ from dataclasses import dataclass
 
 from .abstract_layer import LayerBase
 from framework.model.layer_parameters import ComputeParameters
-from framework.model.onnx_tensor import OnnxTensor
+from framework.model.tiling.iterators import LoopDim, ConcreteLoopIterator
+from framework.model.tensor_wrapper import TensorWrapper
 
 @dataclass
 class SchedulingInfo:
@@ -20,13 +21,15 @@ class ComputationLayer(LayerBase):
                  layer_name: str, 
                  layer_params: ComputeParameters,
                  op_type: str,
-                 inputs: list[OnnxTensor], 
-                 output: OnnxTensor):
+                 inputs: list[TensorWrapper], 
+                 output: TensorWrapper,
+                 loop_dims: list[ConcreteLoopIterator]):
         self.layer_name = layer_name
         self.layer_params = layer_params
         self.op_type = op_type
         self.inputs = inputs
         self.output = output
+        self.loop_dims = loop_dims
         self.scheduling = SchedulingInfo()
 
     def __repr__(self):
