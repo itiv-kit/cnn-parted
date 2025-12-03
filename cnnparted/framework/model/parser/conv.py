@@ -6,14 +6,14 @@ from ..onnx_tensor import OnnxTensor
 from ..layer_parameters import ConvParameters
 from ..layers.compute_layer import ComputationLayer
 from framework.model.tiling.iterators import ConcreteLoopIterator, LoopDim
-from framework.model.tensor_wrapper import TensorWrapper
+from framework.model.tensor_wrapper import TensorWrapper, OperandKind
 
 class ConvParser(OnnxLayerParser):
     def parse(self, inputs: list[OnnxTensor], output: OnnxTensor) -> ComputationLayer:
         attrs = self.node.attribute
         kernel_shape = self.get_int_attr_by_name("kernel_shape", attrs, default=None) #(kh, kw)
         strides = self.get_int_attr_by_name("strides", attrs, default=[1,1])
-        dilations = self.get_int_attr_by_name("strides", attrs, default=[1,1])
+        dilations = self.get_int_attr_by_name("dilations", attrs, default=[1,1])
         groups = self.get_int_attr_by_name("groups", attrs, 1)
         pads = self.get_int_attr_by_name("pads", attrs, default=[0,0,0,0])
 
@@ -36,7 +36,7 @@ class ConvParser(OnnxLayerParser):
             'wpad': pads[0],
             'hpad': pads[1],
             'wstride': strides[0],
-            'hstride': [1],
+            'hstride': strides[1],
             'ifms':ifms,
             'ofms':ofms,
             'weights':weights,
@@ -84,7 +84,8 @@ class ConvParser(OnnxLayerParser):
                 ConcreteLoopIterator(LoopDim.C, params.c),
                 ConcreteLoopIterator(LoopDim.Q, params.h),
                 ConcreteLoopIterator(LoopDim.P, params.w),
-            ]
+            ],
+            OperandKind.INPUT
         )
 
         kernel_wrapper = TensorWrapper(
@@ -94,7 +95,8 @@ class ConvParser(OnnxLayerParser):
                 ConcreteLoopIterator(LoopDim.C, params.c),
                 ConcreteLoopIterator(LoopDim.S, params.s),
                 ConcreteLoopIterator(LoopDim.R, params.r),
-            ]
+            ],
+            OperandKind.WEIGHT
         )
         
         # Check if there is a bias that needs to be wrapped
@@ -105,7 +107,8 @@ class ConvParser(OnnxLayerParser):
                 bias_tensor,
                 [
                     ConcreteLoopIterator(LoopDim.M, params.m)
-                ]
+                ],
+                OperandKind.BIAS
             )
 
         output_wrapper = TensorWrapper(
@@ -115,7 +118,8 @@ class ConvParser(OnnxLayerParser):
                 ConcreteLoopIterator(LoopDim.C, params.c),
                 ConcreteLoopIterator(LoopDim.Q, params.q),
                 ConcreteLoopIterator(LoopDim.P, params.p),
-            ]
+            ],
+            OperandKind.OUTPUT
         )
 
         return (input_wrapper, kernel_wrapper, bias_wrapper, output_wrapper)

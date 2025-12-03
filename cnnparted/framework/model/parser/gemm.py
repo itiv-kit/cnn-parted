@@ -1,12 +1,11 @@
 import numpy as np
-from pytest import param
 
 from .onnx_layer import OnnxLayerParser
 from ..layers.compute_layer import ComputationLayer
 from framework.model.onnx_tensor import OnnxTensor
 from framework.model.layer_parameters import GemmParameters
 from framework.model.tiling.iterators import ConcreteLoopIterator, LoopDim
-from framework.model.tensor_wrapper import TensorWrapper
+from framework.model.tensor_wrapper import TensorWrapper, OperandKind
 
 class GemmParser(OnnxLayerParser):
     def parse(self, inputs: list[OnnxTensor], output: OnnxTensor) -> ComputationLayer:
@@ -70,7 +69,8 @@ class GemmParser(OnnxLayerParser):
                 [
                     ConcreteLoopIterator(LoopDim.N, params.n),
                     ConcreteLoopIterator(LoopDim.C, params.c),
-                ]
+                ],
+                OperandKind.INPUT
             )
 
             weight_wrapper = TensorWrapper(
@@ -78,7 +78,8 @@ class GemmParser(OnnxLayerParser):
                 [
                     ConcreteLoopIterator(LoopDim.C, params.c),
                     ConcreteLoopIterator(LoopDim.M, params.m),
-                ]
+                ],
+                OperandKind.WEIGHT
             )
 
             output_wrapper = TensorWrapper(
@@ -86,7 +87,8 @@ class GemmParser(OnnxLayerParser):
                 [
                     ConcreteLoopIterator(LoopDim.N, params.n),
                     ConcreteLoopIterator(LoopDim.M, params.m),
-                ]
+                ],
+                OperandKind.OUTPUT
             )
         else:
             input_wrapper = TensorWrapper(
@@ -96,7 +98,8 @@ class GemmParser(OnnxLayerParser):
                     ConcreteLoopIterator(LoopDim.B, params.b),
                     ConcreteLoopIterator(LoopDim.N, params.n),
                     ConcreteLoopIterator(LoopDim.C, params.c),
-                ]
+                ],
+                OperandKind.INPUT
             )
 
             weight_wrapper = TensorWrapper(
@@ -106,8 +109,10 @@ class GemmParser(OnnxLayerParser):
                     ConcreteLoopIterator(LoopDim.B, params.b),
                     ConcreteLoopIterator(LoopDim.C, params.c),
                     ConcreteLoopIterator(LoopDim.M, params.m),
-                ]
+                ],
+                OperandKind.WEIGHT
             )
+
             output_wrapper = TensorWrapper(
                 output,
                 [
@@ -115,7 +120,8 @@ class GemmParser(OnnxLayerParser):
                     ConcreteLoopIterator(LoopDim.B, params.b),
                     ConcreteLoopIterator(LoopDim.N, params.n),
                     ConcreteLoopIterator(LoopDim.M, params.m),
-                ]
+                ],
+                OperandKind.OUTPUT
             )
         
         return input_wrapper, weight_wrapper, output_wrapper
@@ -129,7 +135,8 @@ class GemmParser(OnnxLayerParser):
                     ConcreteLoopIterator(LoopDim.B, params.b),
                     ConcreteLoopIterator(LoopDim.N, params.n),
                     ConcreteLoopIterator(LoopDim.M, params.m),
-                ]
+                ],
+                OperandKind.BIAS
             )
         else:
             bias_wrapper = TensorWrapper(
@@ -137,7 +144,8 @@ class GemmParser(OnnxLayerParser):
                 [
                     ConcreteLoopIterator(LoopDim.N, params.n),
                     ConcreteLoopIterator(LoopDim.M, params.m),
-                ]
+                ],
+                OperandKind.BIAS
             )
         return bias_wrapper
 

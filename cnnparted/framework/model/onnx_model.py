@@ -15,6 +15,7 @@ from framework.model.layers.compute_layer import ComputationLayer
 
 from framework.model.parser.onnx_layer import OnnxLayerParser
 from framework.model.parser.conv import ConvParser
+from framework.model.parser.conv_transpose import ConvTransposeParser
 from framework.model.parser.elementwise import ElementwiseParser
 from framework.model.parser.gemm import GemmParser
 from framework.model.parser.pooling import PoolingParser
@@ -100,7 +101,7 @@ class OnnxParser:
         "Conv": ConvParser,
         "MatMul": GemmParser,
         "Gemm": GemmParser,
-        #"ConvTranspose",
+        "ConvTranspose": ConvTransposeParser,
         # Elementwise operations
         "Mul": ElementwiseParser,
         "Div": ElementwiseParser,

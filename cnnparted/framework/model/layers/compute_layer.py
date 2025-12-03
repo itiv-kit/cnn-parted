@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from .abstract_layer import LayerBase
 from framework.model.layer_parameters import ComputeParameters
-from framework.model.tiling.iterators import LoopDim, ConcreteLoopIterator
+from framework.model.tiling.iterators import ConcreteLoopIterator
 from framework.model.tensor_wrapper import TensorWrapper
 
 @dataclass
@@ -36,5 +36,8 @@ class ComputationLayer(LayerBase):
         return f"layers.{self.__class__.__name__}(layer_name={self.layer_name}), op_type={self.op_type}, params={self.layer_params}"
 
 # Specialization Classes
-class ConvLayer(ComputationLayer): ...
-class GemmLayer(ComputationLayer): ...
+class ConvLayer(ComputationLayer): 
+    ...
+
+class GemmLayer(ComputationLayer):
+    ...
