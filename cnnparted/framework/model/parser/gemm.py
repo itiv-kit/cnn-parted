@@ -94,7 +94,7 @@ class GemmParser(OnnxLayerParser):
             input_wrapper = TensorWrapper(
                 input_tensor,
                 [
-                    None,
+                    #None,
                     ConcreteLoopIterator(LoopDim.B, params.b),
                     ConcreteLoopIterator(LoopDim.N, params.n),
                     ConcreteLoopIterator(LoopDim.C, params.c),
@@ -105,7 +105,7 @@ class GemmParser(OnnxLayerParser):
             weight_wrapper = TensorWrapper(
                 weight_tensor,
                 [
-                    None,
+                    #None,
                     ConcreteLoopIterator(LoopDim.B, params.b),
                     ConcreteLoopIterator(LoopDim.C, params.c),
                     ConcreteLoopIterator(LoopDim.M, params.m),
@@ -131,7 +131,7 @@ class GemmParser(OnnxLayerParser):
             bias_wrapper = TensorWrapper(
                 bias,
                 [
-                    None,
+                    #None,
                     ConcreteLoopIterator(LoopDim.B, params.b),
                     ConcreteLoopIterator(LoopDim.N, params.n),
                     ConcreteLoopIterator(LoopDim.M, params.m),

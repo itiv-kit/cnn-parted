@@ -10,13 +10,14 @@ class GraphAnalysis(Stage):
     
     def run(self, artifacts: Artifacts):
         self._take_artifacts(artifacts)
-        ga = GraphAnalyzer(self.work_dir, self.run_name, self.workloads, artifacts.config.args.show_progress)
+        ga = GraphAnalyzer(self.work_dir, self.run_name, self.workloads, artifacts.config.args.show_progress, self.config)
         ga.find_schedules(self.num_topos)
 
         self._update_artifacts(artifacts, ga)
         
     
     def _take_artifacts(self, artifacts: Artifacts):
+        self.config = artifacts.config
         self.work_dir = artifacts.config.general.work_dir
         self.run_name = artifacts.config.args.run_name
         self.num_topos = artifacts.config.general.num_topos

@@ -5,27 +5,39 @@ import pandas as pd
 import networkx as nx
 
 #import framework.stages.inputs.workload_parser as wlparse
+from framework.helpers.config_helper import ConfigHelper
 from framework.model.onnx_model import OnnxModel, OnnxParser 
+from framework.model.tiling.layer_tiling import LayerTiling
 
 from framework.model.scheduling import topo_sort_random_start_node
 
 class GraphAnalyzer:
     def __init__(self, work_dir: str, run_name : str, 
-                 workloads: dict, progress : bool) -> None:
+                 workloads: dict, progress : bool,
+                 config: ConfigHelper) -> None:
         self.work_dir = work_dir
         self.run_name = run_name
         self.workloads = workloads
         self.networks = [nw for nw in workloads.keys()]
         self.progress = progress
+        self.graph_dot_dir = os.path.join(self.work_dir, "figures", "graphs")
+        os.makedirs(self.graph_dot_dir, exist_ok=True)
 
         self.models: dict[str, OnnxModel] = {}
         self.torchmodels  = {}
         for network, workload_info in self.workloads.items():
             onnx_parser = OnnxParser(self.run_name, network)
             onnx_model = onnx_parser.parse_graph()
+
             self.models[network]  = onnx_model
             self.torchmodels[network] = onnx_parser.get_torch_model() 
+            nx.nx_pydot.write_dot(onnx_model, os.path.join(self.graph_dot_dir, f"{network}.dot") )
+        
+        layer_tiling = LayerTiling(self.models, config)
+        layer_tiling.run()
 
+        for network, model in self.models.items():
+            nx.nx_pydot.write_dot(model, os.path.join(self.graph_dot_dir, f"{network}_tiled.dot") )
         self.schedules: dict[str, list] = {}
 
 

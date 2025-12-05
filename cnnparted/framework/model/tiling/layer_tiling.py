@@ -1,58 +1,111 @@
-import itertools as it
-
-#import framework.stages.inputs.workload_parser as wlparse
-import networkx as nx
-import matplotlib.pyplot as plt
-import numpy as np
 import copy
+import numpy as np
 
-from framework.model.execution_graph import ExecutionGraph
+from framework.model.tensor_wrapper import TensorWrapper
+from framework.model.layers.compute_layer import ComputationLayer
+from framework.model.onnx_model import OnnxModel
+from framework.model.tiling.iterators import LoopIterator, ConcreteLoopIterator, LoopDim
 from framework.helpers.config_helper import ConfigHelper
 
 class LayerTiling:
-    def __init__(self, exec: dict[str,ExecutionGraph], config: ConfigHelper):
-        self.exec = copy.deepcopy(exec)
-        #TODO: Specify num of tiles for M, P, Q dimensions for now
-        #      no support for tiling of H/W is planned currently, C prob doesn't make a lot of sense
+    def __init__(self, models: dict[str, OnnxModel], config: ConfigHelper):
+        self.models = models
         # Tiling will insert new compute nodes into the graph and remove old ones with smaller size
         # Or maybe it should just update the layer information? And make a note about tiling?
 
-        # Notes on shapes:
-        #   batch_size: N
-        #   out_channels: M
-        #   out_height: P
-        #   out_width: Q
-        self.num_tiles_n: dict[str, int] = None
-        self.num_tiles_m: dict[str, int] = None
-        self.num_tiles_p: dict[str, int] = None
-        self.num_tiles_q: dict[str, int] = None
-
-        # Dependencies between the shapes (what must be tiles)
-        # If N is tiled -> no dependencies
-        # If P is tiled -> depends on H (input height inferred automatically by Timeloop)
-        # If Q is tiled -> depends on W (input width inferred automatically by Timeloop)
-        # If M is tiled -> depends on M
+        # Map network to num of tiles
+        # These are "outer" tiles
+        self.tiling = {wl.name: wl.tiling for wl in config.workload.workload_spec}
     
-    def _tile_reduced_graph(self):
+    def run(self):
+        self.tile_layers()
 
-        for nw, graph in self.exec.items():
-            num_tiles_n = self.num_tiles_n[nw]
-            num_tiles_m = self.num_tiles_m[nw]
-            num_tiles_p = self.num_tiles_p[nw]
-            num_tiles_q = self.num_tiles_q[nw]
-            
-            for layer_name, layer_data in graph.reduced_graph.nodes(data=True):
-                breakpoint()
-                if num_tiles_n > 1:
-                    ...
-                if num_tiles_m > 1:
-                    ...
+    def tile_layers(self):
+        for network, model in self.models.items():
+            tiling_data = self.tiling[network]
+            layers_to_remove = []
+            layers_to_add: list[tuple[ComputationLayer, list[ComputationLayer], list[ComputationLayer]]] = []
+
+            for layer in model.nodes:
+                if not isinstance(layer, ComputationLayer):
+                    continue
                 
-                #TODO Implement these
-                #if num_tiles_p > 1:
-                #    ...
-                #if num_tiles_q > 1:
-                #    ...
+                # TODO Currently assumes that only one dimension is tiled
+                for dim, num_tiles in tiling_data:
+                    if not (layer.has_loop_dim(dim)) or (num_tiles is None):
+                        continue
 
+                    if not (layer.get_loop_iterator(dim).extent % num_tiles == 0):
+                        continue
 
+                    # This layer will be split into smaller tiles, so we remove the 
+                    # original layer at a later point
+                    layers_to_remove.append(layer)
+                    
+                    # We have a computation layer that has the corresponding dimension
+                    new_tiles = self.generate_tiles(layer, dim, num_tiles)
+
+                    # Add all new tiles to the graph
+                    for tile in new_tiles:
+                        preds = []
+                        succs = []
+                        for pred in model.predecessors(layer):
+                            preds.append(pred)
+                        for succ in model.successors(layer):
+                            succs.append(succ)
+                        layers_to_add.append((tile, preds, succs))            
+            
+            # Add new layer to the graph and connect it
+            for new_layer, preds, succs in layers_to_add:
+                model.add_layer(new_layer)
+                for pred in preds:
+                    model.add_edge(pred, new_layer)
+                for succ in succs:
+                    model.add_edge(new_layer, succ)
+
+            # All layers of the current network have been tiled, remove original layer from the graph
+            for rm_layer in layers_to_remove:
+                model.remove_layer(rm_layer)
+
+    
+    def generate_tiles(self, layer: ComputationLayer, dim: LoopDim, n_outer_tiles: int) -> list[ComputationLayer]:
+        generated_tiles: list[ComputationLayer] = []
+        for num in range(n_outer_tiles):
+
+            new_inputs = []
+            for inp in layer.inputs:
+                if dim not in inp.loop_iterators:
+                    new_inputs.append(inp)
+                    continue
+                
+                tiled_inp = copy.deepcopy(inp)
+                tiled_inp.sub_id = num
+                new_inputs.append(tiled_inp)
+                #TODO We need to perform the tiling here
+            
+            new_output = copy.deepcopy(layer.output)
+            new_output.sub_id = num
+
+            # Modify the layer parameter to reflect the tiling of the operation
+            # I.e., we tile the loop with range N into two loop with ranges (outer, inner) respectively
+            loop_var = dim.name.lower()
+            new_params = copy.deepcopy(layer.layer_params)
+            param_to_tile = getattr(new_params, loop_var)
+            param_to_tile = param_to_tile // n_outer_tiles
+            setattr(new_params, loop_var, param_to_tile) #TODO This requires params and loopdims to be an exact match
+
+            tiled_layer = ComputationLayer(
+                layer_name=layer.layer_name + f"tile_{dim.name}_{num}",
+                layer_params=new_params,
+                op_type=layer.op_type,
+                inputs=new_inputs,
+                output=new_output,
+                loop_dims=copy.deepcopy(layer.loop_dims), #TODO
+            )
+            generated_tiles.append(tiled_layer)
+        
+        return generated_tiles
+    
+    def tile_tensors(self, tensor: TensorWrapper, dim: LoopDim, n_outer_tiles: int) -> list[TensorWrapper]:
+        ...
 

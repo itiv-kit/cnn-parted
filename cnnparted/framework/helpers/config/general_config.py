@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
+from framework.model.tiling.iterators import LoopDim
 
 @dataclass(init=False)
 class GeneralConfig:
@@ -51,10 +52,33 @@ class CnnpartedArguments:
 
 
 ### Everything related to the workload configuration
+
+class TilingConfig:
+    def __init__(self, cfg: dict):
+        self.tiling: dict[LoopDim, int] = {
+            LoopDim.N: cfg.get("N"),
+            LoopDim.M: cfg.get("M"),
+            LoopDim.P: cfg.get("P"),
+            LoopDim.Q: cfg.get("Q"),
+        }
+
+    @property
+    def num_tiles(self):
+        return [num for num in self.tiling.values()]
+    
+    def __iter__(self):
+        return iter(self.tiling.items())
+
 @dataclass
 class WorkloadSpec:
     name: str
     input_size: list[int]
+    tiling: TilingConfig
+
+    def __init__(self, cfg: dict):
+        self.name = cfg["name"]
+        self.input_size = cfg["input-size"] 
+        self.tiling = TilingConfig(cfg.get("tiling", {}))
 
 
 @dataclass(init=False)
@@ -65,7 +89,7 @@ class WorkloadConfig:
         self.workload_spec = []
         for cfg in workload_cfg:
             self.workload_spec.append(
-                    WorkloadSpec(cfg["name"], cfg["input-size"])
+                    WorkloadSpec(cfg)
                 )
 
 @dataclass

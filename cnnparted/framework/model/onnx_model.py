@@ -7,6 +7,7 @@ from onnx import shape_inference, ModelProto, NodeProto, TypeProto, TensorProto 
 from onnx2torch import convert
 import networkx as nx
 
+from framework.model.tensor_wrapper import TensorWrapper
 from framework.constants import MODEL_PATH
 from framework.model.onnx_tensor import OnnxTensor, OnnxTensorKind
 from framework.model.layers.abstract_layer import LayerBase
@@ -40,8 +41,14 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         self.name_to_node_mapping[layer.layer_name] = layer
         self.add_node(layer)
     
-    def _find_consumers(self, tensor: OnnxTensor, layer_inputs: dict[str, list[OnnxTensor]]):
+    def remove_layer(self, layer: RenameLayer | ComputationLayer):
+        del self.name_to_node_mapping[layer.layer_name]
+        self.remove_node(layer)
+    
+    def _find_consumers(self, tensor: OnnxTensor | TensorWrapper, layer_inputs: dict[str, list[OnnxTensor]]):
         consumers = []
+        if isinstance(tensor, TensorWrapper):
+            tensor = tensor._onnx_tensor
         for layer_name, layer_input_tensors in layer_inputs.items():
             if tensor in layer_input_tensors:
                 consumers.append(self.name_to_node_mapping[layer_name])

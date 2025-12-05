@@ -1,5 +1,7 @@
-import yaml
+from ruamel.yaml import YAML
 from .config import CnnpartedArguments, GeneralConfig, WorkloadConfig, PipelineConfig, DseStageConfig, MultiTenancyStageConfig, AccuracyConfig, SystemConfig
+
+yaml = YAML(typ="safe")
 
 class ConfigHelper:
     def __init__(self, args: CnnpartedArguments):
@@ -25,7 +27,7 @@ class ConfigHelper:
 
     def __load_config(self) -> dict:
         with open(self.fname) as f:
-            return yaml.load(f, Loader = yaml.SafeLoader)
+            return yaml.load(f)
 
     def get_config(self) -> dict:
         return self.config

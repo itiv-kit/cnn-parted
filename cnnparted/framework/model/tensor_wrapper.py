@@ -2,7 +2,7 @@ from enum import Enum, auto
 
 import numpy as np
 from framework.model.onnx_tensor import OnnxTensor
-from framework.model.tiling.iterators import ConcreteLoopIterator, LoopIterator
+from framework.model.tiling.iterators import ConcreteLoopIterator, LoopDim, LoopIterator
 
 class OperandKind(Enum):
     INPUT = auto()
@@ -22,3 +22,11 @@ class TensorWrapper(OnnxTensor):
     @property
     def loop_iterators(self) -> list[LoopIterator]:
         return [ldim.iterator for ldim in self.loop_dims]
+    
+    def __contains__(self, key):
+        if isinstance(key, ConcreteLoopIterator):
+            return key in self.loop_dims
+        elif isinstance(key, LoopDim):
+            return key in [ldim.iterator for ldim in self.loop_dims]
+        else:
+            return False
