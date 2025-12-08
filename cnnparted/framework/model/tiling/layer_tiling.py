@@ -29,12 +29,15 @@ class LayerTiling:
             for layer in model.nodes:
                 if not isinstance(layer, ComputationLayer):
                     continue
+
+                tiling_data_op_type = tiling_data[layer.op_type]
                 
                 # TODO Currently assumes that only one dimension is tiled
-                for dim, num_tiles in tiling_data:
-                    if not (layer.has_loop_dim(dim)) or (num_tiles is None):
+                for dim, num_tiles in tiling_data_op_type:
+                    if not (layer.has_loop_dim(dim)): 
                         continue
-
+                    if (num_tiles is None) or (num_tiles == 1):
+                        continue
                     if not (layer.get_loop_iterator(dim).extent % num_tiles == 0):
                         continue
 

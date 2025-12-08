@@ -228,9 +228,13 @@ class MultiTenancyProblem():
             trial.set_user_attr("schedule", node_schedules)
             trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
 
-            return (self._score_edp(work_layer_tracker), 
-                    self._score_utilization(node_schedules), 
+            return (self._score_total_energy(work_layer_tracker), 
+                    self._score_total_latency(work_layer_tracker), 
                     self._score_max_latency(node_schedules))
+
+            #return (self._score_edp(work_layer_tracker), 
+            #        self._score_utilization(node_schedules), 
+            #        self._score_max_latency(node_schedules))
         
 
         # Start the optimization, setup everything for Optuna run
@@ -332,6 +336,24 @@ class MultiTenancyProblem():
         # Prevent idle times during execution
         idle_times = [sched.get_idle_time() for sched in schedules.node_schedules.values()]
         return sum(idle_times)
+    
+    def _score_total_energy(self, tracker: LayerTracker) -> float:
+        # For each layer we want to find the most efficient platform
+        total_energy = 0.0    
+        for nw, layer, bind in tracker:
+            # TODO Currently assumes that there is only one design
+            layer_data = self.node_stats[bind].designs[0].networks[nw].layers[layer]
+            total_energy += layer_data.energy
+        return total_energy
+
+    def _score_total_latency(self, tracker: LayerTracker) -> float:
+        # For each layer we want to find the most efficient platform
+        total_latency = 0.0    
+        for nw, layer, bind in tracker:
+            # TODO Currently assumes that there is only one design
+            layer_data = self.node_stats[bind].designs[0].networks[nw].layers[layer]
+            total_latency += layer_data.latency
+        return total_latency
     
     def _score_max_latency(self, schedules: SystemSchedule) -> float:
         latencies = [sched.cur_time for sched in schedules.node_schedules.values()]

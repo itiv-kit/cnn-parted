@@ -54,6 +54,8 @@ class CnnpartedArguments:
 ### Everything related to the workload configuration
 
 class TilingConfig:
+    SUPPORTED_OP_TYPES = ["Conv", "Gemm", "MatMul"]
+
     def __init__(self, cfg: dict):
         self.tiling: dict[LoopDim, int] = {
             LoopDim.N: cfg.get("N"),
@@ -73,12 +75,15 @@ class TilingConfig:
 class WorkloadSpec:
     name: str
     input_size: list[int]
-    tiling: TilingConfig
+    tiling: dict[str, TilingConfig] #op_type -> config
 
     def __init__(self, cfg: dict):
         self.name = cfg["name"]
         self.input_size = cfg["input-size"] 
-        self.tiling = TilingConfig(cfg.get("tiling", {}))
+        tiling_cfg = cfg.get("tiling", {})
+        self.tiling = {}
+        for op_type in TilingConfig.SUPPORTED_OP_TYPES:
+            self.tiling[op_type] = TilingConfig(tiling_cfg.get(op_type, {}))
 
 
 @dataclass(init=False)

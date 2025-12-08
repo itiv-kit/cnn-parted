@@ -38,6 +38,9 @@ class VisualizeSchedule(Stage):
         self.run_name = artifacts.config.args.run_name
         self.fig_dir = os.path.join(self.work_dir, "figures", "schedule")
         os.makedirs(self.fig_dir, exist_ok=True)
+        for file in os.listdir(self.fig_dir):
+            os.remove(os.path.join(self.fig_dir, file)) #delete all plots that may already exist
+
 
         self.platform_names = self.config.system.platform_names
 
