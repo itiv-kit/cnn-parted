@@ -33,11 +33,12 @@ class GraphAnalyzer:
             self.torchmodels[network] = onnx_parser.get_torch_model() 
             nx.nx_pydot.write_dot(onnx_model, os.path.join(self.graph_dot_dir, f"{network}.dot") )
         
-        layer_tiling = LayerTiling(self.models, config)
-        layer_tiling.run()
-
+        # Perform layer tiling and store results as a DOT file for debugging/visualization
+        layer_tiling = LayerTiling(config)
+        layer_tiling.tile_layers_inplace(self.models)
         for network, model in self.models.items():
             nx.nx_pydot.write_dot(model, os.path.join(self.graph_dot_dir, f"{network}_tiled.dot") )
+
         self.schedules: dict[str, list] = {}
 
 

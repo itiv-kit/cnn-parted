@@ -55,6 +55,7 @@ class CnnpartedArguments:
 
 class TilingConfig:
     SUPPORTED_OP_TYPES = ["Conv", "Gemm", "MatMul"]
+    SUPPORTED_TILING_DIMS = [LoopDim.N, LoopDim.M, LoopDim.P, LoopDim.Q]
 
     def __init__(self, cfg: dict):
         self.tiling: dict[LoopDim, int] = {

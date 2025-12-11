@@ -46,7 +46,7 @@ class ConcreteLoopIterator():
         """Create two new iterators by applying tiling"""
         assert len(factors) == 2, "Tiling expects factors in the form of (outer, inner)"
 
-        outer, inner = factors[0]
+        outer, inner = factors
         if outer is not None and inner is not None:
             assert outer*inner == self.extent, "outer*inner must be equal to old loop extent"
         
