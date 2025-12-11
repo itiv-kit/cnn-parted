@@ -31,15 +31,16 @@ setup-env:
   script:
     - curl -LsSf https://astral.sh/uv/install.sh | sudo  env UV_INSTALL_DIR="/usr/local/bin" sh
     - git config --global --add safe.directory /builds/ai-hardware-accelerators/cnn-parted
-    - uv sync
-    - source env/setupEnv.sh 
-    - uv pip install --no-cache-dir --index-url https://pypi.nvidia.com pytorch-quantization
-    - git -C cnnparted/tools/accelergy-table-based-plug-ins/ apply --reject ../accelergy_table_plugins.patch || true
-    - git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then uv pip install .; elif [ -f setup.py ]; then uv pip install -e .; fi'
-    - git submodule foreach --recursive 'if [ -f requirements.txt ]; then uv pip install -r requirements.txt; fi'
-    - sudo ln -s /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so
-    - source cnnparted/tools/install_tools.sh
-    - source cnnparted/tools/setupTimeloop.sh
+    - ./install.sh
+    #- uv sync
+    #- source env/setupEnv.sh 
+    #- uv pip install --no-cache-dir --index-url https://pypi.nvidia.com pytorch-quantization
+    #- git -C cnnparted/tools/accelergy-table-based-plug-ins/ apply --reject ../accelergy_table_plugins.patch || true
+    #- git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then uv pip install .; elif [ -f setup.py ]; then uv pip install -e .; fi'
+    #- git submodule foreach --recursive 'if [ -f requirements.txt ]; then uv pip install -r requirements.txt; fi'
+    #- sudo ln -s /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so
+    #- source cnnparted/tools/install_tools.sh
+    #- source cnnparted/tools/setupTimeloop.sh
 
 
 run-test:
