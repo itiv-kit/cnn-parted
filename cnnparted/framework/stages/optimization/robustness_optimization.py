@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from loguru import logger
 
 from framework.stages.artifacts import Artifacts
 from framework.stages.analysis.graph_analysis import GraphAnalysis
@@ -12,6 +13,7 @@ class RobustnessOptimization(Stage):
         super().__init__()
     
     def run(self, artifacts: Artifacts):
+        logger.info("Running robustness optimization stage")
         self._take_artifacts(artifacts)
 
         robustnessAnalyzer = RobustnessOptimizer(self.work_dir, self.run_name, self.torch_models, 

@@ -229,7 +229,7 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
         network = node_stats[id].designs[0].networks[nw_name]
         if layer_name in network:
             return network[layer_name]
-        return False
+        raise RuntimeError(f"Could not find layer {layer_name} in network {nw_name}")
 
     schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()) )
 
@@ -269,6 +269,8 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
 
                 # Before we remove the node, set the earliest start for all successory
                 for succ in models[network].successors(layer):
+                    if not isinstance(succ, ComputationLayer):
+                        continue
                     succ_task = schedule.layers[binding][network][layer_name]
                     succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, succ_task.end_time)
 

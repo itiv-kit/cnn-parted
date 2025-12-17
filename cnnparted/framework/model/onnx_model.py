@@ -6,6 +6,7 @@ from onnx import shape_inference, ModelProto, NodeProto, TypeProto, TensorProto 
 #from onnx2pytorch import ConvertModel
 from onnx2torch import convert
 import networkx as nx
+from loguru import logger
 
 from framework.model.tensor_wrapper import TensorWrapper
 from framework.constants import MODEL_PATH
@@ -197,6 +198,7 @@ class OnnxParser:
         for node in self.onnx_model.graph.node:
             if node.op_type == "Constant":
                 continue
+            logger.debug(f"Parsing layer {node.name} with op_type {node.op_type}")
             
             assert len(node.output) == 1, "Layers with more than one output are not supported"
             
@@ -214,6 +216,7 @@ class OnnxParser:
 
             model.add_layer(layer)
         
+        
         # Finalize parsing by adding output layers
         outputs = [outp.name for outp in self.onnx_model.graph.output]
         model_output_tensors = self._get_tensors(outputs)
@@ -221,6 +224,8 @@ class OnnxParser:
             layer_inputs[output] = [tensor]
             layer_repr = OutputLayer(layer_name=output, input=[tensor])
             model.add_layer(layer_repr)
+
+        logger.debug(f"Done parsing Onnx model, there are {model.number_of_nodes()} layers")
         
         # Finally, determine edges between the nodes
         model.construct_layer_relations(layer_outputs, layer_inputs)

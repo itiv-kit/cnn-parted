@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from loguru import logger
 
 from framework.model.scheduling import SystemSchedule
 from framework.optimizer.multitenancy_partitioning import LayerTracker
@@ -17,6 +18,7 @@ class MultiTenancyOptimization(Stage):
         super().__init__()
     
     def run(self, artifacts):
+        logger.info("Running multi-tenancy optimization stage")
         self._take_artifacts(artifacts)
 
         mt_optimizer = MultiTenancyPartitioning(self.work_dir, self.node_results, self.ga, self.config)

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import copy
+from loguru import logger
 
 #from framework.stages import GraphAnalysis, SystemParser
 from framework.stages.analysis.graph_analysis import GraphAnalysis
@@ -15,7 +16,7 @@ class NodeEvaluation(Stage):
         super().__init__()
     
     def run(self, artifacts: Artifacts):
-
+        logger.info("Running NodeEvaluation stage")
         self._take_artifacts(artifacts)
 
         node_eval_stats = SystemResult()

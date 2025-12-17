@@ -1,5 +1,6 @@
 import os
 import copy
+from loguru import logger
 
 from framework.helpers.module_thread_interface import ModuleThreadInterface
 from framework.node.timeloop import Timeloop
@@ -27,6 +28,7 @@ class NodeThread(ModuleThreadInterface):
         node_result_networks = []
 
         # Select which simulator should be used
+        logger.debug(f"Running evaluation of {self.config.accelerator}_{self.config.id} with evaluator {self.config.evaluation.simulator}")
         match self.config.evaluation.simulator:
             case "timeloop":
                 simulator = Timeloop(self.config, self.dse_system_config)

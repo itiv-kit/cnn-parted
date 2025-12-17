@@ -10,6 +10,7 @@ import glob
 import re
 import tqdm
 import shutil
+from loguru import logger
 
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.model.model import ConvParameters, GemmParameters
@@ -91,6 +92,7 @@ class Timeloop(NodeEvaluator):
     def run_from_adaptor(self, network: str, model: OnnxModel, adaptor: TimeloopInterface, progress : bool = False) -> NodeResult:
         self.adaptor = adaptor
         node_result = NodeResult(self.node_config)
+        logger.debug("Running Timeloop from DSE adaptor...")
 
         if not self.adaptor.design_space:
             self._run_design(network, model, progress, node_result, adaptor.config)
@@ -105,6 +107,7 @@ class Timeloop(NodeEvaluator):
             for i, design in enumerate(self.adaptor.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
                     shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
+                logger.debug(f"Running design: {design}")
                 self._run_design(network, model, progress, node_result, design, i)
             
             # Plot all metrics in all combinations of line/bar, scale/log
@@ -121,6 +124,7 @@ class Timeloop(NodeEvaluator):
     def run(self, network: str, model: OnnxModel, progress : bool = False) -> NodeResult:
         node_result = NodeResult(self.node_config)
         node_result.accelerator_name = self.accname
+        logger.debug("Running Timeloop...")
 
         # Here for compatibility with old definition
         if self.adaptor is not None:
@@ -129,6 +133,7 @@ class Timeloop(NodeEvaluator):
             for i, design in enumerate(self.adaptor.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
                     shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
+                logger.debug(f"Running design: {design}")
                 self._run_design(network, model, progress, node_result, design, i)
             
             # Plot all metrics in all combinations of line/bar, scale/log
@@ -145,6 +150,7 @@ class Timeloop(NodeEvaluator):
                 output, valid = self._run_layer(self.runroot, layer, tl_files_path=None)
 
                 if not valid:
+                    logger.debug(f"Timeloop: running layer {layer_name} was invalid")
                     self.stats = {}
                     return
 
@@ -153,6 +159,7 @@ class Timeloop(NodeEvaluator):
                 layer_result.latency = output["latency_ms"]
                 layer_result.energy = output["energy_mJ"]
                 layer_result.area = output["area_mm2"]
+                logger.debug(f"Timeloop: running layer {layer_name} yielded result: {layer_result}")
 
                 design_result.add_layer_to_network(layer_result, network)
 
@@ -190,6 +197,7 @@ class Timeloop(NodeEvaluator):
             output, valid = self._run_layer(design_runroot, layer, tl_files_path=tl_design_dir)
 
             if not valid:
+                logger.debug(f"Timeloop: running layer {layer_name} was invalid")
                 return
 
             layer_result = LayerResult()
@@ -197,6 +205,7 @@ class Timeloop(NodeEvaluator):
             layer_result.latency = output["latency_ms"]
             layer_result.energy = output["energy_mJ"]
             layer_result.area = output["area_mm2"]
+            logger.debug(f"Timeloop: running layer {layer_name} yielded result: {layer_result}")
 
             design_result.add_layer_to_network(layer_result, network)
         

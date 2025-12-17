@@ -2,6 +2,7 @@ import os
 import copy
 from collections import defaultdict
 from dataclasses import dataclass
+from loguru import logger
 
 import numpy as np
 import plotly.express as px
@@ -230,6 +231,7 @@ class MultiTenancyProblem():
 
             return (self._score_total_energy(work_layer_tracker), 
                     self._score_total_latency(work_layer_tracker), 
+                    self._score_even_finish(node_schedules),
                     self._score_max_latency(node_schedules))
 
             #return (self._score_edp(work_layer_tracker), 
@@ -240,7 +242,7 @@ class MultiTenancyProblem():
         # Start the optimization, setup everything for Optuna run
         os.makedirs(self.optuna_out_dir, exist_ok=True)
         #storage=JournalStorage(JournalFileBackend(file_path=os.path.join(self.optuna_out_dir,"journal.log")))
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize"], )
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize", "minimize"], )
 
         study.optimize(objective, n_trials=self.conf.mt.optimizer.n_trials, n_jobs=1, show_progress_bar=True)
         
@@ -249,14 +251,16 @@ class MultiTenancyProblem():
         file_name = "paretos_edp_latency_optuna"
         fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
 
-        fig_hv: go.Figure = optuna.visualization.plot_hypervolume_history(study, [0,0,0])
-        file_name_hv = "hypervolume_optuna"
-        fig_hv.write_html(os.path.join(self.plot_dir, file_name_hv+".html"))
+        #fig_hv: go.Figure = optuna.visualization.plot_hypervolume_history(study, [0,0,0])
+        #file_name_hv = "hypervolume_optuna"
+        #fig_hv.write_html(os.path.join(self.plot_dir, file_name_hv+".html"))
 
         # Update the layer tracker with the results #TODO Multi-objective opt
         trial_least_idle = max(study.best_trials, key=lambda t: t.values[0])
         trial_least_idle_params = [platform_lut[b] for b in trial_least_idle.params.values()]
         work_layer_tracker.set_all_bindings(trial_least_idle_params)
+
+        logger.debug(f"Multi-Tenancy optimization complete, found {len(study.best_trials)} Parto-optimal solutions")
 
         results: list[tuple[LayerTracker, SystemSchedule]] = []
         for trial in study.best_trials:
@@ -299,6 +303,7 @@ class MultiTenancyProblem():
 
     def minimize(self):
         # Distribute workload between platforms
+        logger.debug(f"Optimizing multitenancy problem with {self.conf.mt.algorithm}")
         if self.conf.mt.algorithm == "optuna":
             solutions = self._optuna_optimizer()
         elif self.conf.mt.algorithm == "sa":
@@ -329,8 +334,15 @@ class MultiTenancyProblem():
             # TODO Currently assumes that there is only one design
             layer_data = self.node_stats[bind].designs[0].networks[nw].layers[layer]
             total_edp += layer_data.edp
-        
         return total_edp
+    
+    def _score_even_finish(self, schedules: SystemSchedule):
+        sched_finish_times = [sched.cur_time for sched in schedules.node_schedules.values()]
+        latest_finish = max(sched_finish_times)
+        total_idling_at_end = 0.0
+        for sched in schedules.node_schedules.values():
+            total_idling_at_end += (latest_finish - sched.cur_time)
+        return total_idling_at_end
     
     def _score_utilization(self, schedules: SystemSchedule) -> float:
         # Prevent idle times during execution

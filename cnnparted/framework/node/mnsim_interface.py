@@ -3,6 +3,7 @@ import configparser
 import math
 import torch
 from tqdm import tqdm
+from loguru import logger
 
 import sys
 import os
@@ -102,7 +103,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
                 return i - l_idx
 
     def _get_net(self, model: OnnxModel, hardware_config : dict = None) -> NetworkGraph:
-        if hardware_config == None:
+        if hardware_config is None:
             hardware_config = {'xbar_size': 512, 'input_bit': 2, 'weight_bit': 1, 'quantize_bit': 10}
         layer_config_list = []
         quantize_config_list = []
@@ -133,7 +134,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
                 pad = conv_params.wpad
                 srd = conv_params.wstride
                 depthwise =  conv_params.depthwise
-                if depthwise==True:
+                if depthwise:
                     lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd,'depthwise':'separable'}
                 else:
                     lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd}
@@ -240,12 +241,13 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             energy = mod_e.arch_energy[idx]
             area=area_list[idx]
 
-            l = LayerResult()
-            l.name = layer[0][0].get('name')
-            l.latency = latency / 1e6 # ns -> ms
-            l.energy = energy / 1e6 # nJ -> mJ
-            l.area = area / 1e6 # um^2 -> mm^2
-            design.add_layer_to_network(l, network)
+            lyr_result = LayerResult()
+            lyr_result.name = layer[0][0].get('name')
+            lyr_result.latency = latency / 1e6 # ns -> ms
+            lyr_result.energy = energy / 1e6 # nJ -> mJ
+            lyr_result.area = area / 1e6 # um^2 -> mm^2
+            logger.debug(f"MNSIM: Finished running {lyr_result.name}, yielded result: {lyr_result}")
+            design.add_layer_to_network(lyr_result, network)
 
         # for compatibility reasons with DSE-Extension
         node_res.add_design(design)

@@ -1,3 +1,6 @@
+import numpy as np
+from loguru import logger
+
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
 from framework.stages.optimization.partitioning_optimization import PartitioningOptimization
@@ -6,7 +9,6 @@ from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.quantization.accuracy_evaluator import AccuracyEvaluator
 
-import numpy as np
 
 @register_required_stage(GraphAnalysis, NodeEvaluation, PartitioningOptimization, WorkloadParser)
 class AccuracyEvaluation(Stage):
@@ -14,6 +16,7 @@ class AccuracyEvaluation(Stage):
         super().__init__()
 
     def run(self, artifacts: Artifacts):
+        logger.info("Running AccuracyEvaluation stage")
         self._take_artifacts(artifacts)
         if self.config.accuracy is not None:
             accuracy_cfg = self.config.accuracy

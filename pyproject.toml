@@ -9,6 +9,7 @@ dependencies = [
     "joblib>=1.5.1",
     "kaleido>=1.0.0",
     "libconf>=2.0.1",
+    "loguru>=0.7.3",
     "networkx>=3.5.0",
     "numpy>=2.0.2",
     "onnx>=1.18.0",

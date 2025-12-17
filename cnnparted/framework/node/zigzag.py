@@ -5,6 +5,7 @@ import importlib
 import sys
 import shutil
 import os
+from loguru import logger
 
 from framework.constants import ROOT_DIR
 from framework.dse.interfaces.zigzag_interface import ZigzagInterface
@@ -138,6 +139,9 @@ class Zigzag(NodeEvaluator):
         zigzag_pickle = pathlib.Path(zigzag_design_workdir, "out", "results.pkl")
 
         #modelfile = pathlib.Path(self.model_dir, self.run_name, network + "_new_model.onnx")
+        logger.debug(f"Zigzag: Running model {network}...")
+        logger.debug(f"Zigzag: Accelerator from {accfile}")
+        logger.debug(f"Zigzag: Mapping from {accfile}")
 
         #the model does not give area
         energy, latency, cmes = get_hardware_performance_zigzag(workload=model.onnx_in_model, 
@@ -157,7 +161,7 @@ class Zigzag(NodeEvaluator):
         for layer in layers:
             cme = layer[0]
             #TODO Is this check necessary?
-            if cme.layer.type in ["Conv", "Gemm"]:
+            if cme.layer.type in ["Conv", "Gemm", "MatMul"]:
                 lyr = LayerResult()
                 lyr.name = cme.layer.name
                 lyr.energy = cme.energy_total / 1e9 # pJ -> mJ

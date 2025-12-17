@@ -3,6 +3,7 @@ import random
 import numpy as np
 import pandas as pd
 import networkx as nx
+from loguru import logger
 
 #import framework.stages.inputs.workload_parser as wlparse
 from framework.helpers.config_helper import ConfigHelper
@@ -26,6 +27,7 @@ class GraphAnalyzer:
         self.models: dict[str, OnnxModel] = {}
         self.torchmodels  = {}
         for network, workload_info in self.workloads.items():
+            logger.debug(f"Parsing Model for network {network}")
             onnx_parser = OnnxParser(self.run_name, network)
             onnx_model = onnx_parser.parse_graph()
 

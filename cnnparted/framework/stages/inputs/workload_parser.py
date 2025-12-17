@@ -5,6 +5,7 @@ import shutil
 from dataclasses import dataclass
 from collections.abc import Callable
 import torch
+from loguru import logger
 
 from framework.stages.stage_base import Stage
 from framework.stages.artifacts import Artifacts
@@ -22,7 +23,7 @@ class WorkloadParser(Stage):
         super().__init__()
 
     def run(self, artifacts):
-
+        logger.info("Parsing workload configuration")
         self._take_artifacts(artifacts)
 
         workloads: dict[str, WorkloadInfo] = {}
@@ -36,6 +37,7 @@ class WorkloadParser(Stage):
         
                 # Check if the model is specified as a locally available ONNX file
                 if os.path.isfile(workload.name) and workload.name.endswith(".onnx"):
+                    logger.debug(f"Instantiate workload {wl_name} from ONNX file and input-size {workload.input_size}")
                     shutil.copy(workload.name, filename)
 
                     #TODO Accuracy evaluation is currently not supported, if possible integrate a way to specify it
@@ -43,6 +45,7 @@ class WorkloadParser(Stage):
                     workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, filename)
         
                 else:
+                    logger.debug(f"Instantiate workload {wl_name} from PyTorch repository and input-size {workload.input_size}")
                     model = importlib.import_module(
                         f"{WORKLOAD_FOLDER}.{workload.name}", package=__package__
                     ).model

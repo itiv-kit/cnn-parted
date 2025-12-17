@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from loguru import logger
 
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
@@ -17,6 +18,7 @@ class PartitioningOptimization(Stage):
         super().__init__()
     
     def run(self, artifacts: Artifacts):
+        logger.info("Running partitioning optimization stage")
         self._take_artifacts(artifacts)
         optimizer = PartitioningOptimizer(self.ga, self.num_pp, self.node_stats, self.link_components, self.show_progress)
         n_constr, n_var, sol = optimizer.optimize(self.q_constr, self.config)

@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
@@ -15,6 +16,7 @@ class ExportPartitionResults(Stage):
         super().__init__()
 
     def run(self, artifacts: Artifacts):
+        logger.info("Exporting partitioning results")
         self._take_artifacts(artifacts)
         self._export_files()
         self._write_log_file()

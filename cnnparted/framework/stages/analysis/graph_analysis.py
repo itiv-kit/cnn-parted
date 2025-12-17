@@ -1,3 +1,5 @@
+from loguru import logger
+
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.graph_analyzer import GraphAnalyzer
@@ -9,6 +11,7 @@ class GraphAnalysis(Stage):
         super().__init__()
     
     def run(self, artifacts: Artifacts):
+        logger.info("Running GraphAnalysis stage")
         self._take_artifacts(artifacts)
         ga = GraphAnalyzer(self.work_dir, self.run_name, self.workloads, artifacts.config.args.show_progress, self.config)
         ga.find_schedules(self.num_topos)

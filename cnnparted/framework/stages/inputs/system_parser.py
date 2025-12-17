@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from loguru import logger
 
 from framework.stages.stage_base import Stage
 from framework.stages.artifacts import Artifacts
@@ -9,6 +10,7 @@ class SystemParser(Stage):
         super().__init__()
     
     def run(self, artifacts: Artifacts):
+        logger.info("Parsing system configuration")
         self._take_artifacts(artifacts)
         node_components, link_components = self.config.get_system_components()
         self._update_artifacts(artifacts, node_components, link_components)

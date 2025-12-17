@@ -1,7 +1,5 @@
-#! /usr/bin/env python3
 import itertools
 import argparse
-from genericpath import isfile
 import tempfile
 import shutil
 import torch
@@ -9,13 +7,14 @@ import os
 import sys
 import importlib
 import numpy as np
+from loguru import logger
 from timeit import default_timer as timer
 
 from framework import ConfigHelper
-from framework.helpers.config import *
+from framework.helpers.config import PipelineConfig, CnnpartedArguments
 from framework.stages.artifacts import Artifacts
-from framework.stages.stage_base import STAGE_DEPENDENCIES;
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
+from framework.stages.stage_base import STAGE_DEPENDENCIES
+from framework.constants import ROOT_DIR
 
 def parse_pipeline(config: PipelineConfig):
     stages = config.stages
@@ -53,6 +52,7 @@ def parse_pipeline(config: PipelineConfig):
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser( description='Explore partition point metrics for DNNs')
     parser.add_argument('conf_file_path', help='Path to config file')
     parser.add_argument('run_name',
@@ -121,6 +121,12 @@ if __name__ == '__main__':
         work_dir_tmp = tempfile.TemporaryDirectory(dir=ROOT_DIR)
         work_dir = work_dir_tmp.name.split(os.path.sep)[-1]
         conf_helper.general.work_dir = work_dir
+
+    # Initialize Logging infrastructure
+    logger.remove()
+    logger.add(sys.stderr, level="INFO")
+    logging_file = os.path.join(conf_helper.general.work_dir, "logfile_{time:YY-MM-DD-HH-MM-SS}.log")
+    logger.add(logging_file, level="DEBUG")
     
     if args.clear_partitioning:
         rn = args.run_name

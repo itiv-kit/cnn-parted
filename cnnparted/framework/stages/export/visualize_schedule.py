@@ -4,6 +4,7 @@ import random
 import numpy as np
 import plotly.graph_objects as go
 import yaml
+from loguru import logger
 
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
@@ -105,6 +106,7 @@ class VisualizeSchedule(Stage):
             self.mt_solutions = artifacts.multitenancy_optimization.solutions
 
     def run(self, artifacts: Artifacts):
+        logger.info("Plotting generated schedules")
         self._take_artifacts(artifacts)
 
         if artifacts.partitioning_optimization is not None:

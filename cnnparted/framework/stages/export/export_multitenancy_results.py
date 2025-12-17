@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
@@ -22,6 +23,7 @@ class ExportMultiTenancyResults(Stage):
         self.run_name = artifacts.config.args.run_name
     
     def run(self, artifacts: Artifacts):
+        logger.info("Exporting multi-tenancy results")
         self._take_artifacts(artifacts)
         mt_sol = MultitenancySolution(node_stats=self.node_results, mt_solutions=self.mt_solutions, config=self.config)
         

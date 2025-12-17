@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from loguru import logger
 
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import SystemResult
@@ -20,6 +21,7 @@ class DesignPartitioningOptimization(Stage):
         super().__init__()
     
     def run(self, artifacts: Artifacts):
+        logger.info("Running design optimization stage")
         self._take_artifacts(artifacts)
 
         cfg_helper = ConfigHelper(self.config)

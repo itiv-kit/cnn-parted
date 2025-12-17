@@ -1,12 +1,12 @@
 import copy
 import numpy as np
+from loguru import logger
 
 from framework.model.tensor_wrapper import TensorWrapper
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.model.onnx_model import OnnxModel
 from framework.model.tiling.iterators import LoopIterator, ConcreteLoopIterator, LoopDim
 from framework.helpers.config_helper import ConfigHelper
-from framework.helpers.config.general_config import TilingConfig
 
 class LayerTiling:
     def __init__(self, config: ConfigHelper):
@@ -15,6 +15,8 @@ class LayerTiling:
 
         # Map network to num of tiles, these are "outer" tiles
         self.tiling = {wl.name: wl.tiling for wl in config.workload.workload_spec}
+        for name, tiling in self.tiling.items():
+            logger.debug(f"Initialize layer tiling for network {name} with tiling={tiling}")
 
     
     def _should_skip_tile(self, layer: ComputationLayer, dim: LoopDim, num_tiles: int):
@@ -40,20 +42,21 @@ class LayerTiling:
                 layer_was_tiled = False
 
                 tiles_to_process = [layer]
+
+                logger.debug(f"Tiling layer {layer.layer_name}...")
                 
                 # Tile the current layer across all specified dimensions
                 # In the outer while-loop iterate over all dimensions that should be tiled
                 while len(tiling_data_op_type.tiling) > 0:
                     dim, num_tiles = tiling_data_op_type.tiling.popitem()
                     generated_tiles = []
+                    logger.debug(f"Tiling along dimension \"{dim.name}\" with num_tiles={num_tiles}")
 
                     # The inner while loops iterates over all currently existing tiles and applies
                     # further tiling. In essence, this models a recursive tiling where each layer is
                     # successively tiled, one dimension after the other. The order is irrelevant here.
                     while len(tiles_to_process) > 0:
                         current_tile = tiles_to_process.pop(0)
-                        if isinstance(dim, list):
-                            breakpoint()
                         if self._should_skip_tile(current_tile, dim, num_tiles):
                             generated_tiles.append(current_tile)
                         else: 
@@ -68,6 +71,7 @@ class LayerTiling:
                     tiles_to_process = copy.deepcopy(generated_tiles)
 
                 final_generated_tiles = generated_tiles
+                logger.debug(f"Generated a total of {len(final_generated_tiles)} tiles")
 
                 # If tiling was performed for the current layer we have to remove it from
                 # the graph and add the newly generated tiles to it
@@ -163,64 +167,6 @@ class LayerTiling:
             for rm_layer in layers_to_remove:
                 model.remove_layer(rm_layer)
         
-    def _tile_layer_recursive(self, tiling_cfg_optype: TilingConfig, input_tiles: list[ComputationLayer], ) -> list[ComputationLayer]:
-        if not tiling_cfg_optype.tiling:
-            # Check if any dimensions remain that should be tiled
-            return input_tiles
-        else:
-            output_tiles = []
-
-            dim_to_tile, n_outer_tiles = tiling_cfg_optype.tiling.popitem()
-
-            new_inputs = []
-            num = 999 #TODO 
-
-            #Tile every layer
-            for layer in input_tiles:
-                if not (layer.has_loop_dim(dim_to_tile)): 
-                    output_tiles.append(layer)
-                    continue
-                if (n_outer_tiles is None) or (n_outer_tiles == 1):
-                    output_tiles.append(layer)
-                    continue
-                if not (layer.get_loop_iterator(dim_to_tile).extent % n_outer_tiles == 0):
-                    output_tiles.append(layer)
-                    continue
-
-                # Copy all inputs and check if they need to be tiled, same for the output
-                new_inputs = self._find_inputs_with_dim(layer, dim_to_tile)
-                
-                new_output = copy.deepcopy(layer.output)
-                new_output.sub_id = num
-
-                # Modify the layer parameter to reflect the tiling of the operation
-                # I.e., we tile the loop with range N into two loop with ranges (outer, inner) respectively
-                loop_var = dim_to_tile.name.lower()
-                new_params = copy.deepcopy(layer.layer_params)
-                param_to_tile = getattr(new_params, loop_var)
-                param_to_tile = param_to_tile // n_outer_tiles
-                setattr(new_params, loop_var, param_to_tile) #TODO This requires params and loopdims to be an exact match
-
-                for n in range(n_outer_tiles):
-                    tiled_layer = ComputationLayer(
-                        layer_name=layer.layer_name + f"tile_{dim_to_tile.name}_{num}",
-                        layer_params=new_params,
-                        op_type=layer.op_type,
-                        inputs=new_inputs,
-                        output=new_output,
-                        loop_dims=copy.deepcopy(layer.loop_dims), #TODO
-                    )
-
-                    # Modify loop_dims to reflect tiling
-                    ldim = tiled_layer.get_loop_iterator(dim_to_tile)
-                    ldim_idx = tiled_layer.loop_dims.index(ldim)
-                    new_outer, new_inner = ldim.tile(factors=[n_outer_tiles, None])
-                    tiled_layer.loop_dims[ldim_idx] = [new_outer, new_inner]
-
-                    output_tiles.append(tiled_layer)
-
-            new_output_tiles = self._tile_layer_recursive(tiling_cfg_optype, output_tiles)
-            return new_output_tiles
     
     def generate_tiles(self, layer: ComputationLayer, dim: LoopDim, n_outer_tiles: int) -> list[ComputationLayer]:
         generated_tiles: list[ComputationLayer] = []
