@@ -175,7 +175,7 @@ class PlatformSchedule:
     
     def assign_layer(self, network: str, layer: LayerResult, earliest_start: float):
         start_time = max(earliest_start, self.cur_time)
-        end_time = max(earliest_start, self.cur_time) + layer.latency
+        end_time = start_time + layer.latency
 
         self.cur_time = start_time + layer.latency
         
@@ -241,14 +241,14 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
         misc_layers: list[tuple[str, RenameLayer]] = []
         for network, model in models.items():
             for layer in model.nodes:
-                if isinstance(layer, ComputationLayer):
-                    if model.in_degree(layer) == 0:
-                        platform = layer.scheduling.binding
-                        eval_data = find_layer_info(platform, network, layer.layer_name)
-                        introduced_delay = abs(schedule.node_schedules[platform].cur_time - layer.scheduling.earliest_start)
-                        V_ready.append( (network, eval_data, layer, introduced_delay) )
-                else:
-                    misc_layers.append((network, layer))
+                if model.in_degree(layer) == 0:
+                    if isinstance(layer, ComputationLayer):
+                            platform = layer.scheduling.binding
+                            eval_data = find_layer_info(platform, network, layer.layer_name)
+                            introduced_delay = abs(schedule.node_schedules[platform].cur_time - layer.scheduling.earliest_start)
+                            V_ready.append( (network, eval_data, layer, introduced_delay) )
+                    else:
+                        misc_layers.append((network, layer))
         
         match priority:
             case "earliest_start":
@@ -264,20 +264,22 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
             binding = layer.scheduling.binding
             layer_result = find_layer_info(binding, network, layer.layer_name)
             layer_name = layer.layer_name
-            if layer_result:
-                schedule.assign_layer(binding, network, layer_result, layer.scheduling.earliest_start)
 
-                # Before we remove the node, set the earliest start for all successory
-                for succ in models[network].successors(layer):
-                    if not isinstance(succ, ComputationLayer):
-                        continue
-                    succ_task = schedule.layers[binding][network][layer_name]
-                    succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, succ_task.end_time)
+            schedule.assign_layer(binding, network, layer_result, layer.scheduling.earliest_start)
 
-                models[network].remove_node(layer)
+            # Before we remove the node, set the earliest start for all successory
+            for succ in models[network].successors(layer):
+                current_task = schedule.layers[binding][network][layer_name]
+                succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, current_task.end_time)
+
+            models[network].remove_layer(layer)
         
         for network, layer in misc_layers:
-            models[network].remove_node(layer)
+            for succ in models[network].successors(layer):
+                # We assume here that misc layers take ZERO time to execute,
+                # for that reason we can just propagate the earliest start information here
+                succ.scheduling.earliest_start = layer.scheduling.earliest_start
+            models[network].remove_layer(layer)
 
         num_remaining_nodes = sum([graph.number_of_nodes() for graph in models.values()])
         all_assigned = (num_remaining_nodes == 0)

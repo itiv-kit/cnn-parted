@@ -1,7 +1,15 @@
 from abc import ABC
+from dataclasses import dataclass
 
 from framework.model.onnx_tensor import OnnxTensor
 from framework.model.layer_parameters import AnyLayerParameters
+
+@dataclass
+class SchedulingInfo:
+    binding: int = None
+    earliest_start: float = 0.0
+    start_time: float = None
+    end_time: float = None
 
 class LayerBase(ABC):
     def __init__(self, 
@@ -15,3 +23,4 @@ class LayerBase(ABC):
         self.op_type = op_type
         self.inputs = inputs
         self.output = output
+        self.scheduling = SchedulingInfo()

@@ -1,16 +1,8 @@
-from dataclasses import dataclass
-
-from .abstract_layer import LayerBase
+from .abstract_layer import LayerBase, SchedulingInfo
 from framework.model.layer_parameters import ComputeParameters
 from framework.model.tiling.iterators import ConcreteLoopIterator, LoopDim
 from framework.model.tensor_wrapper import TensorWrapper
 
-@dataclass
-class SchedulingInfo:
-    binding: int = None
-    earliest_start: float = 0.0
-    start_time: float = None
-    end_time: float = None
 
 
 class LoopNest:
