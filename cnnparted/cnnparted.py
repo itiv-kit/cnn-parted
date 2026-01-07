@@ -125,7 +125,7 @@ if __name__ == '__main__':
     # Initialize Logging infrastructure
     logger.remove()
     logger.add(sys.stderr, level="INFO")
-    logging_file = os.path.join(conf_helper.general.work_dir, "logfile_{time:YY-MM-DD-HH-MM-SS}.log")
+    logging_file = os.path.join(conf_helper.general.work_dir, "logfile_{time:YY-MM-DD-HH-mm-ss}.log")
     logger.add(logging_file, level="DEBUG")
     logger.debug(f"Loading config from path {args.conf_file_path}")
     logger.debug(f"Content of config file: {conf_helper.config}")

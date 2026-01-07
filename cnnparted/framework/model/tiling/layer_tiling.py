@@ -33,6 +33,7 @@ class LayerTiling:
             tiling_data = self.tiling[network]
             layers_to_remove = []
             layers_to_add: list[tuple[ComputationLayer, list[ComputationLayer], list[ComputationLayer]]] = []
+            logger.debug(f"Begin tiling for network {network}")
 
             for layer in model.nodes:
                 if not isinstance(layer, ComputationLayer):
@@ -193,6 +194,7 @@ class LayerTiling:
                 output=new_output,
                 loop_dims=copy.deepcopy(layer.loop_dims), #TODO
             )
+            logger.debug(f"Generated tile {tiled_layer.layer_name}")
 
             # Modify loop_dims to reflect tiling
             #ldim = tiled_layer.get_loop_iterator(dim)
