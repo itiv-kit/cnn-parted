@@ -16,7 +16,7 @@ from framework.optimizer.optimizer import Optimizer
 from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
-from framework.model.scheduling import SystemSchedule, list_scheduling
+from framework.scheduling import list_scheduling, SystemSchedule
 
 
 # What this should do:
@@ -230,9 +230,13 @@ class MultiTenancyProblem():
             trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
 
             return (self._score_total_energy(work_layer_tracker), 
-                    self._score_total_latency(work_layer_tracker), 
-                    self._score_even_finish(node_schedules),
-                    self._score_max_latency(node_schedules))
+                    self._score_total_latency(work_layer_tracker),
+                    self._score_idle_times(node_schedules))
+            #return (self._score_total_energy(work_layer_tracker), 
+            #        self._score_total_latency(work_layer_tracker), 
+            #        self._score_idle_times(node_schedules),
+            #        self._score_even_finish(node_schedules),
+            #        self._score_max_latency(node_schedules))
 
             #return (self._score_edp(work_layer_tracker), 
             #        self._score_utilization(node_schedules), 
@@ -242,14 +246,14 @@ class MultiTenancyProblem():
         # Start the optimization, setup everything for Optuna run
         os.makedirs(self.optuna_out_dir, exist_ok=True)
         #storage=JournalStorage(JournalFileBackend(file_path=os.path.join(self.optuna_out_dir,"journal.log")))
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize", "minimize"], )
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize"], )
 
         study.optimize(objective, n_trials=self.conf.mt.optimizer.n_trials, n_jobs=1, show_progress_bar=True)
         
         # Plotting to make sense of the results
-        fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["EDP", "Latency"], targets=lambda t: (t.values[0], t.values[2]))
-        file_name = "paretos_edp_latency_optuna"
-        fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
+        #fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["EDP", "Latency"], targets=lambda t: (t.values[0], t.values[2]))
+        #file_name = "paretos_edp_latency_optuna"
+        #fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
 
         #fig_hv: go.Figure = optuna.visualization.plot_hypervolume_history(study, [0,0,0])
         #file_name_hv = "hypervolume_optuna"
@@ -265,7 +269,19 @@ class MultiTenancyProblem():
         results: list[tuple[LayerTracker, SystemSchedule]] = []
         for trial in study.best_trials:
             results.append( (trial.user_attrs["bindings"], trial.user_attrs["schedule"]) )
-
+        
+        # Log some statistics
+        system_runtimes: list[float] = []
+        system_energy: list[float] = []
+        for trial in study.best_trials:
+            schedule: SystemSchedule = trial.user_attrs["schedule"]
+            bindings = trial.user_attrs["bindings"]
+            system_runtimes.append( max([sched.cur_time for sched in schedule.node_schedules.values()]) )
+            system_energy.append(self._score_total_energy(bindings))
+        
+        logger.info(f"Minimum found system runtime: {min(system_runtimes)}")
+        logger.info(f"Minimium system energy: {min(system_energy)}")
+            
         return results
 
     
@@ -344,7 +360,7 @@ class MultiTenancyProblem():
             total_idling_at_end += (latest_finish - sched.cur_time)
         return total_idling_at_end
     
-    def _score_utilization(self, schedules: SystemSchedule) -> float:
+    def _score_idle_times(self, schedules: SystemSchedule) -> float:
         # Prevent idle times during execution
         idle_times = [sched.get_idle_time() for sched in schedules.node_schedules.values()]
         return sum(idle_times)
@@ -373,7 +389,7 @@ class MultiTenancyProblem():
 
     def _calc_cost(self, tracker: LayerTracker, schedules: SystemSchedule) -> float:
         edp_cost = self._score_edp(tracker)
-        util_cost = self._score_utilization(schedules)
+        util_cost = self._score_idle_times(schedules)
         lat_cost = self._score_max_latency(schedules)
 
         return edp_cost**0.4 +  util_cost**2.5 + lat_cost*2

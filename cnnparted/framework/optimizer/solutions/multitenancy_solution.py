@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from framework.node.node_evaluator import SystemResult, NetworkResult
 from framework import ConfigHelper
-from framework.model.scheduling import SystemSchedule
+from framework.scheduling import SystemSchedule
 from framework.optimizer.multitenancy_partitioning import LayerTracker
 
 @dataclass

@@ -11,7 +11,7 @@ from framework.stages.artifacts import Artifacts
 from framework.stages.optimization.partitioning_optimization import PartitioningOptimization
 from framework.stages.optimization.multitenancy_optimization import MultiTenancyOptimization
 from framework.stages.analysis.graph_analysis import GraphAnalysis
-from framework.model.scheduling import ComputeTask
+from framework.helpers.dtypes import ComputeTask
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
 from framework.stages.optimization.design_optimization import DesignPartitioningOptimization
 
@@ -20,15 +20,15 @@ class VisualizeSchedule(Stage):
     def __init__(self):
         super().__init__()
         self.color_schemes = {
-                1: ["#636efa"],
-                2: ["#636efa", "#ef553b"],
-                3: ['#edf8b1','#7fcdbb','#2c7fb8'], #from here on these are taken from colorbrewer
-                4: ['#ffffcc','#a1dab4','#41b6c4','#225ea8'],
-                5: ['#ffffcc','#a1dab4','#41b6c4','#2c7fb8','#253494'],
-                6: ['#ffffcc','#c7e9b4','#7fcdbb','#41b6c4','#2c7fb8','#253494'],
-                7: ['#ffffcc','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#0c2c84'],
-                8: ['#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#0c2c84'],
-                9: ['#ffffd9','#edf8b1','#c7e9b4','#7fcdbb','#41b6c4','#1d91c0','#225ea8','#253494','#081d58']
+                1: ['#e41a1c'],
+                2: ['#e41a1c','#377eb8'],
+                3: ['#e41a1c','#377eb8','#4daf4a'],
+                4: ['#e41a1c','#377eb8','#4daf4a','#984ea3'],
+                5: ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00'],
+                6: ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33'],
+                7: ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628'],
+                8: ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628','#f781bf'],
+                9: ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628','#f781bf','#999999'],
             }
 
 
