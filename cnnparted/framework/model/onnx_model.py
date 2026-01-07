@@ -43,8 +43,16 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         self.add_node(layer)
     
     def remove_layer(self, layer: RenameLayer | ComputationLayer):
-        del self.name_to_node_mapping[layer.layer_name]
-        self.remove_node(layer)
+        if isinstance(layer, (LayerBase)):
+            del self.name_to_node_mapping[layer.layer_name]
+            self.remove_node(layer)
+        elif isinstance(layer, str):
+            layer_node = self.name_to_node_mapping[layer]
+            del self.name_to_node_mapping[layer]
+            self.remove_node(layer_node)
+        else:
+            raise RuntimeError(f"Invalid call to remove_layer, called on {type(layer)}")
+        
     
     def _find_consumers(self, tensor: OnnxTensor | TensorWrapper, layer_inputs: dict[str, list[OnnxTensor]]):
         consumers = []

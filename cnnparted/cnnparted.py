@@ -101,10 +101,9 @@ if __name__ == '__main__':
     os.environ['PYDEVD_WARN_SLOW_RESOLVE_TIMEOUT'] = '5'
     np.set_printoptions(precision=2)
 
-
-    # Setup working directory based on configuration file
     conf_helper = ConfigHelper(args)
 
+    # Check if some configuration parameters should be overwritten
     if args.top_k is not None:
         if conf_helper.dse is not None:
             conf_helper.dse.top_k = args.top_k #TODO
@@ -112,6 +111,7 @@ if __name__ == '__main__':
         if conf_helper.dse is not None:
             conf_helper.dse.prune_strict = args.prune_strict
 
+    # Setup working directory based on configuration file
     if conf_helper.general.work_dir is not None:
         work_dir = conf_helper.general.work_dir
         if os.path.isdir(work_dir) and not conf_helper.general.keep_dir:
@@ -127,6 +127,8 @@ if __name__ == '__main__':
     logger.add(sys.stderr, level="INFO")
     logging_file = os.path.join(conf_helper.general.work_dir, "logfile_{time:YY-MM-DD-HH-MM-SS}.log")
     logger.add(logging_file, level="DEBUG")
+    logger.debug(f"Loading config from path {args.conf_file_path}")
+    logger.debug(f"Content of config file: {conf_helper.config}")
     
     if args.clear_partitioning:
         rn = args.run_name

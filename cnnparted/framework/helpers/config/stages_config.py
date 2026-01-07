@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
+from enum import Enum, auto
 
 @dataclass
 class GeneticAlgConfig:
@@ -50,15 +51,22 @@ class DseStageConfig:
         self.optimizer = GeneticAlgConfig(cfg["optimizer"])
         self.algorithm = self.optimizer.algorithm
 
+class SchedulingPriority(Enum):
+    EARLIEST_START = auto()
+    EARLIEST_FINISH = auto()
+    IDLE_TIME = auto()
+    LONGEST_JOB = auto()
+    SHORTEST_JOB = auto()
+
 @dataclass
 class MultiTenancyStageConfig:
     optimizer: GeneticAlgConfig | SimulatedAnnealingConfig | OptunaConfig
     algorithm: Literal["sa", "genetic", "optuna"]
-    scheduling: Literal["earliest_start", "shortest_job", "earliest_finish"]
+    scheduling: Literal["earliest_start", "shortest_job", "earliest_finish", "longest_job", "idle_time"]
 
     def __init__(self, cfg: dict):
         self.algorithm = cfg["algorithm"]
-        self.scheduling = cfg["scheduling"]
+        self.scheduling = SchedulingPriority[cfg["scheduling"].upper()]
 
         match self.algorithm:
             case "sa":
