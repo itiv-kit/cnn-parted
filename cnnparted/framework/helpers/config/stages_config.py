@@ -62,11 +62,13 @@ class SchedulingPriority(Enum):
 class MultiTenancyStageConfig:
     optimizer: GeneticAlgConfig | SimulatedAnnealingConfig | OptunaConfig
     algorithm: Literal["sa", "genetic", "optuna"]
-    scheduling: Literal["earliest_start", "shortest_job", "earliest_finish", "longest_job", "idle_time"]
+    scheduling: Literal["list", "multi_queue"]
+    scheduling_priority: SchedulingPriority
 
     def __init__(self, cfg: dict):
         self.algorithm = cfg["algorithm"]
-        self.scheduling = SchedulingPriority[cfg["scheduling"].upper()]
+        self.scheduling = cfg["scheduling"]
+        self.scheduling_priority = SchedulingPriority[cfg["scheduling_priority"].upper()]
 
         match self.algorithm:
             case "sa":

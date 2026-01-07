@@ -2,7 +2,6 @@ from framework.helpers.config.stages_config import SchedulingPriority
 from framework.model.layers.rename_layer import RenameLayer
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.model.onnx_model import OnnxModel
-from framework.noc.noc import NocTopology
 from framework.node.node_evaluator import SystemResult, LayerResult
 from .utils import SystemSchedule
 
@@ -32,7 +31,7 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
                     if isinstance(layer, ComputationLayer):
                             platform = layer.scheduling.binding
                             eval_data = find_layer_info(platform, network, layer.layer_name)
-                            introduced_delay = abs(schedule.node_schedules[platform].cur_time - layer.scheduling.earliest_start)
+                            introduced_delay = layer.scheduling.earliest_start - schedule.node_schedules[platform].cur_time
                             V_ready.append( (network, eval_data, layer, introduced_delay) )
                     else:
                         misc_layers.append((network, layer))

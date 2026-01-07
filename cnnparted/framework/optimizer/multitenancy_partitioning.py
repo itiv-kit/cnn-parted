@@ -6,7 +6,6 @@ from loguru import logger
 
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
 
 import optuna
 
@@ -16,7 +15,7 @@ from framework.optimizer.optimizer import Optimizer
 from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
-from framework.scheduling import list_scheduling, SystemSchedule
+from framework.scheduling import list_scheduling, multi_queue_scheduling, SystemSchedule
 
 
 # What this should do:
@@ -45,8 +44,8 @@ class MultiTenancyPartitioning(Optimizer):
         node_ids = self.system_result.get_platform_ids()
         for network, model in self.ga.models.items():
             for layer in model.nodes:
-                if isinstance(layer, ComputationLayer):
-                    layer.scheduling.binding = np.random.choice(node_ids)
+                #if isinstance(layer, ComputationLayer):
+                layer.scheduling.binding = np.random.choice(node_ids)
 
 
 @dataclass
@@ -115,7 +114,12 @@ class MultiTenancyProblem():
         self.models = copy.deepcopy(ga.models)
         self.rng = np.random.default_rng()
         self.conf = global_conf
-
+        match self.conf.mt.scheduling:
+            case "list":
+                self.scheduling_algorithm = list_scheduling
+            case "multi_queue":
+                self.scheduling_algorithm = multi_queue_scheduling
+        
         # Parse execution graphs into LayerTracker
         network_info = defaultdict(lambda: defaultdict(int))
         for network, model in ga.models.items():
@@ -125,7 +129,7 @@ class MultiTenancyProblem():
 
         self.layer_tracker = LayerTracker(network_info)
         self.num_nodes = self.layer_tracker.get_num_layers()
-        self.initial_schedule = list_scheduling(copy.deepcopy(ga.models), self.node_stats, priority=self.conf.mt.scheduling)
+        self.initial_schedule = self.scheduling_algorithm(copy.deepcopy(ga.models), self.node_stats, priority=self.conf.mt.scheduling_priority)
 
         # SA configuration
         self.initial_cost = self._calc_cost(self.layer_tracker, self.initial_schedule)
@@ -151,7 +155,7 @@ class MultiTenancyProblem():
 
                 new_models = copy.deepcopy(self.models)
                 self._write_binding_to_graph(new_state, new_models)
-                node_schedules = list_scheduling(new_models, self.node_stats, priority=self.conf.mt.scheduling)
+                node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
                 
                 new_cost = self._calc_cost(new_state, node_schedules)
                 
@@ -223,7 +227,7 @@ class MultiTenancyProblem():
 
             new_models = copy.deepcopy(self.models)
             self._write_binding_to_graph(work_layer_tracker, new_models)
-            node_schedules = list_scheduling(new_models, self.node_stats, priority=self.conf.mt.scheduling)
+            node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
             
             # Add information to be later retrieved
             trial.set_user_attr("schedule", node_schedules)
