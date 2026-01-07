@@ -54,7 +54,7 @@ run-test:
     - export ACCELERGYPATH=$(which accelergy)
     - plotly_get_chrome -y
   script:
-    - python3.11 cnnparted/cnnparted.py examples/test_pipeline/alexnet_pipe.yaml test
+    - python3 cnnparted/cnnparted.py examples/test_pipeline/alexnet_pipe.yaml test
   timeout: 12 hours
   artifacts:
     when: always
