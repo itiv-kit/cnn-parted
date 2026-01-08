@@ -189,8 +189,7 @@ class Timeloop(NodeEvaluator):
         self.adaptor.run_tl_from_config(design, outdir=tl_design_dir)
         design_result = DesignResult(design.get_config())
         with open(os.path.join(design_runroot, "arch_config.yaml"), "w") as f:
-            y = yaml.safe_dump(design.get_config(), sort_keys=False)
-            f.write(y)
+            yaml.dump(design.get_config(), f)
 
         for layer in tqdm.tqdm(model.nodes, self.accname, disable=(not progress)):
             if not isinstance(layer, ComputationLayer):
