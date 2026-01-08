@@ -1,5 +1,3 @@
-from loguru import logger
-
 from framework.helpers.config.stages_config import SchedulingPriority
 from framework.model.layers.rename_layer import RenameLayer
 from framework.model.layers.compute_layer import ComputationLayer
@@ -71,12 +69,10 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
             schedule.assign_layer(platform, network, layer_result, layer.scheduling.earliest_start)
 
             # Before we remove the node, set the earliest start for all successors
-            logger.debug(f"Updating successors of layer {layer.layer_name} of {network}")
             for succ in models[network].successors(layer):
                 current_task = schedule.layers[platform][network][layer.layer_name]
                 succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, current_task.end_time)
 
-            logger.debug(f"Removing layer: {layer.layer_name} of {network} that is assigned to platform {platform}")
             models[network].remove_layer(layer)
         
         for network, layer in misc_layers:
