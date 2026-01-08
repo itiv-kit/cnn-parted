@@ -4,7 +4,6 @@ from framework.model.tiling.iterators import ConcreteLoopIterator, LoopDim
 from framework.model.tensor_wrapper import TensorWrapper
 
 
-
 class LoopNest:
     def __init__(self, loop_dims: list[ConcreteLoopIterator]):
         self.loop_order = [ldim for ldim in loop_dims]
@@ -72,13 +71,10 @@ class ComputationLayer(LayerBase):
         for idx, input in enumerate(self.inputs):
             if dim in input:
                 dependent_ins.append(input)
-        
         if dim in self.output:
             dependent_out = self.output
-        
         return dependent_ins, dependent_out
 
-    
     def tile_dim(self, dim: LoopDim, n_outer_tiles:  int):
         layer_dim = list(filter(lambda d: d.iterator==dim, self.loop_dims))[0]
         dim_idx = self.loop_dims.index(layer_dim)

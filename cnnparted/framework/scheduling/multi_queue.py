@@ -7,8 +7,10 @@ from .utils import SystemSchedule
 
 def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, 
                     priority: SchedulingPriority) -> SystemSchedule:
-    """Used for MultiTenancy partitioning. After the layers have been assigned to cores,
-    we must determine a start time for each layer"""
+    """Modified version of list scheduing. Layers that have no more predecessors are assumed
+    to be ready for scheduling and are added to V_ready. From there, these elements are
+    written to a queue, where every accelerator has its own queue from which elements are scheduled.
+    Compared to the basic list scheduling, this results in a more even utilization of accelerators"""
 
     type ReadyElement = tuple[str, LayerResult, ComputationLayer, float]
 

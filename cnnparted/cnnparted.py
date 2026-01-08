@@ -106,7 +106,7 @@ if __name__ == '__main__':
     # Check if some configuration parameters should be overwritten
     if args.top_k is not None:
         if conf_helper.dse is not None:
-            conf_helper.dse.top_k = args.top_k #TODO
+            conf_helper.dse.top_k = args.top_k
     if args.prune_strict is not None:
         if conf_helper.dse is not None:
             conf_helper.dse.prune_strict = args.prune_strict

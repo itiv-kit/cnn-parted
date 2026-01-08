@@ -324,7 +324,6 @@ class Timeloop(NodeEvaluator):
         else:
             raise RuntimeError(f"Invalid layer type for Timeloopsimulation. Found layer with op_type={layer.op_type}")
 
-
         config['problem']['instance']['R'] = r
         config['problem']['instance']['S'] = s
         config['problem']['instance']['P'] = p
@@ -354,7 +353,6 @@ class Timeloop(NodeEvaluator):
                 f.write(libconf.dumps(config))
             elif "yaml" in src:
                 yaml.dump(config, f)
-                #f.write(yaml.dump(config))
 
     def _load_accelerator_files(self, dir : str) -> list:
         arch_fnames = os.path.join(dir, 'archs', (self.accname + '.yaml'))
