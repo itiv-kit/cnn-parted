@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from optparse import Option
 import os
-import yaml
 
 from framework.constants import ROOT_DIR
 from framework.dse.interfaces.architecture_config import ArchitectureConfig

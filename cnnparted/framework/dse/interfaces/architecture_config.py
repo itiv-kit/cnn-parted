@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 import os
-import yaml
+from ruamel.yaml import YAML
+
+yaml = YAML(typ="rt")
 
 class ArchitectureConfig(ABC):
     def to_yaml(self, dir: str):

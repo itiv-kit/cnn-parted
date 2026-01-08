@@ -5,7 +5,8 @@ import sys
 import subprocess
 from typing import Optional
 import libconf
-import yaml
+from ruamel.yaml import YAML
+
 import glob
 import re
 import tqdm
@@ -24,6 +25,8 @@ from framework.helpers.visualizer import plotMetricPerConfigPerLayer
 from framework.helpers.design_metrics import SUPPORTED_METRICS
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
 from framework.helpers.config import NodeConfig, DseStageConfig
+
+yaml = YAML(typ="rt")
 
 class Timeloop(NodeEvaluator):
     # Output file names.
@@ -284,7 +287,7 @@ class Timeloop(NodeEvaluator):
             if "cfg" in src:
                 config = libconf.load(f)
             elif "yaml" in src:
-                config = yaml.load(f, Loader = yaml.SafeLoader)
+                config = yaml.load(f)
 
         for key in self.mapper_cfg.keys():
             config['mapper'][key] = self.mapper_cfg[key]
@@ -293,7 +296,8 @@ class Timeloop(NodeEvaluator):
             if "cfg" in src:
                 f.write(libconf.dumps(config))
             elif "yaml" in src:
-                f.write(yaml.dump(config))
+                yaml.dump(config, f)
+                #f.write(yaml.dump(config))
 
     def _get_timeloop_params(self, config: dict, layer: ComputationLayer) -> list:
         if isinstance(layer.layer_params, ConvParameters):
@@ -342,7 +346,7 @@ class Timeloop(NodeEvaluator):
             if "cfg" in src:
                 config = libconf.load(f)
             elif "yaml" in src:
-                config = yaml.load(f, Loader = yaml.SafeLoader)
+                config = yaml.load(f)
 
         self._get_timeloop_params(config, layer)
 
@@ -350,7 +354,8 @@ class Timeloop(NodeEvaluator):
             if "cfg" in src:
                 f.write(libconf.dumps(config))
             elif "yaml" in src:
-                f.write(yaml.dump(config))
+                yaml.dump(config, f)
+                #f.write(yaml.dump(config))
 
     def _load_accelerator_files(self, dir : str) -> list:
         arch_fnames = os.path.join(dir, 'archs', (self.accname + '.yaml'))
@@ -382,7 +387,7 @@ class Timeloop(NodeEvaluator):
     def _parse_area_stats(self, filename : str) -> float:
         area = 0.0
         with open(filename, "r") as f:
-            area_stats = yaml.load(f, Loader = yaml.SafeLoader)
+            area_stats = yaml.load(f)
             for comp in area_stats['ART']['tables']:
                 single_area = float(comp['area'])
 
