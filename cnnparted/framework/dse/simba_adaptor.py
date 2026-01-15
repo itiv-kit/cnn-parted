@@ -4,14 +4,14 @@ from ruamel.yaml import YAML
 import shutil
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
-from framework.dse.interfaces.genome_interface import GenomeInterface
-from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.genome import Genome
+from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from framework.helpers.config import DseNodeConfig
 
 yaml = YAML(typ="rt")
 
-class SimbaConfig(ArchitectureConfig, GenomeInterface):
+class SimbaConfig(ArchitectureConfig, Genome):
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
         #Constants
         self.word_bits = 8
@@ -95,7 +95,7 @@ class SimbaConfig(ArchitectureConfig, GenomeInterface):
         #self.globalbuf_size = int(self.globalbuf_depth * self.word_bits * self.block_size_global_buf // (8*1024))
 
 
-class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch):
+class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, ExhaustiveSearch):
     def __init__(self):
         super().__init__()
         self.config: SimbaConfig = None

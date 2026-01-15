@@ -17,7 +17,7 @@ from framework.model.layers.compute_layer import ComputationLayer
 from framework.model.model import ConvParameters, GemmParameters
 from framework.model.onnx_model import OnnxModel
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
-from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
 from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
@@ -76,7 +76,7 @@ class Timeloop(NodeEvaluator):
         self.config = tl_config
         self.stats = {}
 
-        self.adaptor: TimeloopInterface = None
+        self.adaptor: TimeloopAdaptor = None
         self.dse_mode = "off"
         if self.dse_node_config and self.dse_node_config.mutator is not None:
             dse_package = importlib.import_module("framework.dse")
@@ -92,7 +92,7 @@ class Timeloop(NodeEvaluator):
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
 
-    def run_from_adaptor(self, network: str, model: OnnxModel, adaptor: TimeloopInterface, progress : bool = False) -> NodeResult:
+    def run_from_adaptor(self, network: str, model: OnnxModel, adaptor: TimeloopAdaptor, progress : bool = False) -> NodeResult:
         self.adaptor = adaptor
         node_result = NodeResult(self.node_config)
         logger.debug("Running Timeloop from DSE adaptor...")

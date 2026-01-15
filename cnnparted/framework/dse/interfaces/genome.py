@@ -6,7 +6,7 @@ from pymoo.core.crossover import Crossover
 from pymoo.core.mutation import Mutation
 
 
-class GenomeInterface(ABC):
+class Genome(ABC):
     def __init__(self):
         super().__init__()
         self.crossover: Crossover = None

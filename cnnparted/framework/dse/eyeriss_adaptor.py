@@ -4,15 +4,15 @@ from ruamel.yaml import YAML
 import shutil
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
-from framework.dse.interfaces.genome_interface import GenomeInterface
-from framework.dse.interfaces.timeloop_interface import TimeloopInterface
-from framework.dse.interfaces.zigzag_interface import ZigzagInterface
+from framework.dse.interfaces.genome import Genome
+from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
+from framework.dse.interfaces.zigzag_adaptor import ZigzagAdaptor
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from framework.helpers.config import DseNodeConfig
 
 yaml = YAML(typ="rt")
 
-class EyerissConfig(ArchitectureConfig, GenomeInterface):
+class EyerissConfig(ArchitectureConfig, Genome):
     def __init__(self, pe_dim_y, pe_dim_x, glb_size, ifmap_spad_size, weight_spad_size, psum_spad_size):
         self.word_bits = 16
         self.glb_block_size = 4
@@ -91,7 +91,7 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
         #self.glb_size = int(glb_depth * self.word_bits * self.glb_block_size // (8*1024))
 
 
-class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch, ZigzagInterface):
+class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, ExhaustiveSearch, ZigzagAdaptor):
     def __init__(self):
         super().__init__()
         self.config: EyerissConfig = None

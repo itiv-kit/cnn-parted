@@ -8,7 +8,7 @@ import os
 from loguru import logger
 
 from framework.constants import ROOT_DIR
-from framework.dse.interfaces.zigzag_interface import ZigzagInterface
+from framework.dse.interfaces.zigzag_adaptor import ZigzagAdaptor
 from framework.model.onnx_model import OnnxModel
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
@@ -44,7 +44,7 @@ class Zigzag(NodeEvaluator):
         assert self.optimization in ["energy", "latency", "EDP"]
         self.freq = self.config.frequency
 
-        self.adaptor: ZigzagInterface = None
+        self.adaptor: ZigzagAdaptor = None
         self.cur_design_id = 0
         if self.dse_node_config is not None and self.dse_node_config.mutator is not None:
 
@@ -78,7 +78,7 @@ class Zigzag(NodeEvaluator):
         self._run_network(network, model, design_runroot, node_result, design=None)
         return node_result
 
-    def run_from_adaptor(self, network: str, model : OnnxModel, adaptor: ZigzagInterface, progress : bool = False) -> NodeResult:
+    def run_from_adaptor(self, network: str, model : OnnxModel, adaptor: ZigzagAdaptor, progress : bool = False) -> NodeResult:
         self.adaptor = adaptor
         node_result = NodeResult(self.node_config)
 

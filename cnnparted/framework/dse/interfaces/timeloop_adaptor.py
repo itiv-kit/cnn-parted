@@ -7,7 +7,7 @@ from framework.dse.interfaces.architecture_config import ArchitectureConfig
 
 ## Base class for design space exploration. For a given Timeloop architecture description this
 #  class is used to mutate the architecture configuration to evaluate different configurations.
-class TimeloopInterface(ABC):
+class TimeloopAdaptor(ABC):
     def __init__(self):
         super().__init__()
 

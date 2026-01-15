@@ -7,7 +7,7 @@ from framework.dse.interfaces.architecture_config import ArchitectureConfig
 
 ## Base class for design space exploration. For a given Timeloop architecture description this
 #  class is used to mutate the architecture configuration to evaluate different configurations.
-class ZigzagInterface(ABC):
+class ZigzagAdaptor(ABC):
     def __init__(self):
         super().__init__()
         self.zigzag_in_configs_dir_local = os.path.join(ROOT_DIR, "configs", "zigzag_configs")

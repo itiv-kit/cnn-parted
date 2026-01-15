@@ -4,14 +4,14 @@ import pathlib
 from ruamel.yaml import YAML
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
-from framework.dse.interfaces.genome_interface import GenomeInterface
-from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.genome import Genome
+from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from framework.helpers.config import DseNodeConfig
 
 yaml = YAML(typ="rt")
 
-class GemminiConfig(ArchitectureConfig, GenomeInterface):
+class GemminiConfig(ArchitectureConfig, Genome):
     def _is_pow_2(self, n):
         return (n & (n-1) == 0) and n != 0
 
@@ -119,7 +119,7 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
     
 
 
-class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch):
+class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, ExhaustiveSearch):
 
     def __init__(self):
         super().__init__()
