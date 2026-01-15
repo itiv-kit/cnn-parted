@@ -283,8 +283,14 @@ class MultiTenancyProblem():
             system_runtimes.append( max([sched.cur_time for sched in schedule.node_schedules.values()]) )
             system_energy.append(self._score_total_energy(bindings))
         
-        logger.info(f"Minimum found system runtime: {min(system_runtimes)}")
-        logger.info(f"Minimium system energy: {min(system_energy)}")
+        min_runtime_idx = system_runtimes.index(min(system_runtimes))
+        min_runtime_latency = system_runtimes[min_runtime_idx]
+        min_runtime_energy = system_energy[min_runtime_idx]
+        min_energy_idx = system_energy.index(min(system_energy))
+        min_energy_latency = system_runtimes[min_energy_idx]
+        min_energy_energy = system_energy[min_energy_idx]
+        logger.info(f"Configuration with minimum system runtime (ID: {min_runtime_idx}):\n\tRuntime: {min_runtime_latency}\n\tEnergy: {min_runtime_energy}")
+        logger.info(f"Configuration with minimum system energy (ID: {min_energy_idx}):\n\tRuntime: {min_energy_latency}\n\tEnergy: {min_energy_energy}")
             
         return results
 
