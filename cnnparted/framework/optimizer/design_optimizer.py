@@ -16,7 +16,7 @@ from pymoo.termination import get_termination
 
 from stable_baselines3 import PPO
 
-from cnnparted.framework.dse.interfaces import ArchitectureConfig, Genome
+from framework.dse.interfaces import ArchitectureConfig, Genome
 from framework.optimizer.optimizer import Optimizer
 from framework.optimizer.algorithms.rl_dse import DseEnv
 from framework.node.node_evaluator import SystemResult, NodeResult

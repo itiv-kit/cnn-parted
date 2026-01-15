@@ -9,7 +9,7 @@ from framework.helpers.config import NodeConfig, LinkConfig, DseStageConfig
 
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.optimizer.config.design_opt_config import DesignOptConfig
-from cnnparted.framework.dse.interfaces import ArchitectureConfig, Genome
+from framework.dse.interfaces import ArchitectureConfig, Genome
 from framework.stages.artifacts import Artifacts
 from framework.node.node_thread import NodeThread
 from framework.node.evaluation_registry import AcceleratorRegistry
