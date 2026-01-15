@@ -8,13 +8,12 @@ from framework.dse.interfaces.genome import Genome
 from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from framework.helpers.config import DseNodeConfig
+from framework.node.evaluation_registry import AcceleratorRegistry
 
 yaml = YAML(typ="rt")
 
-class GemminiConfig(ArchitectureConfig, Genome):
-    def _is_pow_2(self, n):
-        return (n & (n-1) == 0) and n != 0
-
+class GemminiConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator_name="gemmini_like"):
+    N_VAR_OPT = 6
 
     def __init__(self, mesh_dim, spad_size, acc_size, enable_checks=False):
         super().__init__()
@@ -49,6 +48,9 @@ class GemminiConfig(ArchitectureConfig, Genome):
             assert self._is_pow_2(self.dim), "the systolic array's dimensions must be powers of 2"
             assert self.acc_bank_rows % (self.dim) == 0, "the number of rows in an accumulator bank must be a multiple of the dimensions of the systolic array"
             assert ((self.spad_rows/self.dim) - 2) >= (self.acc_rows/self.dim), "the number os usable scratchpad tiles must be greater than or equal the number of total accumulator tiles"
+
+    def _is_pow_2(self, n):
+        return (n & (n-1) == 0) and n != 0
 
     def __str__(self):
         return f"GemminiConfig(dim={self.dim}, spad={self.spad_size}kB, acc={self.acc_size}kB)"

@@ -9,27 +9,19 @@ from framework.helpers.config import NodeConfig, LinkConfig, DseStageConfig
 
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.optimizer.config.design_opt_config import DesignOptConfig
+from cnnparted.framework.dse.interfaces import ArchitectureConfig, Genome
 from framework.stages.artifacts import Artifacts
 from framework.node.node_thread import NodeThread
+from framework.node.evaluation_registry import AcceleratorRegistry
 from framework.dse.simba_adaptor import SimbaConfig, SimbaArchitectureAdaptor
 from framework.dse.eyeriss_adaptor import EyerissConfig, EyerissArchitectureAdaptor
 from framework.dse.gemmini_adaptor import GemminiConfig, GemminiArchitectureAdaptor
 
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
-
 from framework.node.node_evaluator import SystemResult
 
-N_VAR_ACC = {
-    "gemmini_like": 6,
-    "eyeriss_like": 6,
-    "simba_like": 6
-}
+type DseArchitecture = ArchitectureConfig | Genome
 
-ACCELERATOR_CONFIG_MAP = {
-    "gemmini_like": GemminiConfig,
-    "eyeriss_like": EyerissConfig,
-    "simba_like": SimbaConfig
-}
 
 ACCELERATOR_ADAPTOR_MAP = {
     GemminiConfig: GemminiArchitectureAdaptor,
@@ -75,11 +67,14 @@ class DesignProblem(ElementwiseProblem):
         for node in self.node_components:
             self.system_results.register_platform(node.id, node_config=node)
 
-        self.n_var_per_node = [N_VAR_ACC[node.evaluation.accelerator]  for node in node_components if node.dse is not None]
+        self.accelerator_registry = AcceleratorRegistry()
 
         # We return all values of the partitioning algorithm as "constraint"
-        self.accelerator_configs = [ACCELERATOR_CONFIG_MAP[node.evaluation.accelerator] for node in node_components if node.dse is not None]
-        self.accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg] for cfg in self.accelerator_configs]
+        self.accelerator_names: list[str] = [node.evaluation.accelerator for node in node_components if node.dse is not None] #TODO Why was the name a string of its own?
+        self.accelerator_config_types: list[Genome|ArchitectureConfig] = [self.accelerator_registry[name] for name in self.accelerator_names]
+        self.n_var_per_node: list[int] = [accelerator_config_t.n_var_opt for accelerator_config_t in self.accelerator_config_types]
+        #self.n_var_per_node : list[int] = [N_VAR_ACC[node.evaluation.accelerator]  for node in node_components if node.dse is not None]
+        self.accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg] for cfg in self.accelerator_names]
 
         # LUT to prevent evaluating duplicates
         self.dse_node_lut = {}
@@ -181,7 +176,7 @@ class DesignProblem(ElementwiseProblem):
         #valid = True
 
         xs = self._split_system_input(x)
-        acc_cfgs = [cfg.from_genome(param, mem_step) for (cfg, param, mem_step) in zip(self.accelerator_configs, xs, self.node_mem_steps, strict=True)]
+        acc_cfgs = [cfg.from_genome(param, mem_step) for (cfg, param, mem_step) in zip(self.accelerator_names, xs, self.node_mem_steps, strict=True)]
         acc_adaptors = [adaptor() for adaptor in self.accelerator_adaptors] 
 
         # Attach the config we want to run to the adaptor

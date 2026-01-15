@@ -8,10 +8,13 @@ from framework.dse.interfaces.genome import Genome
 from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from framework.helpers.config import DseNodeConfig
+from framework.node.evaluation_registry import AcceleratorRegistry
 
 yaml = YAML(typ="rt")
 
-class SimbaConfig(ArchitectureConfig, Genome):
+class SimbaConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator_name="simba_like"):
+    N_VAR_OPT = 6
+
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
         #Constants
         self.word_bits = 8

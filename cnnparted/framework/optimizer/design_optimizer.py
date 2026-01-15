@@ -16,13 +16,17 @@ from pymoo.termination import get_termination
 
 from stable_baselines3 import PPO
 
+from cnnparted.framework.dse.interfaces import ArchitectureConfig, Genome
 from framework.optimizer.optimizer import Optimizer
 from framework.optimizer.algorithms.rl_dse import DseEnv
 from framework.node.node_evaluator import SystemResult, NodeResult
 from framework.node.node_thread import NodeThread
 from framework.graph_analyzer import GraphAnalyzer
-from framework.optimizer.design_problem import ACCELERATOR_ADAPTOR_MAP, ACCELERATOR_CONFIG_MAP
+from framework.optimizer.design_problem import ACCELERATOR_ADAPTOR_MAP
+from framework.node.evaluation_registry import AcceleratorRegistry
 from framework.helpers.config import NodeConfig, DseStageConfig
+
+type DseArchitecture = ArchitectureConfig | Genome
 
 #TODO Can this be unified with NodeEvaluation?
 class DesignOptimizer(Optimizer):
@@ -34,6 +38,7 @@ class DesignOptimizer(Optimizer):
         self.num_gen =  dse_system_config.optimizer.num_gen #["optimizer"].get("num_gen")
         self.pop_size = dse_system_config.optimizer.pop_size #["optimizer"].get("pop_size")
 
+        self.accelerator_registry = AcceleratorRegistry()
         self.node_components = node_components
         self.node_ids = [node.id for node in self.node_components]
         self.accelerator_names = [node.evaluation.accelerator for node in self.node_components]
@@ -152,8 +157,10 @@ class DesignOptimizer(Optimizer):
             node_eval_stats = SystemResult()
 
             # Setup acc_adaptors
-            accelerator_configs = [ACCELERATOR_CONFIG_MAP[node.evaluation.accelerator] for node in self.node_components if node.dse is not None] #TODO Is the check necessary?
+            accelerator_configs: list[DseArchitecture] = [self.accelerator_registry[node.evaluation.accelerator] 
+                                                        for node in self.node_components if node.dse is not None] #TODO Is the check necessary?
             accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg]() for cfg in accelerator_configs]
+
             for acc_adaptor, node_cfg in zip(accelerator_adaptors, self.node_components):
                 if node_cfg.dse is not None:
                     acc_adaptor.read_space_cfg(node_cfg.dse)

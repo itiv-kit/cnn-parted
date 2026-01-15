@@ -9,10 +9,13 @@ from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
 from framework.dse.interfaces.zigzag_adaptor import ZigzagAdaptor
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
 from framework.helpers.config import DseNodeConfig
+from framework.node.evaluation_registry import AcceleratorRegistry
 
 yaml = YAML(typ="rt")
 
-class EyerissConfig(ArchitectureConfig, Genome):
+class EyerissConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator_name="eyeriss_like"):
+    N_VAR_OPT = 6
+
     def __init__(self, pe_dim_y, pe_dim_x, glb_size, ifmap_spad_size, weight_spad_size, psum_spad_size):
         self.word_bits = 16
         self.glb_block_size = 4
@@ -55,7 +58,7 @@ class EyerissConfig(ArchitectureConfig, Genome):
 
     def to_genome(self) -> list:
         return self.pe_array_dim + self.pe_array_mem + self.local_mems
-
+    
     @property
     def pe_array_dim(self):
         return [self.pe_dim_y, self.pe_dim_x]
