@@ -1,14 +1,10 @@
 from enum import Enum, auto
 
-__all__ = [
-    "LoopIterator",
-    "ConcreteLoopIterator",
-    "LoopDim"
-]
 
 class IteratorKind(Enum):
     PARALLEL = auto()
     REDUCTION = auto()
+
 
 class LoopIterator:
     """An iterator represents a loop dimension"""
@@ -35,11 +31,16 @@ class LoopDim(Enum):
     C = LoopIterator("C", IteratorKind.REDUCTION,aliases=["Ic"]) #input channel
     M = LoopIterator("M", IteratorKind.PARALLEL, aliases=["Oc", "K"]) #output channel
 
+
 class ConcreteLoopIterator():
-    """Iterator with defined loop boundaries"""
-    def __init__(self, iterator: LoopIterator, extent: int, postfix: str = ""):
+    """Iterator with defined loop boundaries with iterator in [lower_bound, upper_bound)"""
+    def __init__(self, iterator: LoopIterator, extent: int, 
+                 lower_bound: int = None, upper_bound: int = None, 
+                 postfix: str = ""):
         self.iterator = iterator
         self.extent = extent
+        self.lower_bound = lower_bound if lower_bound is not None else 0        #lower bound is inclusive
+        self.upper_bound = upper_bound if upper_bound is not None else extent-1 #upper bound is exclusive
         self.postfix = postfix
     
     def tile(self, factors: list[int]):
