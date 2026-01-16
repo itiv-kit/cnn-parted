@@ -146,7 +146,6 @@ if __name__ == '__main__':
                 os.remove(file_p)
         sys.exit()
 
-        
     # Determine stages that should be run
     stages = parse_pipeline(conf_helper.pipeline)
         

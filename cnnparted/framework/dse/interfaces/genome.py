@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
 
-import numpy as np
-
 from pymoo.core.crossover import Crossover
 from pymoo.core.mutation import Mutation
 
@@ -15,7 +13,7 @@ class Genome(ABC):
         self.mutation: Mutation = None
 
     @classmethod
-    def n_var_opt(cls):
+    def n_var_opt(cls) -> int:
         """
         Returns the number of variables needed for the optimizer. For example,
         if the accelerator design space is [xdim, ydim] this should return two.

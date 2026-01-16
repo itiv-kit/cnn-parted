@@ -1,7 +1,7 @@
-import copy
 from math import log2
 import pathlib
 from ruamel.yaml import YAML
+import re
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
 from framework.dse.interfaces.genome import Genome
@@ -12,7 +12,8 @@ from framework.node.evaluation_registry import AcceleratorRegistry
 
 yaml = YAML(typ="rt")
 
-class GemminiConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator_name="gemmini_like"):
+@AcceleratorRegistry.register_architecture("gemmini_like")
+class GemminiConfig(ArchitectureConfig, Genome):
     N_VAR_OPT = 6
 
     def __init__(self, mesh_dim, spad_size, acc_size, enable_checks=False):
@@ -74,6 +75,27 @@ class GemminiConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator
         gemmini.pe_array_dim = pe_dims
         gemmini.local_mems = [spad_depth*mem_step[0], acc_depth*mem_step[1]]
         return gemmini
+    
+    @classmethod
+    def from_yaml(cls, yaml_config: dict):
+        chip = yaml_config["architecture"]["subtree"][0]["subtree"][0]
+        spad = chip["local"][0]
+        pe_cols = chip["subtree"][0]
+        acc = pe_cols["local"][0]
+        pe_rows = pe_cols["subtree"][0]
+        
+        # First we get the PE array dimension
+        p = re.compile(r"\d..\d+")
+        pe_cols = [int(num) for num in p.search(pe_cols["name"]).group(0)][1] + 1
+        pe_rows = [int(num) for num in p.search(pe_rows["name"]).group(0)][1] + 1
+
+        spad_depth = int(spad["attributes"]["depth"])
+        acc_depth = acc["attributes"]["depth"] * pe_cols
+
+        gemmini = cls(1, 1, 1, enable_checks=False) 
+        gemmini.pe_array_dim = [pe_cols, pe_rows]
+        gemmini.local_mems = [spad_depth, acc_depth]
+        return gemmini
 
     def to_genome(self) -> list:
         return self.pe_array_dim + self.pe_array_mem + self.local_mems
@@ -120,7 +142,7 @@ class GemminiConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator
         #self.acc_size = int(self.acc_rows * self.acc_w * self.mesh_dim_x // (8*1024))
     
 
-
+@AcceleratorRegistry.register_adaptor("gemmini_like")
 class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, ExhaustiveSearch):
 
     def __init__(self):
@@ -210,13 +232,13 @@ class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, Exhaustiv
                     acc_bank_rows_max = int(((spad_size*1024*8)//(spad_width) - 2*dim) / self.acc_banks)
                     acc_sizes = self._calc_valid_mem_sizes(dim, self.acc_banks, acc_width, self.min_acc_size, self.max_acc_size, rows_max=acc_bank_rows_max)
                     for acc_size in acc_sizes:
-                        self.design_space.append(copy.copy(GemminiConfig(mesh_dim, spad_size, acc_size) )) 
+                        self.design_space.append(GemminiConfig(mesh_dim, spad_size, acc_size) )
 
     def write_tl_arch_constraints(self, config=None, outdir=None):
         # no arch constraints for Gemmini-like config
         pass
     
-    def write_tl_map_constraints(self, config=None, outdir=None):
+    def write_tl_map_constraints(self, config: GemminiConfig=None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -236,7 +258,7 @@ class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, Exhaustiv
             _ = yaml.dump(constraints, f)
 
 
-    def write_tl_arch(self, config=None, outdir=None):
+    def write_tl_arch(self, config: GemminiConfig=None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:

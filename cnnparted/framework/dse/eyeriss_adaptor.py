@@ -2,6 +2,7 @@ import copy
 import pathlib
 from ruamel.yaml import YAML
 import shutil
+import re
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
 from framework.dse.interfaces.genome import Genome
@@ -13,10 +14,12 @@ from framework.node.evaluation_registry import AcceleratorRegistry
 
 yaml = YAML(typ="rt")
 
-class EyerissConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator_name="eyeriss_like"):
+@AcceleratorRegistry.register_architecture("eyeriss_like")
+class EyerissConfig(ArchitectureConfig, Genome):
     N_VAR_OPT = 6
 
     def __init__(self, pe_dim_y, pe_dim_x, glb_size, ifmap_spad_size, weight_spad_size, psum_spad_size):
+        super().__init__()
         self.word_bits = 16
         self.glb_block_size = 4
         self.spad_block_size = 1
@@ -34,6 +37,42 @@ class EyerissConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator
         self.pe_dim_y = pe_dim_y
         self.pe_dim_x = pe_dim_x
         self.num_pes = pe_dim_y * pe_dim_x
+
+    @classmethod
+    def from_yaml(cls, yaml_config: dict):
+        def get_idx(cfg: list[dict], name: str):
+            for idx, field in enumerate(cfg):
+                if field["name"] == name:
+                    return idx
+            raise RuntimeError(f"Did not find key {name}")
+
+        eyeriss = yaml_config["architecture"]["subtree"][0]["subtree"][0]
+        pe_array = eyeriss["subtree"][0]["local"]
+
+        shared_glb = eyeriss["local"][get_idx("shared_glb")]
+        ifmap = pe_array[get_idx("ifmap_spad")]
+        weights = pe_array[get_idx("weights_spad")]
+        psum = pe_array[get_idx("psum_spad")]
+        macs = pe_array[get_idx("mac")]
+
+        glb_depth = int(shared_glb["attributes"]["memory_depth"])
+        pe_array_mem_depths = [int(ifmap["attributes"]["memory_depth"]),
+                               int(weights["attributes"]["memory_depth"]),
+                               int(psum["attributes"]["memory_depth"])]
+
+        p = re.compile(r"\d..\d+")
+        pe_string: str = p.findall(eyeriss["subtree"]["name"])[0]
+        num_macs = [int(num) for num in pe_string.split("..")]
+        num_macs = num_macs[1] + 1
+
+        pe_x: int = macs["attributes"]["meshX"]
+        pe_y: int = num_macs // pe_x
+
+        eyeriss_config = cls(2, 2, 1024, 128, 128, 128) #init with dumm
+        eyeriss_config.pe_array_dim = [pe_y, pe_x]
+        eyeriss_config.pe_array_mem = pe_array_mem_depths
+        eyeriss_config.local_mems = [glb_depth]
+        return eyeriss_config
 
     def get_config(self) -> dict:
         cfg = {}
@@ -94,6 +133,7 @@ class EyerissConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator
         #self.glb_size = int(glb_depth * self.word_bits * self.glb_block_size // (8*1024))
 
 
+@AcceleratorRegistry.register_adaptor("eyeriss_like")
 class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, ExhaustiveSearch, ZigzagAdaptor):
     def __init__(self):
         super().__init__()

@@ -13,21 +13,12 @@ from framework.dse.interfaces import ArchitectureConfig, Genome
 from framework.stages.artifacts import Artifacts
 from framework.node.node_thread import NodeThread
 from framework.node.evaluation_registry import AcceleratorRegistry
-from framework.dse.simba_adaptor import SimbaConfig, SimbaArchitectureAdaptor
-from framework.dse.eyeriss_adaptor import EyerissConfig, EyerissArchitectureAdaptor
-from framework.dse.gemmini_adaptor import GemminiConfig, GemminiArchitectureAdaptor
 
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
 from framework.node.node_evaluator import SystemResult
 
 type DseArchitecture = ArchitectureConfig | Genome
 
-
-ACCELERATOR_ADAPTOR_MAP = {
-    GemminiConfig: GemminiArchitectureAdaptor,
-    EyerissConfig: EyerissArchitectureAdaptor,
-    SimbaConfig: SimbaArchitectureAdaptor,
-}
 
 
 # This class does the following:
@@ -74,7 +65,7 @@ class DesignProblem(ElementwiseProblem):
         self.accelerator_config_types: list[Genome|ArchitectureConfig] = [self.accelerator_registry[name] for name in self.accelerator_names]
         self.n_var_per_node: list[int] = [accelerator_config_t.n_var_opt for accelerator_config_t in self.accelerator_config_types]
         #self.n_var_per_node : list[int] = [N_VAR_ACC[node.evaluation.accelerator]  for node in node_components if node.dse is not None]
-        self.accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg] for cfg in self.accelerator_names]
+        self.accelerator_adaptors=[AcceleratorRegistry.get_adaptor(cfg) for cfg in self.accelerator_names]
 
         # LUT to prevent evaluating duplicates
         self.dse_node_lut = {}
@@ -176,7 +167,7 @@ class DesignProblem(ElementwiseProblem):
         #valid = True
 
         xs = self._split_system_input(x)
-        acc_cfgs = [cfg.from_genome(param, mem_step) for (cfg, param, mem_step) in zip(self.accelerator_names, xs, self.node_mem_steps, strict=True)]
+        acc_cfgs = [cfg.from_genome(param, mem_step) for (cfg, param, mem_step) in zip(self.accelerator_config_types, xs, self.node_mem_steps, strict=True)]
         acc_adaptors = [adaptor() for adaptor in self.accelerator_adaptors] 
 
         # Attach the config we want to run to the adaptor

@@ -2,6 +2,7 @@ import copy
 import pathlib
 from ruamel.yaml import YAML
 import shutil
+import re
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
 from framework.dse.interfaces.genome import Genome
@@ -12,10 +13,12 @@ from framework.node.evaluation_registry import AcceleratorRegistry
 
 yaml = YAML(typ="rt")
 
-class SimbaConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator_name="simba_like"):
+@AcceleratorRegistry.register_architecture("simba_like")
+class SimbaConfig(ArchitectureConfig, Genome):
     N_VAR_OPT = 6
 
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
+        super().__init__()
         #Constants
         self.word_bits = 8
         self.word_bits_acc = 24
@@ -60,6 +63,38 @@ class SimbaConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator_n
         simba.pe_array_mem = pe_mems
         simba.local_mems = local_mems*mem_step[0]
         return simba
+    
+    @classmethod
+    def from_yaml(cls, yaml_config: dict):
+        def get_idx(cfg: list[dict], name: str):
+            for idx, field in enumerate(cfg):
+                if field["name"] == name or name in field["name"]:
+                    return idx
+            raise RuntimeError(f"Did not find key {name}")
+
+        simba = yaml_config["architecture"]["subtree"][0]["subtree"][0]
+        gbuf = simba["local"][0]
+        pe_array = simba["subtree"][0]
+        input_buffer = pe_array["local"][get_idx("PEInputBuffer")]
+        weight_buffer= pe_array["local"][get_idx("PEWeightBuffer")]
+        accu_buffer = pe_array["local"][get_idx("PEAccuBuffer")]
+        lmacs = pe_array["local"][get_idx("LMAC")]
+
+        # First we get the PE array dimension
+        p = re.compile(r"\d..\d+")
+        num_pe = [int(num) for num in p.search(pe_array["name"]).group(0)][1] + 1
+        num_lmac = [int(num) for num in p.search(lmacs["name"]).group(0)][1] + 1
+
+        gbuf_depth = gbuf["attributes"]["memory_depth"]
+        inbuf_depth = input_buffer["attributes"]["memory_depth"]
+        wbuf_depth = weight_buffer["attributes"]["memory_depth"]
+        accu_depth = accu_buffer["attributes"]["memory_depth"]
+
+        simba_config = cls(1, 1, 1, 1, 1, 1)
+        simba_config.pe_array_dim = [num_pe, num_lmac]
+        simba_config.local_mems = [gbuf_depth]
+        simba_config.pe_array_mem = [inbuf_depth, wbuf_depth, accu_depth]
+        return simba_config
 
     def to_genome(self) -> list:
         return self.pe_array_dim + self.pe_array_mem + self.local_mems
@@ -98,6 +133,7 @@ class SimbaConfig(ArchitectureConfig, Genome, AcceleratorRegistry, accelerator_n
         #self.globalbuf_size = int(self.globalbuf_depth * self.word_bits * self.block_size_global_buf // (8*1024))
 
 
+@AcceleratorRegistry.register_adaptor("simba_like")
 class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, ExhaustiveSearch):
     def __init__(self):
         super().__init__()
@@ -164,7 +200,7 @@ class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, ExhaustiveS
 
     def write_tl_arch(self, config:SimbaConfig = None, outdir=None):
         if config is None:
-            config = self.config
+            config: SimbaConfig = self.config
         if outdir is None:
             outdir = self.tl_out_configs_dir
         base_arch = pathlib.Path(self.tl_in_configs_dir, "archs", "simba_like.yaml")

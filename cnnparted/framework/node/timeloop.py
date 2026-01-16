@@ -13,6 +13,7 @@ import tqdm
 import shutil
 from loguru import logger
 
+#from framework.node.evaluation_registry import AcceleratorRegistry
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.model.model import ConvParameters, GemmParameters
 from framework.model.onnx_model import OnnxModel

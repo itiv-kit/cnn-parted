@@ -3,7 +3,6 @@ from optparse import Option
 import os
 
 from framework.constants import ROOT_DIR
-from framework.dse.interfaces.architecture_config import ArchitectureConfig
 
 ## Base class for design space exploration. For a given Timeloop architecture description this
 #  class is used to mutate the architecture configuration to evaluate different configurations.
