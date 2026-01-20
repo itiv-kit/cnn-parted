@@ -18,10 +18,6 @@ from framework.node.node_evaluator import SystemResult
 from framework.scheduling import list_scheduling, multi_queue_scheduling, SystemSchedule
 
 
-# What this should do:
-#   - given be a random, initial partitioning of the networks
-#   - try to optimize EDP by moving partitions between accelerators
-
 class MultiTenancyPartitioning(Optimizer):
     def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper):
         self.work_dir = work_dir
@@ -79,7 +75,6 @@ class LayerTracker:
                 self.network_info[nw][layer] = new_bindings[idx]
                 idx += 1
 
-    
     # Swap the binding of two layers that are on different platforms
     def swap_layers(self, nws_layers: list[tuple[str,str]]):
         bindings = np.array([self.network_info[nw][layer] for nw, layer in nws_layers])
@@ -214,6 +209,7 @@ class MultiTenancyProblem():
         # but afterwards we have to convert them to the correct id
         platform_lut = {mapping: platform_id for platform_id, mapping in zip(self.conf.system.platform_ids, range(0, self.conf.system.num_platforms)) }
         work_layer_tracker = copy.deepcopy(self.layer_tracker)
+        num_trials = self.conf.mt.optimizer.n_trials
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         def objective(trial: optuna.trial.Trial):
@@ -221,38 +217,27 @@ class MultiTenancyProblem():
             for i in range(self.num_nodes):
                 layer_bind = trial.suggest_int(f"binding_{i}", low=0, high=self.conf.system.num_platforms-1)
                 bindings_int.append(layer_bind)
-
             bindings = [platform_lut[b] for b in bindings_int]
             work_layer_tracker.set_all_bindings(bindings)
+            #else:
+            # Test: Randomly decide if the layer should be moved, not where it should be moved to (Note: This leads to worse quality of results)
+            #for (idx, (network, layer_name, binding)) in enumerate(work_layer_tracker):
+            #    layer_should_move = trial.suggest_int(f"move_{idx}", low=0, high=1)
+            #    if layer_should_move:
+            #        # figure out to which platform it is currently assigned
+            #        new_binding: np.int64 = self.rng.choice([id for id in self.conf.system.platform_ids if id != binding])
+            #        work_layer_tracker.move_layer((network, layer_name), int(new_binding))
 
-            new_models = copy.deepcopy(self.models)
-            self._write_binding_to_graph(work_layer_tracker, new_models)
-            node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
-            
             # Add information to be later retrieved
-            trial.set_user_attr("schedule", node_schedules)
             trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
 
             return (self._score_total_energy(work_layer_tracker), 
-                    self._score_total_latency(work_layer_tracker),
-                    self._score_idle_times(node_schedules))
-            #return (self._score_total_energy(work_layer_tracker), 
-            #        self._score_total_latency(work_layer_tracker), 
-            #        self._score_idle_times(node_schedules),
-            #        self._score_even_finish(node_schedules),
-            #        self._score_max_latency(node_schedules))
-
-            #return (self._score_edp(work_layer_tracker), 
-            #        self._score_utilization(node_schedules), 
-            #        self._score_max_latency(node_schedules))
-        
+                    self._score_total_latency(work_layer_tracker),)
 
         # Start the optimization, setup everything for Optuna run
         os.makedirs(self.optuna_out_dir, exist_ok=True)
-        #storage=JournalStorage(JournalFileBackend(file_path=os.path.join(self.optuna_out_dir,"journal.log")))
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize"], )
-
-        study.optimize(objective, n_trials=self.conf.mt.optimizer.n_trials, n_jobs=1, show_progress_bar=True)
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize"], )
+        study.optimize(objective, n_trials=num_trials, n_jobs=1, show_progress_bar=True)
         
         # Plotting to make sense of the results
         #fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["EDP", "Latency"], targets=lambda t: (t.values[0], t.values[2]))
@@ -270,16 +255,18 @@ class MultiTenancyProblem():
 
         logger.debug(f"Multi-Tenancy optimization complete, found {len(study.best_trials)} Parto-optimal solutions")
 
+        # Perform scheduling for pareto-optimal solutions
         results: list[tuple[LayerTracker, SystemSchedule]] = []
         for trial in study.best_trials:
-            results.append( (trial.user_attrs["bindings"], trial.user_attrs["schedule"]) )
+            new_models = copy.deepcopy(self.models)
+            self._write_binding_to_graph(trial.user_attrs["bindings"], new_models)
+            node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
+            results.append( (trial.user_attrs["bindings"], node_schedules) )
         
         # Log some statistics
         system_runtimes: list[float] = []
         system_energy: list[float] = []
-        for trial in study.best_trials:
-            schedule: SystemSchedule = trial.user_attrs["schedule"]
-            bindings = trial.user_attrs["bindings"]
+        for bindings, schedule in results:
             system_runtimes.append( max([sched.cur_time for sched in schedule.node_schedules.values()]) )
             system_energy.append(self._score_total_energy(bindings))
         
