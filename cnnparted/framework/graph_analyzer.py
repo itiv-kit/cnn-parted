@@ -10,7 +10,7 @@ from framework.helpers.config_helper import ConfigHelper
 from framework.model.onnx_model import OnnxModel, OnnxParser 
 from framework.model.tiling.layer_tiling import LayerTiling
 
-from framework.scheduling import topo_sort_random_start_node
+from framework.scheduling import topo_sort_random_start_node  # noqa: F401
 
 class GraphAnalyzer:
     def __init__(self, work_dir: str, run_name : str, 

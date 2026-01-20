@@ -7,7 +7,6 @@ class AcceleratorRegistry:
 
     @classmethod
     def register_architecture(cls, accelerator_name: str):
-        print(f"Registering {accelerator_name} architecture")
         def inner_wrapper(wrapped_class: ArchitectureConfig):
             if accelerator_name not in cls._arch_registry:
                 cls._arch_registry[accelerator_name] = wrapped_class
@@ -16,7 +15,6 @@ class AcceleratorRegistry:
 
     @classmethod
     def register_adaptor(cls, accelerator_name: str):
-        print(f"Registering {accelerator_name} adaptor")
         def inner_wrapper(wrapped_class: ArchitectureAdaptor):
             if accelerator_name not in cls._adaptor_registry:
                 cls._adaptor_registry[accelerator_name] = wrapped_class

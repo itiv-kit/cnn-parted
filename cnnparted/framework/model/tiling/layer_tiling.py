@@ -130,6 +130,7 @@ class LayerTiling:
             new_params = copy.deepcopy(layer.layer_params)
             param_to_tile = getattr(new_params, loop_var)
             param_to_tile = param_to_tile // n_outer_tiles
+            assert hasattr(new_params, loop_var), f"Did not find {loop_var} as a parameter of {type(new_params)}"
             setattr(new_params, loop_var, param_to_tile)
 
             # Apply tiling information to the loop dimension

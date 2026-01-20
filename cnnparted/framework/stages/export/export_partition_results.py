@@ -8,7 +8,6 @@ from framework.stages.artifacts import Artifacts
 from framework.stages.optimization.partitioning_optimization import PartitioningOptimization
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 @register_required_stage(PartitioningOptimization, GraphAnalysis)
 class ExportPartitionResults(Stage):

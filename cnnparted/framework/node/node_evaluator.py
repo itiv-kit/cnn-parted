@@ -134,12 +134,12 @@ class DesignResult:
         for nw, layers in design_dict["networks"].items():
             if nw == network or network is None:
                 for name, data in layers.items():
-                    l = LayerResult()
-                    l.name = name
-                    l.area = data["area"]
-                    l.energy  = data["energy"]
-                    l.latency = data["latency"]
-                    design_res.add_layer_to_network(l, nw if network is None else network)
+                    layer_res = LayerResult()
+                    layer_res.name = name
+                    layer_res.area = data["area"]
+                    layer_res.energy  = data["energy"]
+                    layer_res.latency = data["latency"]
+                    design_res.add_layer_to_network(layer_res, nw if network is None else network)
         return design_res 
 
 
@@ -285,7 +285,7 @@ class NodeResult:
 
         design_candidates = np.unique(design_candidates)
 
-        pruned_stats = {tag: results for tag, results in design_stats["eval"].items() if tag in design_candidates}
+        #pruned_stats = {tag: results for tag, results in design_stats["eval"].items() if tag in design_candidates}
 
         pruned_designs = [design for design in self.designs if design.tag in design_candidates]
         self.designs = pruned_designs
