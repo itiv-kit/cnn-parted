@@ -243,7 +243,7 @@ requires-dist = [
     { name = "onnx", specifier = ">=1.18.0" },
     { name = "onnx2pytorch", specifier = ">=0.5.1" },
     { name = "onnx2torch", specifier = ">=1.5.15" },
-    { name = "optuna", specifier = ">=4.4.0" },
+    { name = "optuna", specifier = ">=4.7.0" },
     { name = "optunahub", specifier = ">=0.3.1" },
     { name = "pandas", specifier = ">=2.3.0" },
     { name = "plotly", specifier = ">=6.2.0" },
@@ -1067,7 +1067,7 @@ wheels = [
 
 [[package]]
 name = "optuna"
-version = "4.4.0"
+version = "4.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alembic" },
@@ -1078,9 +1078,9 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a5/e0/b303190ae8032d12f320a24c42af04038bacb1f3b17ede354dd1044a5642/optuna-4.4.0.tar.gz", hash = "sha256:a9029f6a92a1d6c8494a94e45abd8057823b535c2570819072dbcdc06f1c1da4", size = 467708, upload-time = "2025-06-16T05:13:00.024Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/58/b2/b5e12de7b4486556fe2257611b55dbabf30d0300bdb031831aa943ad20e4/optuna-4.7.0.tar.gz", hash = "sha256:d91817e2079825557bd2e97de2e8c9ae260bfc99b32712502aef8a5095b2d2c0", size = 479740, upload-time = "2026-01-19T05:45:52.604Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5c/5e/068798a8c7087863e7772e9363a880ab13fe55a5a7ede8ec42fab8a1acbb/optuna-4.4.0-py3-none-any.whl", hash = "sha256:fad8d9c5d5af993ae1280d6ce140aecc031c514a44c3b639d8c8658a8b7920ea", size = 395949, upload-time = "2025-06-16T05:12:58.37Z" },
+    { url = "https://files.pythonhosted.org/packages/75/d1/6c8a4fbb38a9e3565f5c36b871262a85ecab3da48120af036b1e4937a15c/optuna-4.7.0-py3-none-any.whl", hash = "sha256:e41ec84018cecc10eabf28143573b1f0bde0ba56dba8151631a590ecbebc1186", size = 413894, upload-time = "2026-01-19T05:45:50.815Z" },
 ]
 
 [[package]]
