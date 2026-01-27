@@ -72,10 +72,10 @@ class Zigzag(NodeEvaluator):
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
 
-    def run(self, network: str, model: OnnxModel) -> NodeResult:
+    def run(self, network: str, model: OnnxModel, progress: bool = False) -> NodeResult:
         design_runroot = pathlib.Path(self.runroot)
         node_result = NodeResult(self.node_config)
-        self._run_network(network, model, design_runroot, node_result, design=None)
+        self._run_network(network, model, design_runroot, node_result, design=None, progress=progress)
         return node_result
 
     def run_from_adaptor(self, network: str, model : OnnxModel, adaptor: ZigzagAdaptor, progress : bool = False) -> NodeResult:
@@ -123,7 +123,7 @@ class Zigzag(NodeEvaluator):
 
         self._run_network(network, model, design_runroot, node_result, design)
 
-    def _run_network(self, network: str, model: OnnxModel, zigzag_design_workdir: str, node_result: NodeResult, design: ArchitectureConfig = None):
+    def _run_network(self, network: str, model: OnnxModel, zigzag_design_workdir: str, node_result: NodeResult, design: ArchitectureConfig = None, progress = False):
         accfile = self._find_hardware_config(self.accname)
         mapfile = self._find_mapping_config(self.mapname)
         assert accfile.exists() and mapfile.exists(), f"Could not found the specified mapping or accelerator.\nAccfile: {str(accfile)}\nMapfile: {str(mapfile)}"

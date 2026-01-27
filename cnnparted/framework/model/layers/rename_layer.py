@@ -35,4 +35,4 @@ class OutputLayer(LayerBase):
                          op_type="Output", 
                          layer_params=None, 
                          inputs=input, 
-                         output=[])
+                         output=None)

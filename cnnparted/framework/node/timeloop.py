@@ -106,7 +106,7 @@ class Timeloop(NodeEvaluator):
             return node_result
         
         else:
-            print(f"There are a total of {len(self.adaptor.design_space)} designs to be evaluated!")
+            logger.info(f"There are a total of {len(self.adaptor.design_space)} designs to be evaluated!")
             
             for i, design in enumerate(self.adaptor.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):

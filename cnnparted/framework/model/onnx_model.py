@@ -131,6 +131,8 @@ class OnnxParser:
         "Relu": ActivationFuncParser,
         "Sigmoid": ActivationFuncParser,
         "Erf": ActivationFuncParser,
+        "HardSwish": ActivationFuncParser,
+        "HardSigmoid": ActivationFuncParser,
         # Misc. operations
         "Transpose": TransposeParser,
         "Flatten": TransposeParser,

@@ -6,8 +6,10 @@ from loguru import logger
 
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 
 import optuna
+import tqdm
 
 from framework.model.onnx_model import OnnxModel
 from framework.model.layers.compute_layer import ComputationLayer
@@ -36,11 +38,9 @@ class MultiTenancyPartitioning(Optimizer):
         return solutions
 
     def _gen_initial_binding(self):
-        #TODO
         node_ids = self.system_result.get_platform_ids()
         for network, model in self.ga.models.items():
             for layer in model.nodes:
-                #if isinstance(layer, ComputationLayer):
                 layer.scheduling.binding = np.random.choice(node_ids)
 
 
@@ -56,40 +56,41 @@ class LayerTracker:
     def __iter__(self):
         return iter([ (nw,layer_name,binding) for nw, layers in self.network_info.items() for layer_name, binding in layers.items()])
 
-    def get_all_layers_on_platform(self, platform: int):
+    def get_all_layers_on_platform(self, platform: int) -> list[tuple[str, str]]:
         nw_layer = [ (nw,layer_name) for nw, layers in self.network_info.items() for layer_name, binding in layers.items() if binding == platform]
         return nw_layer
     
-    def get_all_layer_names(self):
+    def get_all_layer_names(self) -> list[tuple[str, str]]:
         nw_layer = [ (nw,layer_name) for nw, layers in self.network_info.items() for layer_name, binding in layers.items()]
         return nw_layer
     
-    def get_num_layers(self):
+    def get_num_layers(self) -> int:
         layer_ctr = [ len(layers) for layers in self.network_info.values() ]
         return sum(layer_ctr)
     
     def set_all_bindings(self, new_bindings: list[int]):
+        """Takes a list[int] where each entry denotes the platform on which a layer should be executed"""
         idx = 0
         for nw, layers in self.network_info.items():
             for layer in layers:
                 self.network_info[nw][layer] = new_bindings[idx]
                 idx += 1
 
-    # Swap the binding of two layers that are on different platforms
     def swap_layers(self, nws_layers: list[tuple[str,str]]):
+        """Swap the binding of two layers that are on different platforms"""
         bindings = np.array([self.network_info[nw][layer] for nw, layer in nws_layers])
         (first_nw, first_layer), (second_nw, second_layer) = nws_layers
         first_b, second_b = bindings
         self.network_info[first_nw][first_layer] = second_b
         self.network_info[second_nw][second_layer] = first_b
     
-    # Move one layer to another platform
     def move_layer(self, nw_layer: tuple[str,str], to: int):
+        """Move one layer to a specified platform"""
         nw, layer = nw_layer
         self.network_info[nw][layer] = to
     
-    # Swap ALL layers assigned to two different platforms
     def swap_platforms(self, platform_a: int, platform_b: int):
+        """Swap all layers assigned to two differnt platforms"""
         for nw, layer_bindings in self.network_info.items():
             for layer_name, binding in layer_bindings.items():
                 if binding == platform_a:
@@ -107,7 +108,6 @@ class MultiTenancyProblem():
         self.node_ids = node_stats.get_platform_ids()
         self.ga = ga
         self.models = copy.deepcopy(ga.models)
-        self.rng = np.random.default_rng()
         self.conf = global_conf
         match self.conf.mt.scheduling:
             case "list":
@@ -134,6 +134,9 @@ class MultiTenancyProblem():
         self.cost_history = []
     
     def _simulated_annealing(self) -> list[tuple[LayerTracker, SystemSchedule]]:
+        """Optimize the assigment of layers to platforms using simulated annealing.
+        This optimizer only supports single-objective optimization."""
+
         old_cost = self.initial_cost
         best_cost = np.inf
         best_state = None
@@ -141,12 +144,40 @@ class MultiTenancyProblem():
         current_state = copy.deepcopy(self.layer_tracker)
         improvement_counter = self.convergence_counter
         convergence = False
+        rng = np.random.default_rng()
+
+        def _random_modify(self, current_state: LayerTracker):
+            layer_tracker = copy.deepcopy(current_state)
+            action_space = [layer_tracker.swap_layers, layer_tracker.move_layer, layer_tracker.swap_platforms]
+            action = rng.choice(a=action_space, p=[0.45, 0.45, 0.1])
+            match action:
+                case layer_tracker.swap_layers:
+                    platforms_to_swap = rng.choice(self.node_ids, size=2, replace=False)
+                    layers_to_swap = []
+                    for platform in platforms_to_swap:
+                        layers = np.array(layer_tracker.get_all_layers_on_platform(platform))
+                        if layers.size == 0:
+                            return layer_tracker
+                        layers_to_swap.append(rng.choice(layers))
+                    action(layers_to_swap)
+                case layer_tracker.move_layer:
+                    # Move one layer to other platform
+                    platform_from, platform_to = rng.choice(self.node_ids, size=2, replace=False)
+                    layer_candidates = np.array(layer_tracker.get_all_layers_on_platform(platform_from))
+                    if layer_candidates.size == 0:
+                        return layer_tracker
+                    layer_to_move = rng.choice(layer_candidates)
+                    action(layer_to_move, platform_to)
+                case layer_tracker.swap_platforms:
+                    platform_a, platform_b = rng.choice(self.node_ids, size=2, replace=False)
+                    action(platform_a, platform_b)
+            return layer_tracker
 
         while not convergence:
             solution_improved = False
             for i in range(self.num_iter):
                 t = self.t_start / (i+1)
-                new_state = self._random_modify(current_state)
+                new_state = _random_modify(current_state)
 
                 new_models = copy.deepcopy(self.models)
                 self._write_binding_to_graph(new_state, new_models)
@@ -154,7 +185,7 @@ class MultiTenancyProblem():
                 
                 new_cost = self._calc_cost(new_state, node_schedules)
                 
-                if self.rng.random() <= np.exp( -(new_cost - old_cost) / t ):
+                if rng.random() <= np.exp( -(new_cost - old_cost) / t ):
                     current_state = new_state
                     old_cost = new_cost
                     
@@ -186,6 +217,9 @@ class MultiTenancyProblem():
 
     
     def _optuna_optimizer(self) -> list[tuple[LayerTracker, SystemSchedule]]:
+        """Optimize the assigment of layers to platforms a specified Optuna sampler.
+        This aims to optize energy and latency as a multi-objective optimization.
+        """
 
         match self.conf.mt.optimizer.sampler:
             case "grid":
@@ -205,28 +239,20 @@ class MultiTenancyProblem():
             case _:
                 raise RuntimeError(f"Unknow selection for Optuna sampler, found: {self.conf.mt.optimizer.sampler}")
         
-        # We want optuna to suggest continuous ints from [0, num_platforms-1], 
-        # but afterwards we have to convert them to the correct id
-        platform_lut = {mapping: platform_id for platform_id, mapping in zip(self.conf.system.platform_ids, range(0, self.conf.system.num_platforms)) }
+        # Setup information for optuna. For every layer, sample from available 
+        # platform ids to determine on which platform it should be executed
+        platform_ids = self.conf.system.platform_ids
         work_layer_tracker = copy.deepcopy(self.layer_tracker)
         num_trials = self.conf.mt.optimizer.n_trials
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         def objective(trial: optuna.trial.Trial):
-            bindings_int = []
-            for i in range(self.num_nodes):
-                layer_bind = trial.suggest_int(f"binding_{i}", low=0, high=self.conf.system.num_platforms-1)
-                bindings_int.append(layer_bind)
-            bindings = [platform_lut[b] for b in bindings_int]
+            bindings = []
+            for i, (nw, layer, current_binding) in enumerate(work_layer_tracker):
+                layer_bind = trial.suggest_categorical(f"binding_{i}", 
+                                                       choices=platform_ids)
+                bindings.append(layer_bind)
             work_layer_tracker.set_all_bindings(bindings)
-            #else:
-            # Test: Randomly decide if the layer should be moved, not where it should be moved to (Note: This leads to worse quality of results)
-            #for (idx, (network, layer_name, binding)) in enumerate(work_layer_tracker):
-            #    layer_should_move = trial.suggest_int(f"move_{idx}", low=0, high=1)
-            #    if layer_should_move:
-            #        # figure out to which platform it is currently assigned
-            #        new_binding: np.int64 = self.rng.choice([id for id in self.conf.system.platform_ids if id != binding])
-            #        work_layer_tracker.move_layer((network, layer_name), int(new_binding))
 
             # Add information to be later retrieved
             trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
@@ -236,28 +262,29 @@ class MultiTenancyProblem():
 
         # Start the optimization, setup everything for Optuna run
         os.makedirs(self.optuna_out_dir, exist_ok=True)
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize"], )
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize",], )
         study.optimize(objective, n_trials=num_trials, n_jobs=1, show_progress_bar=True)
         
         # Plotting to make sense of the results
-        #fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["EDP", "Latency"], targets=lambda t: (t.values[0], t.values[2]))
-        #file_name = "paretos_edp_latency_optuna"
+        #fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["Energy", "Latency"], 
+        #                                                        targets=lambda t: (t.values[0], t.values[1]),
+        #                                                        include_dominated_trials=False)
+        #file_name = "pareto_points_optuna"
         #fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
+        #fig.write_image(os.path.join(self.plot_dir, file_name+".png"))
 
-        #fig_hv: go.Figure = optuna.visualization.plot_hypervolume_history(study, [0,0,0])
-        #file_name_hv = "hypervolume_optuna"
-        #fig_hv.write_html(os.path.join(self.plot_dir, file_name_hv+".html"))
-
-        # Update the layer tracker with the results #TODO Multi-objective opt
-        trial_least_idle = max(study.best_trials, key=lambda t: t.values[0])
-        trial_least_idle_params = [platform_lut[b] for b in trial_least_idle.params.values()]
-        work_layer_tracker.set_all_bindings(trial_least_idle_params)
+        for idx, target in [(0, "Energy"), (1, "Latency")]:
+            fig: go.Figure = optuna.visualization.plot_optimization_history(study, target_name=target, target=lambda t: t.values[idx])
+            file_name = f"history_{target.lower()}_optuna"
+            fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
+            fig.write_image(os.path.join(self.plot_dir, file_name+".png"))
 
         logger.debug(f"Multi-Tenancy optimization complete, found {len(study.best_trials)} Parto-optimal solutions")
+        logger.info("Performing scheduling of pareto-optimal bindings")
 
         # Perform scheduling for pareto-optimal solutions
         results: list[tuple[LayerTracker, SystemSchedule]] = []
-        for trial in study.best_trials:
+        for trial in tqdm.tqdm(study.best_trials):
             new_models = copy.deepcopy(self.models)
             self._write_binding_to_graph(trial.user_attrs["bindings"], new_models)
             node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
@@ -282,38 +309,6 @@ class MultiTenancyProblem():
         return results
 
     
-    def _random_modify(self, current_state: LayerTracker):
-        layer_tracker = copy.deepcopy(current_state)
-        action_space = [layer_tracker.swap_layers, layer_tracker.move_layer, layer_tracker.swap_platforms]
-        action = self.rng.choice(a=action_space, p=[0.45, 0.45, 0.1])
-
-        match action:
-            case layer_tracker.swap_layers:
-                platforms_to_swap = self.rng.choice(self.node_ids, size=2, replace=False)
-                layers_to_swap = []
-                for platform in platforms_to_swap:
-                    layers = np.array(layer_tracker.get_all_layers_on_platform(platform))
-                    if layers.size == 0:
-                        return layer_tracker
-                    layers_to_swap.append(self.rng.choice(layers))
-                action(layers_to_swap)
-
-            case layer_tracker.move_layer:
-                # Move one layer to other platform
-                platform_from, platform_to = self.rng.choice(self.node_ids, size=2, replace=False)
-                layer_candidates = np.array(layer_tracker.get_all_layers_on_platform(platform_from))
-                if layer_candidates.size == 0:
-                    return layer_tracker
-                layer_to_move = self.rng.choice(layer_candidates)
-                action(layer_to_move, platform_to)
-
-            case layer_tracker.swap_platforms:
-                platform_a, platform_b = self.rng.choice(self.node_ids, size=2, replace=False)
-                action(platform_a, platform_b)
-
-        return layer_tracker
-
-
     def minimize(self):
         # Distribute workload between platforms
         logger.debug(f"Optimizing multitenancy problem with {self.conf.mt.algorithm}")
@@ -383,6 +378,19 @@ class MultiTenancyProblem():
     def _score_max_latency(self, schedules: SystemSchedule) -> float:
         latencies = [sched.cur_time for sched in schedules.node_schedules.values()]
         return max(latencies)
+    
+    def _score_even_latency(self, tracker: LayerTracker) -> float:
+        """The total time of operations assigned to each platform should be roughly equal"""
+        ideal_runtimes = {platform: 0.0 for platform in self.conf.system.platform_ids}
+        for nw, layer, bind in tracker:
+            # TODO Currently assumes that there is only one design
+            layer_data = self.node_stats[bind].designs[0].networks[nw].layers[layer]
+            ideal_runtimes[bind] += layer_data.latency
+        max_runtime = max(ideal_runtimes.values())
+        cost = 0.0
+        for runtime in ideal_runtimes.values():
+            cost += (max_runtime - runtime)
+        return cost
 
     def _calc_cost(self, tracker: LayerTracker, schedules: SystemSchedule) -> float:
         edp_cost = self._score_edp(tracker)

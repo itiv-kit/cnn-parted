@@ -122,7 +122,7 @@ class LayerTiling:
 
         for num in range(n_outer_tiles):
             tiled_inputs = self.tile_tensors(copy.deepcopy(new_inputs), dim, n_outer_tiles, num)
-            tiled_output = self.tile_tensors([copy.deepcopy(layer.output)], dim, n_outer_tiles, num)
+            tiled_output = self.tile_tensors([copy.deepcopy(layer.output)], dim, n_outer_tiles, num)[0]
 
             # Modify the layer parameter to reflect the tiling of the operation
             # I.e., we tile the loop with range N into two loop with ranges (outer, inner) respectively
@@ -168,7 +168,9 @@ class LayerTiling:
             loop_dim.lower_bound = tiled_extent * dim_value
             loop_dim.upper_bound = (tiled_extent * (dim_value+1)) - 1
             loop_dim.extent = tiled_extent
-            tensor.sub_id = tensor.sub_id*dim_value+1 #TODO
+            tensor.sub_id = tensor.sub_id*dim_value+1 #TODO proper calculation of sub_id
+
+            #TODO Need to modify the shape property to reflect the changed access pattern
         
         return tensors
 

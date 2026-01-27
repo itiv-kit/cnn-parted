@@ -82,6 +82,8 @@ class ActivationKind(IntEnum):
     Relu = auto()
     Sigmoid = auto()
     Erf = auto()
+    HardSwish = auto()
+    HardSigmoid = auto()
     unknown = auto()
 
 @dataclass

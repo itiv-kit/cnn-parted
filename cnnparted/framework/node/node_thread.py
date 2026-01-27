@@ -49,7 +49,7 @@ class NodeThread(ModuleThreadInterface):
             else:
                 # Perform the actual evaluation
                 if self.acc_adaptor is None:
-                    stats = simulator.run(network, self.ga.models[network])
+                    stats = simulator.run(network, self.ga.models[network], progress=True)
                 else:
                     stats = simulator.run_from_adaptor(network, self.ga.models[network], self.acc_adaptor)
 
