@@ -38,12 +38,12 @@ class PartitioningOptimizer(Optimizer):
         self.layer_dict = {}
         for l in self.schedules[0]:
             self.layer_dict[l] = {}
-            self.layer_dict[l]["predecessors"] = [layer.layer_name for layer in ga.models[network].predecessors_by_layer(l)]
-            self.layer_dict[l]["successors"] = [layer.layer_name for layer in ga.models[network].successors_by_layer(l)]
+            self.layer_dict[l]["predecessors"] = [layer.layer_name for layer in ga.models[network].predecessors_by_layer_name(l)]
+            self.layer_dict[l]["successors"] = [layer.layer_name for layer in ga.models[network].successors_by_layer_name(l)]
             if l != "output":   
-                self.layer_dict[l]["output_size"] = [ga.models[network].node_by_layer(l).output.shape]
+                self.layer_dict[l]["output_size"] = [ga.models[network].node_by_layer_name(l).output.shape]
             else:
-                self.layer_dict[l]["output_size"] = [ga.models[network].node_by_layer(l).inputs[0].shape]
+                self.layer_dict[l]["output_size"] = [ga.models[network].node_by_layer_name(l).inputs[0].shape]
 
         self.layer_params = self._set_layer_params(ga)
 

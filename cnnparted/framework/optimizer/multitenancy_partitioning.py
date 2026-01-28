@@ -401,6 +401,6 @@ class MultiTenancyProblem():
     
     def _write_binding_to_graph(self, tracker: LayerTracker, models: dict[str, OnnxModel]):
         for nw, layer, binding in tracker:
-            node = models[nw].node_by_layer(layer)
+            node = models[nw].node_by_layer_name(layer)
             node.scheduling.binding = binding
 

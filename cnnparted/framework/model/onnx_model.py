@@ -42,7 +42,7 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         self.name_to_node_mapping[layer.layer_name] = layer
         self.add_node(layer)
     
-    def remove_layer(self, layer: RenameLayer | ComputationLayer):
+    def remove_layer(self, layer: RenameLayer | ComputationLayer | str):
         if isinstance(layer, (LayerBase)):
             del self.name_to_node_mapping[layer.layer_name]
             self.remove_node(layer)
@@ -70,15 +70,15 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
             for consumer in consumers:
                 self.add_edge(node, consumer)
             
-    def successors_by_layer(self, layer: str):
+    def successors_by_layer_name(self, layer: str):
         node = self.name_to_node_mapping[layer]
         return self.successors(node)
 
-    def predecessors_by_layer(self, layer: str):
+    def predecessors_by_layer_name(self, layer: str):
         node = self.name_to_node_mapping[layer]
         return self.predecessors(node)
     
-    def node_by_layer(self, layer: str):
+    def node_by_layer_name(self, layer: str):
         return self.name_to_node_mapping[layer]
     
     def get_initial_layers(self):
