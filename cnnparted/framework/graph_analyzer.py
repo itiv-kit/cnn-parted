@@ -5,7 +5,7 @@ import pandas as pd
 import networkx as nx
 from loguru import logger
 
-#import framework.stages.inputs.workload_parser as wlparse
+from framework.helpers.dtypes import WorkloadInfo
 from framework.helpers.config_helper import ConfigHelper
 from framework.model.onnx_model import OnnxModel, OnnxParser 
 from framework.model.tiling.layer_tiling import LayerTiling
@@ -14,7 +14,7 @@ from framework.scheduling import topo_sort_random_start_node  # noqa: F401
 
 class GraphAnalyzer:
     def __init__(self, work_dir: str, run_name : str, 
-                 workloads: dict, progress : bool,
+                 workloads: dict[str, WorkloadInfo], progress : bool,
                  config: ConfigHelper) -> None:
         self.work_dir = work_dir
         self.run_name = run_name
@@ -30,6 +30,7 @@ class GraphAnalyzer:
             logger.debug(f"Parsing Model for network {network}")
             onnx_parser = OnnxParser(self.run_name, network)
             onnx_model = onnx_parser.parse_graph()
+            onnx_model.deadline = workload_info.deadline
 
             self.models[network]  = onnx_model
             self.torchmodels[network] = onnx_parser.get_torch_model() 

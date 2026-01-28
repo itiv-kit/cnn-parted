@@ -7,15 +7,10 @@ from collections.abc import Callable
 import torch
 from loguru import logger
 
+from framework.helpers.dtypes import WorkloadInfo
 from framework.stages.stage_base import Stage
 from framework.stages.artifacts import Artifacts
 from framework.constants import MODEL_PATH, WORKLOAD_FOLDER
-
-@dataclass
-class WorkloadInfo:
-    accuracy_function: Callable
-    input_shape: list[int]
-    onnx_filepath: str
 
 
 class WorkloadParser(Stage):
@@ -42,7 +37,7 @@ class WorkloadParser(Stage):
 
                     #TODO Accuracy evaluation is currently not supported, if possible integrate a way to specify it
                     accuracy_function = None
-                    workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, filename)
+                    workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, workload.deadline, filename)
         
                 else:
                     logger.debug(f"Instantiate workload {wl_name} from PyTorch repository and input-size {workload.input_size}")
@@ -58,7 +53,7 @@ class WorkloadParser(Stage):
                     x = torch.randn(input_size)
                     torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
 
-                workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, filename)
+                workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, workload.deadline, filename)
     
     
             except KeyError:
@@ -67,13 +62,13 @@ class WorkloadParser(Stage):
                 print()
                 quit(1)
 
-            self._update_artifacts(artifacts, accuracy_function, networks, workloads)
+        self._update_artifacts(artifacts, accuracy_function, networks, workloads)
 
     def _take_artifacts(self, artifacts: Artifacts):
         self.run_name = artifacts.config.args.run_name
         self.workload_array = artifacts.config.workload #["workload"]
         
-    def _update_artifacts(self, artifacts: Artifacts, accuracy_func, networks, workloads):
+    def _update_artifacts(self, artifacts: Artifacts, accuracy_func, networks: list[str], workloads: dict[str, WorkloadInfo]):
         artifacts.workload_parser.accuracy_function = accuracy_func
         artifacts.workload_parser.networks = networks
         artifacts.workload_parser.workloads = workloads

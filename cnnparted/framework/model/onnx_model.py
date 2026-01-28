@@ -37,6 +37,7 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         super().__init__(**attr)
         self.onnx_in_model = onnx_in_model
         self.name_to_node_mapping: dict[str, LayerBase] = {}
+        self.deadline: int = None
     
     def add_layer(self, layer: RenameLayer | ComputationLayer):
         self.name_to_node_mapping[layer.layer_name] = layer

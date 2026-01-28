@@ -57,6 +57,7 @@ class SchedulingPriority(Enum):
     IDLE_TIME = auto()
     LONGEST_JOB = auto()
     SHORTEST_JOB = auto()
+    DEADLINE = auto()
 
 @dataclass
 class MultiTenancyStageConfig:

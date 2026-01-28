@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from math import inf
 from typing import Literal
 from framework.model.tiling.iterators import LoopDim
 
@@ -77,10 +78,12 @@ class WorkloadSpec:
     name: str
     input_size: list[int]
     tiling: dict[str, TilingConfig] #op_type -> config
+    deadline: int
 
     def __init__(self, cfg: dict):
         self.name = cfg["name"]
         self.input_size = cfg["input-size"] 
+        self.deadline = cfg.get("deadline", inf)
         tiling_cfg = cfg.get("tiling", {})
         self.tiling = {}
         for op_type in TilingConfig.SUPPORTED_OP_TYPES:
