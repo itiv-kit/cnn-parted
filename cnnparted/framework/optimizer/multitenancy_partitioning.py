@@ -1,3 +1,4 @@
+from math import inf
 import os
 import copy
 from collections import defaultdict
@@ -229,7 +230,7 @@ class MultiTenancyProblem():
             case "cmaes":
                 sampler = optuna.samplers.CmaEsSampler()
             case "nsga2":
-                sampler = optuna.samplers.NSGAIISampler()
+                sampler = optuna.samplers.NSGAIISampler(seed=42)
             case "random":
                 sampler = optuna.samplers.RandomSampler()
             case "qmc":
@@ -282,13 +283,35 @@ class MultiTenancyProblem():
         logger.debug(f"Multi-Tenancy optimization complete, found {len(study.best_trials)} Parto-optimal solutions")
         logger.info("Performing scheduling of pareto-optimal bindings")
 
-        # Perform scheduling for pareto-optimal solutions
+        ### Perform scheduling for pareto-optimal solutions
         results: list[tuple[LayerTracker, SystemSchedule]] = []
         for trial in tqdm.tqdm(study.best_trials):
             new_models = copy.deepcopy(self.models)
             self._write_binding_to_graph(trial.user_attrs["bindings"], new_models)
             node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
             results.append( (trial.user_attrs["bindings"], node_schedules) )
+        
+        
+        # For every network, figure out at which time it finishes execution
+        # Needed to check if deadlines have been met or not
+        deadline_stats = {network: [0,0] for network in self.models.keys()}
+        all_succeeded = []
+        for _, schedule in results:
+            all_succeeded.append(True)
+            network_finishes = schedule.get_network_finish_times()
+            for nw, end in network_finishes.items():
+                if (deadline := self.models[nw].deadline) and deadline != inf:
+                    if end <= deadline:
+                        #success
+                        deadline_stats[nw][0] += 1
+                    else:
+                        #failure
+                        all_succeeded[-1] = False
+                        deadline_stats[nw][1] += 1
+        logger.info(f"All deadlines were wet in {all_succeeded.count(True)}/{len(all_succeeded)} cases ({all_succeeded.count(True)/len(all_succeeded)*100:.2f}%)")
+        for nw, (success, fail) in deadline_stats.items():
+            if self.models[nw].deadline != inf:
+                logger.info(f"Deadline for {nw} was met in {success}/{fail+success} cases ({success/(fail+success)*100:.2f}%)")
         
         # Log some statistics
         system_runtimes: list[float] = []

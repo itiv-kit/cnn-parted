@@ -399,6 +399,23 @@ class SystemResult:
     def get_design_tags(self, platform_id: int):
         return [design.tag for design in self.platforms[platform_id].designs]
     
+    def get_unique_platforms(self):
+        """Find all platforms that only differ by ID but are the same accelerator and design"""
+        all_ids = self.ids
+        all_accelerators = [platform.accelerator_name for platform in self.platforms.values()]
+        all_archs = [ frozenset(platform.design.architecture.items()) for platform in self.platforms.values()]
+
+        is_elem_duplicate = []
+        bucket = set()
+        for elem in zip(all_accelerators, all_archs):
+            if elem in bucket:
+                is_elem_duplicate.append(True)
+            else:
+                is_elem_duplicate.append(False)
+                bucket.add(elem)
+        unique_ids = [id for is_duplicate, id in zip(is_elem_duplicate, all_ids) if not is_duplicate]
+        return unique_ids
+
     def to_dict(self) -> dict:
         stats = {}
         for id, node_res in self.platforms.items():

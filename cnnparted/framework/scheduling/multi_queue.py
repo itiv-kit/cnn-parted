@@ -1,3 +1,5 @@
+import math
+
 from framework.helpers.config.stages_config import SchedulingPriority
 from framework.model.layers.rename_layer import RenameLayer
 from framework.model.layers.compute_layer import ComputationLayer
@@ -12,7 +14,7 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
     written to a queue, where every accelerator has its own queue from which elements are scheduled.
     Compared to the basic list scheduling, this results in a more even utilization of accelerators"""
 
-    type ReadyElement = tuple[str, LayerResult, ComputationLayer, float]
+    type ReadyElement = tuple[str, LayerResult, ComputationLayer, float, float]
 
     # Define helper functions to find layers
     def find_layer_info(id: int, nw_name: str, layer_name: str):
@@ -30,45 +32,62 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
         V_ready: list[ReadyElement] = []
         task_queues: dict[int, list[ReadyElement]] = {platform: [] for platform in node_stats.get_platform_ids()}
         misc_layers: list[tuple[str, RenameLayer]] = []
+
+        # When one or more models have a deadline we start by scheduling only those to 
+        # increase the likeliness of successfully scheduling them
+        all_deadlines_scheduled = True
         for network, model in models.items():
+            if model.deadline != math.inf and model.number_of_nodes() > 0:
+                all_deadlines_scheduled = False
+                break
+
+        for network, model in models.items():
+            if not all_deadlines_scheduled and model.deadline == math.inf:
+                continue
+
             for layer in model.nodes:
                 if model.in_degree(layer) == 0:
                     if isinstance(layer, ComputationLayer):
                             platform = layer.scheduling.binding
                             eval_data = find_layer_info(platform, network, layer.layer_name)
                             introduced_delay = layer.scheduling.earliest_start - schedule.node_schedules[platform].cur_time
-                            V_ready.append( (network, eval_data, layer, introduced_delay) )
+                            V_ready.append( (network, eval_data, layer, introduced_delay, model.deadline-schedule.node_schedules[platform].cur_time) )
                     else:
                         misc_layers.append((network, layer))
 
         # For all operations that are ready, assign them to the respective queues
         # Afterwards, sort the queues according to the scheduling algorithm
         for ready_layer in V_ready:
-            _, _, layer, _ = ready_layer
+            network, _, layer, _, _ = ready_layer
             task_queues[layer.scheduling.binding].append(ready_layer)
         
+        for task_queue in task_queues.values():
             match priority:
                 case SchedulingPriority.EARLIEST_START:
-                    task_queues[layer.scheduling.binding].sort(key=lambda data: data[2].scheduling.earliest_start)
+                    task_queue.sort(key=lambda data: data[2].scheduling.earliest_start)
                 case SchedulingPriority.SHORTEST_JOB:
-                    task_queues[layer.scheduling.binding].sort(key=lambda data: data[1].latency)
+                    task_queue.sort(key=lambda data: data[1].latency)
                 case SchedulingPriority.EARLIEST_FINISH:
-                    task_queues[layer.scheduling.binding].sort(key=lambda data: data[2].scheduling.earliest_start + data[1].latency)
+                    task_queue.sort(key=lambda data: data[2].scheduling.earliest_start + data[1].latency)
                 case SchedulingPriority.LONGEST_JOB:
-                    task_queues[layer.scheduling.binding].sort(key=lambda data: -data[1].latency)
+                    task_queue.sort(key=lambda data: -data[1].latency)
                 case SchedulingPriority.IDLE_TIME:
-                    task_queues[layer.scheduling.binding].sort(key=lambda data: data[3])
+                    task_queue.sort(key=lambda data: data[3])
+                case SchedulingPriority.DEADLINE:
+                    task_queue.sort(key=lambda data: 
+                                    models[data[0]].deadline - schedule.node_schedules[data[2].scheduling.binding].cur_time )
                 case _:
                     raise RuntimeError(f"Found an unknown priority {priority}")
 
-        # Iterate over all queues and finally schedule the layers on their respective nodes
+        # Iterate over all queues and schedule one layers for each node
+        # We schedule only one layer here to allow updating the priority functions
         for platform, queue in task_queues.items():
             if len(queue) == 0:
                 continue
 
-            network, eval_data, layer, introduced_delay = queue.pop(0)
+            network, eval_data, layer, introduced_delay, _ = queue.pop(0)
             layer_result = find_layer_info(platform, network, layer.layer_name)
-            schedule.assign_layer(platform, network, layer_result, layer.scheduling.earliest_start)
+            schedule.schedule_layer(platform, network, layer_result, layer.scheduling.earliest_start)
 
             # Before we remove the node, set the earliest start for all successors
             for succ in models[network].successors(layer):

@@ -1,3 +1,5 @@
+import math
+
 from framework.helpers.config.stages_config import SchedulingPriority
 from framework.model.layers.rename_layer import RenameLayer
 from framework.model.layers.compute_layer import ComputationLayer
@@ -25,7 +27,19 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
         #Determine all nodes that can be scheduled (all that have no predecessor)
         V_ready: list[tuple[str, LayerResult, ComputationLayer, float]] = []
         misc_layers: list[tuple[str, RenameLayer]] = []
+
+        # When one or more models have a deadline we start by scheduling only those to 
+        # increase the likeliness of successfully scheduling them
+        all_deadlines_scheduled = True
         for network, model in models.items():
+            if model.deadline != math.inf and model.number_of_nodes() > 0:
+                all_deadlines_scheduled = False
+                break
+
+        for network, model in models.items():
+            if not all_deadlines_scheduled and model.deadline == math.inf:
+                continue
+
             for layer in model.nodes:
                 if model.in_degree(layer) == 0:
                     if isinstance(layer, ComputationLayer):
@@ -38,24 +52,27 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
         
         match priority:
             case SchedulingPriority.EARLIEST_START:
-                V_ready = sorted(V_ready, key=lambda data: data[2].scheduling.earliest_start)
+                V_ready.sort(key=lambda data: data[2].scheduling.earliest_start)
             case SchedulingPriority.SHORTEST_JOB:
-                V_ready = sorted(V_ready, key=lambda data: data[1].latency)
+                V_ready.sort(key=lambda data: data[1].latency)
             case SchedulingPriority.EARLIEST_FINISH:
-                V_ready = sorted(V_ready, key=lambda data: data[2].scheduling.earliest_start + data[1].latency)
+                V_ready.sort(key=lambda data: data[2].scheduling.earliest_start + data[1].latency)
             case SchedulingPriority.LONGEST_JOB:
-                V_ready = sorted(V_ready, key=lambda data: -data[1].latency)
+                V_ready.sort(key=lambda data: -data[1].latency)
             case SchedulingPriority.IDLE_TIME:
-                V_ready = sorted(V_ready, key=lambda data: data[3])
+                V_ready.sort(key=lambda data: data[3])
+            case SchedulingPriority.DEADLINE:
+                V_ready.sort(key=lambda data: 
+                                models[data[0]].deadline - schedule.node_schedules[data[2].scheduling.binding].cur_time )
             case _:
-                raise RuntimeError(f"Found an unknown {priority}")
+                raise RuntimeError(f"Found an unknown priority: {priority}")
 
         for network, eval_data, layer, introduced_delay in V_ready[:1]:
             binding = layer.scheduling.binding
             layer_result = find_layer_info(binding, network, layer.layer_name)
             layer_name = layer.layer_name
 
-            schedule.assign_layer(binding, network, layer_result, layer.scheduling.earliest_start)
+            schedule.schedule_layer(binding, network, layer_result, layer.scheduling.earliest_start)
 
             # Before we remove the node, set the earliest start for all successors
             for succ in models[network].successors(layer):

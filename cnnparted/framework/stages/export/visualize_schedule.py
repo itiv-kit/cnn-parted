@@ -1,3 +1,4 @@
+import math
 import os
 import glob
 import random
@@ -35,6 +36,7 @@ class VisualizeSchedule(Stage):
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
         self.num_networks = len(artifacts.config.workload.workload_spec)
+        self.network_infos = artifacts.workload_parser.workloads
         self.work_dir = self.config.general.work_dir
         self.run_name = artifacts.config.args.run_name
         self.fig_dir = os.path.join(self.work_dir, "figures", "schedule")
@@ -154,6 +156,12 @@ class VisualizeSchedule(Stage):
                         )
                         fig.add_trace(bar)
                         nw_legend_lut[nw_name] = True #workaround to show network only once in legend
+
+            # For all networks, print a vertical line to mark the deadline (if there is one)
+            for network_name, network_info in self.network_infos.items():
+                if network_info.deadline != math.inf:
+                   fig.add_vline(x=network_info.deadline, line_width=3, line_dash="dash", line_color="green",
+                                 annotation_text=f"{network_name}", annotation_position="top") 
 
             fig.update_layout(
                 title_text=("Execution Schedule"),
