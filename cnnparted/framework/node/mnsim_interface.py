@@ -10,11 +10,10 @@ import os
 from framework.model.layers.abstract_layer import LayerBase
 from framework.model.onnx_model import OnnxModel
 from framework.constants import ROOT_DIR
-sys.path.append(os.path.join(ROOT_DIR, "cnnparted", "tools", "MNSIM-2.0"))
-
 from framework.node.node_evaluator import  NodeResult, DesignResult, LayerResult, NodeEvaluator
 from framework.helpers.config import NodeConfig
 
+sys.path.append(os.path.join(ROOT_DIR, "cnnparted", "tools", "MNSIM-2.0"))
 from MNSIM.Interface.network import NetworkGraph
 from MNSIM.Interface.interface import TrainTestInterface
 from MNSIM.Latency_Model.Model_latency import Model_latency
@@ -99,7 +98,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
 
     def _find_rel_layer_idx(self, layers : list[LayerBase], l_idx : int, name: str) -> int:
         for i in range(l_idx-1,0, -1):
-            if layers[i].output.name == name:
+            if layers[i].output is not None and layers[i].output.name == name:
                 return i - l_idx
 
     def _get_net(self, model: OnnxModel, hardware_config : dict = None) -> NetworkGraph:
@@ -177,6 +176,26 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             elif op_type =='Swish':
                 lyr={'type':'Swish'}
             #linqiushi above
+            elif op_type == "Erf":
+                lyr={'type': "Sigmoid"} #approximation
+            elif op_type == "MatMul":
+                input_size = layers[layers.index(l) - 1].output.shape
+                batch = input_size[1]
+                gemm_dims = input_size[2:]
+                in_features = input_size[-1]
+                num_classes = l.output.shape[3]
+                lyr = {'type': 'fc', 'in_features': in_features, 'out_features': num_classes, 'batch': batch}
+            #elif op_type == "LayerNormalization":
+            #    lyr = {'type': 'element_multiply'} #approximation
+            #    input_size = layers[layers.index(l) - 1].output.shape
+            #elif op_type == "Mul":
+            #    lyr = {'type': 'element_multiply'} #approximation
+            #elif op_type == "Div":
+            #    lyr = {'type': 'element_multiply'} #approximation
+            elif op_type in ["Mul", "Div", "LayerNormalization"]:
+                continue #mute
+            elif op_type == "Transpose":
+                lyr = {'type': 'view'}
             elif op_type == "Input":
                 if self.input_size is None:
                     self.input_size = l.output.shape
@@ -191,7 +210,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             l_idx = layers.index(l)
             input_idx = []
             for i in inputs:
-                if i.name.endswith("output_0"):
+                if i.name.endswith("output_0") and "Constant" not in i.name:
                     input_idx.append(self._find_rel_layer_idx(layers, l_idx, i.name))
             if len(input_idx) != 0:
                 lyr['input_index'] = sorted(input_idx, reverse=True)

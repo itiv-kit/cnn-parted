@@ -1,24 +1,23 @@
 import os
+import sys
+import pathlib
 import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
 
-
+from scipy.optimize import dual_annealing
+from typing import Callable
 from copy import deepcopy
 
-from model_explorer.utils.setup import build_dataloader_generators
 
+from framework.optimizer.optimizer import Optimizer
+from framework.constants import ROOT_DIR
 from framework.quantization.faulty_quantized_model import FaultyQuantizedModel
 from framework.quantization.generate_calibration import generate_calibration
 from framework.helpers.config import AccuracyConfig
-
-from scipy.optimize import dual_annealing
-
-from typing import Callable
-
-from framework.optimizer.optimizer import Optimizer
-
+sys.path.append(str(pathlib.Path(ROOT_DIR, "cnnparted", "tools", "dnn-model-exploration")))
+from model_explorer.utils.setup import build_dataloader_generators
 
 
 class RobustnessOptimizer(Optimizer):

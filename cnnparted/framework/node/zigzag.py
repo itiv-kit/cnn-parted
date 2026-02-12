@@ -15,7 +15,7 @@ from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult,
 from framework.helpers.config import NodeConfig, EvaluationConfig
 
 sys.path.append(str(pathlib.Path(ROOT_DIR, "cnnparted", "tools", "zigzag")))
-from tools.zigzag.zigzag.api import get_hardware_performance_zigzag
+from zigzag.api import get_hardware_performance_zigzag
 
 yaml = YAML(typ="rt")
 

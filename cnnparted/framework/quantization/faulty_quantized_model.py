@@ -1,6 +1,8 @@
 import torch
 import numpy as np
 import pandas as pd
+import sys
+import pathlib
 
 
 from tqdm import tqdm
@@ -8,12 +10,14 @@ from torch import nn as torch_nn
 
 from torch.utils.data import DataLoader
 
+from framework.constants import ROOT_DIR
 import framework.quantization.faulty_quantized_modules as qmodules
 from pytorch_quantization import nn as quant_nn
 from pytorch_quantization import calib
 from pytorch_quantization import tensor_quant
 from pytorch_quantization.tensor_quant import QuantDescriptor
 
+sys.path.append(str(pathlib.Path(ROOT_DIR, "cnnparted", "tools", "dnn-model-exploration")))
 from model_explorer.exploration.weighting_functions import bits_weighted_linear
 from framework.quantization.custom_model import CustomModel
 
