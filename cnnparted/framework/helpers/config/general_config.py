@@ -35,6 +35,7 @@ class CnnpartedArguments:
     cuda: bool
     cuda_id: int
     clear_partitioning: bool
+    clear_logs: bool
     top_k: int
     prune_strict: bool
     no_log: bool
@@ -47,6 +48,7 @@ class CnnpartedArguments:
         self.cuda = args["cuda"]
         self.cuda_id = args["cid"]
         self.clear_partitioning = args["clear_partitioning"]
+        self.clear_logs = args["clear_logs"]
         self.top_k = args["top_k"]
         self.no_log = args["no_log"]
         self.prune_strict = args["prune_strict"]

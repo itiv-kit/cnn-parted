@@ -77,7 +77,11 @@ if __name__ == '__main__':
     parser.add_argument('-clp',
                         '--clear-partitioning',
                         action='store_true',
-                        help="Use to clean results of partitioning evaluation")
+                        help="Use to clean results of partitioning optimization stage")
+    parser.add_argument('-cll',
+                        '--clear-logs',
+                        action='store_true',
+                        help="Use to clear all generated log files in the work directory")
     parser.add_argument('--top-k',
                         type=int,
                         required=False,
@@ -129,6 +133,12 @@ if __name__ == '__main__':
     logger.add(logging_file, level="DEBUG")
     logger.debug(f"Loading config from path {args.conf_file_path}")
     logger.debug(f"Content of config file: {conf_helper.config}")
+
+    if args.clear_logs:
+        log_files = [f for f in os.listdir(os.path.join(ROOT_DIR, work_dir)) if f.endswith(".log")]
+        for log_file in log_files:
+            os.remove(os.path.join(ROOT_DIR, work_dir, log_file))
+        sys.exit()
     
     if args.clear_partitioning:
         rn = args.run_name
