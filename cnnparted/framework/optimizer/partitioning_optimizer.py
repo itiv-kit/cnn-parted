@@ -36,14 +36,14 @@ class PartitioningOptimizer(Optimizer):
         nodes = len(ga.schedules[network][0])
 
         self.layer_dict = {}
-        for l in self.schedules[0]:
-            self.layer_dict[l] = {}
-            self.layer_dict[l]["predecessors"] = [layer.layer_name for layer in ga.models[network].predecessors_by_layer_name(l)]
-            self.layer_dict[l]["successors"] = [layer.layer_name for layer in ga.models[network].successors_by_layer_name(l)]
-            if l != "output":   
-                self.layer_dict[l]["output_size"] = [ga.models[network].node_by_layer_name(l).output.shape]
+        for layer in self.schedules[0]:
+            self.layer_dict[layer] = {}
+            self.layer_dict[layer]["predecessors"] = [layer.layer_name for layer in ga.models[network].predecessors_by_layer_name(layer)]
+            self.layer_dict[layer]["successors"] = [layer.layer_name for layer in ga.models[network].successors_by_layer_name(layer)]
+            if layer != "output":   
+                self.layer_dict[layer]["output_size"] = [ga.models[network].node_by_layer_name(layer).output.shape]
             else:
-                self.layer_dict[l]["output_size"] = [ga.models[network].node_by_layer_name(l).inputs[0].shape]
+                self.layer_dict[layer]["output_size"] = [ga.models[network].node_by_layer_name(layer).inputs[0].shape]
 
         self.layer_params = self._set_layer_params(ga)
 
@@ -91,7 +91,7 @@ class PartitioningOptimizer(Optimizer):
 
             num_platforms = len(self.node_stats)
             num_layers = len(self.schedules[0])
-            nodeStatsIds = list(self.node_stats.keys())
+            #nodeStatsIds = list(self.node_stats.keys())
             for i, sort in enumerate(sorts):
                 if sort is not None:
                     for res in sort:

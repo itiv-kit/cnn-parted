@@ -193,7 +193,8 @@ class PartitioningProblem(ElementwiseProblem):
             if layer in self.layer_params.keys():
                 part_l_params += self.layer_params[layer]
 
-            while layer in successors: successors.remove(layer)
+            while layer in successors:
+                successors.remove(layer)
             layer_successors = self.layer_dict[layer]["successors"]
             successors += layer_successors
 
@@ -365,7 +366,8 @@ class PartitioningProblem(ElementwiseProblem):
             if layer in self.layer_params.keys():
                 part_l_params += self.layer_params[layer]
 
-            while layer in successors: successors.remove(layer)
+            while layer in successors: 
+                successors.remove(layer)
             layer_successors = self.layer_dict[layer]["successors"]
             successors += layer_successors
 
@@ -478,9 +480,9 @@ class PartitioningProblem(ElementwiseProblem):
             tag = design_tag[platform]
             if self.node_stats[platform]['simulator'] == 'mnsim':
                 for part in parts[key]:
-                    for l in self.schedule[part[0]+1:part[1]+1]:
-                        if l in [*self.node_stats[platform]["eval"][tag]["networks"][self.network]]:
-                            area += float(self.node_stats[platform]["eval"][tag]["networks"][self.network][l]['area'])
+                    for layer in self.schedule[part[0]+1:part[1]+1]:
+                        if layer in [*self.node_stats[platform]["eval"][tag]["networks"][self.network]]:
+                            area += float(self.node_stats[platform]["eval"][tag]["networks"][self.network][layer]['area'])
             else: # timeloop
                 #part: partition
                 for part in parts[key]:

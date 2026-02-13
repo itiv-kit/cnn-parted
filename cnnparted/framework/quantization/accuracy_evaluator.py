@@ -5,7 +5,7 @@ import torch.nn as nn
 import numpy as np
 
 from copy import deepcopy
-from tqdm import tqdm
+#from tqdm import tqdm
 from typing import Callable, Tuple
 
 from model_explorer.utils.setup import build_dataloader_generators
@@ -137,13 +137,13 @@ class AccuracyEvaluator():
         quant_list = []
         for base_layer in self.qmodel.explorable_module_names:
             quant_list.append(self.bits[0])
-            for i, l in enumerate(schedules[0]):
-                if l in base_layer and l != 'input' and l != 'output':
-                    if l in layer_dict and layer_dict[l] % 2:
+            for i, layer in enumerate(schedules[0]):
+                if layer in base_layer and layer != 'input' and layer != 'output':
+                    if layer in layer_dict and layer_dict[layer] % 2:
                         continue
-                    layer_dict[l] = len(quant_list) - 1
+                    layer_dict[layer] = len(quant_list) - 1
                     break
-                elif l == 'output': # FIXME? hotfix for last layer being renamed in ONNX file
+                elif layer == 'output': # FIXME? hotfix for last layer being renamed in ONNX file
                     layer_dict[schedules[0][i-1]] = len(quant_list) - 1
 
         quants = []
@@ -174,11 +174,11 @@ class AccuracyEvaluator():
         for base_layer in self.qmodel.faulty_module_names:
             fault_rate_list.append(self.fault_rates[0])
             faulty_bit_list.append(self.faulty_bits[0])
-            for l in schedules[0]:
-                if l in base_layer:
-                    if l in layer_dict:
+            for layer in schedules[0]:
+                if layer in base_layer:
+                    if layer in layer_dict:
                         continue
-                    layer_dict[l] = len(fault_rate_list) - 1
+                    layer_dict[layer] = len(fault_rate_list) - 1
                     break
 
         fault_rates = []

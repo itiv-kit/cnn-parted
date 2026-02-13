@@ -75,7 +75,7 @@ class RobustnessOptimizer(Optimizer):
                         self.qmodel.base_model.to(self.gpu_device),
                         self.val_dataloadergen,
                         progress=self.progress,
-                        title=f"Infere"
+                        title="Infere"
                     )
                     accuracy_result = float(accuracy_result.cpu().detach().numpy())
                     acc_lut[tuple(x)] = accuracy_result
