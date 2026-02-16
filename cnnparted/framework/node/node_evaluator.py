@@ -25,22 +25,12 @@ class LayerResult:
     energy: float #must be in mJ
     cycles: int 
 
-    #Information relevant for scheduling
-    binding: int = None
-    start_time: float = None
-    end_time: float = None
-
     def __init__(self):
         self.name: str = ""
         self.area: float = 0.0  #must be in mm2
         self.latency: float = 0.0 #must be in ms
         self.energy: float = 0.0 #must be in mJ
         self.cycles: int = None
-
-        # Information relevant for scheduling
-        self.binding: int = None
-        self.start_time: float = None
-        self.end_time: float = None
 
     def to_dict(self) -> dict :
         ret = {
@@ -50,16 +40,7 @@ class LayerResult:
                     "energy": self.energy,
                 }
             }   
-        if self.binding is not None:
-            ret[self.name]["binding"] = self.binding
-            ret[self.name]["start_time"] = self.start_time
-            ret[self.name]["end_time"] = self.end_time
         return ret
-    
-    def reset_scheduling(self):
-        self.binding = None
-        self.start_time = None
-        self.end_time = None
     
     @property
     def edp(self):

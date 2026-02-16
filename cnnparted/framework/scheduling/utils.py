@@ -23,7 +23,7 @@ class PlatformSchedule:
                     # Check if layer can be scheduled immediately after pred
                     start_time = pred.end_time
                     end_time = start_time + layer.latency
-                    task = ComputeTask(network, layer.name, start_time, end_time)
+                    task = ComputeTask(network, layer.name, self.id, start_time, end_time)
                     insert_idx = self.tasks.index(succ)
                     self.tasks.insert(insert_idx, task)
                     return task
@@ -31,7 +31,7 @@ class PlatformSchedule:
                     # Check if layer can be scheduled immediately before succ
                     start_time = succ.start_time - earliest_start
                     end_time = start_time + layer.latency
-                    task = ComputeTask(network, layer.name, start_time, end_time)
+                    task = ComputeTask(network, layer.name, self.id, start_time, end_time)
                     insert_idx = self.tasks.index(succ)
                     self.tasks.insert(insert_idx, task)
                     return task
@@ -42,7 +42,7 @@ class PlatformSchedule:
 
         self.cur_time = start_time + layer.latency
         
-        task = ComputeTask(network, layer.name, start_time, end_time)
+        task = ComputeTask(network, layer.name, self.id, start_time, end_time)
         self.tasks.append(task)
         return task
     

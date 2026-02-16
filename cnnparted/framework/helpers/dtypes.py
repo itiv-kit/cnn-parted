@@ -16,8 +16,19 @@ LinkId = NewType("LinkId", tuple[NocCoordinate, NocCoordinate])
 class ComputeTask:
     network: str
     layer: str
+    binding: int
     start_time: float
     end_time: float
+
+    def to_dict(self) -> dict:
+        return {
+            self.layer: {
+                "binding": self.binding,
+                "start_time": self.start_time,
+                "end_time": self.end_time,          
+            }
+
+        }
 
 @dataclass
 class TransferTask:
