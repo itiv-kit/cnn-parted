@@ -81,11 +81,16 @@ class WorkloadSpec:
     input_size: list[int]
     tiling: dict[str, TilingConfig] #op_type -> config
     deadline: int
+    frames: int
 
     def __init__(self, cfg: dict):
         self.name = cfg["name"]
         self.input_size = cfg["input-size"] 
         self.deadline = cfg.get("deadline", inf)
+        self.frames = cfg.get("frames", 1)
+        assert self.frames >= 1, "Frames must be at least 1"
+        assert self.deadline >= 0, "Deadline must be non-negative"
+        assert not (self.frames > 1 and self.deadline != inf), "Cannot set a deadline for a workload with multiple frames"
         tiling_cfg = cfg.get("tiling", {})
         self.tiling = {}
         for op_type in TilingConfig.SUPPORTED_OP_TYPES:

@@ -63,11 +63,12 @@ class SystemSchedule:
         for platform_id in platform_ids: 
             self.layers[platform_id] = {nw: {} for nw in networks}
 
-    def schedule_layer(self, platform_id: int, network: str, layer: LayerResult, earliest_start: float):
+    def schedule_layer(self, platform_id: int, network: str, layer: LayerResult, earliest_start: float) -> ComputeTask:
         task = self.node_schedules[platform_id].schedule_layer(network, layer, earliest_start)
         
         # Keep a dict to make searching for a specifc layer easier
         self.layers[platform_id][network][task.layer] = task 
+        return task
 
     @property
     def system_latency(self):

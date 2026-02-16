@@ -31,6 +31,7 @@ class GraphAnalyzer:
             onnx_parser = OnnxParser(self.run_name, network)
             onnx_model = onnx_parser.parse_graph()
             onnx_model.deadline = workload_info.deadline
+            onnx_model.frames = workload_info.frames
 
             self.models[network]  = onnx_model
             self.torchmodels[network] = onnx_parser.get_torch_model() 

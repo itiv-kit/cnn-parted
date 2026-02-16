@@ -37,4 +37,5 @@ class WorkloadInfo:
     accuracy_function: Callable
     input_shape: list[int]
     deadline: int
+    frames: int
     onnx_filepath: str

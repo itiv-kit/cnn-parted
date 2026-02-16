@@ -37,7 +37,6 @@ class WorkloadParser(Stage):
 
                     #TODO Accuracy evaluation is currently not supported, if possible integrate a way to specify it
                     accuracy_function = None
-                    workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, workload.deadline, filename)
         
                 else:
                     logger.debug(f"Instantiate workload {wl_name} from PyTorch repository and input-size {workload.input_size}")
@@ -53,12 +52,11 @@ class WorkloadParser(Stage):
                     x = torch.randn(input_size)
                     torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
 
-                workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, workload.deadline, filename)
-    
+                workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, workload.deadline, workload.frames, filename)
     
             except KeyError:
                 print()
-                print('\033[1m' + 'Workload not available' + '\033[0m')
+                logger.error(f"Workload {workload.name} not found. Make sure to specify a valid workload name or path to an ONNX file in the configuration.")
                 print()
                 quit(1)
 

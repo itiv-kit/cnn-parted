@@ -1,3 +1,4 @@
+import math
 import os
 from typing import Any, TYPE_CHECKING
 
@@ -38,6 +39,11 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         self.onnx_in_model = onnx_in_model
         self.name_to_node_mapping: dict[str, LayerBase] = {}
         self.deadline: int = None
+        self.frames: int = None
+    
+    @property
+    def has_constraints(self):
+        return self.deadline != math.inf or self.frames > 1
     
     def add_layer(self, layer: RenameLayer | ComputationLayer):
         self.name_to_node_mapping[layer.layer_name] = layer
@@ -54,7 +60,6 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         else:
             raise RuntimeError(f"Invalid call to remove_layer, called on {type(layer)}")
         
-    
     def _find_consumers(self, tensor: OnnxTensor | TensorWrapper, layer_inputs: dict[str, list[OnnxTensor]]):
         consumers = []
         if isinstance(tensor, TensorWrapper):
@@ -93,6 +98,13 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
             if all(tensor_initially_available):
                 initial_layers.append(node)
         return initial_layers
+    
+    def get_input_layers(self) -> list[InputLayer]:
+        input_layers = []
+        for node in self.nodes:
+            if isinstance(node, InputLayer):
+                input_layers.append(node)
+        return input_layers
     
     def get_compute_layers(self):
         compute_layers = []

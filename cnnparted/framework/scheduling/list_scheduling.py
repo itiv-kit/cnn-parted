@@ -1,4 +1,4 @@
-import math
+import copy
 
 from framework.helpers.config.stages_config import SchedulingPriority
 from framework.model.layers.rename_layer import RenameLayer
@@ -21,6 +21,11 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
 
     schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()) )
 
+    # Backup of models: scheduling modifies the model, so we need a backup
+    # incase a model should be scheduled more than once. 
+    model_backup = copy.deepcopy(models)
+    model_endtimes = {nw_name: 0.0 for nw_name in models.keys()}
+
     # While not all nodes have been assigned
     all_assigned = False
     while not all_assigned:
@@ -30,14 +35,10 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
 
         # When one or more models have a deadline we start by scheduling only those to 
         # increase the likeliness of successfully scheduling them
-        all_deadlines_scheduled = True
-        for network, model in models.items():
-            if model.deadline != math.inf and model.number_of_nodes() > 0:
-                all_deadlines_scheduled = False
-                break
+        all_constraints_scheduled = not any([model.has_constraints and model.number_of_nodes() > 0 for model in models.values()])
 
         for network, model in models.items():
-            if not all_deadlines_scheduled and model.deadline == math.inf:
+            if not all_constraints_scheduled and not model.has_constraints:
                 continue
 
             for layer in model.nodes:
@@ -72,7 +73,8 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
             layer_result = find_layer_info(binding, network, layer.layer_name)
             layer_name = layer.layer_name
 
-            schedule.schedule_layer(binding, network, layer_result, layer.scheduling.earliest_start)
+            scheduled_task = schedule.schedule_layer(binding, network, layer_result, layer.scheduling.earliest_start)
+            model_endtimes[network] = max(model_endtimes[network], scheduled_task.end_time)
 
             # Before we remove the node, set the earliest start for all successors
             for succ in models[network].successors(layer):
@@ -87,6 +89,19 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
                 # for that reason we can just propagate the earliest start information here
                 succ.scheduling.earliest_start = layer.scheduling.earliest_start
             models[network].remove_layer(layer)
+        
+        # Logic to schedule a network multiple times
+        # If all nodes are scheduled, and the netweork should be exectued multiple times,
+        # copy it over which enables scheduling it repeatedly
+        for network, model in models.items():
+            if model.number_of_nodes() == 0 and model.frames >= 1:
+                remaining_frames = model.frames - 1
+                if remaining_frames > 0:
+                    models[network] = copy.deepcopy(model_backup[network])
+                    models[network].frames = remaining_frames
+                    for input_layer in models[network].get_input_layers():
+                        # This is needed to reset the earliest start times of the input layers
+                        input_layer.scheduling.earliest_start = model_endtimes[network] 
 
         num_remaining_nodes = sum([graph.number_of_nodes() for graph in models.values()])
         all_assigned = (num_remaining_nodes == 0)
