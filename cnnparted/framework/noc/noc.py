@@ -35,6 +35,7 @@ class NocNode:
         self.result = result
         self.cur_time = 0.0
         self.schedule: list[ComputeTask] = []
+        #self.allocated_tensors: list[AllocatedTensor] = []
 
     def attach_result(self, result: NodeResult):
         #TODO Probably need some validation here

@@ -29,5 +29,7 @@ class FullyConnectedNoc(NocTopology):
         paths: dict[NocCoordinate, NocPath] = {}
         for end in ends:
             paths[end] = self.links[(start, end)]
-        
         return paths
+    
+    def get_num_hops(self, start: NocCoordinate, end: NocCoordinate) -> int:
+        return 1 #all nodes are directly connected with each other

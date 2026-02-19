@@ -14,7 +14,7 @@ class Link():
         if not self.config:
             return
 
-        self.link = LinkModelInterface
+        self.link: LinkModelInterface
         conf = self.config.parameters
         match self.config.kind:
             case "ethernet":

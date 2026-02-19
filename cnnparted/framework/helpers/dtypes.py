@@ -27,7 +27,6 @@ class ComputeTask:
                 "start_time": self.start_time,
                 "end_time": self.end_time,          
             }
-
         }
 
 @dataclass
@@ -36,6 +35,8 @@ class TransferTask:
     tensor_name: str
     start_time: float
     end_time: float
+    start_node: NocCoordinate
+    dest_node: NocCoordinate
 
 @dataclass
 class AllocatedTensor:

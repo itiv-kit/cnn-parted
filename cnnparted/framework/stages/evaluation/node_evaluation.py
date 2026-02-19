@@ -44,6 +44,12 @@ class NodeEvaluation(Stage):
                 # If the accelerator should be instatiated multiple times, copy the results and look-up the unique id
                 for v_id_int in node_thread.config.virtual_ids.values():
                     node_eval_stats.add_platform(v_id_int, copy.deepcopy(stats))
+        
+        for id in node_eval_stats.get_unique_platforms():
+            for network, network_eval in node_eval_stats.platforms[id].design.networks.items():
+                network_latency = sum([res.latency for res in network_eval.layers.values()])
+                #network_energy = sum([res.energy for res in network_eval.layers.values()])
+                logger.info(f"{network} on platform {id}: Latency: {network_latency:.2f}")
 
         self._update_artifacts(artifacts, node_eval_stats)
     

@@ -1,5 +1,6 @@
 import itertools as it
 
+from framework.model.onnx_model import OnnxModel
 from framework.node.node_evaluator import SystemResult, LayerResult
 from framework.helpers.dtypes import ComputeTask, TransferTask
 
@@ -89,3 +90,15 @@ class SystemSchedule:
             for task in node_schedule.tasks:
                 networks_finish[task.network] = max(networks_finish[task.network], task.end_time)
         return networks_finish
+
+
+def validate_schedule(schedule: SystemSchedule, models: dict[str, OnnxModel]):
+    for network, model in models.items():
+        for layer in model.nodes:
+            layer_task = schedule.layers[layer.scheduling.binding][network][layer.layer_name]
+            for succ in model.successors(layer):
+                # Check that all succesors actually start after their
+                # predecessor is finished
+                succ_task = schedule.layers[succ.scheduling.binding][network][succ.layer_name]
+                assert succ_task.start_time >= layer_task.end_time, f"Layer {succ.layer_name} of {network} is not scheduled after predecssor {layer.layer_name}"
+
