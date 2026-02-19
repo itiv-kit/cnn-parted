@@ -108,7 +108,6 @@ system:
     evaluation:
       accelerator: RRAM_acc # accelerator name
       conf_path: /configs/mnsim_configs/RRAM_acc.ini
-
       simulator: mnsim
   link:
   - id: 1

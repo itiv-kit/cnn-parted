@@ -11,7 +11,10 @@
         "ms-python.python",
         "ms-python.debugpy",
         "mechatroner.rainbow-csv",
-        "ms-vscode.live-server"
+        "ms-vscode.live-server",
+        "tintinweb.graphviz-interactive-preview",
+        "charliermarsh.ruff",
+        "gruntfuggly.todo-tree"
       ]
     }
   }
