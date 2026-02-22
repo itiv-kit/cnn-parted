@@ -1,6 +1,9 @@
+import math
 import itertools as it
+from intervaltree import IntervalTree
 
 from framework.model.onnx_model import OnnxModel
+from framework.model.layers.compute_layer import ComputationLayer
 from framework.node.node_evaluator import SystemResult, LayerResult
 from framework.helpers.dtypes import ComputeTask, TransferTask
 
@@ -10,7 +13,7 @@ class PlatformSchedule:
         self.layers: list[LayerResult] = []
         self.cur_time = 0.0
 
-        self.tasks: list[ComputeTask | TransferTask] = []
+        self.tasks: list[ComputeTask] = []
     
     def get_time(self):
         return self.cur_time
@@ -47,14 +50,21 @@ class PlatformSchedule:
         self.tasks.append(task)
         return task
     
-    def assign_tensor(self, network: str, tensor):
-        ...
     
     def get_idle_time(self) -> float:
         idle_time = [(nxt.start_time-cur.end_time)  for cur, nxt in it.pairwise(self.tasks)]
         if self.tasks[0].start_time > 0:
             idle_time = [self.tasks[0].start_time] + idle_time
         return sum(idle_time)
+
+class LinkSchedule:
+    def __init__(self, start: int, end: int):
+        self.start = start
+        self.end = end
+
+        self.tasks: list[TransferTask] = []
+        self.task_intervals = IntervalTree()
+
     
 class SystemSchedule:
     def __init__(self, platform_ids: list[int], networks: list[str]):
@@ -93,12 +103,27 @@ class SystemSchedule:
 
 
 def validate_schedule(schedule: SystemSchedule, models: dict[str, OnnxModel]):
+    are_constraints_fulfilled = True
+    network_end_times = schedule.get_network_finish_times()
     for network, model in models.items():
         for layer in model.nodes:
+            if not isinstance(layer, ComputationLayer):
+                continue
             layer_task = schedule.layers[layer.scheduling.binding][network][layer.layer_name]
             for succ in model.successors(layer):
                 # Check that all succesors actually start after their
                 # predecessor is finished
                 succ_task = schedule.layers[succ.scheduling.binding][network][succ.layer_name]
                 assert succ_task.start_time >= layer_task.end_time, f"Layer {succ.layer_name} of {network} is not scheduled after predecssor {layer.layer_name}"
+        
+        # Check if this schedule fulfills the constraints
+        if model.deadline != math.inf and network_end_times[network] > model.deadline:
+            # Scheduling with a given deadline
+            are_constraints_fulfilled = False
+        elif model.frames > 1 and network_end_times[network] > 1_000:
+            # Scheduling a fixed amount of frames per second (here: 1000ms)
+            are_constraints_fulfilled = False
+    
+    return are_constraints_fulfilled
+
 

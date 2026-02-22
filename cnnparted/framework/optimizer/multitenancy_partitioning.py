@@ -18,7 +18,7 @@ from framework.optimizer.optimizer import Optimizer
 from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
-from framework.scheduling import list_scheduling, multi_queue_scheduling, SystemSchedule
+from framework.scheduling import list_scheduling, multi_queue_scheduling, SystemSchedule, validate_schedule
 
 
 class MultiTenancyPartitioning(Optimizer):
@@ -125,12 +125,12 @@ class MultiTenancyProblem():
 
         self.layer_tracker = LayerTracker(network_info)
         self.num_nodes = self.layer_tracker.get_num_layers()
-        self.initial_schedule = self.scheduling_algorithm(copy.deepcopy(ga.models), self.node_stats, priority=self.conf.mt.scheduling_priority)
+        #self.initial_schedule = self.scheduling_algorithm(copy.deepcopy(ga.models), self.node_stats, priority=self.conf.mt.scheduling_priority)
 
         # SA configuration
-        self.initial_cost = self._calc_cost(self.layer_tracker, self.initial_schedule)
+        #self.initial_cost = self._calc_cost(self.layer_tracker, self.initial_schedule)
         self.num_iter = self.num_nodes * 100
-        self.t_start = self.initial_cost*8
+        #self.t_start = self.initial_cost*8
         self.convergence_counter = 0
         self.cost_history = []
     
@@ -285,18 +285,23 @@ class MultiTenancyProblem():
 
         ### Perform scheduling for pareto-optimal solutions
         results: list[tuple[LayerTracker, SystemSchedule]] = []
+        invalid_results: list[tuple[LayerTracker, SystemSchedule]] = []
         for trial in tqdm.tqdm(study.best_trials):
             new_models = copy.deepcopy(self.models)
             self._write_binding_to_graph(trial.user_attrs["bindings"], new_models)
             node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
-            results.append( (trial.user_attrs["bindings"], node_schedules) )
-        
+            are_constraints_fulfilled = validate_schedule(node_schedules, new_models)
+
+            if are_constraints_fulfilled:
+                results.append( (trial.user_attrs["bindings"], node_schedules) )
+            else:
+                invalid_results.append( (trial.user_attrs["bindings"], node_schedules) )
         
         # For every network, figure out at which time it finishes execution
         # Needed to check if deadlines have been met or not
         deadline_stats = {network: [0,0] for network in self.models.keys()}
         all_succeeded = []
-        for _, schedule in results:
+        for _, schedule in results + invalid_results:
             all_succeeded.append(True)
             network_finishes = schedule.get_network_finish_times()
             for nw, end in network_finishes.items():
