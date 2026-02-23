@@ -35,7 +35,7 @@ class TransferTask:
     tensor_name: str
     start_time: float
     end_time: float
-    start_node: NocCoordinate
+    src_node: NocCoordinate
     dest_node: NocCoordinate
 
 @dataclass
