@@ -47,6 +47,7 @@ class NocTopology(nx.MultiDiGraph[NocNode] if TYPE_CHECKING else nx.MultiDiGraph
         super().__init__(**attr)
         self.id_to_link: dict[LinkId, NocLink] = {}
         self.id_to_node: dict[NodeId, NocNode] = {}
+        self.default_link: Link = None
 
     @abstractmethod
     def determine_routing(self, start: NocCoordinate, ends: list[NocCoordinate]) -> list[NocPath]:

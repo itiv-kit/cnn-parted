@@ -21,7 +21,7 @@ class MultiTenancyOptimization(Stage):
         logger.info("Running multi-tenancy optimization stage")
         self._take_artifacts(artifacts)
 
-        mt_optimizer = MultiTenancyPartitioning(self.work_dir, self.node_results, self.ga, self.config)
+        mt_optimizer = MultiTenancyPartitioning(self.work_dir, self.node_results, self.ga, self.config, self.noc)
         solutions = mt_optimizer.optimize()
 
         self._update_artifacts(artifacts, solutions)
@@ -31,6 +31,7 @@ class MultiTenancyOptimization(Stage):
         self.node_results = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
         self.work_dir = artifacts.config.general.work_dir
         self.config = artifacts.config
+        self.noc = artifacts.system_parser.noc
     
     def _update_artifacts(self, artifacts: Artifacts, solutions):
         artifacts.multitenancy_optimization.solutions = solutions

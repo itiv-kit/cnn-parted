@@ -1,4 +1,4 @@
-from math import inf
+import math
 import os
 import copy
 from collections import defaultdict
@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 import optuna
 import tqdm
 
+from framework.noc.noc import NocTopology
 from framework.model.onnx_model import OnnxModel
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.optimizer.optimizer import Optimizer
@@ -22,19 +23,20 @@ from framework.scheduling import list_scheduling, multi_queue_scheduling, System
 
 
 class MultiTenancyPartitioning(Optimizer):
-    def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper):
+    def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper, noc: NocTopology):
         self.work_dir = work_dir
         self.plot_dir = os.path.join(work_dir, "figures")
         self.ga = ga
         self.conf = global_conf
         self.system_result = node_stats
+        self.noc = noc
 
         os.makedirs(self.plot_dir, exist_ok=True)
 
     def optimize(self):
         self._gen_initial_binding()
 
-        algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga, self.conf)
+        algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga, self.conf, self.noc)
         solutions = algorithm.minimize()
         return solutions
 
@@ -101,13 +103,14 @@ class LayerTracker:
 
 
 class MultiTenancyProblem():
-    def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper):
+    def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper, noc: NocTopology):
         self.work_dir = work_dir
         self.plot_dir = os.path.join(work_dir, "figures")
         self.optuna_out_dir = os.path.join(work_dir, "optuna")
         self.node_stats = node_stats
         self.node_ids = node_stats.get_platform_ids()
         self.ga = ga
+        self.noc = noc
         self.models = copy.deepcopy(ga.models)
         self.conf = global_conf
         match self.conf.mt.scheduling:
@@ -258,7 +261,7 @@ class MultiTenancyProblem():
             # Add information to be later retrieved
             trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
 
-            return (self._score_total_energy(work_layer_tracker), 
+            return (self._score_total_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker), 
                     self._score_total_latency(work_layer_tracker),)
 
         # Start the optimization, setup everything for Optuna run
@@ -305,7 +308,7 @@ class MultiTenancyProblem():
             all_succeeded.append(True)
             network_finishes = schedule.get_network_finish_times()
             for nw, end in network_finishes.items():
-                if (deadline := self.models[nw].deadline) and deadline != inf:
+                if (deadline := self.models[nw].deadline) and deadline != math.inf:
                     if end <= deadline:
                         #success
                         deadline_stats[nw][0] += 1
@@ -315,7 +318,7 @@ class MultiTenancyProblem():
                         deadline_stats[nw][1] += 1
         logger.info(f"All deadlines were wet in {all_succeeded.count(True)}/{len(all_succeeded)} cases ({all_succeeded.count(True)/len(all_succeeded)*100:.2f}%)")
         for nw, (success, fail) in deadline_stats.items():
-            if self.models[nw].deadline != inf:
+            if self.models[nw].deadline != math.inf:
                 logger.info(f"Deadline for {nw} was met in {success}/{fail+success} cases ({success/(fail+success)*100:.2f}%)")
         
         # Log some statistics
@@ -392,6 +395,20 @@ class MultiTenancyProblem():
             # TODO Currently assumes that there is only one design
             layer_data = self.node_stats[bind].designs[0].networks[nw].layers[layer]
             total_energy += layer_data.energy
+        return total_energy
+    
+    def _score_tensor_transfer_energy(self, tracker: LayerTracker) -> float:
+        total_energy = 0.0    
+        for nw, layer, bind in tracker:
+            # Besides executing the layer, consider the energy to transfer the input and output
+            # tensors between the platform and the DRAM
+            platform_coord = self.noc.id_to_node[bind].coord
+            num_hops = self.noc.get_min_hops_to_dram(platform_coord)
+            model_layer = self.models[nw].node_by_layer_name(layer)
+            tensor_num_elem = [math.prod(tensor.shape) for tensor in model_layer.inputs + [model_layer.output]]
+            tensor_transfer_eval = [self.noc.default_link.eval(num_elem) for num_elem in tensor_num_elem]
+            tensor_transfer_energy = [energy * num_hops for (latency, energy, slice_size) in tensor_transfer_eval]
+            total_energy += sum(tensor_transfer_energy)
         return total_energy
 
     def _score_total_latency(self, tracker: LayerTracker) -> float:

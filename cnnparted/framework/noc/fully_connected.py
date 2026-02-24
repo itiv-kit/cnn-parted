@@ -1,6 +1,6 @@
 import itertools as it
 
-from framework.link.link_model_interface import LinkModelInterface
+from framework.link.link import Link
 from framework.helpers.config_helper import ConfigHelper
 from framework.helpers.dtypes import NocCoordinate
 from .noc import NocLink, NocNode, NocTopology, NocPath
@@ -8,8 +8,10 @@ from .noc import NocLink, NocNode, NocTopology, NocPath
 
 class FullyConnectedNoc(NocTopology):
     """A network where each node is directly connected with all other nodes"""
-    def __init__(self, cfg: ConfigHelper, link_kind: LinkModelInterface):
+    def __init__(self, cfg: ConfigHelper, link_kind: Link):
         super().__init__()
+
+        self.default_link = link_kind
         
         # As all nodes are directly connected, we use the node id as the corrdinate
         for node_id in cfg.system.platform_ids:

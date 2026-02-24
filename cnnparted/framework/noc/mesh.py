@@ -3,6 +3,7 @@ import numpy as np
 import math
 import matplotlib as plt
 
+from framework.link.link import Link
 from framework.helpers.dtypes import NocCoordinate
 from framework.helpers.config_helper import ConfigHelper
 from framework.link.link_model_interface import LinkModelInterface
@@ -10,11 +11,13 @@ from .noc import NocLink, NocNode, NocTopology
 
 class MeshNoc(NocTopology):
     ...
-    def __init__(self, cfg: ConfigHelper, link: LinkModelInterface):
+    def __init__(self, cfg: ConfigHelper, link: Link):
         super().__init__()
 
         noc_cfg = cfg.system.noc
         noc_shape = noc_cfg.shape
+
+        self.default_link = link
 
         assert math.prod(noc_shape) == len(cfg.system.platform_id_mapping), f"For Mesh NoC, number of nodes (is: {cfg.system.num_platforms}) must be exactly shape of NoC (is: {noc_shape})"
 
@@ -31,7 +34,6 @@ class MeshNoc(NocTopology):
         init_graph:nx.Graph = nx.grid_graph(dim=noc_layout.tolist())
         init_graph = init_graph.to_directed()
         self.add_edges_from(init_graph)
-        nx.from_pandas_edgelist
 
         for source, sink, key in self.edges:
             source_coord = NocCoordinate(source.coord)
