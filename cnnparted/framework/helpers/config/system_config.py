@@ -205,10 +205,10 @@ class SystemConfig:
 
         # Configuration for the NoC
         self.noc = NocConfig(cfg["noc"]) if "noc" in cfg else None
-        all_available_slots = it.product(*(range(s) for s in self.noc.shape))
 
         if self.noc is not None:
             assert self.num_platforms <= math.prod(self.noc.shape), "Number of platforms exceeds available slots of the configured NoC"
+            all_available_slots = it.product(*(range(s) for s in self.noc.shape))
             for compute_node in self.compute:
                 if compute_node.noc_coords is None or compute_node.noc_coords == "auto":
                     # Generate default values for indices
