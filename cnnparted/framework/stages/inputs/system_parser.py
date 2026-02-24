@@ -22,7 +22,6 @@ class SystemParser(Stage):
                 noc_topo = MeshNoc(self.config, Link(link_components[0]))
             case _:
                 raise RuntimeError(f"Could not parse NoC topology, found {self.config.system.noc.topology}")
-        breakpoint()
         self._update_artifacts(artifacts, node_components, link_components, noc_topo)
     
     def _take_artifacts(self, artifacts: Artifacts):

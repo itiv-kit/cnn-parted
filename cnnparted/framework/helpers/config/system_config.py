@@ -3,8 +3,6 @@ from typing import Literal
 import itertools as it
 import math
 
-import numpy as np
-
 from framework.helpers.dtypes import NodeId
 
 @dataclass
