@@ -15,13 +15,16 @@ class SystemParser(Stage):
         logger.info("Parsing system configuration")
         self._take_artifacts(artifacts)
         node_components, link_components = self.config.get_system_components()
-        match self.config.system.noc.topology:
-            case "fully_connected":
-                noc_topo = FullyConnectedNoc(self.config, Link(link_components[0]))
-            case "mesh":
-                noc_topo = MeshNoc(self.config, Link(link_components[0]))
-            case _:
-                raise RuntimeError(f"Could not parse NoC topology, found {self.config.system.noc.topology}")
+        if self.config.system.noc is not None:
+            match self.config.system.noc.topology:
+                case "fully_connected":
+                    noc_topo = FullyConnectedNoc(self.config, Link(link_components[0]))
+                case "mesh":
+                    noc_topo = MeshNoc(self.config, Link(link_components[0]))
+                case _:
+                    raise RuntimeError(f"Could not parse NoC topology, found {self.config.system.noc.topology}")
+        else:
+            noc_topo = None
         self._update_artifacts(artifacts, node_components, link_components, noc_topo)
     
     def _take_artifacts(self, artifacts: Artifacts):
