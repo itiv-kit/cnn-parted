@@ -33,6 +33,22 @@ class OptunaConfig:
         self.n_trials = int(cfg["n_trials"])
         self.sampler = cfg["sampler"]
 
+@dataclass
+class PartitioningStageConfig:
+    fixed_sys: bool
+    acc_once: bool
+    num_pp: int
+    num_jobs: int
+    optimization: Literal["all", "edp", "ppa"]
+    max_num_platforms: int | None
+
+    def __init__(self, cfg: dict):
+        self.fixed_sys = cfg["fixed_sys"]
+        self.acc_once = cfg["acc_once"]
+        self.num_pp = cfg["num_pp"]
+        self.num_jobs = cfg["num_jobs"]
+        self.optimization = cfg["optimization"]
+        self.max_num_platforms = cfg.get("max_num_platforms")
 
 @dataclass
 class DseStageConfig:
@@ -65,11 +81,15 @@ class MultiTenancyStageConfig:
     algorithm: Literal["sa", "genetic", "optuna"]
     scheduling: Literal["list", "multi_queue"]
     scheduling_priority: SchedulingPriority
+    binding_granularity: Literal["layer", "network"]
+    num_jobs: int
 
     def __init__(self, cfg: dict):
         self.algorithm = cfg["algorithm"]
         self.scheduling = cfg["scheduling"]
         self.scheduling_priority = SchedulingPriority[cfg["scheduling_priority"].upper()]
+        self.binding_granularity = cfg["binding_granularity"]
+        self.num_jobs = cfg["num_jobs"]
 
         match self.algorithm:
             case "sa":

@@ -4,6 +4,10 @@ import copy
 from collections import defaultdict
 from dataclasses import dataclass
 from loguru import logger
+import itertools as it
+
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 
 import numpy as np
 import plotly.express as px
@@ -79,6 +83,11 @@ class LayerTracker:
                 self.network_info[nw][layer] = new_bindings[idx]
                 idx += 1
 
+    def _write_binding_to_graph(self, models: dict[str, OnnxModel]):
+        for nw, layer, binding in self:
+            node = models[nw].node_by_layer_name(layer)
+            node.scheduling.binding = binding
+
     def swap_layers(self, nws_layers: list[tuple[str,str]]):
         """Swap the binding of two layers that are on different platforms"""
         bindings = np.array([self.network_info[nw][layer] for nw, layer in nws_layers])
@@ -100,6 +109,23 @@ class LayerTracker:
                     self.network_info[nw][layer_name] = platform_b
                 elif binding == platform_b:
                     self.network_info[nw][layer_name] = platform_a
+
+
+@dataclass
+class ScheduleResult:
+    schedule: SystemSchedule
+    tracker: LayerTracker
+    is_valid: bool
+
+def _scheduling_wrapper(trial: optuna.Trial, models: dict[str, OnnxModel], scheduling_algorithm,
+                        node_stats: SystemResult, scheduling_priority) -> ScheduleResult:
+    """Wrapper to simplify parallelizing scheduling"""
+    new_models = copy.deepcopy(models)
+    tracker: LayerTracker = trial.user_attrs["bindings"]
+    tracker._write_binding_to_graph(new_models)
+    system_schedule = scheduling_algorithm(new_models, node_stats, priority=scheduling_priority)
+    are_constraints_fulfilled = validate_schedule(system_schedule, new_models)
+    return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
 
 
 class MultiTenancyProblem():
@@ -150,7 +176,7 @@ class MultiTenancyProblem():
         convergence = False
         rng = np.random.default_rng()
 
-        def _random_modify(self, current_state: LayerTracker):
+        def _random_modify(self, current_state: LayerTracker) -> LayerTracker:
             layer_tracker = copy.deepcopy(current_state)
             action_space = [layer_tracker.swap_layers, layer_tracker.move_layer, layer_tracker.swap_platforms]
             action = rng.choice(a=action_space, p=[0.45, 0.45, 0.1])
@@ -184,7 +210,7 @@ class MultiTenancyProblem():
                 new_state = _random_modify(current_state)
 
                 new_models = copy.deepcopy(self.models)
-                self._write_binding_to_graph(new_state, new_models)
+                new_state._write_binding_to_graph(new_models)
                 node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
                 
                 new_cost = self._calc_cost(new_state, node_schedules)
@@ -248,25 +274,40 @@ class MultiTenancyProblem():
         platform_ids = self.conf.system.platform_ids
         work_layer_tracker = copy.deepcopy(self.layer_tracker)
         num_trials = self.conf.mt.optimizer.n_trials
+        binding_granularity = self.conf.mt.binding_granularity
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         def objective(trial: optuna.trial.Trial):
             bindings = []
-            for i, (nw, layer, current_binding) in enumerate(work_layer_tracker):
-                layer_bind = trial.suggest_categorical(f"binding_{i}", 
-                                                       choices=platform_ids)
-                bindings.append(layer_bind)
+
+            match binding_granularity:
+                case "layer":
+                    for i, (nw, layer, current_binding) in enumerate(work_layer_tracker):
+                        layer_bind = trial.suggest_categorical(f"layer_binding_{i}", 
+                                                               choices=platform_ids)
+                        bindings.append(layer_bind)
+                case "network":
+                    network_bind = {}
+                    for i, nw in enumerate(self.models.keys()):
+                        network_bind[nw] = trial.suggest_categorical(f"network_binding_{i}",
+                                                                choices=platform_ids)
+                    for (nw, layer, current_binding) in work_layer_tracker:
+                        bindings.append(network_bind[nw])
+                    
             work_layer_tracker.set_all_bindings(bindings)
 
             # Add information to be later retrieved
             trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
 
-            return (self._score_total_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker), 
-                    self._score_total_latency(work_layer_tracker),)
+            return (
+                    self._score_binding_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker),
+                    self._score_binding_latency(work_layer_tracker),
+                    self._score_latency_gini(work_layer_tracker),
+                    )
 
         # Start the optimization, setup everything for Optuna run
         os.makedirs(self.optuna_out_dir, exist_ok=True)
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize",], )
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize"], )
         study.optimize(objective, n_trials=num_trials, n_jobs=1, show_progress_bar=True)
         
         # Plotting to make sense of the results
@@ -277,7 +318,7 @@ class MultiTenancyProblem():
         #fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
         #fig.write_image(os.path.join(self.plot_dir, file_name+".png"))
 
-        for idx, target in [(0, "Energy"), (1, "Latency")]:
+        for idx, target in [(0, "Energy"), (1, "Latency"), ]:
             fig: go.Figure = optuna.visualization.plot_optimization_history(study, target_name=target, target=lambda t: t.values[idx])
             file_name = f"history_{target.lower()}_optuna"
             fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
@@ -289,16 +330,29 @@ class MultiTenancyProblem():
         ### Perform scheduling for pareto-optimal solutions
         results: list[tuple[LayerTracker, SystemSchedule]] = []
         invalid_results: list[tuple[LayerTracker, SystemSchedule]] = []
-        for trial in tqdm.tqdm(study.best_trials):
-            new_models = copy.deepcopy(self.models)
-            self._write_binding_to_graph(trial.user_attrs["bindings"], new_models)
-            node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
-            are_constraints_fulfilled = validate_schedule(node_schedules, new_models)
 
-            if are_constraints_fulfilled:
-                results.append( (trial.user_attrs["bindings"], node_schedules) )
+        sched_function = partial(_scheduling_wrapper, models=self.models, scheduling_algorithm=self.scheduling_algorithm, 
+                                 node_stats=self.node_stats, scheduling_priority=self.conf.mt.scheduling_priority)
+        with ThreadPoolExecutor(max_workers=self.conf.mt.num_jobs) as executor:
+            sorts = list( tqdm.tqdm(executor.map(sched_function, study.best_trials), total=len(study.best_trials) ) )
+
+        for res in sorts:
+            if res.is_valid:
+                results.append( (res.tracker, res.schedule) )
             else:
-                invalid_results.append( (trial.user_attrs["bindings"], node_schedules) )
+                invalid_results.append( (res.tracker, res.schedule) )
+
+        #for trial in tqdm.tqdm(study.best_trials):
+        #    new_models = copy.deepcopy(self.models)
+        #    tracker: LayerTracker = trial.user_attrs["bindings"]
+        #    tracker._write_binding_to_graph(new_models)
+        #    node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
+        #    are_constraints_fulfilled = validate_schedule(node_schedules, new_models)
+        
+        #    if are_constraints_fulfilled:
+        #        results.append( (tracker, node_schedules) )
+        #    else:
+        #        invalid_results.append( (tracker, node_schedules) )
         
         # For every network, figure out at which time it finishes execution
         # Needed to check if deadlines have been met or not
@@ -326,7 +380,7 @@ class MultiTenancyProblem():
         system_energy: list[float] = []
         for bindings, schedule in results:
             system_runtimes.append( max([sched.cur_time for sched in schedule.node_schedules.values()]) )
-            system_energy.append(self._score_total_energy(bindings))
+            system_energy.append(self._score_binding_energy(bindings))
         
         min_runtime_idx = system_runtimes.index(min(system_runtimes))
         min_runtime_latency = system_runtimes[min_runtime_idx]
@@ -388,7 +442,7 @@ class MultiTenancyProblem():
         idle_times = [sched.get_idle_time() for sched in schedules.node_schedules.values()]
         return sum(idle_times)
     
-    def _score_total_energy(self, tracker: LayerTracker) -> float:
+    def _score_binding_energy(self, tracker: LayerTracker) -> float:
         # For each layer we want to find the most efficient platform
         total_energy = 0.0    
         for nw, layer, bind in tracker:
@@ -410,8 +464,25 @@ class MultiTenancyProblem():
             tensor_transfer_energy = [energy * num_hops for (latency, energy, slice_size) in tensor_transfer_eval]
             total_energy += sum(tensor_transfer_energy)
         return total_energy
+    
+    def _score_cuts(self, tracker: LayerTracker) -> int:
+        cut_cost = 0
+        for network, model in self.models.items():
+            for layer in model.nodes:
+                if not isinstance(layer, ComputationLayer):
+                    continue
+                layer_binding = tracker.network_info[network][layer.layer_name]
+                all_computation_succs = model.computation_successors(layer)
+                found_cuts = 0
+                for succ in all_computation_succs:
+                    succ_binding = tracker.network_info[network][succ.layer_name]
+                    if layer_binding != succ_binding:
+                        found_cuts += 1
+                if all_computation_succs:
+                    cut_cost += (found_cuts // len(all_computation_succs))
+        return cut_cost
 
-    def _score_total_latency(self, tracker: LayerTracker) -> float:
+    def _score_binding_latency(self, tracker: LayerTracker) -> float:
         # For each layer we want to find the most efficient platform
         total_latency = 0.0    
         for nw, layer, bind in tracker:
@@ -424,18 +495,60 @@ class MultiTenancyProblem():
         latencies = [sched.cur_time for sched in schedules.node_schedules.values()]
         return max(latencies)
     
-    def _score_even_latency(self, tracker: LayerTracker) -> float:
-        """The total time of operations assigned to each platform should be roughly equal"""
-        ideal_runtimes = {platform: 0.0 for platform in self.conf.system.platform_ids}
-        for nw, layer, bind in tracker:
-            # TODO Currently assumes that there is only one design
-            layer_data = self.node_stats[bind].designs[0].networks[nw].layers[layer]
-            ideal_runtimes[bind] += layer_data.latency
-        max_runtime = max(ideal_runtimes.values())
-        cost = 0.0
-        for runtime in ideal_runtimes.values():
-            cost += (max_runtime - runtime)
-        return cost
+    def _score_static_max_latency(self, tracker:LayerTracker):
+        latencies  = {id: 0 for id in self.conf.system.platform_ids}
+        for nw, layer, binding in tracker:
+            layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
+            latencies[binding] += layer_data.latency
+        return max(latencies.values())
+    
+    def _score_latency_fairness(self, tracker: LayerTracker):
+        """Calculate jains fairness index -> to be maximized"""
+        latencies  = {id: 0 for id in self.conf.system.platform_ids}
+        for nw, layer, binding in tracker:
+            layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
+            latencies[binding] += layer_data.latency
+        lats = list(latencies.values())
+        
+        x = sum(lats)**2
+        y = self.conf.system.num_platforms * (sum([lat**2 for lat in lats])) 
+        J = x / y
+        return J
+    
+    def _score_latency_std_dev(self, tracker: LayerTracker):
+        """Calculate std deviation of latency on different platforms"""
+        latencies  = {id: 0 for id in self.conf.system.platform_ids}
+        for nw, layer, binding in tracker:
+            layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
+            latencies[binding] += layer_data.latency
+        lats = list(latencies.values())
+        mean = (1/len(lats)) * sum(lats)
+        var = (1/len(lats)) * sum( (lat - mean)**2 for lat in latencies) 
+        return math.sqrt(var)
+    
+    def _score_latency_gini(self, tracker: LayerTracker):
+        """Calculate Gini coefficient to measure equality of latency on different platforms"""
+        latencies  = {id: 0 for id in self.conf.system.platform_ids}
+        for nw, layer, binding in tracker:
+            layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
+            latencies[binding] += layer_data.latency
+        lats = list(latencies.values())
+
+        mean = (1/len(lats)) * sum(lats)
+        x = sum([abs(li - lj) for li, lj in it.permutations(lats, 2)])
+        y = 2 * self.conf.system.num_platforms**2*mean
+        gini = x / y
+        return gini
+    
+    def _score_latency_max_min_space(self, tracker: LayerTracker):
+        """Calculate difference of max and min accelerators to score equality of latency on different platforms"""
+        latencies  = {id: 0 for id in self.conf.system.platform_ids}
+        for nw, layer, binding in tracker:
+            layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
+            latencies[binding] += layer_data.latency
+        lats = list(latencies.values())
+
+        return max(lats) - min(lats)
 
     def _calc_cost(self, tracker: LayerTracker, schedules: SystemSchedule) -> float:
         edp_cost = self._score_edp(tracker)
@@ -444,8 +557,4 @@ class MultiTenancyProblem():
 
         return edp_cost**0.4 +  util_cost**2.5 + lat_cost*2
     
-    def _write_binding_to_graph(self, tracker: LayerTracker, models: dict[str, OnnxModel]):
-        for nw, layer, binding in tracker:
-            node = models[nw].node_by_layer_name(layer)
-            node.scheduling.binding = binding
 

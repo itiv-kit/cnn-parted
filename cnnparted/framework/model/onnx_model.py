@@ -42,7 +42,7 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         self.frames: int = None
     
     @property
-    def has_constraints(self):
+    def has_constraints(self) -> bool:
         return self.deadline != math.inf or self.frames > 1
     
     def add_layer(self, layer: RenameLayer | ComputationLayer):
@@ -60,7 +60,7 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         else:
             raise RuntimeError(f"Invalid call to remove_layer, called on {type(layer)}")
         
-    def _find_consumers(self, tensor: OnnxTensor | TensorWrapper, layer_inputs: dict[str, list[OnnxTensor]]):
+    def _find_consumers(self, tensor: OnnxTensor | TensorWrapper, layer_inputs: dict[str, list[OnnxTensor]]) -> list[LayerBase]:
         consumers = []
         if isinstance(tensor, TensorWrapper):
             tensor = tensor._onnx_tensor
@@ -76,15 +76,15 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
             for consumer in consumers:
                 self.add_edge(node, consumer)
             
-    def successors_by_layer_name(self, layer: str):
+    def successors_by_layer_name(self, layer: str) -> LayerBase:
         node = self.name_to_node_mapping[layer]
         return self.successors(node)
 
-    def predecessors_by_layer_name(self, layer: str):
+    def predecessors_by_layer_name(self, layer: str) -> LayerBase:
         node = self.name_to_node_mapping[layer]
         return self.predecessors(node)
     
-    def node_by_layer_name(self, layer: str):
+    def node_by_layer_name(self, layer: str) -> LayerBase:
         return self.name_to_node_mapping[layer]
     
     def get_initial_layers(self):
@@ -106,7 +106,7 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
                 input_layers.append(node)
         return input_layers
     
-    def get_compute_layers(self):
+    def get_compute_layers(self) -> list[ComputationLayer]:
         compute_layers = []
         for node in self.nodes:
             if not isinstance(node, ComputationLayer):
@@ -114,7 +114,7 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
             compute_layers.append(node)
         return compute_layers
     
-    def get_ready_layers(self, scheduled_layers: list[LayerBase]):
+    def get_ready_layers(self, scheduled_layers: list[LayerBase]) -> list[LayerBase]:
         rdy: list[LayerBase] = []
         for node in self.nodes:
             # A layer can be scheduled if all predcessors are scheduled
@@ -123,6 +123,16 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
             if all(is_pred_scheduled):
                 rdy.append(node)
         return rdy
+    
+    def computation_successors(self, layer: LayerBase) -> list[ComputationLayer]:
+        """Depth first search of all computation nodes that are immediate successors to a given layer"""
+        found_computation_succs = []
+        for succ in self.successors(layer):
+            if isinstance(succ, ComputationLayer):
+                found_computation_succs.append(succ)
+            else:
+                found_computation_succs = found_computation_succs + self.computation_successors(succ)
+        return found_computation_succs
 
 
 class OnnxParser: 
