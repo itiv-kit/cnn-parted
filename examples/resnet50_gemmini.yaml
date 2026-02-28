@@ -1,10 +1,4 @@
 general:
-  fixed_sys: true
-  acc_once: true
-  num_pp: -1
-  num_topos: 1
-  num_jobs: 1
-  optimization: ppa
   work_dir: runs/resnet50_gemmini_run
 
 workload:
@@ -19,6 +13,15 @@ pipeline:
   - NodeEvaluation
   - PartitioningOptimization
   - ExportPartitionResults
+
+partitioning:
+  fixed_sys: true
+  acc_once: true
+  max_num_platforms:
+  num_pp: -1
+  num_jobs: 1
+  num_topos: 1
+  optimization: ppa
 
 system:
   compute:

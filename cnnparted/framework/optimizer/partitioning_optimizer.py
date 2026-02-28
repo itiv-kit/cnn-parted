@@ -66,12 +66,12 @@ class PartitioningOptimizer(Optimizer):
         return params
 
     def optimize(self, q_constr : dict, conf : ConfigHelper, store_results: bool = True) -> tuple[int, int, dict]:
-        fixed_sys = conf.general.fixed_sys
-        acc_once = conf.general.acc_once
-        opt = conf.general.optimization
-        num_jobs = conf.general.num_jobs
+        fixed_sys = conf.partitioning.fixed_sys
+        acc_once = conf.partitioning.acc_once
+        opt = conf.partitioning.optimization
+        num_jobs = conf.partitioning.num_jobs
         system_constraints = conf.get_system_constraints()
-        max_num_platforms = conf.general.max_num_platforms
+        max_num_platforms = conf.partitioning.max_num_platforms
 
         all_paretos = []
         non_optimals = []

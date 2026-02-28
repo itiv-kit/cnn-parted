@@ -39,16 +39,18 @@ class PartitioningStageConfig:
     acc_once: bool
     num_pp: int
     num_jobs: int
+    num_topos: int
     optimization: Literal["all", "edp", "ppa"]
     max_num_platforms: int | None
 
     def __init__(self, cfg: dict):
-        self.fixed_sys = cfg["fixed_sys"]
-        self.acc_once = cfg["acc_once"]
-        self.num_pp = cfg["num_pp"]
-        self.num_jobs = cfg["num_jobs"]
-        self.optimization = cfg["optimization"]
-        self.max_num_platforms = cfg.get("max_num_platforms")
+        self.fixed_sys = cfg.get("fixed_sys", False)
+        self.acc_once = cfg.get("acc_once", False)
+        self.num_pp = cfg.get("num_pp", -1)
+        self.num_jobs = cfg.get("num_jobs", 1)
+        self.num_topos = cfg.get("num_topos", 1)
+        self.optimization = cfg.get("optimization", "all")
+        self.max_num_platforms = cfg.get("max_num_platforms", -1)
 
 @dataclass
 class DseStageConfig:

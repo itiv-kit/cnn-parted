@@ -1,17 +1,9 @@
 from dataclasses import dataclass
 from math import inf
-from typing import Literal
 from framework.model.tiling.iterators import LoopDim
 
 @dataclass(init=False)
 class GeneralConfig:
-    fixed_sys: bool
-    acc_once: bool
-    max_num_platforms: int | None
-    num_pp: int
-    num_topos: int
-    num_jobs: int
-    optimization: Literal["all", "edp", "ppa"]
     work_dir: str | None
     keep_dir: bool
 

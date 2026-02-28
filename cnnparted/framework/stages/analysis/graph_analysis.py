@@ -14,7 +14,6 @@ class GraphAnalysis(Stage):
         logger.info("Running GraphAnalysis stage")
         self._take_artifacts(artifacts)
         ga = GraphAnalyzer(self.work_dir, self.run_name, self.workloads, artifacts.config.args.show_progress, self.config)
-        ga.find_schedules(self.num_topos)
 
         self._update_artifacts(artifacts, ga)
         
@@ -23,19 +22,11 @@ class GraphAnalysis(Stage):
         self.config = artifacts.config
         self.work_dir = artifacts.config.general.work_dir
         self.run_name = artifacts.config.args.run_name
-        self.num_topos = artifacts.config.general.num_topos
         self.workloads = artifacts.workload_parser.workloads 
 
     def _update_artifacts(self, artifacts: Artifacts, ga: GraphAnalyzer):
         artifacts.graph_analysis.ga = ga
 
-        # Update number of partitioning points
-        num_pp = artifacts.config.general.num_pp
-        if num_pp == -1:
-            num_pp = len(ga.schedules[ga.networks[0]][0]) - 1
-        #elif len(node_stats) == 1:
-        #    num_pp = 0
-        artifacts.config.general.num_pp = num_pp
 
 
 class GraphAnalysisArtifacts:

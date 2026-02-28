@@ -7,6 +7,7 @@ from framework.stages.inputs.system_parser import SystemParser
 from framework.stages.optimization.robustness_optimization import RobustnessOptimization
 from framework.stages.optimization.design_optimization import DesignPartitioningOptimization
 
+from framework.node.node_evaluator import SystemResult
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
@@ -26,8 +27,28 @@ class PartitioningOptimization(Stage):
     
     def _take_artifacts(self, artifacts: Artifacts):
         self.ga = artifacts.graph_analysis.ga
-        self.num_pp = artifacts.config.general.num_pp
-        self.node_stats = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
+        self.ga.find_schedules(artifacts.config.partitioning.num_topos)
+        self.node_stats: SystemResult = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
+
+        num_pp = artifacts.config.partitioning.num_pp
+
+        # TODO Not sure if num_pp should depend on GraphAnalysis or Platform evaluation
+        if num_pp == -1:
+            num_pp = len(self.ga.schedules[self.ga.networks[0]][0]) - 1
+        #elif len(node_stats) == 1:
+        #    num_pp = 0
+
+        #if num_pp == -1:
+        #    platform_id = self.node_stats.get_platform_ids()[0]
+        #    design = self.node_stats[platform_id].designs[0]
+        #    network =  self.node_stats[platform_id].designs[0].get_networks()[0]
+        #    num_pp = len(design.networks[network].layers) - 1
+        #elif len(node_stats) == 1:
+        #    num_pp = 0
+
+        artifacts.config.partitioning.num_pp = num_pp
+        self.num_pp = artifacts.config.partitioning.num_pp
+
         self.link_components = artifacts.system_parser.links
         self.show_progress = artifacts.config.args.show_progress
         self.config = artifacts.config

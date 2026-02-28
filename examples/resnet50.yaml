@@ -1,10 +1,4 @@
 general:
-  fixed_sys: false
-  acc_once: false
-  num_pp: -1
-  num_topos: 1
-  num_jobs: 1
-  optimization: ppa
   work_dir: runs/resnet50_run
 
 workload:
@@ -53,6 +47,15 @@ accuracy:
       total_samples: 1281167
       batch_size: 256
       sample_limit:
+
+partitioning:
+  fixed_sys: false
+  acc_once: false
+  max_num_platforms:
+  num_pp: -1
+  num_jobs: 1
+  num_topos: 1
+  optimization: ppa
 
 system:
   compute:

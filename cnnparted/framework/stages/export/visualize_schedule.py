@@ -61,7 +61,7 @@ class VisualizeSchedule(Stage):
             network = self.ga.networks[0] #TODO Multiple networks
             self.schedules = self.ga.schedules[network]
             self.num_platforms = self.config.system.num_platforms
-            self.num_pp = artifacts.config.general.num_pp
+            self.num_pp = artifacts.config.partitioning.num_pp
             self.n_var_part = (self.num_pp + 1) + (self.num_pp) # platform IDs + mapping partition to platform
             if self.num_pp == 0:
                 self.n_var_part_metrics = 1

@@ -24,7 +24,8 @@ class ConfigHelper:
         self.workload = WorkloadConfig(self.config["workload"])
         self.pipeline = PipelineConfig(self.config["pipeline"])
         self.dse = DseStageConfig(self.config["dse"]) if "dse" in self.config else None
-        self.partitioning = PartitioningStageConfig(self.config["partitioning"]) if "partitioning" in self.config else None
+        #self.partitioning = PartitioningStageConfig(self.config["partitioning"]) if "partitioning" in self.config else None
+        self.partitioning = PartitioningStageConfig(self.config.get("partitioning", {})) #TODO Currently DSE relies on this existing
         self.mt = MultiTenancyStageConfig(self.config["multi-tenancy"]) if "multi-tenancy" in self.config else None
         self.accuracy = AccuracyConfig(self.config["accuracy"]) if "accuracy" in self.config else None
         self.system = SystemConfig(self.config["system"])

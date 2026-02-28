@@ -66,7 +66,7 @@ class DesignPartitioningOptimization(Stage):
         self.run_name = artifacts.config.args.run_name
         self.ga = artifacts.graph_analysis.ga
         self.show_progress = artifacts.config.args.show_progress
-        self.num_pp = artifacts.config.general.num_pp
+        self.num_pp = artifacts.config.partitioning.num_pp
         self.link_components = artifacts.system_parser.links
         self.work_dir = artifacts.config.general.work_dir
 

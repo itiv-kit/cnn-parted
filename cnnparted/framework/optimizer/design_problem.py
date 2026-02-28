@@ -37,7 +37,7 @@ class DesignProblem(ElementwiseProblem):
         self.run_name = artifacts.config.args.run_name
         self.ga = artifacts.graph_analysis.ga 
         self.show_progress = artifacts.config.args.show_progress
-        self.num_pp = artifacts.config.general.num_pp
+        self.num_pp = artifacts.config.partitioning.num_pp
         self.config = artifacts.config
         self.q_constr = q_constr
         self.system_dse_config = system_dse_config

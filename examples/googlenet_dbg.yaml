@@ -1,10 +1,4 @@
 general:
-  fixed_sys: false
-  acc_once: false
-  num_pp: -1
-  num_topos: 1
-  num_jobs: 1
-  optimization: all
   work_dir: runs/googlenet_dbg
 
 workload:
@@ -19,6 +13,15 @@ pipeline:
   - NodeEvaluation
   - PartitioningOptimization
   - ExportPartitionResults
+
+partitioning:
+  fixed_sys: false
+  acc_once: false
+  max_num_platforms:
+  num_pp: -1
+  num_jobs: 1
+  num_topos: 1
+  optimization: all
 
 system:
   compute:
