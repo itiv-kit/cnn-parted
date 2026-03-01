@@ -23,4 +23,5 @@ class LayerBase(ABC):
         self.op_type = op_type
         self.inputs = inputs
         self.output = output
+        self.id: int = None
         self.scheduling = SchedulingInfo()

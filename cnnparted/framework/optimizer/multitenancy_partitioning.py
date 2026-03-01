@@ -278,13 +278,23 @@ class MultiTenancyProblem():
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         def objective(trial: optuna.trial.Trial):
-            bindings = []
+            bindings: list[int] = []
 
             match binding_granularity:
-                case "layer":
+                case "tile":
                     for i, (nw, layer, current_binding) in enumerate(work_layer_tracker):
-                        layer_bind = trial.suggest_categorical(f"layer_binding_{i}", 
+                        tile_bind = trial.suggest_categorical(f"tile_binding_{i}", 
                                                                choices=platform_ids)
+                        bindings.append(tile_bind)
+                case "layer":
+                    layer_id_binding: dict[int, int] = {}
+                    for i, (nw, layer, current_binding) in enumerate(work_layer_tracker):
+                        layer_id = self.models[nw].node_by_layer_name(layer).id
+                        if layer_id not in layer_id_binding:
+                            layer_bind = trial.suggest_categorical(f"layer_binding_{id}",
+                                                                   choices=platform_ids)
+                        else:
+                            layer_bind = layer_id_binding[layer_id]
                         bindings.append(layer_bind)
                 case "network":
                     network_bind = {}

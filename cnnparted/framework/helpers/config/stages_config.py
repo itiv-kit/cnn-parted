@@ -83,7 +83,7 @@ class MultiTenancyStageConfig:
     algorithm: Literal["sa", "genetic", "optuna"]
     scheduling: Literal["list", "multi_queue"]
     scheduling_priority: SchedulingPriority
-    binding_granularity: Literal["layer", "network"]
+    binding_granularity: Literal["tile", "layer", "network"]
     num_jobs: int
 
     def __init__(self, cfg: dict):

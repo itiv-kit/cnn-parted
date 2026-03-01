@@ -36,6 +36,7 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
     """Result after parsing the onnx model into an internal representation"""
     def __init__(self, onnx_in_model: ModelProto, **attr: Any):
         super().__init__(**attr)
+        self._current_id = 0
         self.onnx_in_model = onnx_in_model
         self.name_to_node_mapping: dict[str, LayerBase] = {}
         self.deadline: int = None
@@ -46,6 +47,8 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         return self.deadline != math.inf or self.frames > 1
     
     def add_layer(self, layer: RenameLayer | ComputationLayer):
+        layer.id = self._current_id
+        self._current_id += 1
         self.name_to_node_mapping[layer.layer_name] = layer
         self.add_node(layer)
     
