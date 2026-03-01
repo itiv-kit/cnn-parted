@@ -39,11 +39,13 @@ class ComputationLayer(LayerBase):
                  inputs: list[TensorWrapper], 
                  output: TensorWrapper,
                  loop_dims: list[ConcreteLoopIterator]):
-        self.layer_name = layer_name
-        self.layer_params = layer_params
-        self.op_type = op_type
-        self.inputs = inputs
-        self.output = output
+        super().__init__(
+            layer_name=layer_name,
+            layer_params=layer_params,
+            op_type=op_type,
+            inputs=inputs,
+            output=output
+        )
         self.loop_dims = loop_dims
         self.scheduling = SchedulingInfo()
 

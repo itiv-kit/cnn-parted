@@ -152,6 +152,7 @@ class LayerTiling:
                 output=tiled_output,
                 loop_dims=tiled_loop_dims,
             )
+            tiled_layer.id = layer.id #ID must be the same for all tiles
             logger.debug(f"Generated tile {tiled_layer.layer_name}")
 
             generated_tiles.append(tiled_layer)

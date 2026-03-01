@@ -10,11 +10,13 @@ class RenameLayer(LayerBase):
                  op_type: str,
                  inputs: list[OnnxTensor], 
                  output: OnnxTensor):
-        self.layer_name = layer_name
-        self.layer_params = layer_params
-        self.op_type = op_type
-        self.inputs = inputs
-        self.output = output
+        super().__init__(
+            layer_name=layer_name,
+            layer_params=layer_params,
+            op_type=op_type,
+            inputs=inputs,
+            output=output
+        )
         self.scheduling = SchedulingInfo()
 
     def __repr__(self):
