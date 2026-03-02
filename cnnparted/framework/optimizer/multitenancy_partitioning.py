@@ -291,7 +291,7 @@ class MultiTenancyProblem():
                     for i, (nw, layer, current_binding) in enumerate(work_layer_tracker):
                         layer_id = self.models[nw].node_by_layer_name(layer).id
                         if layer_id not in layer_id_binding:
-                            layer_bind = trial.suggest_categorical(f"layer_binding_{id}",
+                            layer_bind = trial.suggest_categorical(f"layer_binding_{i}",
                                                                    choices=platform_ids)
                         else:
                             layer_bind = layer_id_binding[layer_id]
@@ -517,7 +517,7 @@ class MultiTenancyProblem():
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
-            latencies[binding] += layer_data.latency
+            latencies[binding] += layer_data.latency * self.models[nw].frames
         lats = list(latencies.values())
         
         x = sum(lats)**2
@@ -530,7 +530,7 @@ class MultiTenancyProblem():
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
-            latencies[binding] += layer_data.latency
+            latencies[binding] += layer_data.latency * self.models[nw].frames
         lats = list(latencies.values())
         mean = (1/len(lats)) * sum(lats)
         var = (1/len(lats)) * sum( (lat - mean)**2 for lat in latencies) 
@@ -541,7 +541,7 @@ class MultiTenancyProblem():
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
-            latencies[binding] += layer_data.latency
+            latencies[binding] += layer_data.latency * self.models[nw].frames
         lats = list(latencies.values())
 
         mean = (1/len(lats)) * sum(lats)
@@ -555,7 +555,7 @@ class MultiTenancyProblem():
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
-            latencies[binding] += layer_data.latency
+            latencies[binding] += layer_data.latency * self.models[nw].frames
         lats = list(latencies.values())
 
         return max(lats) - min(lats)

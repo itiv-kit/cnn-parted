@@ -49,11 +49,31 @@ class MultitenancySolution:
     def to_json(self, out_path: str):
         if not out_path.endswith(".json"):
             out_path = out_path + ".json"
+        
+        total_energies = [res.total_energy for res in self.res]
+        total_latencies = [res.total_latency for res in self.res]
+        min_energy_sol_idx = total_energies.index(min(total_energies))
+        min_latency_sol_idx = total_latencies.index(min(total_latencies))
+        min_energy_sol = self.res[min_energy_sol_idx]
+        min_latency_sol = self.res[min_latency_sol_idx]
 
-        result_json = []
-        for res in self.res:
+        result_json = {
+            "min_energy": {
+                "index": min_energy_sol_idx,
+                "total_energy": min_energy_sol.total_energy,
+                "total_latency": min_energy_sol.total_latency
+            },
+            "min_latency": {
+                "index": min_latency_sol_idx,
+                "total_energy": min_latency_sol.total_energy,
+                "total_latency": min_latency_sol.total_latency
+            },
+            "all": []
+            }
+        for idx, res in enumerate(self.res):
             result_item = {
                 "summary": {
+                    "index": idx,
                     "total_energy": res.total_energy,
                     "total_latency": res.total_latency,
                 },
@@ -64,7 +84,7 @@ class MultitenancySolution:
                 compute_task_list_of_dicts = [task.to_dict() for task in nw_data]
                 compute_task_dict_of_dicts = reduce(operator.ior, compute_task_list_of_dicts, {})
                 result_item["network_data"][nw_name] = compute_task_dict_of_dicts
-            result_json.append(result_item)
+            result_json["all"].append(result_item)
 
         with open(out_path, "w") as f:
            json.dump(result_json, f, indent=4) 
