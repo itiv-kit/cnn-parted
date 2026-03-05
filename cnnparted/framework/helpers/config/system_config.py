@@ -139,6 +139,12 @@ class LinkConfig:
 class DramConfig:
     location: Literal["below", "above", "left", "right"] | None
     neighbors: list[list[int]] | None
+
+    def __init__(self, cfg: dict):
+        assert not ("location" in cfg and "neighbors" in cfg), "Cannot specify both explicit neighbors and location in DRAM config"
+        assert ("location" in cfg or "neighbors" in cfg), "Must specify either neighbors or location in DRAM"
+        self.location = cfg.get("location")
+        self.neighbors = cfg.get("neighbors")
         
 @dataclass
 class NocConfig:
@@ -149,7 +155,7 @@ class NocConfig:
     def __init__(self, cfg):
         self.topology = cfg["topology"]
         self.shape = cfg["shape"]
-        #self.dram = DramConfig(cfg["dram"])
+        self.dram = DramConfig(cfg["dram"])
 
 @dataclass
 class PlatformIdInfo:

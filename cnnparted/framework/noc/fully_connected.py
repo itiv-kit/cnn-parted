@@ -32,11 +32,14 @@ class FullyConnectedNoc(NocTopology):
         input_nodes = [node for node in self.id_to_node.values()]
         self.add_edges_from(it.permutations(input_nodes, 2))
     
-    def determine_routing(self, start: NocCoordinate, ends: list[NocCoordinate]) -> dict[NocCoordinate, NocPath]:
+    def singlecast_routing(self, start, end):
+        return self.id_to_link[(start, end)]
+    
+    def mulitcast_routing(self, start: NocCoordinate, ends: list[NocCoordinate]) -> dict[NocCoordinate, NocPath]:
         # all connections are just one hop
         paths: dict[NocCoordinate, NocPath] = {}
         for end in ends:
-            paths[end] = self.links[(start, end)]
+            paths[end] = self.id_to_link[(start, end)]
         return paths
     
     def get_num_hops(self, start: NocCoordinate, end: NocCoordinate) -> int:
