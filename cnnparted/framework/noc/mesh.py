@@ -29,11 +29,12 @@ class MeshNoc(NocTopology):
             noc_layout[info.noc_coord] = node
             self.noc_ids[info.noc_coord] = node_id
             self.id_to_node[node_id] = node
+            self.add_node(node)
         
-        #Noc layout is transposed since nx expects data in 
-        init_graph:nx.Graph = nx.grid_graph(dim=noc_layout.tolist())
-        init_graph = init_graph.to_directed()
-        self.add_edges_from(init_graph)
+        node_neigbors = self._get_nd_neighbors()
+        for node, neighbors in node_neigbors.items():
+            for neighbor in neighbors:
+                self.add_edge(node, neighbor)
 
         for source, sink, key in self.edges:
             source_coord = NocCoordinate(source.coord)
@@ -92,3 +93,35 @@ class MeshNoc(NocTopology):
         for end in ends:
             paths[end] = self.singlecast_routing(start, end)
         return paths
+    
+    def _get_nd_neighbors(self):
+        """
+        Determines neighbors for objects in an n-dimensional mesh.
+        Returns a dict: {element: [list of neighbor objects]}
+        """
+        # 1. Map coordinates to objects
+        # Assumes obj.coords is a tuple, e.g., (x, y, z, w...)
+        spatial_map = {tuple(obj.coord): obj for obj in self.nodes}
+        
+        neighbors_registry:dict[NocNode, list[NocNode]] = {}
+
+        for obj in self.nodes:
+            coords = tuple(obj.coord)
+            n_dims = len(coords)
+            obj_neighbors = []
+
+            # 2. Iterate through each dimension
+            for i in range(n_dims):
+                # Check both directions (+1 and -1) for the current dimension
+                for delta in [-1, 1]:
+                    neighbor_coords = list(coords)
+                    neighbor_coords[i] += delta
+                    
+                    # Look up the potential neighbor
+                    neighbor = spatial_map.get(tuple(neighbor_coords))
+                    if neighbor:
+                        obj_neighbors.append(neighbor)
+            
+            neighbors_registry[obj] = obj_neighbors
+            
+        return neighbors_registry
