@@ -2,6 +2,7 @@ import networkx as nx
 import numpy as np
 import math
 import matplotlib as plt
+from pathlib import Path
 
 from framework.link.link import Link
 from framework.helpers.dtypes import NocCoordinate
@@ -9,7 +10,9 @@ from framework.helpers.config_helper import ConfigHelper
 from .noc import NocLink, NocNode, NocTopology
 
 class MeshNoc(NocTopology):
-    ...
+    """
+    Represents an N-D Mesh topology
+    """
     def __init__(self, cfg: ConfigHelper, link: Link):
         super().__init__()
 
@@ -25,7 +28,7 @@ class MeshNoc(NocTopology):
 
         for node_id, info in cfg.system.platform_id_mapping.items():
             coord = NocCoordinate(info.noc_coord)
-            node = NocNode(node_id, coord)
+            node = NocNode(node_id, coord, info.accelerator_name)
             noc_layout[info.noc_coord] = node
             self.noc_ids[info.noc_coord] = node_id
             self.id_to_node[node_id] = node
@@ -63,14 +66,16 @@ class MeshNoc(NocTopology):
         else:
             self.dram_neighbors = noc_cfg.dram.neighbors
         
-        fig = plt.pyplot.figure()
-        pos = {node:node.coord for node in self.nodes}
-        nx.draw(self, 
-                pos=pos, 
-                node_color='lightgreen', 
-                with_labels=True,
-                node_size=600)
-        fig.savefig("mesh.png")
+        if len(noc_shape) == 2:
+            fig = plt.pyplot.figure()
+            pos = {node:node.coord for node in self.nodes}
+            nx.draw(self, 
+                    pos=pos, 
+                    node_color='lightgreen', 
+                    with_labels=True,
+                    node_size=600)
+            fig_dir = Path(cfg.general.work_dir) / "figures" / "mesh.png"
+            fig.savefig(fig_dir)
     
     def get_num_hops(self, start: NocCoordinate, end: NocCoordinate):
         hops_by_dim = [abs(start_dim - end_dim ) for start_dim, end_dim in zip(start, end)]

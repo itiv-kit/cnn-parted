@@ -29,16 +29,17 @@ class NocLink:
 
 
 class NocNode:
-    def __init__(self, id: int, coord: NocCoordinate):
+    def __init__(self, id: int, coord: NocCoordinate, accel_name: str):
         # Need a more meaningful description here, or just remove it
         self.id = id
         self.coord = coord
+        self.accelerator_name = accel_name
         #self.cur_time = 0.0
         #self.schedule = PlatformSchedule(id)
         #self.allocated_tensors: list[AllocatedTensor] = []
     
     def __repr__(self):
-        return f"{self.__class__.__name__}(\nid={self.id},\ncoord={self.coord})"
+        return f"NocNode(cord={self.coord}, accel={self.id}_{self.accelerator_name})"
 
 
 class NocTopology(nx.MultiDiGraph[NocNode] if TYPE_CHECKING else nx.MultiDiGraph):

@@ -14,14 +14,13 @@ class FullyConnectedNoc(NocTopology):
         self.default_link = link_kind
         
         # As all nodes are directly connected, we use the node id as the corrdinate
-        for node_id in cfg.system.platform_ids:
+        for node_id, info in cfg.system.platform_id_mapping.items():
             coord = NocCoordinate((node_id,))
-            node = NocNode(node_id, coord)
+            node = NocNode(node_id, coord, info.accelerator_name)
             self.id_to_node[node_id] = node
             self.add_node(node)
         
         # Create a connection between all nodes
-        #TODO: Link mapping
         all_node_pairs = it.permutations(cfg.system.platform_ids, r=2)
         for (start, end) in all_node_pairs:
             start_coord = NocCoordinate((start,))
