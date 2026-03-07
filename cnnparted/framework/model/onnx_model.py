@@ -11,7 +11,8 @@ from loguru import logger
 
 from framework.model.tensor_wrapper import TensorWrapper
 from framework.constants import MODEL_PATH
-from framework.model.onnx_tensor import OnnxTensor, OnnxTensorKind
+from framework.model.onnx_tensor import OnnxTensor#, OnnxTensorKind
+from framework.model.tensor_like import TensorKind
 from framework.model.layers.abstract_layer import LayerBase
 from framework.model.layers.rename_layer import InputLayer, OutputLayer, RenameLayer
 from framework.model.layers.compute_layer import ComputationLayer 
@@ -186,15 +187,15 @@ class OnnxParser:
     def _get_tensor_info(self, name: str):
         for i in self.onnx_model.graph.input:
             if i.name == name:
-                return OnnxTensor.from_tensor(i.name, i.type.tensor_type, OnnxTensorKind.INPUT)
+                return OnnxTensor.from_tensor(i.name, i.type.tensor_type, TensorKind.INPUT)
 
         for v in self.onnx_model.graph.value_info:
             if v.name == name:
-                return OnnxTensor.from_tensor(v.name, v.type.tensor_type, OnnxTensorKind.HIDDEN)  
+                return OnnxTensor.from_tensor(v.name, v.type.tensor_type, TensorKind.HIDDEN)  
         
         for o in self.onnx_model.graph.output:
             if o.name == name:
-                return OnnxTensor.from_tensor(o.name, o.type.tensor_type, OnnxTensorKind.OUTPUT)
+                return OnnxTensor.from_tensor(o.name, o.type.tensor_type, TensorKind.OUTPUT)
         
         for init in self.onnx_model.graph.initializer:
             if init.name == name:

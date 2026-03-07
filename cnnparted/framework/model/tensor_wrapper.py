@@ -1,6 +1,7 @@
 from enum import Enum, auto
 
 import numpy as np
+from framework.model.tensor_like import TensorLike
 from framework.model.onnx_tensor import OnnxTensor
 from framework.model.tiling.iterators import ConcreteLoopIterator, LoopDim, LoopIterator
 
@@ -10,9 +11,10 @@ class OperandKind(Enum):
     BIAS = auto()
     OUTPUT = auto()
 
-class TensorWrapper(OnnxTensor):
+class TensorWrapper(TensorLike):
     def __init__(self, onnx_tensor: OnnxTensor, loop_dims: list[ConcreteLoopIterator], operand: OperandKind, sub_id: int = 0):
-        super().__init__(name=onnx_tensor.name, elem_type_map=onnx_tensor.elem_type_map, kind=onnx_tensor.kind, shape=onnx_tensor.shape)
+        #super().__init__(name=onnx_tensor.name, elem_type_map=onnx_tensor.elem_type_map, kind=onnx_tensor.kind, shape=onnx_tensor.shape)
+        super().__init__(name=onnx_tensor.name, kind=onnx_tensor.kind, _shape = onnx_tensor.shape)
         self._onnx_tensor = onnx_tensor
         self.loop_dims: list[ConcreteLoopIterator] = loop_dims
         self.operand = operand
@@ -23,6 +25,15 @@ class TensorWrapper(OnnxTensor):
     @property
     def loop_iterators(self) -> list[LoopIterator]:
         return [ldim.iterator for ldim in self.loop_dims]
+    
+    @property
+    def shape(self) -> list[int]:
+        return [ldim.extent for ldim in self.loop_dims]
+    
+    @shape.setter
+    def shape(self, new_shape: list[int]) :
+        self._shape = new_shape
+        self._onnx_tensor.shape = new_shape
     
     def get_loop_dim(self, dim: LoopDim):
         return self.loop_dims[self.loop_iterators.index(dim)]
