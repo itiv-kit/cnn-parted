@@ -2,7 +2,8 @@ import copy
 import numpy as np
 from loguru import logger
 
-from framework.model.tensor_wrapper import TensorWrapper
+from framework.model.layer_parameters import ConvParameters, GemmParameters
+from framework.model.tensor_wrapper import TensorWrapper, OperandKind
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.model.onnx_model import OnnxModel
 from framework.model.tiling.iterators import LoopDim
@@ -121,8 +122,8 @@ class LayerTiling:
         new_inputs = self._find_inputs_with_dim(layer, dim)
 
         for num in range(n_outer_tiles):
-            tiled_inputs = self.tile_tensors(copy.deepcopy(new_inputs), dim, n_outer_tiles, num)
-            tiled_output = self.tile_tensors([copy.deepcopy(layer.output)], dim, n_outer_tiles, num)[0]
+            tiled_inputs = self.tile_tensors(copy.deepcopy(new_inputs), dim, n_outer_tiles, num, layer.layer_params)
+            tiled_output = self.tile_tensors([copy.deepcopy(layer.output)], dim, n_outer_tiles, num, layer.layer_params)[0]
 
             # Modify the layer parameter to reflect the tiling of the operation
             # I.e., we tile the loop with range N into two loop with ranges (outer, inner) respectively
@@ -159,19 +160,65 @@ class LayerTiling:
         
         return generated_tiles
     
-    def tile_tensors(self, tensors: list[TensorWrapper], dim: LoopDim, n_outer_tiles: int, dim_value: int) -> list[TensorWrapper]:
+    def tile_tensors(self, tensors: list[TensorWrapper], dim: LoopDim, n_outer_tiles: int, 
+                     dim_value: int, params: GemmParameters | ConvParameters
+                      ) -> list[TensorWrapper]:
         for tensor in tensors:
             if dim not in tensor:
                 continue
             loop_dim = tensor.get_loop_dim(dim)
             assert (loop_dim.extent % n_outer_tiles) == 0
-            tiled_extent = loop_dim.extent // n_outer_tiles
-            loop_dim.lower_bound = tiled_extent * dim_value
-            loop_dim.upper_bound = (tiled_extent * (dim_value+1)) - 1
-            loop_dim.extent = tiled_extent
-            tensor.sub_id = tensor.sub_id*dim_value+1 #TODO proper calculation of sub_id
 
-            #TODO Need to modify the shape property to reflect the changed access pattern
-        
+            match params:
+                case GemmParameters():
+                    self._tile_tensor_gemm(tensor, dim, n_outer_tiles, dim_value, params)
+                case ConvParameters():
+                    self._tile_tensor_conv(tensor, dim, n_outer_tiles, dim_value, params)
+                case _:
+                    raise RuntimeError("Unexpected tensor tiling on operation that is not conv or gemm")
+
         return tensors
+    
+    def _tile_tensor_conv(self, tensor: TensorWrapper, dim: LoopDim, n_outer_tiles: int, dim_value: int, param: ConvParameters):
+        iterator = tensor.get_loop_dim(dim)
 
+        match tensor.operand:
+            case OperandKind.INPUT:
+                match dim:
+                    case LoopDim.N | LoopDim.M:
+                        tiled_extent = iterator.extent // n_outer_tiles
+                    case LoopDim.P:
+                        tiled_extent = (iterator.extent // n_outer_tiles) * param.wstride
+                    case LoopDim.Q:
+                        tiled_extent = (iterator.extent // n_outer_tiles) * param.hstride
+                    case _:
+                        raise RuntimeError("Unexpected tiling dimension for conv2d INPUT operand")
+                iterator.lower_bound = tiled_extent * dim_value
+                iterator.upper_bound = (tiled_extent * (dim_value+1)) -1
+                iterator.extent = tiled_extent
+
+            case OperandKind.WEIGHT:
+                match dim:
+                    case LoopDim.M:
+                        tiled_extent = iterator.extent // n_outer_tiles
+                        iterator.lower_bound = tiled_extent * dim_value
+                        iterator.upper_bound = (tiled_extent * (dim_value+1)) -1
+                        iterator.extent = tiled_extent
+                    case _:
+                        raise RuntimeError("Unexpected tiling dimension for conv2d WEIGHT operand")
+
+            case OperandKind.OUTPUT:
+                tiled_extent = (iterator.extent // n_outer_tiles)
+                iterator.lower_bound = tiled_extent * dim_value
+                iterator.upper_bound = (tiled_extent * (dim_value+1)) -1
+                iterator.extent = tiled_extent
+            case OperandKind.BIAS:
+                # no tiling along C dimension is performed
+                ...
+
+    def _tile_tensor_gemm(self, tensor: TensorWrapper, dim: LoopDim, n_outer_tiles: int, dim_value: int, param: GemmParameters):
+        iterator = tensor.get_loop_dim(dim)
+        tiled_extent = iterator.extent // n_outer_tiles
+        iterator.lower_bound = tiled_extent * dim_value
+        iterator.upper_bound = (tiled_extent * (dim_value+1)) - 1
+        iterator.extent = tiled_extent
