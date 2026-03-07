@@ -3,6 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from framework.model.tensor_wrapper import TensorWrapper
+from framework.helpers.config.general_config import WorkloadSpec
 
 NodeId = NewType("NodeId", int)
 NocCoordinate = NewType("NocCoordinate", tuple[int, ...])
@@ -49,5 +50,16 @@ class WorkloadInfo:
     accuracy_function: Callable
     input_shape: list[int]
     deadline: int
+    deadline_div: float
+    deadline_mul: float
     frames: int
     onnx_filepath: str
+
+    def __init__(self, accuracy_function: Callable, spec: WorkloadSpec, onnx_filepath: str):
+        self.accuracy_function = accuracy_function
+        self.input_shape = spec.input_size
+        self.onnx_filepath = onnx_filepath
+        self.deadline = spec.deadline
+        self.deadline_div = spec.deadline_div
+        self.deadline_mul = spec.deadline_mul
+        self.frames = spec.frames

@@ -40,8 +40,15 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         self._current_id = 0
         self.onnx_in_model = onnx_in_model
         self.name_to_node_mapping: dict[str, LayerBase] = {}
-        self.deadline: int = None
+        self.deadline: float = None
+        self.deadline_mul: float = None
+        self.deadline_div: float = None
         self.frames: int = None
+    
+    @property
+    def has_auto_deadline(self) -> bool:
+        return self.deadline == math.inf and  \
+                (self.deadline_div is not None and self.deadline_mul is not None)
     
     @property
     def has_constraints(self) -> bool:

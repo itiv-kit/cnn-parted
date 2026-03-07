@@ -74,15 +74,25 @@ class WorkloadSpec:
     tiling: dict[str, TilingConfig] #op_type -> config
     deadline: int
     frames: int
+    deadline_mul: float
+    deadline_div: float
 
     def __init__(self, cfg: dict):
         self.name = cfg["name"]
         self.input_size = cfg["input-size"] 
+
+        # Deadline related configuration
         self.deadline = cfg.get("deadline", inf)
         self.frames = cfg.get("frames", 1)
+        self.deadline_mul = cfg.get("deadline_mul", None)
+        self.deadline_div = cfg.get("deadline_div", None)
         assert self.frames >= 1, "Frames must be at least 1"
         assert self.deadline >= 0, "Deadline must be non-negative"
         assert not (self.frames > 1 and self.deadline != inf), "Cannot set a deadline for a workload with multiple frames"
+        use_auto_deadline = self.deadline != inf and (self.deadline_div is not None and self.deadline_mul is not None)
+        assert not (use_auto_deadline and (self.deadline_div is None or self.deadline_mul is None)), "Auto-deadline requires specifying dealine_mul AND deadline_div"
+        assert not (use_auto_deadline and (self.deadline_div > 0.0 and self.deadline_mul > 0.0)), "Deadline scaling cannot be negative"
+
         tiling_cfg = cfg.get("tiling", {})
         self.tiling = {}
         for op_type in TilingConfig.SUPPORTED_OP_TYPES:

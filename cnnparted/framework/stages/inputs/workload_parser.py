@@ -52,7 +52,7 @@ class WorkloadParser(Stage):
                     x = torch.randn(input_size)
                     torch.onnx.export(model, x, filename, verbose=False, input_names=['input'], output_names=['output'])
 
-                workloads[wl_name] = WorkloadInfo(accuracy_function, workload.input_size, workload.deadline, workload.frames, filename)
+                workloads[wl_name] = WorkloadInfo(accuracy_function, workload, filename)
     
             except KeyError:
                 print()
