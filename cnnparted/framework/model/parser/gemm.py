@@ -116,7 +116,7 @@ class GemmParser(OnnxLayerParser):
             output_wrapper = TensorWrapper(
                 output,
                 [
-                    None,
+                    #None,
                     ConcreteLoopIterator(LoopDim.B, params.b),
                     ConcreteLoopIterator(LoopDim.N, params.n),
                     ConcreteLoopIterator(LoopDim.M, params.m),
