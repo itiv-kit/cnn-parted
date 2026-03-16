@@ -81,6 +81,7 @@ class SchedulingPriority(Enum):
 class MultiTenancyStageConfig:
     optimizer: GeneticAlgConfig | SimulatedAnnealingConfig | OptunaConfig
     algorithm: Literal["sa", "genetic", "optuna"]
+    fairness_score: Literal["gini", "jain", "max_min_space", "std_dev"]
     scheduling: Literal["list", "multi_queue"]
     scheduling_priority: SchedulingPriority
     binding_granularity: Literal["tile", "layer", "network"]
@@ -91,6 +92,7 @@ class MultiTenancyStageConfig:
         self.scheduling = cfg["scheduling"]
         self.scheduling_priority = SchedulingPriority[cfg["scheduling_priority"].upper()]
         self.binding_granularity = cfg["binding_granularity"]
+        self.fairness_score = cfg["fairness_score"]
         self.num_jobs = cfg["num_jobs"]
 
         match self.algorithm:

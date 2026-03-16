@@ -139,11 +139,28 @@ class MultiTenancyProblem():
         self.noc = noc
         self.models = copy.deepcopy(ga.models)
         self.conf = global_conf
+
+        # Determine scheduling algorithms
         match self.conf.mt.scheduling:
             case "list":
                 self.scheduling_algorithm = list_scheduling
             case "multi_queue":
                 self.scheduling_algorithm = multi_queue_scheduling
+            
+        # Determine which scoring metric is used to measure fairness of latency allocation
+        match self.conf.mt.fairness_score:
+            case "gini":
+                self.score_latency_fairness = self._score_latency_fairness_gini
+                self.fairness_direction = "minimize"
+            case "jain":
+                self.score_latency_fairness = self._score_latency_fairness_jain
+                self.fairness_direction = "maximize"
+            case "max_min_space":
+                self.score_latency_fairness = self._score_latency_fairness_max_min_space
+                self.fairness_direction = "minimize"
+            case "std_dev":
+                self.score_latency_fairness = self._score_latency_fairness_std_dev
+                self.fairness_direction = "minimize"
         
         # Parse execution graphs into LayerTracker
         network_info = defaultdict(lambda: defaultdict(int))
@@ -312,12 +329,12 @@ class MultiTenancyProblem():
             return (
                     self._score_binding_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker),
                     self._score_binding_latency(work_layer_tracker),
-                    self._score_latency_gini(work_layer_tracker),
+                    self.score_latency_fairness(work_layer_tracker),
                     )
 
         # Start the optimization, setup everything for Optuna run
         os.makedirs(self.optuna_out_dir, exist_ok=True)
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", "minimize"], )
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", self.fairness_direction], )
         study.optimize(objective, n_trials=num_trials, n_jobs=1, show_progress_bar=True)
         
         # Plotting to make sense of the results
@@ -505,14 +522,14 @@ class MultiTenancyProblem():
         latencies = [sched.cur_time for sched in schedules.node_schedules.values()]
         return max(latencies)
     
-    def _score_static_max_latency(self, tracker:LayerTracker):
+    def _score_static_max_latency(self, tracker:LayerTracker) -> float:
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
             latencies[binding] += layer_data.latency
         return max(latencies.values())
     
-    def _score_latency_fairness(self, tracker: LayerTracker):
+    def _score_latency_fairness_jain(self, tracker: LayerTracker) -> float:
         """Calculate jains fairness index -> to be maximized"""
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
@@ -525,7 +542,7 @@ class MultiTenancyProblem():
         J = x / y
         return J
     
-    def _score_latency_std_dev(self, tracker: LayerTracker):
+    def _score_latency_fairness_std_dev(self, tracker: LayerTracker) -> float:
         """Calculate std deviation of latency on different platforms"""
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
@@ -536,7 +553,7 @@ class MultiTenancyProblem():
         var = (1/len(lats)) * sum( (lat - mean)**2 for lat in latencies) 
         return math.sqrt(var)
     
-    def _score_latency_gini(self, tracker: LayerTracker):
+    def _score_latency_fairness_gini(self, tracker: LayerTracker) -> float:
         """Calculate Gini coefficient to measure equality of latency on different platforms"""
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
@@ -550,9 +567,9 @@ class MultiTenancyProblem():
         gini = x / y
         return gini
     
-    def _score_latency_max_min_space(self, tracker: LayerTracker):
+    def _score_latency_fairness_max_min_space(self, tracker: LayerTracker) -> float:
         """Calculate difference of max and min accelerators to score equality of latency on different platforms"""
-        latencies  = {id: 0 for id in self.conf.system.platform_ids}
+        latencies  = {id: 0.0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
             latencies[binding] += layer_data.latency * self.models[nw].frames
