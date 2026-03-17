@@ -62,9 +62,11 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
                 V_ready.sort(key=lambda data: -data[1].latency)
             case SchedulingPriority.IDLE_TIME:
                 V_ready.sort(key=lambda data: data[3])
-            case SchedulingPriority.DEADLINE:
+            case SchedulingPriority.DYNAMIC_DEADLINE:
                 V_ready.sort(key=lambda data: 
                                 models[data[0]].deadline - schedule.node_schedules[data[2].scheduling.binding].cur_time )
+            case SchedulingPriority.EARLIEST_DEADLINE:
+                V_ready.sort(key=lambda data: models[data[0]].deadline)
             case _:
                 raise RuntimeError(f"Found an unknown priority: {priority}")
 
