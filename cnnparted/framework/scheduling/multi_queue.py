@@ -6,7 +6,8 @@ from framework.model.layers.rename_layer import RenameLayer
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.model.onnx_model import OnnxModel
 from framework.node.node_evaluator import SystemResult, LayerResult
-from .utils import SystemSchedule
+from .schedules import SystemSchedule
+from .utils import sort_ready_list, get_ready_layers, find_layer_info
 
 def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,  noc: NocTopology,
                     priority: SchedulingPriority) -> SystemSchedule:
@@ -15,14 +16,7 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
     written to a queue, where every accelerator has its own queue from which elements are scheduled.
     Compared to the basic list scheduling, this results in a more even utilization of accelerators"""
 
-    type ReadyElement = tuple[str, LayerResult, ComputationLayer, float, float]
-
-    # Define helper functions to find layers
-    def find_layer_info(id: int, nw_name: str, layer_name: str):
-        network = node_stats[id].designs[0].networks[nw_name]
-        if layer_name in network:
-            return network[layer_name]
-        raise RuntimeError(f"Could not find layer {layer_name} in network {nw_name}")
+    type ReadyElement = tuple[str, LayerResult, ComputationLayer, float]
 
     schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()), noc )
 
@@ -32,56 +26,23 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
     model_endtimes = {nw_name: 0.0 for nw_name in models.keys()}
 
     # While not all nodes have been assigned
-    all_assigned = False
-    while not all_assigned:
+    all_scheduled = False
+    while not all_scheduled:
         #Determine all nodes that can be scheduled (all that have no predecessor)
         V_ready: list[ReadyElement] = []
         task_queues: dict[int, list[ReadyElement]] = {platform: [] for platform in node_stats.get_platform_ids()}
         misc_layers: list[tuple[str, RenameLayer]] = []
 
-        # When one or more models have a deadline we start by scheduling only those to 
-        # increase the likeliness of successfully scheduling them
-        all_constraints_scheduled = not any([model.has_constraints and model.number_of_nodes() > 0 for model in models.values()])
-
-        for network, model in models.items():
-            if not all_constraints_scheduled and not model.has_constraints:
-                continue
-
-            for layer in model.nodes:
-                if model.in_degree(layer) == 0:
-                    if isinstance(layer, ComputationLayer):
-                            platform = layer.scheduling.binding
-                            eval_data = find_layer_info(platform, network, layer.layer_name)
-                            introduced_delay = layer.scheduling.earliest_start - schedule.node_schedules[platform].cur_time
-                            V_ready.append( (network, eval_data, layer, introduced_delay, model.deadline-schedule.node_schedules[platform].cur_time) )
-                    else:
-                        misc_layers.append((network, layer))
+        V_ready, misc_layers = get_ready_layers(models, schedule, node_stats)
 
         # For all operations that are ready, assign them to the respective queues
         # Afterwards, sort the queues according to the scheduling algorithm
         for ready_layer in V_ready:
-            network, _, layer, _, _ = ready_layer
+            network, _, layer, _, = ready_layer
             task_queues[layer.scheduling.binding].append(ready_layer)
         
         for task_queue in task_queues.values():
-            match priority:
-                case SchedulingPriority.EARLIEST_START:
-                    task_queue.sort(key=lambda data: data[2].scheduling.earliest_start)
-                case SchedulingPriority.SHORTEST_JOB:
-                    task_queue.sort(key=lambda data: data[1].latency)
-                case SchedulingPriority.EARLIEST_FINISH:
-                    task_queue.sort(key=lambda data: data[2].scheduling.earliest_start + data[1].latency)
-                case SchedulingPriority.LONGEST_JOB:
-                    task_queue.sort(key=lambda data: -data[1].latency)
-                case SchedulingPriority.IDLE_TIME:
-                    task_queue.sort(key=lambda data: data[3])
-                case SchedulingPriority.DYNAMIC_DEADLINE:
-                    task_queue.sort(key=lambda data: 
-                                    models[data[0]].deadline - schedule.node_schedules[data[2].scheduling.binding].cur_time )
-                case SchedulingPriority.EARLIEST_DEADLINE:
-                    task_queue.sort(key=lambda data: models[data[0]].deadline)
-                case _:
-                    raise RuntimeError(f"Found an unknown priority {priority}")
+            task_queue = sort_ready_list(task_queue, schedule, models, priority)
 
         # Iterate over all queues and schedule one layers for each node
         # We schedule only one layer here to allow updating the priority functions
@@ -89,8 +50,8 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
             if len(queue) == 0:
                 continue
 
-            network, eval_data, layer, introduced_delay, _ = queue.pop(0)
-            layer_result = find_layer_info(platform, network, layer.layer_name)
+            network, eval_data, layer, introduced_delay = queue.pop(0)
+            layer_result = find_layer_info(platform, network, layer.layer_name, node_stats)
             scheduled_task = schedule.schedule_layer(platform, network, layer_result, layer)
             model_endtimes[network] = max(model_endtimes[network], scheduled_task.end_time)
 
@@ -123,6 +84,6 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
                         input_layer.scheduling.earliest_start = model_endtimes[network] 
         
         num_remaining_nodes = sum([graph.number_of_nodes() for graph in models.values()])
-        all_assigned = (num_remaining_nodes == 0)
+        all_scheduled = (num_remaining_nodes == 0)
 
     return schedule

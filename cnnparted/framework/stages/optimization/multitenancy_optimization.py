@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from loguru import logger
 
-from framework.scheduling import SystemSchedule
+from framework.scheduling.schedules import SystemSchedule
 from framework.optimizer.multitenancy_partitioning import LayerTracker
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import NodeEvaluation

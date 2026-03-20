@@ -23,7 +23,7 @@ from framework.optimizer.optimizer import Optimizer
 from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
-from framework.scheduling import list_scheduling, multi_queue_scheduling, SystemSchedule, validate_schedule
+from framework.scheduling import list_scheduling, multi_queue_scheduling, validate_schedule, SystemSchedule
 
 
 class MultiTenancyPartitioning(Optimizer):

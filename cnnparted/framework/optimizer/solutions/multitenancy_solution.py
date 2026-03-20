@@ -7,7 +7,7 @@ from collections import defaultdict
 from framework.helpers.dtypes import ComputeTask
 from framework.node.node_evaluator import SystemResult
 from framework import ConfigHelper
-from framework.scheduling import SystemSchedule
+from framework.scheduling.schedules import SystemSchedule
 from framework.optimizer.multitenancy_partitioning import LayerTracker
 
 @dataclass

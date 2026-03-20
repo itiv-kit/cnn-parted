@@ -6,19 +6,13 @@ from framework.model.layers.rename_layer import RenameLayer
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.model.onnx_model import OnnxModel
 from framework.node.node_evaluator import SystemResult, LayerResult
-from .utils import SystemSchedule
+from .schedules import SystemSchedule
+from framework.scheduling.utils import sort_ready_list, get_ready_layers, find_layer_info
 
 def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, noc: NocTopology,
                     priority: SchedulingPriority) -> SystemSchedule:
     """Used for MultiTenancy partitioning. After the layers have been assigned to cores,
     we must determine a start time for each layer"""
-
-    # Define helper functions to find layers
-    def find_layer_info(id: int, nw_name: str, layer_name: str):
-        network = node_stats[id].designs[0].networks[nw_name]
-        if layer_name in network:
-            return network[layer_name]
-        raise RuntimeError(f"Could not find layer {layer_name} in network {nw_name}")
 
     schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()), noc )
 
@@ -28,48 +22,16 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, noc:
     model_endtimes = {nw_name: 0.0 for nw_name in models.keys()}
 
     # While not all nodes have been assigned
-    all_assigned = False
-    while not all_assigned:
+    all_scheduled = False
+    while not all_scheduled:
         #Determine all nodes that can be scheduled (all that have no predecessor)
         V_ready: list[tuple[str, LayerResult, ComputationLayer, float]] = []
         misc_layers: list[tuple[str, RenameLayer]] = []
 
-        # When one or more models have a deadline we start by scheduling only those to 
-        # increase the likeliness of successfully scheduling them
-        all_constraints_scheduled = not any([model.has_constraints and model.number_of_nodes() > 0 for model in models.values()])
-
-        for network, model in models.items():
-            if not all_constraints_scheduled and not model.has_constraints:
-                continue
-
-            for layer in model.nodes:
-                if model.in_degree(layer) == 0:
-                    if isinstance(layer, ComputationLayer):
-                            platform = layer.scheduling.binding
-                            eval_data = find_layer_info(platform, network, layer.layer_name)
-                            introduced_delay = layer.scheduling.earliest_start - schedule.node_schedules[platform].cur_time
-                            V_ready.append( (network, eval_data, layer, introduced_delay) )
-                    else:
-                        misc_layers.append((network, layer))
+        V_ready, misc_layers = get_ready_layers(models, schedule, node_stats)
         
-        match priority:
-            case SchedulingPriority.EARLIEST_START:
-                V_ready.sort(key=lambda data: data[2].scheduling.earliest_start)
-            case SchedulingPriority.SHORTEST_JOB:
-                V_ready.sort(key=lambda data: data[1].latency)
-            case SchedulingPriority.EARLIEST_FINISH:
-                V_ready.sort(key=lambda data: data[2].scheduling.earliest_start + data[1].latency)
-            case SchedulingPriority.LONGEST_JOB:
-                V_ready.sort(key=lambda data: -data[1].latency)
-            case SchedulingPriority.IDLE_TIME:
-                V_ready.sort(key=lambda data: data[3])
-            case SchedulingPriority.DYNAMIC_DEADLINE:
-                V_ready.sort(key=lambda data: 
-                                models[data[0]].deadline - schedule.node_schedules[data[2].scheduling.binding].cur_time )
-            case SchedulingPriority.EARLIEST_DEADLINE:
-                V_ready.sort(key=lambda data: models[data[0]].deadline)
-            case _:
-                raise RuntimeError(f"Found an unknown priority: {priority}")
+        # Sort the list according to the priority function
+        V_ready = sort_ready_list(V_ready, schedule, models, priority)
 
         for network, eval_data, layer, introduced_delay in V_ready[:1]:
             binding = layer.scheduling.binding
@@ -107,6 +69,6 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, noc:
                         input_layer.scheduling.earliest_start = model_endtimes[network] 
 
         num_remaining_nodes = sum([graph.number_of_nodes() for graph in models.values()])
-        all_assigned = (num_remaining_nodes == 0)
+        all_scheduled = (num_remaining_nodes == 0)
 
     return schedule
