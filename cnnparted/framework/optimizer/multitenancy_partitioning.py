@@ -118,12 +118,12 @@ class ScheduleResult:
     is_valid: bool
 
 def _scheduling_wrapper(trial: optuna.Trial, models: dict[str, OnnxModel], scheduling_algorithm,
-                        node_stats: SystemResult, scheduling_priority) -> ScheduleResult:
+                        node_stats: SystemResult, noc: NocTopology, scheduling_priority) -> ScheduleResult:
     """Wrapper to simplify parallelizing scheduling"""
     new_models = copy.deepcopy(models)
     tracker: LayerTracker = trial.user_attrs["bindings"]
     tracker._write_binding_to_graph(new_models)
-    system_schedule = scheduling_algorithm(new_models, node_stats, priority=scheduling_priority)
+    system_schedule = scheduling_algorithm(new_models, node_stats, noc, priority=scheduling_priority)
     are_constraints_fulfilled = validate_schedule(system_schedule, new_models)
     return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
 
@@ -228,7 +228,7 @@ class MultiTenancyProblem():
 
                 new_models = copy.deepcopy(self.models)
                 new_state._write_binding_to_graph(new_models)
-                node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
+                node_schedules = self.scheduling_algorithm(new_models, self.node_stats, self.noc, priority=self.conf.mt.scheduling_priority)
                 
                 new_cost = self._calc_cost(new_state, node_schedules)
                 
@@ -359,7 +359,9 @@ class MultiTenancyProblem():
         invalid_results: list[tuple[LayerTracker, SystemSchedule]] = []
 
         sched_function = partial(_scheduling_wrapper, models=self.models, scheduling_algorithm=self.scheduling_algorithm, 
-                                 node_stats=self.node_stats, scheduling_priority=self.conf.mt.scheduling_priority)
+                                noc=self.noc, node_stats=self.node_stats, 
+                                scheduling_priority=self.conf.mt.scheduling_priority)
+
         with ThreadPoolExecutor(max_workers=self.conf.mt.num_jobs) as executor:
             sorts = list( tqdm.tqdm(executor.map(sched_function, study.best_trials), total=len(study.best_trials) ) )
 

@@ -13,13 +13,13 @@ class MeshNoc(NocTopology):
     """
     Represents an N-D Mesh topology
     """
-    def __init__(self, cfg: ConfigHelper, link: Link):
+    def __init__(self, cfg: ConfigHelper, link_model: Link):
         super().__init__()
 
         noc_cfg = cfg.system.noc
         noc_shape = noc_cfg.shape
 
-        self.default_link = link
+        self.default_link = link_model
 
         assert math.prod(noc_shape) == len(cfg.system.platform_id_mapping), f"For Mesh NoC, every nodes (is: {cfg.system.num_platforms}) must exactly fit into one slot of the NoC (shape is: {noc_shape})"
 
@@ -42,7 +42,7 @@ class MeshNoc(NocTopology):
         for source, sink, key in self.edges:
             source_coord = NocCoordinate(source.coord)
             sink_coord = NocCoordinate(sink.coord)
-            link = NocLink(source_coord, sink_coord, link)
+            link = NocLink(source_coord, sink_coord, link_model)
             self.id_to_link[(source.coord, sink.coord)] = link
         
         # Add reverse edge to model bidirectional data transfer
@@ -64,7 +64,7 @@ class MeshNoc(NocTopology):
                     max_x = noc_shape[0]-1
                     self.dram_neighbors = [(max_x, y) for y in range(noc_shape[1])]
         else:
-            self.dram_neighbors = noc_cfg.dram.neighbors
+            self.dram_neighbors = [tuple(nghbr) for nghbr in noc_cfg.dram.neighbors]
         
         if len(noc_shape) == 2:
             fig = plt.pyplot.figure()
@@ -84,6 +84,11 @@ class MeshNoc(NocTopology):
     def get_min_hops_to_dram(self, start) -> int:
         hops_to_dram_neighbor = [self.get_num_hops(start, dram_neighbor) for dram_neighbor in self.dram_neighbors]
         return min(hops_to_dram_neighbor)
+    
+    def get_nearest_dram_node(self, start) -> NocCoordinate:
+        hops_to_dram_neighbor = [self.get_num_hops(start, dram_neighbor) for dram_neighbor in self.dram_neighbors]
+        min_hops_idx = hops_to_dram_neighbor.index(min(hops_to_dram_neighbor))
+        return self.dram_neighbors[min_hops_idx]
 
     def singlecast_routing(self, start, end) -> list[NocNode]:
         start_node_id = self.noc_ids[start]

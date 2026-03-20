@@ -222,7 +222,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "absl-py" },
     { name = "cerberus" },
-    { name = "intervaltree" },
     { name = "joblib" },
     { name = "kaleido" },
     { name = "libconf" },
@@ -246,6 +245,7 @@ dependencies = [
     { name = "scons" },
     { name = "seaborn" },
     { name = "setuptools" },
+    { name = "sortedcontainers" },
     { name = "sphinx-glpi-theme" },
     { name = "stable-baselines3", extra = ["extra"] },
     { name = "typeguard" },
@@ -259,7 +259,6 @@ dependencies = [
 requires-dist = [
     { name = "absl-py", specifier = ">=2.3.0" },
     { name = "cerberus", specifier = ">=1.3.8" },
-    { name = "intervaltree", specifier = ">=3.2.1" },
     { name = "joblib", specifier = ">=1.5.1" },
     { name = "kaleido", specifier = ">=1.0.0" },
     { name = "libconf", specifier = ">=2.0.1" },
@@ -283,6 +282,7 @@ requires-dist = [
     { name = "scons", specifier = ">=4.9.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
     { name = "setuptools", specifier = "==75.8.2" },
+    { name = "sortedcontainers", specifier = ">=2.4.0" },
     { name = "sphinx-glpi-theme", specifier = ">=0.6" },
     { name = "stable-baselines3", extras = ["extra"], specifier = ">=2.6.0" },
     { name = "typeguard", specifier = ">=4.4.4" },
@@ -584,18 +584,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f1/70/7703c29685631f5a7590aa73f1f1d3fa9a380e654b86af429e0934a32f7d/idna-3.10.tar.gz", hash = "sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9", size = 190490, upload-time = "2024-09-15T18:07:39.745Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3", size = 70442, upload-time = "2024-09-15T18:07:37.964Z" },
-]
-
-[[package]]
-name = "intervaltree"
-version = "3.2.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "sortedcontainers" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/53/c3/b2afa612aa0373f3e6bb190e6de35f293b307d1537f109e3e25dbfcdf212/intervaltree-3.2.1.tar.gz", hash = "sha256:f3f7e8baeb7dd75b9f7a6d33cf3ec10025984a8e66e3016d537e52130c73cfe2", size = 1231531, upload-time = "2025-12-24T04:25:06.773Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/83/7f/8a80a1c7c2ed05822b5a2b312d2995f30c533641f8198366ba2e26a7bb03/intervaltree-3.2.1-py2.py3-none-any.whl", hash = "sha256:a8a8381bbd35d48ceebee932c77ffc988492d22fb1d27d0ba1d74a7694eb8f0b", size = 25929, upload-time = "2025-12-24T04:25:05.298Z" },
 ]
 
 [[package]]

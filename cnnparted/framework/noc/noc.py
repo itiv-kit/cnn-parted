@@ -13,7 +13,6 @@ from framework.link.ble_link import BLELink
 type NocComponent = NocLink | NocNode
 type NocLinkKind = EthernetLink | NoILink | BLELink
 type NocTopologyCfg = Literal["mesh", "fully_connected"]
-type NocPath = list[NocLink]
 
 class NocLink: 
     def __init__(self, start: NocCoordinate, end: NocCoordinate, link: Link):
@@ -23,8 +22,8 @@ class NocLink:
         #self.cur_time = 0.0
         #self.schedule: list[TransferTask] = []
     
-    def eval(self, n_bytes: int,):
-        latency, energy, slice_size = self.link.eval(n_bytes)
+    def eval(self, n_bytes: int, allocated_bw=1.0) -> tuple[float, float]:
+        latency, energy, slice_size = self.link.eval(n_bytes, allocated_bw)
         return latency, energy
 
 
@@ -53,16 +52,20 @@ class NocTopology(nx.MultiDiGraph[NocNode] if TYPE_CHECKING else nx.MultiDiGraph
         self.default_link: Link = None
 
     @abstractmethod
-    def singlecast_routing(self, start: NocCoordinate, end: NocCoordinate) -> NocPath:
+    def singlecast_routing(self, start: NocCoordinate, end: NocCoordinate) -> list[NocNode]:
         ...
 
     @abstractmethod
-    def multicast_routing(self, start: NocCoordinate, ends: list[NocCoordinate]) -> list[NocPath]:
+    def multicast_routing(self, start: NocCoordinate, ends: list[NocCoordinate]) -> list[list[NocNode]]:
         # ends is a list as a tensor maybe can be broadcast to multiple platforms
         ...
     
     @abstractmethod
     def get_num_hops(self, start: NocCoordinate, end: NocCoordinate):
+        ...
+
+    @abstractmethod
+    def get_nearest_dram_node(self, start: NocCoordinate) -> NocCoordinate:
         ...
 
     @abstractmethod

@@ -3,7 +3,7 @@ import itertools as it
 from framework.link.link import Link
 from framework.helpers.config_helper import ConfigHelper
 from framework.helpers.dtypes import NocCoordinate
-from .noc import NocLink, NocNode, NocTopology, NocPath
+from .noc import NocLink, NocNode, NocTopology
 
 
 class FullyConnectedNoc(NocTopology):
@@ -31,12 +31,13 @@ class FullyConnectedNoc(NocTopology):
         input_nodes = [node for node in self.id_to_node.values()]
         self.add_edges_from(it.permutations(input_nodes, 2))
     
+    # TODO Fix routing here
     def singlecast_routing(self, start, end):
         return self.id_to_link[(start, end)]
     
-    def mulitcast_routing(self, start: NocCoordinate, ends: list[NocCoordinate]) -> dict[NocCoordinate, NocPath]:
+    def mulitcast_routing(self, start: NocCoordinate, ends: list[NocCoordinate]) -> dict[NocCoordinate, list[NocNode]]:
         # all connections are just one hop
-        paths: dict[NocCoordinate, NocPath] = {}
+        paths: dict[NocCoordinate, list[NocNode]] = {}
         for end in ends:
             paths[end] = self.id_to_link[(start, end)]
         return paths

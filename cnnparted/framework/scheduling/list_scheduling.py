@@ -1,5 +1,6 @@
 import copy
 
+from framework.noc.noc import NocTopology
 from framework.helpers.config.stages_config import SchedulingPriority
 from framework.model.layers.rename_layer import RenameLayer
 from framework.model.layers.compute_layer import ComputationLayer
@@ -7,7 +8,7 @@ from framework.model.onnx_model import OnnxModel
 from framework.node.node_evaluator import SystemResult, LayerResult
 from .utils import SystemSchedule
 
-def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, 
+def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, noc: NocTopology,
                     priority: SchedulingPriority) -> SystemSchedule:
     """Used for MultiTenancy partitioning. After the layers have been assigned to cores,
     we must determine a start time for each layer"""
@@ -19,7 +20,7 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
             return network[layer_name]
         raise RuntimeError(f"Could not find layer {layer_name} in network {nw_name}")
 
-    schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()) )
+    schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()), noc )
 
     # Backup of models: scheduling modifies the model, so we need a backup
     # incase a model should be scheduled more than once. 
@@ -75,7 +76,7 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,
             layer_result = find_layer_info(binding, network, layer.layer_name)
             layer_name = layer.layer_name
 
-            scheduled_task = schedule.schedule_layer(binding, network, layer_result, layer.scheduling.earliest_start)
+            scheduled_task = schedule.schedule_layer(binding, network, layer_result, layer)
             model_endtimes[network] = max(model_endtimes[network], scheduled_task.end_time)
 
             # Before we remove the node, set the earliest start for all successors

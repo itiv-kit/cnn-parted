@@ -1,5 +1,6 @@
 import copy
 
+from framework.noc.noc import NocTopology
 from framework.helpers.config.stages_config import SchedulingPriority
 from framework.model.layers.rename_layer import RenameLayer
 from framework.model.layers.compute_layer import ComputationLayer
@@ -7,7 +8,7 @@ from framework.model.onnx_model import OnnxModel
 from framework.node.node_evaluator import SystemResult, LayerResult
 from .utils import SystemSchedule
 
-def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, 
+def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult,  noc: NocTopology,
                     priority: SchedulingPriority) -> SystemSchedule:
     """Modified version of list scheduing. Layers that have no more predecessors are assumed
     to be ready for scheduling and are added to V_ready. From there, these elements are
@@ -23,7 +24,7 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
             return network[layer_name]
         raise RuntimeError(f"Could not find layer {layer_name} in network {nw_name}")
 
-    schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()) )
+    schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()), noc )
 
     # Backup of models: scheduling modifies the model, so we need a backup
     # incase a model should be scheduled more than once. 
@@ -90,12 +91,13 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
 
             network, eval_data, layer, introduced_delay, _ = queue.pop(0)
             layer_result = find_layer_info(platform, network, layer.layer_name)
-            scheduled_task = schedule.schedule_layer(platform, network, layer_result, layer.scheduling.earliest_start)
+            scheduled_task = schedule.schedule_layer(platform, network, layer_result, layer)
             model_endtimes[network] = max(model_endtimes[network], scheduled_task.end_time)
 
             # Before we remove the node, set the earliest start for all successors
             for succ in models[network].successors(layer):
                 current_task = schedule.layers[platform][network][layer.layer_name]
+                assert current_task == scheduled_task
                 succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, current_task.end_time)
 
             models[network].remove_layer(layer)

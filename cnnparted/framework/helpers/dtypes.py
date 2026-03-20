@@ -1,6 +1,6 @@
 from typing import NewType
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from framework.model.tensor_wrapper import TensorWrapper
 from framework.helpers.config.general_config import WorkloadSpec
@@ -13,22 +13,6 @@ LinkId = NewType("LinkId", tuple[NocCoordinate, NocCoordinate])
 #    def __init__(self, *coords: tuple[int]):
 #        self.coord = coords
 
-@dataclass
-class ComputeTask:
-    network: str
-    layer: str
-    binding: int
-    start_time: float
-    end_time: float
-
-    def to_dict(self) -> dict:
-        return {
-            self.layer: {
-                "binding": self.binding,
-                "start_time": self.start_time,
-                "end_time": self.end_time,          
-            }
-        }
 
 @dataclass
 class TransferTask:
@@ -38,6 +22,26 @@ class TransferTask:
     end_time: float
     src_node: NocCoordinate
     dest_node: NocCoordinate
+    bandwidth: int
+
+@dataclass
+class ComputeTask:
+    network: str
+    layer: str
+    binding: int
+    start_time: float
+    end_time: float
+    loads: list[TransferTask] = field(default_factory=lambda: [])
+    stores: list[TransferTask] = field(default_factory=lambda: [])
+
+    def to_dict(self) -> dict:
+        return {
+            self.layer: {
+                "binding": self.binding,
+                "start_time": self.start_time,
+                "end_time": self.end_time,          
+            }
+        }
 
 @dataclass
 class AllocatedTensor:
