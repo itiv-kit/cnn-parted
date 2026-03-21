@@ -124,7 +124,6 @@ def _scheduling_wrapper(trial: optuna.Trial, models: dict[str, OnnxModel], sched
     tracker: LayerTracker = trial.user_attrs["bindings"]
     tracker._write_binding_to_graph(scheduling_models)
     system_schedule: SystemSchedule = scheduling_algorithm(scheduling_models, node_stats, noc, priority=scheduling_priority)
-    #tmp = [ (id, link.max_utiliaztion) for id, link in system_schedule.links.items()]
     validation_models = copy.deepcopy(models)
     tracker._write_binding_to_graph(validation_models)
     are_constraints_fulfilled = validate_schedule(system_schedule, validation_models)

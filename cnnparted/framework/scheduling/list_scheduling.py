@@ -37,24 +37,23 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, noc:
         for network, eval_data, layer, introduced_delay in V_ready[:1]:
             binding = layer.scheduling.binding
             layer_result = find_layer_info(binding, network, layer.layer_name)
-            layer_name = layer.layer_name
+            current_frame = completed_model_frames[network]
 
-            scheduled_task = schedule.schedule_layer(binding, network, layer_result, layer)
+            scheduled_task = schedule.schedule_layer(binding, network, current_frame, layer_result, layer)
             model_endtimes[network] = max(model_endtimes[network], scheduled_task.end_time)
 
             # Before we remove the node, set the earliest start for all successors
             for succ in models[network].successors(layer):
-                current_task = schedule.layers[binding][network][layer_name]
-                succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, current_task.end_time)
+                succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, scheduled_task.end_time)
 
             models[network].remove_layer(layer)
         
-        for network, layer in misc_layers:
-            for succ in models[network].successors(layer):
+        for network, rename_layer in misc_layers:
+            for succ in models[network].successors(rename_layer):
                 # We assume here that misc layers take ZERO time to execute,
                 # for that reason we can just propagate the earliest start information here
-                succ.scheduling.earliest_start = layer.scheduling.earliest_start
-            models[network].remove_layer(layer)
+                succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, rename_layer.scheduling.earliest_start)
+            models[network].remove_layer(rename_layer)
         
         # Logic to schedule a network multiple times
         # If all nodes are scheduled, and the netweork should be exectued multiple times,

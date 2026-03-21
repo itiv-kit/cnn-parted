@@ -82,17 +82,19 @@ def validate_schedule(schedule: SystemSchedule, models: dict[str, OnnxModel]):
 
     # Check that all successors are scheduled after 
     for network, model in models.items():
-        for layer in model.nodes:
-            if not isinstance(layer, ComputationLayer):
-                continue
-            layer_task = schedule.layers[layer.scheduling.binding][network][layer.layer_name]
-            for succ in model.successors(layer):
-                if not isinstance(succ, ComputationLayer):
+        for frame in range(model.frames):
+            for layer in model.nodes:
+                if not isinstance(layer, ComputationLayer):
                     continue
-                # Check that all succesors actually start after their
-                # predecessor is finished
-                succ_task = schedule.layers[succ.scheduling.binding][network][succ.layer_name]
-                assert succ_task.start_time >= layer_task.end_time, f"Layer {succ.layer_name} of {network} is not scheduled after predecssor {layer.layer_name}"
+                #layer_task = schedule.layers[layer.scheduling.binding][network][layer.layer_name]
+                current_task = schedule.find_task(layer.scheduling.binding, network, frame, layer.layer_name)
+                for succ in model.computation_successors(layer):
+                    if not isinstance(succ, ComputationLayer):
+                        continue
+                    # Check that all successors only start after the predecessor is finished
+                    #succ_task = schedule.layers[succ.scheduling.binding][network][succ.layer_name]
+                    succ_task = schedule.find_task(succ.scheduling.binding, network, frame, succ.layer_name)
+                    assert succ_task.start_time >= current_task.end_time, f"Layer {succ.layer_name} of {network} is not scheduled after predecessor {layer.layer_name}"
         
         # Check if this schedule fulfills the constraints
         if model.deadline != math.inf and network_end_times[network] > model.deadline:

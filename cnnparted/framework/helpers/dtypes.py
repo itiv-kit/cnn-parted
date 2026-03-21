@@ -37,6 +37,7 @@ class TransferTask:
 @dataclass
 class ComputeTask:
     network: str
+    frame: int
     layer: str
     binding: int
     start_time: float
@@ -47,6 +48,7 @@ class ComputeTask:
     def to_dict(self) -> dict:
         return {
             self.layer: {
+                "frame:": self.frame,
                 "binding": self.binding,
                 "start_time": self.start_time,
                 "end_time": self.end_time,          

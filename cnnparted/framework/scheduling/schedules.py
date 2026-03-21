@@ -20,26 +20,31 @@ class PlatformSchedule:
 
         self.tasks: list[ComputeTask] = []
 
-    def schedule_layer(self, network: str, layer_result: LayerResult, compute_layer: ComputationLayer):
+    def schedule_layer(self, network: str, current_frame: int, layer_result: LayerResult, compute_layer: ComputationLayer):
         # Check if the layer can be backfilled between two earlier tasks
         successive_tasks =[(pred, succ, succ.start_time-pred.end_time)  for pred, succ in it.pairwise(self.tasks)]
         earliest_start = compute_layer.scheduling.earliest_start
 
+        # Ideally, we are able to fill the task in between two tasks:
+        # |pred_task| - |current_task| - |succ_task|
+        # Here, pred and succ refer to a pair of two consecutive, already scheduled tasks
         for pred, succ, slack in successive_tasks:
             if slack >= layer_result.latency:
                 if earliest_start <= pred.end_time:
                     # Check if layer can be scheduled immediately after pred
                     start_time = pred.end_time
                     end_time = start_time + layer_result.latency
-                    task = ComputeTask(network, layer_result.name, self.id, start_time, end_time)
+                    task = ComputeTask(network, current_frame, compute_layer.layer_name,
+                                        self.id, start_time, end_time)
                     insert_idx = self.tasks.index(succ)
                     self.tasks.insert(insert_idx, task)
                     return task
-                elif earliest_start <= succ.start_time and (succ.start_time - earliest_start) <= layer_result.latency:
+                elif earliest_start <= succ.start_time and (earliest_start + layer_result.latency < succ.start_time):
                     # Check if layer can be scheduled immediately before succ
-                    start_time = succ.start_time - earliest_start
+                    start_time = earliest_start
                     end_time = start_time + layer_result.latency
-                    task = ComputeTask(network, layer_result.name, self.id, start_time, end_time)
+                    task = ComputeTask(network, current_frame, compute_layer.layer_name,
+                                        self.id, start_time, end_time)
                     insert_idx = self.tasks.index(succ)
                     self.tasks.insert(insert_idx, task)
                     return task
@@ -50,7 +55,8 @@ class PlatformSchedule:
 
         self.cur_time = start_time + layer_result.latency
 
-        task = ComputeTask(network, layer_result.name, self.id, start_time, end_time)
+        task = ComputeTask(network, current_frame, compute_layer.layer_name, 
+                           self.id, start_time, end_time)
         self.tasks.append(task)
         return task
 
@@ -81,11 +87,9 @@ class LinkSchedule:
         current_util = 0.0
         for time in self.transfer_events.irange(minimum=0.0, maximum=None, inclusive=(False, True)):
             bw_delta = self.transfer_events[time]
-            #print(f"[@{time}: {bw_delta}]")
             current_util += bw_delta
             if current_util > max_util:
                 max_util = current_util
-        #breakpoint()
         return max_util
 
     def schedule_tensor_transfer(self, network: str, tensor_name: str, 
@@ -213,12 +217,13 @@ class SystemSchedule:
                             allocated_bw, link_events)
         return task
 
-    def schedule_layer(self, platform_id: int, network: str, layer_result: LayerResult, compute_layer: ComputationLayer) -> ComputeTask:
+    def schedule_layer(self, platform_id: int, network: str, current_frame: int,
+                        layer_result: LayerResult, compute_layer: ComputationLayer) -> ComputeTask:
         # TODO
         # For alexnet output_/features/features.6/Conv/tile_M_4/tile_N_0 all tiles seem to end at the same time
 
         # We first determine when the computation should take place, as this not necessarily exactly at earliest_start
-        compute_task = self.node_schedules[platform_id].schedule_layer(network, layer_result, compute_layer)
+        compute_task = self.node_schedules[platform_id].schedule_layer(network, current_frame, layer_result, compute_layer)
 
         # Next, determine when load and store opertions should begin
         load_task = self.schedule_input_transfers(platform_id, network, compute_task, compute_layer)
@@ -232,6 +237,14 @@ class SystemSchedule:
         # Keep a dict to make searching for a specifc layer easier
         self.layers[platform_id][network][compute_task.layer] = compute_task
         return compute_task
+
+    def find_task(self, platform_id: int, network: str, frame: int, layer_name: str):
+        sched = self.node_schedules[platform_id]
+        for task in sched.tasks:
+            match = (task.network == network and task.layer == layer_name and task.frame == frame) 
+            if match:
+                return task
+        raise RuntimeError(f"Could not find ComputeTask(network={network}, layer={layer_name}, frame={frame})")
 
     @property
     def system_latency(self):
