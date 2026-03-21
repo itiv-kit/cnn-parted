@@ -46,6 +46,7 @@ class ComputationLayer(LayerBase):
             inputs=inputs,
             output=output
         )
+        self.num_tiles = 1
         self.loop_dims = loop_dims
         self.scheduling = SchedulingInfo()
 

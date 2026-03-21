@@ -1,11 +1,8 @@
 import itertools as it
-import numpy as np
 from sortedcontainers import SortedDict
 
-from framework.helpers.dtypes import ComputeTask, TransferTask
-from framework.noc.noc import NocTopology, NocLink
-from framework.link.link import Link
-from framework.model.tensor_wrapper import TensorWrapper
+from framework.helpers.dtypes import ComputeTask, NocCoordinate, TransferTask, LinkEvent
+from framework.noc.noc import NocTopology, NocLink, NocNode
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.node.node_evaluator import SystemResult, LayerResult
 
@@ -69,16 +66,40 @@ class LinkSchedule:
     Manages the schedule of single link between two nodes. It is stored as
     a SortedDict to enable easy access to peak bandwidth utilization
     """
-    def __init__(self, start: int, end: int, link: NocLink):
+    def __init__(self, start_node: NocNode, end_node: NocNode, link: NocLink):
         self.link = link
-        self.start = start
-        self.end = end
+        self.start = start_node.id
+        self.end = end_node.id
+        self.start_coord = start_node.coord
+        self.end_coord = end_node.coord
         self.transfer_events = SortedDict()
-        self.tasks: list[TransferTask] = []
+        self.tasks: list[LinkEvent] = []
+    
+    @property
+    def max_utiliaztion(self):
+        max_util = 0.0
+        current_util = 0.0
+        for time in self.transfer_events.irange(minimum=0.0, maximum=None, inclusive=(False, True)):
+            bw_delta = self.transfer_events[time]
+            #print(f"[@{time}: {bw_delta}]")
+            current_util += bw_delta
+            if current_util > max_util:
+                max_util = current_util
+        #breakpoint()
+        return max_util
 
-    def schedule_tensor_transfer(self, link: Link, layer_result: LayerResult, tensor: TensorWrapper):
-        ...
+    def schedule_tensor_transfer(self, network: str, tensor_name: str, 
+                                link_start_time: float, link_latency: float, allocated_bw: float):
+        link_finish_time = link_start_time + link_latency
+        self.transfer_events[link_start_time] =  self.transfer_events.get(link_start_time, 0.0)  + allocated_bw
+        self.transfer_events[link_finish_time] = self.transfer_events.get(link_finish_time, 0.0) - allocated_bw
 
+        event = LinkEvent(network, tensor_name,
+                          self.start, self.end,
+                          link_start_time, link_finish_time,
+                          allocated_bw)
+        self.tasks.append(event)
+        return event
 
 class SystemSchedule:
     """
@@ -88,6 +109,8 @@ class SystemSchedule:
         self.noc = noc
         self.networks = networks
 
+        self.transfer_tasks: list[TransferTask] = []
+
         # Computation tasks
         self.node_schedules = {id: PlatformSchedule(id) for id in platform_ids}
         self.layers: dict[int, dict[str, dict[str, ComputeTask]]] = {}
@@ -96,12 +119,17 @@ class SystemSchedule:
 
         # Network transfer tasks
         self.links: dict[tuple[int], LinkSchedule] = {}
-        for start, end, key in noc.edges:
-            noc_link = noc.id_to_link[ (start.coord, end.coord) ]
-            self.links[(start.id, end.id)] = LinkSchedule(start.id, end.id, noc_link)
+        for start_node, end_node, key in noc.edges:
+            noc_link = noc.id_to_link[ (start_node.coord, end_node.coord) ]
+            self.links[(start_node.id, end_node.id)] = LinkSchedule(start_node, end_node, noc_link)
 
-    def schedule_input_transfers(self, platform_id: int, network: str, compute_layer: ComputationLayer) -> tuple[TransferTask]:
-        allocated_bw = 0.05 #TODO
+    def schedule_input_transfers(self, platform_id: int, network: str, compute_task: ComputeTask, compute_layer: ComputationLayer) -> TransferTask:
+        # Conservative estimation for bandwidth: 
+        # all compute platforms must be fed data in parallel
+        # all tiles should be able to be executed in parallel
+        allocated_bw = min(1/len(self.node_schedules),
+                           1/compute_layer.num_tiles,
+                           )
         num_elems = sum([t.num_elems for t in compute_layer.inputs])
 
         # Determine which links will be traversed
@@ -109,11 +137,12 @@ class SystemSchedule:
         start_dram_node = self.noc.get_nearest_dram_node(dest_compute_node)
         if dest_compute_node == start_dram_node:
             task = TransferTask(network, "inputs",
-                                start_time=compute_layer.scheduling.earliest_start,
-                                end_time=compute_layer.scheduling.earliest_start,
+                                start_time=compute_task.start_time,
+                                end_time=compute_task.start_time,
                                 src_node=start_dram_node, dest_node=dest_compute_node,
-                                bandwidth=allocated_bw)
-            return tuple([task])
+                                bandwidth=allocated_bw,
+                                events=[])
+            return task
 
         visited_nodes = self.noc.singlecast_routing(start_dram_node, dest_compute_node)
         traversed_link_ids = it.pairwise([node.id for node in visited_nodes])
@@ -123,38 +152,40 @@ class SystemSchedule:
         # Also the point in time at which a link starts transmitting
         link_eval: list[tuple[float, float]] = [ link_sched.link.eval(num_elems, allocated_bw) for link_sched in traversed_links]
         link_latencies = [leval[0] for leval in link_eval ]
-        cum_latencies: list[float] = np.cumsum(link_latencies).tolist()
-        cum_latencies.reverse()
-        link_start_times = [compute_layer.scheduling.earliest_start - cum_latency for cum_latency in cum_latencies]
+        transfer_start_time = compute_task.start_time - sum(link_latencies)
 
-        link_tasks = []
-        for traversed_link, link_start, link_latency in zip(traversed_links, link_start_times, link_latencies):
-            link_finish = link_start + link_latency
-            traversed_link.transfer_events[link_start] = traversed_link.transfer_events.get(link_start, 0.0) + allocated_bw
-            traversed_link.transfer_events[link_finish] = traversed_link.transfer_events.get(link_finish, 0.0) + allocated_bw
+        link_events = []
+        link_start_time = transfer_start_time
+        for traversed_link, link_latency in zip(traversed_links, link_latencies):
+            task = traversed_link.schedule_tensor_transfer(network, f"inputs_{compute_layer.layer_name}", 
+                                                           link_start_time, link_latency,
+                                                           allocated_bw)
+            link_events.append(task)
+            link_start_time += link_latency
+        
+        # Generate one TransferTask that contains all link events
+        task = TransferTask(network, f"inputs_{compute_layer.layer_name}",
+                            transfer_start_time, transfer_start_time+sum(link_latencies), start_dram_node, dest_compute_node,
+                            allocated_bw, link_events)
+        return task
 
-            task = TransferTask(network, "inputs",
-                                start_time=link_start, end_time=link_finish,
-                                src_node=start_dram_node, dest_node=dest_compute_node,
-                                bandwidth=allocated_bw)
-            traversed_link.tasks.append(task)
-            link_tasks.append(task)
-        return tuple(link_tasks)
-
-    def schedule_output_transfers(self, platform_id: int, network: str, compute_task: ComputeTask, compute_layer: ComputationLayer) -> tuple[TransferTask]:
-        allocated_bw = 0.05 #TODO
+    def schedule_output_transfers(self, platform_id: int, network: str, compute_task: ComputeTask, compute_layer: ComputationLayer) -> TransferTask:
+        allocated_bw = min(1/len(self.node_schedules),
+                           1/compute_layer.num_tiles,
+                           )
         num_elems = compute_layer.output.num_elems
 
         # Determine which links will be traversed
         start_compute_node = self.noc.id_to_node[platform_id].coord
         dest_dram_node = self.noc.get_nearest_dram_node(start_compute_node)
         if start_compute_node == dest_dram_node:
-            task = TransferTask(network, "inputs",
+            task = TransferTask(network, "output",
                                 start_time=compute_layer.scheduling.end_time,
                                 end_time=compute_layer.scheduling.end_time,
                                 src_node=start_compute_node, dest_node=dest_dram_node,
-                                bandwidth=allocated_bw)
-            return tuple([task])
+                                bandwidth=allocated_bw,
+                                events=[])
+            return task
         visited_nodes = self.noc.singlecast_routing(start_compute_node, dest_dram_node)
         traversed_link_ids = it.pairwise([node.id for node in visited_nodes])
         traversed_links = [self.links[link_ids] for link_ids in traversed_link_ids]
@@ -163,30 +194,38 @@ class SystemSchedule:
         # Also the point in time at which a link starts transmitting
         link_eval: list[tuple[float, float]] = [ link.link.eval(num_elems, allocated_bw) for link in traversed_links]
         link_latencies = [leval[0] for leval in link_eval]
-        cum_latencies: list[float] = np.cumsum(link_latencies).tolist()
-        link_start_times = [compute_task.end_time + cum_latency for cum_latency in cum_latencies]
+        transfer_start_time = compute_task.end_time
 
-        link_tasks = []
-        for traversed_link, link_start, link_latency in zip(traversed_links, link_start_times, link_latencies):
-            link_finish = link_start + link_latency
-            traversed_link.transfer_events[link_start] = traversed_link.transfer_events.get(link_start, 0.0) + allocated_bw
-            traversed_link.transfer_events[link_finish] = traversed_link.transfer_events.get(link_finish, 0.0) + allocated_bw
+        link_events = []
+        link_start_time = transfer_start_time
+        for traversed_link,  link_latency in zip(traversed_links, link_latencies):
+            # TODO Maybe traversed link is incorrect?
+            task = traversed_link.schedule_tensor_transfer(network, f"output_{compute_layer.layer_name}", 
+                                                           link_start_time, link_latency,
+                                                           allocated_bw)
+            link_events.append(task)
+            link_start_time += link_latency
 
-            task = TransferTask(network, "output",
-                                start_time=link_start, end_time=link_finish,
-                                src_node=start_compute_node, dest_node=dest_dram_node,
-                                bandwidth=allocated_bw)
-            traversed_link.tasks.append(task)
-            link_tasks.append(task)
-        return tuple(link_tasks)
+        # Generate one TransferTask that contains all link events
+        task = TransferTask(network, f"output_{compute_layer.layer_name}",
+                            transfer_start_time, transfer_start_time + sum(link_latencies), 
+                            start_compute_node, dest_dram_node,
+                            allocated_bw, link_events)
+        return task
 
     def schedule_layer(self, platform_id: int, network: str, layer_result: LayerResult, compute_layer: ComputationLayer) -> ComputeTask:
-        load_tasks = self.schedule_input_transfers(platform_id, network, compute_layer)
+        # TODO
+        # For alexnet output_/features/features.6/Conv/tile_M_4/tile_N_0 all tiles seem to end at the same time
 
+        # We first determine when the computation should take place, as this not necessarily exactly at earliest_start
         compute_task = self.node_schedules[platform_id].schedule_layer(network, layer_result, compute_layer)
 
-        store_tasks = self.schedule_output_transfers(platform_id, network, compute_task, compute_layer)
-        store_complete = max([store_task.end_time for store_task in store_tasks])
+        # Next, determine when load and store opertions should begin
+        load_task = self.schedule_input_transfers(platform_id, network, compute_task, compute_layer)
+        store_task = self.schedule_output_transfers(platform_id, network, compute_task, compute_layer)
+
+        self.transfer_tasks.append(load_task)
+        self.transfer_tasks.append(store_task)
 
         #compute_task.end_time = store_complete
 

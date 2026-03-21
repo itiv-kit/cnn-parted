@@ -13,6 +13,15 @@ LinkId = NewType("LinkId", tuple[NocCoordinate, NocCoordinate])
 #    def __init__(self, *coords: tuple[int]):
 #        self.coord = coords
 
+@dataclass
+class LinkEvent:
+    network: str
+    tensor_name: str
+    link_start_node: int
+    link_end_node: int
+    start_time: float
+    end_time: float
+    bandwidth: float
 
 @dataclass
 class TransferTask:
@@ -23,6 +32,7 @@ class TransferTask:
     src_node: NocCoordinate
     dest_node: NocCoordinate
     bandwidth: int
+    events: list[LinkEvent]
 
 @dataclass
 class ComputeTask:
