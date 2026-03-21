@@ -24,6 +24,9 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
     # incase a model should be scheduled more than once. 
     model_backup = copy.deepcopy(models)
     model_endtimes = {nw_name: 0.0 for nw_name in models.keys()}
+    completed_model_frames = {nw_name: 0 for nw_name in models.keys()}
+
+    scheduled_layers = {nw_name: [] for nw_name in models.keys()}
 
     # While not all nodes have been assigned
     all_scheduled = False
@@ -52,6 +55,7 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
 
             network, eval_data, layer, introduced_delay = queue.pop(0)
             layer_result = find_layer_info(platform, network, layer.layer_name, node_stats)
+            scheduled_layers[network].append(layer.layer_name)
             scheduled_task = schedule.schedule_layer(platform, network, layer_result, layer)
             model_endtimes[network] = max(model_endtimes[network], scheduled_task.end_time)
 
@@ -62,6 +66,7 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
                 succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, current_task.end_time)
 
             models[network].remove_layer(layer)
+            queue.clear()
         
         for network, layer in misc_layers:
             for succ in models[network].successors(layer):
@@ -74,11 +79,12 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], node_stats: SystemResul
         # If all nodes are scheduled, and the netweork should be exectued multiple times,
         # copy it over which enables scheduling it repeatedly
         for network, model in models.items():
-            if model.number_of_nodes() == 0 and model.frames >= 1:
-                remaining_frames = model.frames - 1
-                if remaining_frames > 0:
+            if model.number_of_nodes() == 0:
+                completed_model_frames[network] += 1
+                # Check if the model has been scheduled enough times
+                if completed_model_frames[network] < model.frames:
                     models[network] = copy.deepcopy(model_backup[network])
-                    models[network].frames = remaining_frames
+                    #models[network].frames = remaining_frames
                     for input_layer in models[network].get_input_layers():
                         # This is needed to reset the earliest start times of the input layers
                         input_layer.scheduling.earliest_start = model_endtimes[network] 

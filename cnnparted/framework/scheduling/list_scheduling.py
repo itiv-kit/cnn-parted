@@ -20,6 +20,7 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, noc:
     # incase a model should be scheduled more than once. 
     model_backup = copy.deepcopy(models)
     model_endtimes = {nw_name: 0.0 for nw_name in models.keys()}
+    completed_model_frames = {nw_name: 0 for nw_name in models.keys()}
 
     # While not all nodes have been assigned
     all_scheduled = False
@@ -59,11 +60,12 @@ def list_scheduling(models: dict[str, OnnxModel], node_stats: SystemResult, noc:
         # If all nodes are scheduled, and the netweork should be exectued multiple times,
         # copy it over which enables scheduling it repeatedly
         for network, model in models.items():
-            if model.number_of_nodes() == 0 and model.frames >= 1:
-                remaining_frames = model.frames - 1
-                if remaining_frames > 0:
+            if model.number_of_nodes() == 0:
+                completed_model_frames[network] += 1
+                # Check if the model has been scheduled enough times
+                if completed_model_frames[network] < model.frames:
                     models[network] = copy.deepcopy(model_backup[network])
-                    models[network].frames = remaining_frames
+                    #models[network].frames = remaining_frames
                     for input_layer in models[network].get_input_layers():
                         # This is needed to reset the earliest start times of the input layers
                         input_layer.scheduling.earliest_start = model_endtimes[network] 

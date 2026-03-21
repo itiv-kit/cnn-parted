@@ -66,12 +66,29 @@ def sort_ready_list(ready_list: list[tuple[str, LayerResult, ComputationLayer, f
 def validate_schedule(schedule: SystemSchedule, models: dict[str, OnnxModel]):
     are_constraints_fulfilled = True
     network_end_times = schedule.get_network_finish_times()
+
+    # Check that all layers are of each network are scheduled #frames-times
+    scheduled_layers = {nw_name: [] for nw_name in models.keys()}
+    for platform_schedule in schedule.node_schedules.values():
+        for task in platform_schedule.tasks:
+            scheduled_layers[task.network].append(task.layer)
+    for network, model in models.items():
+        for layer in model.nodes:
+            if not isinstance(layer, ComputationLayer):
+                continue
+            target_times_exec = model.frames
+            actual_times_exec = scheduled_layers[network].count(layer.layer_name)
+            assert target_times_exec == actual_times_exec, f"Layer {layer.layer_name} is started {actual_times_exec} times but should be started {target_times_exec} times"
+
+    # Check that all successors are scheduled after 
     for network, model in models.items():
         for layer in model.nodes:
             if not isinstance(layer, ComputationLayer):
                 continue
             layer_task = schedule.layers[layer.scheduling.binding][network][layer.layer_name]
             for succ in model.successors(layer):
+                if not isinstance(succ, ComputationLayer):
+                    continue
                 # Check that all succesors actually start after their
                 # predecessor is finished
                 succ_task = schedule.layers[succ.scheduling.binding][network][succ.layer_name]
