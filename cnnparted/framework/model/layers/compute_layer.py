@@ -1,36 +1,11 @@
-from .abstract_layer import LayerBase, SchedulingInfo
+from .abstract_layer import LayerBase
 from framework.model.layer_parameters import ComputeParameters
 from framework.model.tiling.iterators import ConcreteLoopIterator, LoopDim
 from framework.model.tensor_wrapper import TensorWrapper
 
 
-class LoopNest:
-    def __init__(self, loop_dims: list[ConcreteLoopIterator]):
-        self.loop_order = [ldim for ldim in loop_dims]
-        self.axis = {ldim.iterator: ldim.extent for ldim in loop_dims}
-        self._map = {ldim.iterator: [ldim] for ldim in loop_dims}
-        #self.variables = [ldim.iterator.name.lower() for ldim in loop_dims]
-    
-    def tile(self, dim: LoopDim, n_outer_tiles: int):
-        assert len(self._map[dim]) == 1, "Cannot tile a loop that was already tiled"
-
-        loop_idx = self.loop_order.index(dim)
-        loop_to_tile = self._map[dim]
-        new_outer, new_inner = loop_to_tile.tile(factors=[n_outer_tiles, None])
-
-        #Delete entries referencing the old index, add newly constructed loops
-        del self.loop_order[loop_idx]
-        self.loop_order = [new_outer, new_inner] + self.loop_order
-        self._map[dim] = [new_outer, new_inner]
-
-    
-    def reorder(self, new_order: list[ConcreteLoopIterator]):
-        assert len(new_order) == len(self.loop_order), "New loop order must be fully specified"
-
-
 class ComputationLayer(LayerBase):
     layer_params: ComputeParameters
-    scheduling: SchedulingInfo
 
     def __init__(self, 
                  layer_name: str, 
@@ -48,7 +23,6 @@ class ComputationLayer(LayerBase):
         )
         self.num_tiles = 1
         self.loop_dims = loop_dims
-        self.scheduling = SchedulingInfo()
 
     def __repr__(self):
         return f"layers.{self.__class__.__name__}(layer_name={self.layer_name}), op_type={self.op_type}, params={self.layer_params}"

@@ -5,13 +5,6 @@ from framework.model.onnx_tensor import OnnxTensor
 from framework.model.tensor_wrapper import TensorWrapper
 from framework.model.layer_parameters import AnyLayerParameters
 
-@dataclass
-class SchedulingInfo:
-    binding: int = None
-    earliest_start: float = 0.0
-    start_time: float = None
-    end_time: float = None
-
 class LayerBase(ABC):
     def __init__(self, 
                  layer_name: str, 
@@ -25,4 +18,3 @@ class LayerBase(ABC):
         self.inputs = inputs
         self.output = output
         self.id: int = None
-        self.scheduling = SchedulingInfo()

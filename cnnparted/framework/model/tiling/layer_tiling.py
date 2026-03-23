@@ -28,7 +28,18 @@ class LayerTiling:
         if not (layer.get_loop_iterator(dim).extent % num_tiles == 0):
             return True
         return False
-
+    
+    def _determine_num_tiles(self, layer: ComputationLayer, dim: LoopDim, num_tiles: int):
+        # Try to create a smaller number of tiles, if the dimension is not perfectly
+        # tilable by the given factor
+        if num_tiles is None:
+            return num_tiles
+        while num_tiles >= 1:
+            if layer.get_loop_iterator(dim).extent % num_tiles == 0:
+                return num_tiles
+            else:
+                num_tiles -= 1
+        return num_tiles
     
     def tile_layers_inplace(self, models: dict[str, OnnxModel]):
         for network, model in models.items():
@@ -49,15 +60,22 @@ class LayerTiling:
                 # Tile the current layer across all specified dimensions
                 # In the outer while-loop iterate over all dimensions that should be tiled
                 while len(tiling_data_op_type.tiling) > 0:
-                    dim, num_tiles = tiling_data_op_type.tiling.popitem()
+                    dim, num_tiles_cfg = tiling_data_op_type.tiling.popitem()
                     generated_tiles = []
-                    logger.debug(f"Tiling along dimension \"{dim.name}\" with num_tiles={num_tiles}")
+                    logger.debug(f"Tiling along dimension \"{dim.name}\" with num_tiles={num_tiles_cfg}")
 
                     # The inner while loops iterates over all currently existing tiles and applies
                     # further tiling. In essence, this models a recursive tiling where each layer is
                     # successively tiled, one dimension after the other. The order is irrelevant here.
                     while len(tiles_to_process) > 0:
                         current_tile = tiles_to_process.pop(0)
+                        
+                        # Hack to get FCNResNet working with Simba
+                        if network == "fcnresnet50" and current_tile.has_loop_dim(dim) and current_tile.get_loop_iterator(dim).extent == 21:
+                            num_tiles_cfg = 8
+                        
+                        num_tiles = self._determine_num_tiles(current_tile, dim, num_tiles_cfg)
+                        
                         if self._should_skip_tile(current_tile, dim, num_tiles):
                             generated_tiles.append(current_tile)
                         else: 

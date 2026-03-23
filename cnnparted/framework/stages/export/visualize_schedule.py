@@ -167,6 +167,7 @@ class VisualizeSchedule(Stage):
                 title_text=("Execution Schedule"),
                 barmode="stack",
                 showlegend=True,
+                margin=dict(l=20, r=20, t=20, b=20),
             )
 
 
@@ -180,7 +181,7 @@ class VisualizeSchedule(Stage):
             )
             
             fig_file = os.path.join(self.fig_dir, f"mt_schedule_{i}")
-            fig.write_html(fig_file + ".html")
+            #fig.write_html(fig_file + ".html")
             fig.write_image(fig_file + ".png", scale=8)
 
     def _visualize_partitioning_schedule(self):
@@ -231,6 +232,7 @@ class VisualizeSchedule(Stage):
             title_text=("Execution Schedule"),
             barmode="stack",
             showlegend=False,
+            margin=dict(l=20, r=20, t=20, b=20),
         )
         fig.update_yaxes(
             title="Platform [-]",

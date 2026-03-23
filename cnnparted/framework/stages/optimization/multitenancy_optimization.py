@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from loguru import logger
 
 from framework.scheduling.schedules import SystemSchedule
-from framework.optimizer.multitenancy_partitioning import LayerTracker
+from framework.model.layer_tracker import LayerBindings
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
 from framework.stages.inputs.system_parser import SystemParser
@@ -39,4 +39,4 @@ class MultiTenancyOptimization(Stage):
 
 @dataclass
 class MultiTenancyOptimizationArtifacts():
-    solutions: list[tuple[LayerTracker, SystemSchedule]] = None
+    solutions: list[tuple[LayerBindings, SystemSchedule]] = None

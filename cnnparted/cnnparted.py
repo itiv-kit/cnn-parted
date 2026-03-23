@@ -121,6 +121,7 @@ if __name__ == '__main__':
         if os.path.isdir(work_dir) and not conf_helper.general.keep_dir:
             shutil.rmtree(work_dir, ignore_errors=True)
         os.makedirs(work_dir, exist_ok=True)
+        os.makedirs(os.path.join(work_dir, "figures"), exist_ok=True)
     else:
         work_dir_tmp = tempfile.TemporaryDirectory(dir=ROOT_DIR)
         work_dir = work_dir_tmp.name.split(os.path.sep)[-1]

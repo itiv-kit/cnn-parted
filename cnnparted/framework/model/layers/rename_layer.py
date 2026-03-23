@@ -1,5 +1,4 @@
 from .abstract_layer import LayerBase
-from .compute_layer import SchedulingInfo
 from framework.model.layer_parameters import AnyLayerParameters
 from framework.model.onnx_tensor import OnnxTensor
 
@@ -17,7 +16,6 @@ class RenameLayer(LayerBase):
             inputs=inputs,
             output=output
         )
-        self.scheduling = SchedulingInfo()
 
     def __repr__(self):
         return f"layers.{self.__class__.__name__}(layer_name={self.layer_name}), op_type={self.op_type}, params={self.layer_params}"

@@ -3,8 +3,11 @@ import os
 import copy
 from collections import defaultdict
 from dataclasses import dataclass
-from loguru import logger
+import sys
 import itertools as it
+
+import ray
+from loguru import logger
 
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
@@ -16,6 +19,7 @@ import plotly.graph_objects as go
 import optuna
 import tqdm
 
+from framework.model.layer_tracker import LayerBindings
 from framework.noc.noc import NocTopology
 from framework.model.onnx_model import OnnxModel
 from framework.model.layers.compute_layer import ComputationLayer
@@ -38,97 +42,55 @@ class MultiTenancyPartitioning(Optimizer):
         os.makedirs(self.plot_dir, exist_ok=True)
 
     def optimize(self):
-        self._gen_initial_binding()
-
         algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga, self.conf, self.noc)
         solutions = algorithm.minimize()
         return solutions
-
-    def _gen_initial_binding(self):
-        node_ids = self.system_result.get_platform_ids()
-        for network, model in self.ga.models.items():
-            for layer in model.nodes:
-                layer.scheduling.binding = np.random.choice(node_ids)
-
-
-@dataclass
-class LayerTracker:
-    """
-    This class is used to keep track of all layers of all networks that are being evaluated. 
-    For each layer, it keeps the name of the layer and the binding, i.e. the assignment to a platform.
-    Detailed layer stats, like energy or latency, must be retrieved from the SystemResult class.
-    """
-    network_info: dict[str, dict[str, int]]
-
-    def __iter__(self):
-        return iter([ (nw,layer_name,binding) for nw, layers in self.network_info.items() for layer_name, binding in layers.items()])
-
-    def get_all_layers_on_platform(self, platform: int) -> list[tuple[str, str]]:
-        nw_layer = [ (nw,layer_name) for nw, layers in self.network_info.items() for layer_name, binding in layers.items() if binding == platform]
-        return nw_layer
-    
-    def get_all_layer_names(self) -> list[tuple[str, str]]:
-        nw_layer = [ (nw,layer_name) for nw, layers in self.network_info.items() for layer_name, binding in layers.items()]
-        return nw_layer
-    
-    def get_num_layers(self) -> int:
-        layer_ctr = [ len(layers) for layers in self.network_info.values() ]
-        return sum(layer_ctr)
-    
-    def set_all_bindings(self, new_bindings: list[int]):
-        """Takes a list[int] where each entry denotes the platform on which a layer should be executed"""
-        idx = 0
-        for nw, layers in self.network_info.items():
-            for layer in layers:
-                self.network_info[nw][layer] = new_bindings[idx]
-                idx += 1
-
-    def _write_binding_to_graph(self, models: dict[str, OnnxModel]):
-        for nw, layer, binding in self:
-            node = models[nw].node_by_layer_name(layer)
-            node.scheduling.binding = binding
-
-    def swap_layers(self, nws_layers: list[tuple[str,str]]):
-        """Swap the binding of two layers that are on different platforms"""
-        bindings = np.array([self.network_info[nw][layer] for nw, layer in nws_layers])
-        (first_nw, first_layer), (second_nw, second_layer) = nws_layers
-        first_b, second_b = bindings
-        self.network_info[first_nw][first_layer] = second_b
-        self.network_info[second_nw][second_layer] = first_b
-    
-    def move_layer(self, nw_layer: tuple[str,str], to: int):
-        """Move one layer to a specified platform"""
-        nw, layer = nw_layer
-        self.network_info[nw][layer] = to
-    
-    def swap_platforms(self, platform_a: int, platform_b: int):
-        """Swap all layers assigned to two differnt platforms"""
-        for nw, layer_bindings in self.network_info.items():
-            for layer_name, binding in layer_bindings.items():
-                if binding == platform_a:
-                    self.network_info[nw][layer_name] = platform_b
-                elif binding == platform_b:
-                    self.network_info[nw][layer_name] = platform_a
 
 
 @dataclass
 class ScheduleResult:
     schedule: SystemSchedule
-    tracker: LayerTracker
+    tracker: LayerBindings
     is_valid: bool
 
 def _scheduling_wrapper(trial: optuna.Trial, models: dict[str, OnnxModel], scheduling_algorithm,
                         node_stats: SystemResult, noc: NocTopology, scheduling_priority) -> ScheduleResult:
     """Wrapper to simplify parallelizing scheduling"""
-    scheduling_models = copy.deepcopy(models)
-    tracker: LayerTracker = trial.user_attrs["bindings"]
-    tracker._write_binding_to_graph(scheduling_models)
-    system_schedule: SystemSchedule = scheduling_algorithm(scheduling_models, node_stats, noc, priority=scheduling_priority)
-    validation_models = copy.deepcopy(models)
-    tracker._write_binding_to_graph(validation_models)
-    are_constraints_fulfilled = validate_schedule(system_schedule, validation_models)
+
+    # --- SCHEDULING ---
+    #scheduling_models = copy.deepcopy(models)
+    tracker: LayerBindings = trial.user_attrs["bindings"]
+    system_schedule: SystemSchedule = scheduling_algorithm(models, tracker, node_stats, noc, priority=scheduling_priority)
+
+    # --- VALIDATION ---
+    are_constraints_fulfilled = validate_schedule(system_schedule, tracker, models)
     return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
 
+@ray.remote
+def scheduling_worker(trial, models_id, node_stats_id, noc_id, priority_id, scheduling_algorithm):
+    """
+    Worker function: Executes the scheduling and validation for one trial.
+    """
+    # Pull references from shared memory (Zero-copy read)
+    base_models = models_id
+    node_stats = node_stats_id
+    noc = noc_id
+    scheduling_priority = priority_id
+
+    # --- SCHEDULING ---
+    tracker: LayerBindings = trial.user_attrs["bindings"]
+    #scheduling_models = copy.deepcopy(base_models)
+    #tracker._write_binding_to_graph(scheduling_models)
+
+    system_schedule: SystemSchedule = scheduling_algorithm(
+        base_models, tracker, node_stats, noc, scheduling_priority
+    )
+
+    # --- VALIDATION ---
+    are_constraints_fulfilled = validate_schedule(system_schedule, tracker, base_models)
+
+    return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
+    
 
 class MultiTenancyProblem():
     def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper, noc: NocTopology):
@@ -164,14 +126,15 @@ class MultiTenancyProblem():
                 self.score_latency_fairness = self._score_latency_fairness_std_dev
                 self.fairness_direction = "minimize"
         
-        # Parse execution graphs into LayerTracker
+        # Parse execution graphs into LayerBindings and generate random initial binding
         network_info = defaultdict(lambda: defaultdict(int))
+        node_ids = self.node_stats.get_platform_ids()
         for network, model in ga.models.items():
             for layer in model.nodes:
                 if isinstance(layer, ComputationLayer):
-                    network_info[network][layer.layer_name] = layer.scheduling.binding
+                    network_info[network][layer.layer_name] = np.random.choice(node_ids)
 
-        self.layer_tracker = LayerTracker(network_info)
+        self.layer_tracker = LayerBindings(network_info)
         self.num_nodes = self.layer_tracker.get_num_layers()
         #self.initial_schedule = self.scheduling_algorithm(copy.deepcopy(ga.models), self.node_stats, priority=self.conf.mt.scheduling_priority)
 
@@ -182,7 +145,7 @@ class MultiTenancyProblem():
         self.convergence_counter = 0
         self.cost_history = []
     
-    def _simulated_annealing(self) -> list[tuple[LayerTracker, SystemSchedule]]:
+    def _simulated_annealing(self) -> list[tuple[LayerBindings, SystemSchedule]]:
         """Optimize the assigment of layers to platforms using simulated annealing.
         This optimizer only supports single-objective optimization."""
 
@@ -195,7 +158,7 @@ class MultiTenancyProblem():
         convergence = False
         rng = np.random.default_rng()
 
-        def _random_modify(self, current_state: LayerTracker) -> LayerTracker:
+        def _random_modify(self, current_state: LayerBindings) -> LayerBindings:
             layer_tracker = copy.deepcopy(current_state)
             action_space = [layer_tracker.swap_layers, layer_tracker.move_layer, layer_tracker.swap_platforms]
             action = rng.choice(a=action_space, p=[0.45, 0.45, 0.1])
@@ -229,8 +192,8 @@ class MultiTenancyProblem():
                 new_state = _random_modify(current_state)
 
                 new_models = copy.deepcopy(self.models)
-                new_state._write_binding_to_graph(new_models)
-                node_schedules = self.scheduling_algorithm(new_models, self.node_stats, self.noc, priority=self.conf.mt.scheduling_priority)
+                #new_state._write_binding_to_graph(new_models)
+                node_schedules = self.scheduling_algorithm(new_models, new_state, self.node_stats, self.noc, priority=self.conf.mt.scheduling_priority)
                 
                 new_cost = self._calc_cost(new_state, node_schedules)
                 
@@ -265,7 +228,7 @@ class MultiTenancyProblem():
         return [result]
 
     
-    def _optuna_optimizer(self) -> list[tuple[LayerTracker, SystemSchedule]]:
+    def _optuna_optimizer(self) -> list[tuple[LayerBindings, SystemSchedule]]:
         """Optimize the assigment of layers to platforms a specified Optuna sampler.
         This aims to optize energy and latency as a multi-objective optimization.
         """
@@ -336,7 +299,9 @@ class MultiTenancyProblem():
 
         # Start the optimization, setup everything for Optuna run
         os.makedirs(self.optuna_out_dir, exist_ok=True)
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", self.fairness_direction], )
+        storage_db = f"sqlite:///{self.optuna_out_dir}/optuna_allocation_opt.db"
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", self.fairness_direction], 
+                                    study_name="optuna_allocation_opt",) # storage=storage_db
         study.optimize(objective, n_trials=num_trials, n_jobs=1, show_progress_bar=True)
         
         # Plotting to make sense of the results
@@ -357,33 +322,70 @@ class MultiTenancyProblem():
         logger.info("Performing scheduling of pareto-optimal bindings")
 
         ### Perform scheduling for pareto-optimal solutions
-        results: list[tuple[LayerTracker, SystemSchedule]] = []
-        invalid_results: list[tuple[LayerTracker, SystemSchedule]] = []
+        results: list[tuple[LayerBindings, SystemSchedule]] = []
+        invalid_results: list[tuple[LayerBindings, SystemSchedule]] = []
 
         sched_function = partial(_scheduling_wrapper, models=self.models, scheduling_algorithm=self.scheduling_algorithm, 
                                 noc=self.noc, node_stats=self.node_stats, 
                                 scheduling_priority=self.conf.mt.scheduling_priority)
-
-        with ThreadPoolExecutor(max_workers=self.conf.mt.num_jobs) as executor:
-            sorts = list( tqdm.tqdm(executor.map(sched_function, study.best_trials), total=len(study.best_trials) ) )
-
-        for res in sorts:
+        #with ThreadPoolExecutor(max_workers=self.conf.mt.num_jobs) as executor:
+        #    final_results = list( tqdm.tqdm(executor.map(sched_function, study.best_trials), total=len(study.best_trials) ) )
+        
+        # #########################################################
+        # ------------------ WIP Ray integration ------------------
+        # #########################################################
+        # 1. Initialize Ray
+        # 'address="local"' is implied; it uses all available cores by default
+        ray.init(num_cpus=self.conf.mt.num_jobs, 
+                 )
+        
+        # 2. Put static objects in the Shared Memory Object Store
+        # This prevents the 100MB 'models' from being copied 1000 times
+        models_ref = ray.put(self.models)
+        node_stats_ref = ray.put(self.node_stats)
+        noc_ref = ray.put(self.noc)
+        priority_ref = ray.put(self.conf.mt.scheduling_priority)
+        
+        task_ids = [
+            scheduling_worker.remote(
+                trial, models_ref, node_stats_ref, noc_ref, priority_ref, self.scheduling_algorithm
+            )
+            for trial in study.best_trials
+        ]
+        
+        final_results: list[ScheduleResult] = []
+        with tqdm.tqdm(total=len(task_ids), desc="Finalizing Schedules") as pbar:
+            remaining = task_ids
+            while remaining:
+                # Get the next finished task
+                done, remaining = ray.wait(remaining, num_returns=1)
+                try:
+                    result = ray.get(done[0])
+                except Exception as e:
+                    print(f"WORKER ERROR: {e}")
+                final_results.append(result)
+                pbar.update(1)
+        
+        # Shutdown Ray when done to free up shared memory
+        ray.shutdown()
+        
+        for res in final_results:
             if res.is_valid:
                 results.append( (res.tracker, res.schedule) )
             else:
                 invalid_results.append( (res.tracker, res.schedule) )
+        # #########################################################
+        # ------------------ END Ray integration ------------------
+        # #########################################################
 
+        # Old, single-threaded approach
         #for trial in tqdm.tqdm(study.best_trials):
-        #    new_models = copy.deepcopy(self.models)
-        #    tracker: LayerTracker = trial.user_attrs["bindings"]
-        #    tracker._write_binding_to_graph(new_models)
-        #    node_schedules = self.scheduling_algorithm(new_models, self.node_stats, priority=self.conf.mt.scheduling_priority)
-        #    are_constraints_fulfilled = validate_schedule(node_schedules, new_models)
+        #    sched_res = sched_function(trial)
         
-        #    if are_constraints_fulfilled:
-        #        results.append( (tracker, node_schedules) )
+        #    if sched_res.is_valid:
+        #        results.append( (sched_res.tracker, sched_res.schedule) )
         #    else:
-        #        invalid_results.append( (tracker, node_schedules) )
+        #        invalid_results.append( (sched_res.tracker, sched_res.schedule) )
         
         # For every network, figure out at which time it finishes execution
         # Needed to check if deadlines have been met or not
@@ -451,7 +453,7 @@ class MultiTenancyProblem():
 
         return solutions
 
-    def _score_edp(self, tracker: LayerTracker) -> float:
+    def _score_edp(self, tracker: LayerBindings) -> float:
         # For each layer we want to find the most efficient platform
         total_edp = 0.0    
         for nw, layer, bind in tracker:
@@ -473,7 +475,7 @@ class MultiTenancyProblem():
         idle_times = [sched.get_idle_time() for sched in schedules.node_schedules.values()]
         return sum(idle_times)
     
-    def _score_binding_energy(self, tracker: LayerTracker) -> float:
+    def _score_binding_energy(self, tracker: LayerBindings) -> float:
         # For each layer we want to find the most efficient platform
         total_energy = 0.0    
         for nw, layer, bind in tracker:
@@ -482,7 +484,7 @@ class MultiTenancyProblem():
             total_energy += layer_data.energy
         return total_energy
     
-    def _score_tensor_transfer_energy(self, tracker: LayerTracker) -> float:
+    def _score_tensor_transfer_energy(self, tracker: LayerBindings) -> float:
         total_energy = 0.0    
         for nw, layer, bind in tracker:
             # Besides executing the layer, consider the energy to transfer the input and output
@@ -496,7 +498,7 @@ class MultiTenancyProblem():
             total_energy += sum(tensor_transfer_energy)
         return total_energy
     
-    def _score_cuts(self, tracker: LayerTracker) -> int:
+    def _score_cuts(self, tracker: LayerBindings) -> int:
         cut_cost = 0
         for network, model in self.models.items():
             for layer in model.nodes:
@@ -513,7 +515,7 @@ class MultiTenancyProblem():
                     cut_cost += (found_cuts // len(all_computation_succs))
         return cut_cost
 
-    def _score_binding_latency(self, tracker: LayerTracker) -> float:
+    def _score_binding_latency(self, tracker: LayerBindings) -> float:
         # For each layer we want to find the most efficient platform
         total_latency = 0.0    
         for nw, layer, bind in tracker:
@@ -526,14 +528,14 @@ class MultiTenancyProblem():
         latencies = [sched.cur_time for sched in schedules.node_schedules.values()]
         return max(latencies)
     
-    def _score_static_max_latency(self, tracker:LayerTracker) -> float:
+    def _score_static_max_latency(self, tracker:LayerBindings) -> float:
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
             latencies[binding] += layer_data.latency
         return max(latencies.values())
     
-    def _score_latency_fairness_jain(self, tracker: LayerTracker) -> float:
+    def _score_latency_fairness_jain(self, tracker: LayerBindings) -> float:
         """Calculate jains fairness index -> to be maximized"""
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
@@ -546,7 +548,7 @@ class MultiTenancyProblem():
         J = x / y
         return J
     
-    def _score_latency_fairness_std_dev(self, tracker: LayerTracker) -> float:
+    def _score_latency_fairness_std_dev(self, tracker: LayerBindings) -> float:
         """Calculate std deviation of latency on different platforms"""
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
@@ -557,7 +559,7 @@ class MultiTenancyProblem():
         var = (1/len(lats)) * sum( (lat - mean)**2 for lat in latencies) 
         return math.sqrt(var)
     
-    def _score_latency_fairness_gini(self, tracker: LayerTracker) -> float:
+    def _score_latency_fairness_gini(self, tracker: LayerBindings) -> float:
         """Calculate Gini coefficient to measure equality of latency on different platforms"""
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
@@ -571,7 +573,7 @@ class MultiTenancyProblem():
         gini = x / y
         return gini
     
-    def _score_latency_fairness_max_min_space(self, tracker: LayerTracker) -> float:
+    def _score_latency_fairness_max_min_space(self, tracker: LayerBindings) -> float:
         """Calculate difference of max and min accelerators to score equality of latency on different platforms"""
         latencies  = {id: 0.0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
@@ -581,7 +583,7 @@ class MultiTenancyProblem():
 
         return max(lats) - min(lats)
 
-    def _calc_cost(self, tracker: LayerTracker, schedules: SystemSchedule) -> float:
+    def _calc_cost(self, tracker: LayerBindings, schedules: SystemSchedule) -> float:
         edp_cost = self._score_edp(tracker)
         util_cost = self._score_idle_times(schedules)
         lat_cost = self._score_max_latency(schedules)

@@ -20,10 +20,10 @@ class PlatformSchedule:
 
         self.tasks: list[ComputeTask] = []
 
-    def schedule_layer(self, network: str, current_frame: int, layer_result: LayerResult, compute_layer: ComputationLayer):
+    def schedule_layer(self, network: str, current_frame: int, earliest_start: float,
+                        layer_result: LayerResult, compute_layer: ComputationLayer):
         # Check if the layer can be backfilled between two earlier tasks
         successive_tasks =[(pred, succ, succ.start_time-pred.end_time)  for pred, succ in it.pairwise(self.tasks)]
-        earliest_start = compute_layer.scheduling.earliest_start
 
         # Ideally, we are able to fill the task in between two tasks:
         # |pred_task| - |current_task| - |succ_task|
@@ -112,6 +112,7 @@ class SystemSchedule:
     def __init__(self, platform_ids: list[int], networks: list[str], noc: NocTopology):
         self.noc = noc
         self.networks = networks
+        self.network_finish_times = {nw: [] for nw in networks} #track when each frame of a network is completed
 
         self.transfer_tasks: list[TransferTask] = []
 
@@ -184,8 +185,8 @@ class SystemSchedule:
         dest_dram_node = self.noc.get_nearest_dram_node(start_compute_node)
         if start_compute_node == dest_dram_node:
             task = TransferTask(network, "output",
-                                start_time=compute_layer.scheduling.end_time,
-                                end_time=compute_layer.scheduling.end_time,
+                                start_time=compute_task.end_time,
+                                end_time=compute_task.end_time,
                                 src_node=start_compute_node, dest_node=dest_dram_node,
                                 bandwidth=allocated_bw,
                                 events=[])
@@ -217,13 +218,11 @@ class SystemSchedule:
                             allocated_bw, link_events)
         return task
 
-    def schedule_layer(self, platform_id: int, network: str, current_frame: int,
+    def schedule_layer(self, platform_id: int, network: str, current_frame: int, earliest_start: float,
                         layer_result: LayerResult, compute_layer: ComputationLayer) -> ComputeTask:
-        # TODO
-        # For alexnet output_/features/features.6/Conv/tile_M_4/tile_N_0 all tiles seem to end at the same time
 
         # We first determine when the computation should take place, as this not necessarily exactly at earliest_start
-        compute_task = self.node_schedules[platform_id].schedule_layer(network, current_frame, layer_result, compute_layer)
+        compute_task = self.node_schedules[platform_id].schedule_layer(network, current_frame, earliest_start, layer_result, compute_layer)
 
         # Next, determine when load and store opertions should begin
         load_task = self.schedule_input_transfers(platform_id, network, compute_task, compute_layer)

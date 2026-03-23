@@ -9,6 +9,7 @@ from onnx2torch import convert
 import networkx as nx
 from loguru import logger
 
+from framework.helpers.dtypes import WorkloadInfo
 from framework.model.tensor_wrapper import TensorWrapper
 from framework.constants import MODEL_PATH
 from framework.model.onnx_tensor import OnnxTensor#, OnnxTensorKind
@@ -44,6 +45,16 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         self.deadline_mul: float = None
         self.deadline_div: float = None
         self.frames: int = None
+        self.deadlines: list[float] = None
+
+    def set_runtime_constraints(self, wl_info: WorkloadInfo):
+        self.deadline = wl_info.deadline
+        self.deadline_mul = wl_info.deadline_mul
+        self.deadline_div = wl_info.deadline_div
+        self.frames = wl_info.frames
+        if wl_info.frames > 1:
+            time_per_frame = 1000 / wl_info.frames
+            self.deadlines = [i*time_per_frame for i in range(1, wl_info.frames+1)]
     
     @property
     def has_auto_deadline(self) -> bool:
@@ -75,13 +86,15 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         consumers = []
         if isinstance(tensor, TensorWrapper):
             tensor = tensor._onnx_tensor
+        if tensor is None:
+            return consumers
         for layer_name, layer_input_tensors in layer_inputs.items():
             if tensor in layer_input_tensors:
                 consumers.append(self.name_to_node_mapping[layer_name])
         return consumers
     
     def construct_layer_relations(self, layer_outputs: dict[str, list[OnnxTensor]], 
-                                  layer_inputs: dict[str, list[OnnxTensor]]):
+                                  layer_inputs: dict[str, list[OnnxTensor]], network: str):
         for node in self.nodes:
             consumers = self._find_consumers(node.output, layer_inputs)
             for consumer in consumers:
@@ -179,6 +192,7 @@ class OnnxParser:
     }
 
     def __init__(self, run_name: str, network_name: str):
+        self.network_name = network_name
         _model_path = os.path.join(MODEL_PATH, run_name, network_name + "_model.onnx")
         self.onnx_model: ModelProto = onnx.load(_model_path)
         onnx.checker.check_model(self.onnx_model)
@@ -272,5 +286,5 @@ class OnnxParser:
         logger.debug(f"Done parsing Onnx model, there are {model.number_of_nodes()} layers")
         
         # Finally, determine edges between the nodes
-        model.construct_layer_relations(layer_outputs, layer_inputs)
+        model.construct_layer_relations(layer_outputs, layer_inputs, self.network_name)
         return model

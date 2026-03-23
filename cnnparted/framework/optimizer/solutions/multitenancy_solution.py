@@ -8,7 +8,7 @@ from framework.helpers.dtypes import ComputeTask
 from framework.node.node_evaluator import SystemResult
 from framework import ConfigHelper
 from framework.scheduling.schedules import SystemSchedule
-from framework.optimizer.multitenancy_partitioning import LayerTracker
+from framework.model.layer_tracker import LayerBindings
 
 @dataclass
 class MultiTenancySolutionElem:
@@ -18,7 +18,7 @@ class MultiTenancySolutionElem:
 
 
 class MultitenancySolution:
-    def __init__(self, node_stats: SystemResult, mt_solutions:list[tuple[LayerTracker, SystemSchedule]],  config: ConfigHelper):
+    def __init__(self, node_stats: SystemResult, mt_solutions:list[tuple[LayerBindings, SystemSchedule]],  config: ConfigHelper):
         self.nw_names = [wl.name for wl in config.workload.workload_spec]
 
         self.res: list[MultiTenancySolutionElem] = []
