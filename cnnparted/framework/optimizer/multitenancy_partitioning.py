@@ -5,6 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 import sys
 import itertools as it
+import time
 
 import ray
 from loguru import logger
@@ -27,7 +28,8 @@ from framework.optimizer.optimizer import Optimizer
 from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
-from framework.scheduling import list_scheduling, multi_queue_scheduling, validate_schedule, SystemSchedule
+from framework.scheduling import (list_scheduling, multi_queue_scheduling, 
+                                  herald_like, validate_schedule, SystemSchedule)
 
 
 class MultiTenancyPartitioning(Optimizer):
@@ -58,7 +60,6 @@ def _scheduling_wrapper(trial: optuna.Trial, models: dict[str, OnnxModel], sched
     """Wrapper to simplify parallelizing scheduling"""
 
     # --- SCHEDULING ---
-    #scheduling_models = copy.deepcopy(models)
     tracker: LayerBindings = trial.user_attrs["bindings"]
     system_schedule: SystemSchedule = scheduling_algorithm(models, tracker, node_stats, noc, priority=scheduling_priority)
 
@@ -79,8 +80,6 @@ def scheduling_worker(trial, models_id, node_stats_id, noc_id, priority_id, sche
 
     # --- SCHEDULING ---
     tracker: LayerBindings = trial.user_attrs["bindings"]
-    #scheduling_models = copy.deepcopy(base_models)
-    #tracker._write_binding_to_graph(scheduling_models)
 
     system_schedule: SystemSchedule = scheduling_algorithm(
         base_models, tracker, node_stats, noc, scheduling_priority
@@ -136,7 +135,7 @@ class MultiTenancyProblem():
 
         self.layer_tracker = LayerBindings(network_info)
         self.num_nodes = self.layer_tracker.get_num_layers()
-        #self.initial_schedule = self.scheduling_algorithm(copy.deepcopy(ga.models), self.node_stats, priority=self.conf.mt.scheduling_priority)
+        #self.initial_schedule = self.scheduling_algorithm(self.models, self.node_stats, priority=self.conf.mt.scheduling_priority)
 
         # SA configuration
         #self.initial_cost = self._calc_cost(self.layer_tracker, self.initial_schedule)
@@ -144,6 +143,20 @@ class MultiTenancyProblem():
         #self.t_start = self.initial_cost*8
         self.convergence_counter = 0
         self.cost_history = []
+    
+    def _herald_like(self) -> list[tuple[LayerBindings, SystemSchedule]]:
+        system_schedule = herald_like(self.models, self.node_stats, self.noc, self.conf.mt.optimizer.lbf)
+
+        # Herald combines binding and scheduling, read out values from the schedule
+        network_info = {nw_name: {} for nw_name in self.models.keys()}
+        for id, node_schedule in system_schedule.node_schedules.items():
+            for task in node_schedule.tasks:
+                network_info[task.network][task.layer] = id
+        bindings = LayerBindings(network_info)
+
+        # Herald only finds one solution
+        return [(bindings, system_schedule)]
+                
     
     def _simulated_annealing(self) -> list[tuple[LayerBindings, SystemSchedule]]:
         """Optimize the assigment of layers to platforms using simulated annealing.
@@ -191,9 +204,7 @@ class MultiTenancyProblem():
                 t = self.t_start / (i+1)
                 new_state = _random_modify(current_state)
 
-                new_models = copy.deepcopy(self.models)
-                #new_state._write_binding_to_graph(new_models)
-                node_schedules = self.scheduling_algorithm(new_models, new_state, self.node_stats, self.noc, priority=self.conf.mt.scheduling_priority)
+                node_schedules = self.scheduling_algorithm(self.models, new_state, self.node_stats, self.noc, priority=self.conf.mt.scheduling_priority)
                 
                 new_cost = self._calc_cost(new_state, node_schedules)
                 
@@ -233,6 +244,8 @@ class MultiTenancyProblem():
         This aims to optize energy and latency as a multi-objective optimization.
         """
 
+        optuna_cfg = self.conf.mt.optimizer
+
         match self.conf.mt.optimizer.sampler:
             case "grid":
                 sampler = optuna.samplers.GridSampler()
@@ -241,7 +254,8 @@ class MultiTenancyProblem():
             case "cmaes":
                 sampler = optuna.samplers.CmaEsSampler()
             case "nsga2":
-                sampler = optuna.samplers.NSGAIISampler(seed=42)
+                sampler = optuna.samplers.NSGAIISampler(seed=42, population_size=optuna_cfg.population_size, 
+                                                        mutation_prob=optuna_cfg.mutation_prob, crossover_prob=optuna_cfg.crossover_prob)
             case "random":
                 sampler = optuna.samplers.RandomSampler()
             case "qmc":
@@ -302,7 +316,11 @@ class MultiTenancyProblem():
         storage_db = f"sqlite:///{self.optuna_out_dir}/optuna_allocation_opt.db"
         study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", self.fairness_direction], 
                                     study_name="optuna_allocation_opt",) # storage=storage_db
+        
+        start_time_optuna = time.perf_counter()
         study.optimize(objective, n_trials=num_trials, n_jobs=1, show_progress_bar=True)
+        end_time_optuna = time.perf_counter()
+        logger.info(f"Runtime of task binding: {end_time_optuna - start_time_optuna}")
         
         # Plotting to make sense of the results
         #fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["Energy", "Latency"], 
@@ -325,9 +343,9 @@ class MultiTenancyProblem():
         results: list[tuple[LayerBindings, SystemSchedule]] = []
         invalid_results: list[tuple[LayerBindings, SystemSchedule]] = []
 
-        sched_function = partial(_scheduling_wrapper, models=self.models, scheduling_algorithm=self.scheduling_algorithm, 
-                                noc=self.noc, node_stats=self.node_stats, 
-                                scheduling_priority=self.conf.mt.scheduling_priority)
+        #sched_function = partial(_scheduling_wrapper, models=self.models, scheduling_algorithm=self.scheduling_algorithm, 
+        #                        noc=self.noc, node_stats=self.node_stats, 
+        #                        scheduling_priority=self.conf.mt.scheduling_priority)
         #with ThreadPoolExecutor(max_workers=self.conf.mt.num_jobs) as executor:
         #    final_results = list( tqdm.tqdm(executor.map(sched_function, study.best_trials), total=len(study.best_trials) ) )
         
@@ -335,7 +353,7 @@ class MultiTenancyProblem():
         # ------------------ WIP Ray integration ------------------
         # #########################################################
         # 1. Initialize Ray
-        # 'address="local"' is implied; it uses all available cores by default
+        scheduling_start_time = time.perf_counter()
         ray.init(num_cpus=self.conf.mt.num_jobs, 
                  )
         
@@ -368,6 +386,9 @@ class MultiTenancyProblem():
         
         # Shutdown Ray when done to free up shared memory
         ray.shutdown()
+
+        scheduling_end_time = time.perf_counter()
+        logger.info(f"Scheduling runtime: {scheduling_end_time-scheduling_start_time}")
         
         for res in final_results:
             if res.is_valid:
@@ -407,13 +428,27 @@ class MultiTenancyProblem():
         for nw, (success, fail) in deadline_stats.items():
             if self.models[nw].deadline != math.inf:
                 logger.info(f"Deadline for {nw} was met in {success}/{fail+success} cases ({success/(fail+success)*100:.2f}%)")
-        
+            
+        return results
+    
+    def minimize(self):
+        # Distribute workload between platforms
+        logger.debug(f"Optimizing multitenancy problem with {self.conf.mt.algorithm}")
+
+        match self.conf.mt.algorithm:
+            case "optuna":
+                solutions = self._optuna_optimizer()
+            case "sa":
+                solutions =  self._simulated_annealing()
+            case "herald":
+                solutions = self._herald_like()
+
         # Log some statistics
         system_runtimes: list[float] = []
         system_energy: list[float] = []
-        for bindings, schedule in results:
+        for bindings, schedule in solutions:
             system_runtimes.append( max([sched.cur_time for sched in schedule.node_schedules.values()]) )
-            system_energy.append(self._score_binding_energy(bindings))
+            system_energy.append(schedule.get_system_energy(self.node_stats))
         
         min_runtime_idx = system_runtimes.index(min(system_runtimes))
         min_runtime_latency = system_runtimes[min_runtime_idx]
@@ -423,33 +458,6 @@ class MultiTenancyProblem():
         min_energy_energy = system_energy[min_energy_idx]
         logger.info(f"Configuration with minimum system runtime (ID: {min_runtime_idx}):\n\tRuntime: {min_runtime_latency}\n\tEnergy: {min_runtime_energy}")
         logger.info(f"Configuration with minimum system energy (ID: {min_energy_idx}):\n\tRuntime: {min_energy_latency}\n\tEnergy: {min_energy_energy}")
-            
-        return results
-
-    
-    def minimize(self):
-        # Distribute workload between platforms
-        logger.debug(f"Optimizing multitenancy problem with {self.conf.mt.algorithm}")
-        if self.conf.mt.algorithm == "optuna":
-            solutions = self._optuna_optimizer()
-        elif self.conf.mt.algorithm == "sa":
-            solutions =  self._simulated_annealing()
-
-        # Move binding to graphs
-        #for solution in solutions:
-        #    for network, layer, binding in solution:
-        #        self.execution_graphs[network].reduced_graph.nodes(data=True)[layer]["binding"] = binding
-        
-        # For node_stats: when a layer was not bound to a specific platform, reset scheduling information
-        #for platform, data in self.node_stats.platforms.items():
-        #    for nw_name, nw_data in data.designs[0].networks.items():
-        #        for layer_name, layer_data in nw_data.layers.items():
-        #            binding = best_solution.network_info[nw_name][layer_name]
-        #            if binding != platform:
-        #                layer_data.reset_scheduling()
-
-
-        #TODO: Between binding and scheduling, the design must be fixed and a new node_stats must be created with the single design
 
         return solutions
 

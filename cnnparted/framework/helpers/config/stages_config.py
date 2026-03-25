@@ -32,6 +32,16 @@ class OptunaConfig:
     def __init__(self, cfg: dict):
         self.n_trials = int(cfg["n_trials"])
         self.sampler = cfg["sampler"]
+        self.population_size = cfg.get("population_size", 50)
+        self.mutation_prob = cfg.get("mutation_prob", None)
+        self.crossover_prob = cfg.get("crossover_prob", 0.9)
+
+@dataclass
+class HeraldConfig:
+    lbf: float
+
+    def __init__(self, cfg: dict):
+        self.lbf = cfg["lbf"]
 
 @dataclass
 class PartitioningStageConfig:
@@ -80,8 +90,8 @@ class SchedulingPriority(Enum):
 
 @dataclass
 class MultiTenancyStageConfig:
-    optimizer: GeneticAlgConfig | SimulatedAnnealingConfig | OptunaConfig
-    algorithm: Literal["sa", "genetic", "optuna"]
+    optimizer: GeneticAlgConfig | SimulatedAnnealingConfig | OptunaConfig | HeraldConfig
+    algorithm: Literal["sa", "genetic", "optuna", "herald"]
     fairness_score: Literal["gini", "jain", "max_min_space", "std_dev"]
     scheduling: Literal["list", "multi_queue"]
     scheduling_priority: SchedulingPriority
@@ -103,3 +113,5 @@ class MultiTenancyStageConfig:
                 self.optimizer = GeneticAlgConfig(cfg["optimizer"])
             case "optuna":
                 self.optimizer = OptunaConfig(cfg["optimizer"])
+            case "herald":
+                self.optimizer = HeraldConfig(cfg["optimizer"])

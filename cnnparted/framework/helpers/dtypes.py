@@ -56,6 +56,7 @@ class ComputeTask:
     start_time: float
     end_time: float
     computation_latency: float
+    computation_energy: float
     loads: list[TransferTask] = field(default_factory=lambda: [])
     stores: list[TransferTask] = field(default_factory=lambda: [])
 
@@ -65,7 +66,11 @@ class ComputeTask:
                 "frame:": self.frame,
                 "binding": self.binding,
                 "start_time": self.start_time,
-                "end_time": self.end_time,          
+                "end_time": self.end_time,
+                "computation_latency": self.computation_latency,
+                "computation_energy": self.computation_energy,
+                "total_latency": self.total_latency,
+                "total_energy": self.total_energy
             }
         }
     
@@ -80,6 +85,10 @@ class ComputeTask:
     @property
     def total_latency(self):
         return self.computation_latency + self.communication_latency
+    
+    @property
+    def total_energy(self):
+        return self.computation_energy + self.communication_energy
 
 @dataclass
 class AllocatedTensor:

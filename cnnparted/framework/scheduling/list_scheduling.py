@@ -1,5 +1,3 @@
-import copy
-
 from framework.noc.noc import NocTopology
 from framework.model.layer_tracker import LayerBindings
 from framework.helpers.config.stages_config import SchedulingPriority

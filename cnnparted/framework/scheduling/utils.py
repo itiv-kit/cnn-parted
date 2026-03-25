@@ -96,6 +96,26 @@ def sort_ready_list(ready_list: list[tuple[str, LayerResult, ComputationLayer, f
     
     return ready_list
 
+def handle_multiframe_logic(models: dict[str, OnnxModel], scheduling_constraints: dict[str, SchedulingConstraints],
+                            schedule: SystemSchedule, completed_model_frames: dict[str, int],
+                            model_endtimes: dict[str, float]):
+        # Logic to schedule a network multiple times
+        # If all nodes are scheduled, and the netweork should be exectued multiple times,
+        # copy it over which enables scheduling it repeatedly
+        for network, model in models.items():
+            if scheduling_constraints[network].network_is_complete:
+                # If not all iterations of this model have been scheduled incement the counter
+                if completed_model_frames[network] < model.frames:
+                    completed_model_frames[network] += 1
+                    schedule.network_finish_times[network].append(model_endtimes[network])
+
+                    # If, after the previous increment, we still have more iterations to schedule,
+                    # copy the model over to schedule it once more
+                    if completed_model_frames[network] < model.frames:
+                        scheduling_constraints[network] = SchedulingConstraints(model)
+                        for input_layer in models[network].get_input_layers():
+                            # This is needed to reset the earliest start times of the input layers
+                            scheduling_constraints[network][input_layer].earliest_start = model_endtimes[network]
 
 def validate_schedule(schedule: SystemSchedule, tracker: LayerBindings,  models: dict[str, OnnxModel]):
     #TODO replace with new end times

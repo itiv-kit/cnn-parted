@@ -35,7 +35,8 @@ class PlatformSchedule:
                     start_time = pred.end_time
                     end_time = start_time + layer_result.latency
                     task = ComputeTask(network, current_frame, compute_layer.layer_name,
-                                        self.id, start_time, end_time, layer_result.latency)
+                                        self.id, start_time, end_time, layer_result.latency,
+                                        layer_result.energy)
                     insert_idx = self.tasks.index(succ)
                     self.tasks.insert(insert_idx, task)
                     return task
@@ -44,7 +45,8 @@ class PlatformSchedule:
                     start_time = earliest_start
                     end_time = start_time + layer_result.latency
                     task = ComputeTask(network, current_frame, compute_layer.layer_name,
-                                        self.id, start_time, end_time, layer_result.latency)
+                                        self.id, start_time, end_time, layer_result.latency,
+                                        layer_result.energy)
                     insert_idx = self.tasks.index(succ)
                     self.tasks.insert(insert_idx, task)
                     return task
@@ -56,7 +58,8 @@ class PlatformSchedule:
         self.cur_time = start_time + layer_result.latency
 
         task = ComputeTask(network, current_frame, compute_layer.layer_name, 
-                           self.id, start_time, end_time, layer_result.latency)
+                           self.id, start_time, end_time, layer_result.latency,
+                           layer_result.energy)
         self.tasks.append(task)
         return task
 

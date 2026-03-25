@@ -373,6 +373,13 @@ class SystemResult:
     def get_platform_ids(self):
         return list(self.platforms.keys())
     
+    def get_layer_on_all_platforms(self, network: str, layer_name: str):
+        layer_results: list[tuple[int, LayerResult]] = []
+        for id, platform in self.platforms.items():
+            layer_result = platform.design.networks[network].layers[layer_name]
+            layer_results.append((id, layer_result))
+        return layer_results
+    
     @property
     def ids(self):
         return list(self.platforms.keys())
