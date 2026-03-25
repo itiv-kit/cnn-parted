@@ -35,7 +35,7 @@ class PlatformSchedule:
                     start_time = pred.end_time
                     end_time = start_time + layer_result.latency
                     task = ComputeTask(network, current_frame, compute_layer.layer_name,
-                                        self.id, start_time, end_time)
+                                        self.id, start_time, end_time, layer_result.latency)
                     insert_idx = self.tasks.index(succ)
                     self.tasks.insert(insert_idx, task)
                     return task
@@ -44,7 +44,7 @@ class PlatformSchedule:
                     start_time = earliest_start
                     end_time = start_time + layer_result.latency
                     task = ComputeTask(network, current_frame, compute_layer.layer_name,
-                                        self.id, start_time, end_time)
+                                        self.id, start_time, end_time, layer_result.latency)
                     insert_idx = self.tasks.index(succ)
                     self.tasks.insert(insert_idx, task)
                     return task
@@ -56,7 +56,7 @@ class PlatformSchedule:
         self.cur_time = start_time + layer_result.latency
 
         task = ComputeTask(network, current_frame, compute_layer.layer_name, 
-                           self.id, start_time, end_time)
+                           self.id, start_time, end_time, layer_result.latency)
         self.tasks.append(task)
         return task
 
@@ -93,7 +93,7 @@ class LinkSchedule:
         return max_util
 
     def schedule_tensor_transfer(self, network: str, tensor_name: str, 
-                                link_start_time: float, link_latency: float, allocated_bw: float):
+                                link_start_time: float, link_latency: float, link_energy: float, allocated_bw: float):
         link_finish_time = link_start_time + link_latency
         self.transfer_events[link_start_time] =  self.transfer_events.get(link_start_time, 0.0)  + allocated_bw
         self.transfer_events[link_finish_time] = self.transfer_events.get(link_finish_time, 0.0) - allocated_bw
@@ -101,7 +101,7 @@ class LinkSchedule:
         event = LinkEvent(network, tensor_name,
                           self.start, self.end,
                           link_start_time, link_finish_time,
-                          allocated_bw)
+                          allocated_bw, link_energy)
         self.tasks.append(event)
         return event
 
@@ -155,15 +155,17 @@ class SystemSchedule:
 
         # For the scheduling, we need to determine the latencies
         # Also the point in time at which a link starts transmitting
+        # list of (latency, energy)
         link_eval: list[tuple[float, float]] = [ link_sched.link.eval(num_elems, allocated_bw) for link_sched in traversed_links]
-        link_latencies = [leval[0] for leval in link_eval ]
+        link_latencies = [leval[0] for leval in link_eval]
+        link_energies = [leval[1] for leval in link_eval]
         transfer_start_time = compute_task.start_time - sum(link_latencies)
 
         link_events = []
         link_start_time = transfer_start_time
-        for traversed_link, link_latency in zip(traversed_links, link_latencies):
+        for traversed_link, link_latency, link_energy in zip(traversed_links, link_latencies, link_energies):
             task = traversed_link.schedule_tensor_transfer(network, f"inputs_{compute_layer.layer_name}", 
-                                                           link_start_time, link_latency,
+                                                           link_start_time, link_latency, link_energy,
                                                            allocated_bw)
             link_events.append(task)
             link_start_time += link_latency
@@ -197,16 +199,17 @@ class SystemSchedule:
 
         # For the scheduling, we need to determine the latencies
         # Also the point in time at which a link starts transmitting
+        # list of (latency, energy)
         link_eval: list[tuple[float, float]] = [ link.link.eval(num_elems, allocated_bw) for link in traversed_links]
         link_latencies = [leval[0] for leval in link_eval]
+        link_energies = [leval[1] for leval in link_eval]
         transfer_start_time = compute_task.end_time
 
         link_events = []
         link_start_time = transfer_start_time
-        for traversed_link,  link_latency in zip(traversed_links, link_latencies):
-            # TODO Maybe traversed link is incorrect?
+        for traversed_link, link_latency, link_energy in zip(traversed_links, link_latencies, link_energies):
             task = traversed_link.schedule_tensor_transfer(network, f"output_{compute_layer.layer_name}", 
-                                                           link_start_time, link_latency,
+                                                           link_start_time, link_latency, link_energy,
                                                            allocated_bw)
             link_events.append(task)
             link_start_time += link_latency
@@ -231,7 +234,11 @@ class SystemSchedule:
         self.transfer_tasks.append(load_task)
         self.transfer_tasks.append(store_task)
 
-        #compute_task.end_time = store_complete
+        compute_task.loads.append(load_task)
+        compute_task.stores.append(store_task)
+
+        # TODO
+        #compute_task.end_time = store_task.end_time
 
         # Keep a dict to make searching for a specifc layer easier
         self.layers[platform_id][network][compute_task.layer] = compute_task
@@ -255,7 +262,7 @@ class SystemSchedule:
         for platform, sched in self.node_schedules.items():
             for task in sched.tasks:
                 layer_result = node_stats.platforms[platform].designs[0].networks[task.network].layers[task.layer]
-                total_energy += layer_result.energy
+                total_energy += layer_result.energy + task.communication_energy
         return total_energy
 
     def get_network_finish_times(self) -> dict[str, float]:

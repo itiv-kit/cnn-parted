@@ -37,7 +37,7 @@ def list_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_
 
         for network, eval_data, layer, introduced_delay in V_ready[:1]:
             binding = bindings.get_binding(network, layer.layer_name)
-            layer_result = find_layer_info(binding, network, layer.layer_name)
+            layer_result = find_layer_info(binding, network, layer.layer_name, node_stats)
             current_frame = completed_model_frames[network]
             earliest_start = scheduling_constraints[network][layer].earliest_start
 
@@ -82,7 +82,6 @@ def list_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_
                     # If, after the previous increment, we still have more iterations to schedule,
                     # copy the model over to schedule it once more
                     if completed_model_frames[network] < model.frames:
-                        #models[network] = copy.deepcopy(model_backup[network])
                         scheduling_constraints[network] = SchedulingConstraints(model)
                         for input_layer in models[network].get_input_layers():
                             # This is needed to reset the earliest start times of the input layers

@@ -18,17 +18,16 @@ class SchedulingInfo:
 
 class SchedulingConstraints:
     def __init__(self, model: OnnxModel):
-        self.constraints: dict[LayerBase, SchedulingInfo] = {}
+        self.constraints: dict[str, SchedulingInfo] = {}
         self.num_nodes_total = model.number_of_nodes()
         for layer in model.nodes:
-            # TODO Is this separation needed?
             in_degree = model.in_degree(layer)
-            if isinstance(layer, ComputationLayer):
-                self.constraints[layer] = SchedulingInfo(in_degree)
-            else:
-                self.constraints[layer] = SchedulingInfo(in_degree)
+            assert layer.layer_name not in self.constraints #Sanity check: all layer names within a network must be unique
+            self.constraints[layer.layer_name] = SchedulingInfo(in_degree)
     
-    def __getitem__(self, key: LayerBase):
+    def __getitem__(self, key: LayerBase | str):
+        if isinstance(key, LayerBase):
+            key = key.layer_name
         return self.constraints[key]
     
     @property
@@ -99,6 +98,7 @@ def sort_ready_list(ready_list: list[tuple[str, LayerResult, ComputationLayer, f
 
 
 def validate_schedule(schedule: SystemSchedule, tracker: LayerBindings,  models: dict[str, OnnxModel]):
+    #TODO replace with new end times
     network_end_times = schedule.get_network_finish_times()
 
     # Check that all layers are of each network are scheduled #frames-times

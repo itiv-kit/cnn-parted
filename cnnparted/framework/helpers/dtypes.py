@@ -22,6 +22,11 @@ class LinkEvent:
     start_time: float
     end_time: float
     bandwidth: float
+    link_energy: float
+
+    @property
+    def link_latency(self):
+        return self.end_time - self.start_time
 
 @dataclass
 class TransferTask:
@@ -34,6 +39,14 @@ class TransferTask:
     bandwidth: int
     events: list[LinkEvent]
 
+    @property
+    def transfer_latency(self):
+        return sum([ev.link_latency for ev in self.events])
+    
+    @property
+    def transfer_energy(self):
+        return sum([ev.link_energy for ev in self.events])
+
 @dataclass
 class ComputeTask:
     network: str
@@ -42,6 +55,7 @@ class ComputeTask:
     binding: int
     start_time: float
     end_time: float
+    computation_latency: float
     loads: list[TransferTask] = field(default_factory=lambda: [])
     stores: list[TransferTask] = field(default_factory=lambda: [])
 
@@ -54,6 +68,18 @@ class ComputeTask:
                 "end_time": self.end_time,          
             }
         }
+    
+    @property
+    def communication_latency(self):
+        return sum([ld.transfer_latency for ld in self.loads] + [st.transfer_latency for st in self.stores])
+
+    @property
+    def communication_energy(self):
+        return sum([ld.transfer_energy for ld in self.loads] + [st.transfer_energy for st in self.stores])
+    
+    @property
+    def total_latency(self):
+        return self.computation_latency + self.communication_latency
 
 @dataclass
 class AllocatedTensor:

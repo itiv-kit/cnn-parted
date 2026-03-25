@@ -13,6 +13,7 @@ from framework.model.layer_tracker import LayerBindings
 @dataclass
 class MultiTenancySolutionElem:
     network_res: dict[str, list[ComputeTask]]
+    network_end_times: dict[str, list[int]]
     total_energy: float
     total_latency: float
 
@@ -35,7 +36,8 @@ class MultitenancySolution:
 
             elem = MultiTenancySolutionElem(network_res=nw_results, 
                                             total_energy=schedule.get_system_energy(node_stats),
-                                            total_latency=schedule.system_latency)
+                                            total_latency=schedule.system_latency,
+                                            network_end_times=schedule.network_finish_times)
             self.res.append(elem)
 
         #From system_config: get hardware parameters of the resulting architecture
@@ -76,6 +78,7 @@ class MultitenancySolution:
                     "index": idx,
                     "total_energy": res.total_energy,
                     "total_latency": res.total_latency,
+                    "network_endtimes": res.network_end_times,
                 },
                 "network_data": {},
                 "system_hardware": {},
