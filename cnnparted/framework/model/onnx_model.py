@@ -60,7 +60,6 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
             self.frames = wl_info.frames
             time_per_frame = 1000 / wl_info.frames
             self.deadlines = [i*time_per_frame for i in range(1, wl_info.frames+1)]
-            print(f"Model deadlines: {self.deadlines}")
         else:
             self.has_frame_constraint = False
             self.frames = 1
@@ -73,7 +72,7 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
     
     @property
     def has_constraints(self) -> bool:
-        return any([deadline != math.inf for deadline in self.deadlines]) or (self._has_frame_constraint)
+        return any([deadline != math.inf for deadline in self.deadlines]) or (self.has_frame_constraint)
     
     def add_layer(self, layer: RenameLayer | ComputationLayer):
         layer.id = self._current_id

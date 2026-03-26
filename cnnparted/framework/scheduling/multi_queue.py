@@ -102,7 +102,7 @@ def multi_queue_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings
                         scheduling_constraints[network] = SchedulingConstraints(model)
                         for input_layer in models[network].get_input_layers():
                             # This is needed to reset the earliest start times of the input layers
-                            scheduling_constraints[network][input_layer].earliest_start = max(model_endtimes[network], model_deadlines[network].previous_deadline)
+                            scheduling_constraints[network][input_layer].earliest_start = model_deadlines[network].previous_deadline #max(model_endtimes[network], model_deadlines[network].previous_deadline)
         
         # Check if the scheduling is finished
         all_scheduled = all([sched_constr.network_is_complete for sched_constr in scheduling_constraints.values()])

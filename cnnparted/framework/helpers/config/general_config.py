@@ -86,9 +86,8 @@ class WorkloadSpec:
         self.frames = cfg.get("frames", None)
         self.deadline_mul = cfg.get("deadline_mul", None)
         self.deadline_div = cfg.get("deadline_div", None)
-        assert self.frames >= 1, "Frames must be at least 1"
         assert self.deadline >= 0, "Deadline must be non-negative"
-        assert not (self.frames > 1 and self.deadline != inf), "Cannot set a deadline for a workload with multiple frames"
+        assert not (self.frames is not None and self.deadline != inf), "Cannot set a deadline for a workload with multiple frames"
         use_auto_deadline = self.deadline != inf and (self.deadline_div is not None and self.deadline_mul is not None)
         assert not (use_auto_deadline and (self.deadline_div is None or self.deadline_mul is None)), "Auto-deadline requires specifying dealine_mul AND deadline_div"
         assert not (use_auto_deadline and (self.deadline_div > 0.0 and self.deadline_mul > 0.0)), "Deadline scaling cannot be negative"

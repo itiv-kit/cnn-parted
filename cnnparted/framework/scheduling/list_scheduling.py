@@ -85,7 +85,7 @@ def list_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_
                         scheduling_constraints[network] = SchedulingConstraints(model)
                         for input_layer in models[network].get_input_layers():
                             # This is needed to reset the earliest start times of the input layers
-                            scheduling_constraints[network][input_layer].earliest_start = max(model_endtimes[network], model_deadlines[network].previous_deadline)
+                            scheduling_constraints[network][input_layer].earliest_start = model_deadlines[network].previous_deadline #max(model_endtimes[network], model_deadlines[network].previous_deadline)
 
         #num_remaining_nodes = sum([graph.number_of_nodes() for graph in models.values()])
         #all_scheduled = (num_remaining_nodes == 0)
