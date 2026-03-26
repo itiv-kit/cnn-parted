@@ -17,6 +17,8 @@ class SchedulingInfo:
     earliest_start: float = 0.0
 
 class SchedulingConstraints:
+    """SchedulingConstraints models if all predecessors of a node are completed and provides information
+    about the earliest possible starting time of a layer"""
     def __init__(self, model: OnnxModel):
         self.constraints: dict[str, SchedulingInfo] = {}
         self.num_nodes_total = model.number_of_nodes()
@@ -37,7 +39,30 @@ class SchedulingConstraints:
     
     @property
     def network_is_complete(self):
-        return self.num_nodes_total == self.num_layers_scheduled
+        return all([constr.is_scheduled for constr in self.constraints.values()])
+
+
+class SchedulingDeadlines:
+    """SchedulingDeadlines stores information about all deadlines of a model
+    and simplifies information retrieval"""
+    def __init__(self, deadlines: list[float]):
+        self._deadlines = deadlines
+        self._current_idx = 0
+    
+    @property
+    def active_deadline(self):
+        return self._deadlines[self._current_idx]
+
+    @property
+    def previous_deadline(self):
+        return self._deadlines[self._current_idx-1]
+    
+    @property
+    def all_frames_are_done(self):
+        return len(self._deadlines) == self._current_idx
+    
+    def mark_frame_complete(self):
+        self._current_idx += 1
 
 
 def find_layer_info(id: int, nw_name: str, layer_name: str, node_stats: SystemResult):
@@ -74,7 +99,8 @@ def get_ready_layers(models: dict[str, OnnxModel], bindings: LayerBindings, sche
 def sort_ready_list(ready_list: list[tuple[str, LayerResult, ComputationLayer, float, float]],
                     bindings: LayerBindings, schedule: SystemSchedule,
                     sched_constr: dict[str, SchedulingConstraints],
-                    models: dict[str, OnnxModel], priority: SchedulingPriority):
+                    sched_deadlines: dict[str, SchedulingDeadlines],
+                    priority: SchedulingPriority):
     match priority:
         case SchedulingPriority.EARLIEST_START:
             ready_list.sort(key=lambda data: sched_constr[data[0]][data[2]].earliest_start)
@@ -87,10 +113,11 @@ def sort_ready_list(ready_list: list[tuple[str, LayerResult, ComputationLayer, f
         case SchedulingPriority.IDLE_TIME:
             ready_list.sort(key=lambda data: data[3])
         case SchedulingPriority.DYNAMIC_DEADLINE:
-            ready_list.sort(key=lambda data: 
-                            models[data[0]].deadline - schedule.node_schedules[bindings.get_binding(data[0], data[2].layer_name)].cur_time )
+            ready_list.sort(key=lambda data:
+                            sched_deadlines[data[0]].active_deadline - schedule.node_schedules[bindings.get_binding(data[0], data[2].layer_name)].cur_time )
         case SchedulingPriority.EARLIEST_DEADLINE:
-            ready_list.sort(key=lambda data: models[data[0]].deadline)
+            ready_list.sort(key=lambda data:
+                            sched_deadlines[data[0]].active_deadline)
         case _:
             raise RuntimeError(f"Found an unknown priority {priority}")
     
@@ -119,7 +146,7 @@ def handle_multiframe_logic(models: dict[str, OnnxModel], scheduling_constraints
 
 def validate_schedule(schedule: SystemSchedule, tracker: LayerBindings,  models: dict[str, OnnxModel]):
     #TODO replace with new end times
-    network_end_times = schedule.get_network_finish_times()
+    network_end_times = schedule.network_finish_times #schedule.get_network_finish_times()
 
     # Check that all layers are of each network are scheduled #frames-times
     scheduled_layers = {nw_name: [] for nw_name in models.keys()}
@@ -152,12 +179,17 @@ def validate_schedule(schedule: SystemSchedule, tracker: LayerBindings,  models:
                     assert succ_task.start_time >= current_task.end_time, f"Layer {succ.layer_name} of {network} is not scheduled after predecessor {layer.layer_name}"
         
         # Check if this schedule fulfills the constraints
-        if model.deadline != math.inf and network_end_times[network] > model.deadline:
+        if model.has_constraints and not model.has_frame_constraint: 
             # Scheduling with a given deadline
-            are_constraints_fulfilled = False
-        elif model.frames > 1 and network_end_times[network] > 1_000:
+            assert len(network_end_times[network]) == 1 #Sanity check
+            if network_end_times[network][0] > model.deadlines[0]:
+                are_constraints_fulfilled = False
+        elif model.has_constraints and model.has_frame_constraint:
             # Scheduling a fixed amount of frames per second (here: 1000ms)
-            are_constraints_fulfilled = False
+            assert len(network_end_times[network]) == len(model.deadlines)
+            if network_end_times[network][-1] > 1000:
+                are_constraints_fulfilled = False
+
     
     return are_constraints_fulfilled
 

@@ -40,6 +40,7 @@ class VisualizeSchedule(Stage):
         self.work_dir = self.config.general.work_dir
         self.run_name = artifacts.config.args.run_name
         self.fig_dir = os.path.join(self.work_dir, "figures", "schedule")
+        self.models = artifacts.graph_analysis.ga.models
         os.makedirs(self.fig_dir, exist_ok=True)
         for file in os.listdir(self.fig_dir):
             os.remove(os.path.join(self.fig_dir, file)) #delete all plots that may already exist
@@ -158,10 +159,11 @@ class VisualizeSchedule(Stage):
                         nw_legend_lut[nw_name] = True #workaround to show network only once in legend
 
             # For all networks, print a vertical line to mark the deadline (if there is one)
-            for network_name, network_info in self.network_infos.items():
-                if network_info.deadline != math.inf:
-                   fig.add_vline(x=network_info.deadline, line_width=3, line_dash="dash", line_color="green",
-                                 annotation_text=f"{network_name}", annotation_position="top") 
+            for network_name, model in self.models.items():
+                if model.has_constraints:
+                    for deadline in model.deadlines:
+                        fig.add_vline(x=deadline, line_width=3, line_dash="dash", line_color="green",
+                                        annotation_text=f"{network_name}", annotation_position="top") 
 
             fig.update_layout(
                 title_text=("Execution Schedule"),

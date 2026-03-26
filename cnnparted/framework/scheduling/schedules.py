@@ -115,7 +115,7 @@ class SystemSchedule:
     def __init__(self, platform_ids: list[int], networks: list[str], noc: NocTopology):
         self.noc = noc
         self.networks = networks
-        self.network_finish_times = {nw: [] for nw in networks} #track when each frame of a network is completed
+        self.network_finish_times: dict[str, list[float]] = {nw: [] for nw in networks} #track when each frame of a network is completed
 
         self.transfer_tasks: list[TransferTask] = []
 
@@ -259,6 +259,12 @@ class SystemSchedule:
     def system_latency(self):
         latencies = [sched.cur_time for sched in self.node_schedules.values()]
         return max(latencies)
+    
+    @property
+    def max_min_span(self):
+        latencies = [sched.cur_time for sched in self.node_schedules.values()]
+        return max(latencies) - min(latencies)
+
 
     def get_system_energy(self, node_stats: SystemResult):
         total_energy = 0.0

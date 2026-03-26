@@ -53,7 +53,7 @@ class NodeEvaluation(Stage):
                 for id in node_eval_stats.get_unique_platforms():
                     network_on_id_latency = sum([lyr.latency for lyr in node_eval_stats.platforms[id].designs[0].networks[name].layers.values()])
                     model_latencies.append(network_on_id_latency)
-                model.deadline = ( max(model_latencies) * model.deadline_mul ) / model.deadline_div
+                model.deadlines = [( max(model_latencies) * model.deadline_mul ) / model.deadline_div]
         
         self._update_artifacts(artifacts, node_eval_stats)
     

@@ -83,7 +83,7 @@ class WorkloadSpec:
 
         # Deadline related configuration
         self.deadline = cfg.get("deadline", inf)
-        self.frames = cfg.get("frames", 1)
+        self.frames = cfg.get("frames", None)
         self.deadline_mul = cfg.get("deadline_mul", None)
         self.deadline_div = cfg.get("deadline_div", None)
         assert self.frames >= 1, "Frames must be at least 1"

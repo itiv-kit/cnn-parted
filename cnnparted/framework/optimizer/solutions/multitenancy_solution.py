@@ -16,6 +16,8 @@ class MultiTenancySolutionElem:
     network_end_times: dict[str, list[int]]
     total_energy: float
     total_latency: float
+    total_edp: float
+    max_min_span: float
 
 
 class MultitenancySolution:
@@ -28,16 +30,22 @@ class MultitenancySolution:
         for _, schedule in mt_solutions:
             nw_results: dict[str, list[ComputeTask]] = {nw_name: [] for nw_name in self.nw_names}
 
+            schedule_edp = 0.0
             for node_schedule in schedule.node_schedules.values():
                 for task in node_schedule.tasks:
                     nw_results[task.network].append(task)
+                    schedule_edp += (task.computation_energy * task.computation_latency) + \
+                                        (task.communication_energy * task.communication_latency)
+
             for nw_tasks in nw_results.values():
                 nw_tasks.sort(key=lambda task: task.start_time)
 
             elem = MultiTenancySolutionElem(network_res=nw_results, 
                                             total_energy=schedule.get_system_energy(node_stats),
                                             total_latency=schedule.system_latency,
-                                            network_end_times=schedule.network_finish_times)
+                                            network_end_times=schedule.network_finish_times,
+                                            total_edp = schedule_edp,
+                                            max_min_span=schedule.max_min_span)
             self.res.append(elem)
 
         #From system_config: get hardware parameters of the resulting architecture
@@ -78,6 +86,8 @@ class MultitenancySolution:
                     "index": idx,
                     "total_energy": res.total_energy,
                     "total_latency": res.total_latency,
+                    "total_edp": res.total_edp,
+                    "max_min_span": res.max_min_span,
                     "network_endtimes": res.network_end_times,
                 },
                 "network_data": {},

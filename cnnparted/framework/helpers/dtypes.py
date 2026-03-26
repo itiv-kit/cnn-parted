@@ -63,7 +63,7 @@ class ComputeTask:
     def to_dict(self) -> dict:
         return {
             self.layer: {
-                "frame:": self.frame,
+                "frame": self.frame,
                 "binding": self.binding,
                 "start_time": self.start_time,
                 "end_time": self.end_time,
@@ -103,7 +103,7 @@ class WorkloadInfo:
     deadline: int
     deadline_div: float
     deadline_mul: float
-    frames: int
+    frames: int | None
     onnx_filepath: str
 
     def __init__(self, accuracy_function: Callable, spec: WorkloadSpec, onnx_filepath: str):

@@ -6,7 +6,7 @@ from framework.model.layers.compute_layer import ComputationLayer
 from framework.model.onnx_model import OnnxModel
 from framework.node.node_evaluator import SystemResult, LayerResult
 from .schedules import SystemSchedule
-from framework.scheduling.utils import sort_ready_list, get_ready_layers, find_layer_info, SchedulingConstraints
+from framework.scheduling.utils import sort_ready_list, get_ready_layers, find_layer_info, SchedulingConstraints, SchedulingDeadlines
 
 def list_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_stats: SystemResult, 
                     noc: NocTopology, priority: SchedulingPriority) -> SystemSchedule:
@@ -14,6 +14,7 @@ def list_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_
     we must determine a start time for each layer"""
 
     schedule = SystemSchedule(node_stats.get_platform_ids(), list(models.keys()), noc )
+    model_deadlines = {nw: SchedulingDeadlines(model.deadlines) for nw, model in models.items()}
 
     # Initialize a lookup to decide when a layer is ready to be scheduled
     scheduling_constraints: dict[str, SchedulingConstraints] = {nw: SchedulingConstraints(model) for nw, model in models.items()}
@@ -31,7 +32,7 @@ def list_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_
         V_ready, misc_layers = get_ready_layers(models, bindings, schedule, node_stats, scheduling_constraints)
         
         # Sort the list according to the priority function
-        V_ready = sort_ready_list(V_ready, bindings, schedule, scheduling_constraints, models, priority)
+        task_queue = sort_ready_list(task_queue, bindings, schedule, scheduling_constraints, model_deadlines, priority)
 
         for network, eval_data, layer, introduced_delay in V_ready[:1]:
             binding = bindings.get_binding(network, layer.layer_name)
@@ -69,22 +70,22 @@ def list_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_
         
         # Logic to schedule a network multiple times
         # If all nodes are scheduled, and the netweork should be exectued multiple times,
-        # copy it over which enables scheduling it repeatedly
+        # reset the SchedulingConstraints to re-start scheduling of it
         for network, model in models.items():
             if scheduling_constraints[network].network_is_complete:
                 # If not all iterations of this model have been scheduled incement the counter
-                if completed_model_frames[network] < model.frames:
+                if not model_deadlines[network].all_frames_are_done:
                     completed_model_frames[network] += 1
+                    model_deadlines[network].mark_frame_complete()
                     schedule.network_finish_times[network].append(model_endtimes[network])
 
                     # If, after the previous increment, we still have more iterations to schedule,
                     # copy the model over to schedule it once more
-                    if completed_model_frames[network] < model.frames:
+                    if not model_deadlines[network].all_frames_are_done:
                         scheduling_constraints[network] = SchedulingConstraints(model)
                         for input_layer in models[network].get_input_layers():
                             # This is needed to reset the earliest start times of the input layers
-                            scheduling_constraints[network][input_layer].earliest_start = model_endtimes[network]
-                            #input_layer.scheduling.earliest_start = model_endtimes[network] 
+                            scheduling_constraints[network][input_layer].earliest_start = max(model_endtimes[network], model_deadlines[network].previous_deadline)
 
         #num_remaining_nodes = sum([graph.number_of_nodes() for graph in models.values()])
         #all_scheduled = (num_remaining_nodes == 0)

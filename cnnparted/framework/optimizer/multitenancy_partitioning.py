@@ -114,16 +114,19 @@ class MultiTenancyProblem():
         match self.conf.mt.fairness_score:
             case "gini":
                 self.score_latency_fairness = self._score_latency_fairness_gini
-                self.fairness_direction = "minimize"
+                self.fairness_direction = ["minimize"]
             case "jain":
                 self.score_latency_fairness = self._score_latency_fairness_jain
-                self.fairness_direction = "maximize"
+                self.fairness_direction = ["maximize"]
             case "max_min_space":
                 self.score_latency_fairness = self._score_latency_fairness_max_min_space
-                self.fairness_direction = "minimize"
+                self.fairness_direction = ["minimize"]
             case "std_dev":
                 self.score_latency_fairness = self._score_latency_fairness_std_dev
-                self.fairness_direction = "minimize"
+                self.fairness_direction = ["minimize"]
+            case "no":
+                self.score_latency_fairness = None
+                self.fairness_direction = []
         
         # Parse execution graphs into LayerBindings and generate random initial binding
         network_info = defaultdict(lambda: defaultdict(int))
@@ -305,16 +308,22 @@ class MultiTenancyProblem():
             # Add information to be later retrieved
             trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
 
-            return (
-                    self._score_binding_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker),
-                    self._score_binding_latency(work_layer_tracker),
-                    self.score_latency_fairness(work_layer_tracker),
-                    )
+            if self.score_latency_fairness is not None:
+                return (
+                        self._score_binding_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker),
+                        self._score_binding_latency(work_layer_tracker),
+                        self.score_latency_fairness(work_layer_tracker),
+                        )
+            else:
+                return (
+                        self._score_binding_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker),
+                        self._score_binding_latency(work_layer_tracker),
+                        )
 
         # Start the optimization, setup everything for Optuna run
         os.makedirs(self.optuna_out_dir, exist_ok=True)
         storage_db = f"sqlite:///{self.optuna_out_dir}/optuna_allocation_opt.db"
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize", self.fairness_direction], 
+        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize"] + self.fairness_direction, 
                                     study_name="optuna_allocation_opt",) # storage=storage_db
         
         start_time_optuna = time.perf_counter()
@@ -346,8 +355,15 @@ class MultiTenancyProblem():
         #sched_function = partial(_scheduling_wrapper, models=self.models, scheduling_algorithm=self.scheduling_algorithm, 
         #                        noc=self.noc, node_stats=self.node_stats, 
         #                        scheduling_priority=self.conf.mt.scheduling_priority)
-        #with ThreadPoolExecutor(max_workers=self.conf.mt.num_jobs) as executor:
-        #    final_results = list( tqdm.tqdm(executor.map(sched_function, study.best_trials), total=len(study.best_trials) ) )
+        ## Old, single-threaded approach
+        #for trial in tqdm.tqdm(study.best_trials):
+        #    sched_res = sched_function(trial)
+        
+        #    if sched_res.is_valid:
+        #        results.append( (sched_res.tracker, sched_res.schedule) )
+        #    else:
+        #        invalid_results.append( (sched_res.tracker, sched_res.schedule) )
+        #breakpoint()
         
         # #########################################################
         # ------------------ WIP Ray integration ------------------
@@ -363,12 +379,19 @@ class MultiTenancyProblem():
         node_stats_ref = ray.put(self.node_stats)
         noc_ref = ray.put(self.noc)
         priority_ref = ray.put(self.conf.mt.scheduling_priority)
+
+        # Decide if scheduling should be performed for all bindings or just Pareto-optimal
+        # NOTE: This is very bad for performance
+        if self.conf.mt.schedule_all_bindings:
+            bindings_to_schedule = study.trials
+        else:
+            bindings_to_schedule = study.best_trials
         
         task_ids = [
             scheduling_worker.remote(
                 trial, models_ref, node_stats_ref, noc_ref, priority_ref, self.scheduling_algorithm
             )
-            for trial in study.best_trials
+            for trial in bindings_to_schedule
         ]
         
         final_results: list[ScheduleResult] = []
@@ -399,36 +422,52 @@ class MultiTenancyProblem():
         # ------------------ END Ray integration ------------------
         # #########################################################
 
-        # Old, single-threaded approach
-        #for trial in tqdm.tqdm(study.best_trials):
-        #    sched_res = sched_function(trial)
         
-        #    if sched_res.is_valid:
-        #        results.append( (sched_res.tracker, sched_res.schedule) )
-        #    else:
-        #        invalid_results.append( (sched_res.tracker, sched_res.schedule) )
-        
-        # For every network, figure out at which time it finishes execution
-        # Needed to check if deadlines have been met or not
-        deadline_stats = {network: [0,0] for network in self.models.keys()}
-        all_succeeded = []
+        # Log some statistics about deadline success rates
+        @dataclass
+        class DeadlineStats:
+            success: int = 0
+            partial_violation: int = 0
+            end_violation: int = 0
+            end_success: int = 0
+
+        deadline_stats = {network: DeadlineStats() for network in self.models.keys()}
+        all_partial_succeeded = []
+        all_fully_succeeded = []
         for _, schedule in results + invalid_results:
-            all_succeeded.append(True)
-            network_finishes = schedule.get_network_finish_times()
-            for nw, end in network_finishes.items():
-                if (deadline := self.models[nw].deadline) and deadline != math.inf:
-                    if end <= deadline:
-                        #success
-                        deadline_stats[nw][0] += 1
-                    else:
-                        #failure
-                        all_succeeded[-1] = False
-                        deadline_stats[nw][1] += 1
-        logger.info(f"All deadlines were wet in {all_succeeded.count(True)}/{len(all_succeeded)} cases ({all_succeeded.count(True)/len(all_succeeded)*100:.2f}%)")
-        for nw, (success, fail) in deadline_stats.items():
-            if self.models[nw].deadline != math.inf:
-                logger.info(f"Deadline for {nw} was met in {success}/{fail+success} cases ({success/(fail+success)*100:.2f}%)")
-            
+            network_frame_endtimes = schedule.network_finish_times
+            partial_succ = True
+            fully_succ = True
+            for nw, frame_endtimes in network_frame_endtimes.items():
+                
+                # Check if every single frame finishes with the deadline
+                for frame_endtime, deadline in zip(frame_endtimes, self.models[nw].deadlines, strict=True):
+                    if frame_endtime > deadline:
+                        deadline_stats[nw].partial_violation += 1
+                        fully_succ = False
+                        break
+                
+                if frame_endtimes[-1] > 1000 and self.models[nw].has_frame_constraint:
+                    # Check if the last frame is finished before 1s elapsed
+                    partial_succ = False
+                    fully_succ = False
+                    deadline_stats[nw].end_violation += 1
+                else:
+                    # If the last frame is successful, we count it as a success
+                    # This is a relaxed definition
+                    partial_succ = True
+                    deadline_stats[nw].end_success += 1
+
+            all_fully_succeeded.append(fully_succ)
+            all_partial_succeeded.append(partial_succ)
+                
+        num_all_succ = all_partial_succeeded.count(True)
+        num_sched = len(all_partial_succeeded)
+        logger.info(f"All deadlines were wet in {num_all_succ}/{num_sched} cases ({num_all_succ/num_sched*100:.2f}%)")
+        for nw, stats in deadline_stats.items():
+            if self.models[nw].has_constraints:
+                logger.info(f"End-frame success for {nw} in {stats.end_success}/{num_sched} cases ({stats.end_success/(num_sched)*100:.2f}%)")
+
         return results
     
     def minimize(self):

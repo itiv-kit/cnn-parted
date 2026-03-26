@@ -41,29 +41,39 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         self._current_id = 0
         self.onnx_in_model = onnx_in_model
         self.name_to_node_mapping: dict[str, LayerBase] = {}
-        self.deadline: float = None
         self.deadline_mul: float = None
         self.deadline_div: float = None
         self.frames: int = None
         self.deadlines: list[float] = None
+        self.has_frame_constraint = False
 
     def set_runtime_constraints(self, wl_info: WorkloadInfo):
-        self.deadline = wl_info.deadline
         self.deadline_mul = wl_info.deadline_mul
         self.deadline_div = wl_info.deadline_div
-        self.frames = wl_info.frames
-        if wl_info.frames > 1:
+
+        if wl_info.deadline != math.inf:
+            self.has_frame_constraint = False
+            self.deadlines = [wl_info.deadline]
+            self.frames = 1
+        elif wl_info.frames is not None:
+            self.has_frame_constraint = True
+            self.frames = wl_info.frames
             time_per_frame = 1000 / wl_info.frames
             self.deadlines = [i*time_per_frame for i in range(1, wl_info.frames+1)]
+            print(f"Model deadlines: {self.deadlines}")
+        else:
+            self.has_frame_constraint = False
+            self.frames = 1
+            self.deadlines = [math.inf]
     
     @property
     def has_auto_deadline(self) -> bool:
-        return self.deadline == math.inf and  \
+        return self.deadlines[0] == math.inf and len(self.deadlines) == 1 and  \
                 (self.deadline_div is not None and self.deadline_mul is not None)
     
     @property
     def has_constraints(self) -> bool:
-        return self.deadline != math.inf or self.frames > 1
+        return any([deadline != math.inf for deadline in self.deadlines]) or (self._has_frame_constraint)
     
     def add_layer(self, layer: RenameLayer | ComputationLayer):
         layer.id = self._current_id
