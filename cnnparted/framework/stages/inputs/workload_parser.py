@@ -27,13 +27,13 @@ class WorkloadParser(Stage):
             try:
                 wl_name = workload.name
 
-                filename = os.path.join(MODEL_PATH, self.run_name, wl_name + "_model.onnx")
-                subprocess.check_call(['mkdir', '-p', os.path.join(MODEL_PATH, self.run_name)])
+                filename = os.path.join(MODEL_PATH, self.run_name, workload.dest_model_fname)
+                os.makedirs(os.path.join(MODEL_PATH, self.run_name), exist_ok=True)
         
                 # Check if the model is specified as a locally available ONNX file
-                if os.path.isfile(workload.name) and workload.name.endswith(".onnx"):
+                if os.path.isfile(workload.src_model_fname) and workload.src_model_fname.endswith(".onnx"):
                     logger.debug(f"Instantiate workload {wl_name} from ONNX file and input-size {workload.input_size}")
-                    shutil.copy(workload.name, filename)
+                    shutil.copy(workload.src_model_fname, filename)
 
                     #TODO Accuracy evaluation is currently not supported, if possible integrate a way to specify it
                     accuracy_function = None

@@ -32,7 +32,7 @@ def list_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_
         V_ready, misc_layers = get_ready_layers(models, bindings, schedule, node_stats, scheduling_constraints)
         
         # Sort the list according to the priority function
-        task_queue = sort_ready_list(task_queue, bindings, schedule, scheduling_constraints, model_deadlines, priority)
+        V_ready = sort_ready_list(V_ready, bindings, schedule, scheduling_constraints, model_deadlines, priority)
 
         for network, eval_data, layer, introduced_delay in V_ready[:1]:
             binding = bindings.get_binding(network, layer.layer_name)
@@ -64,9 +64,7 @@ def list_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_
                                                                 scheduling_constraints[network][rename_layer].earliest_start
                                                             )
                 scheduling_constraints[network][succ].in_degree -= 1
-                #succ.scheduling.earliest_start = max(succ.scheduling.earliest_start, rename_layer.scheduling.earliest_start)
             scheduling_constraints[network][rename_layer].is_scheduled = True
-            #models[network].remove_layer(rename_layer)
         
         # Logic to schedule a network multiple times
         # If all nodes are scheduled, and the netweork should be exectued multiple times,

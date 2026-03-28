@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 from math import inf
+from pathlib import Path
+
 from framework.model.tiling.iterators import LoopDim
 
 @dataclass(init=False)
@@ -78,8 +80,19 @@ class WorkloadSpec:
     deadline_div: float
 
     def __init__(self, cfg: dict):
-        self.name = cfg["name"]
         self.input_size = cfg["input-size"] 
+
+        # Parse the name of the file
+        name_path = Path(cfg["name"])
+        # Check if the name points to an ONNX file or is a PyTorch model
+        if name_path.is_file() and name_path.suffix == ".onnx":
+            self.src_model_fname = str(name_path)
+            self.dest_model_fname = name_path.stem + "_model.onnx"
+            self.name = name_path.stem
+        else:
+            self.src_model_fname = str(name_path) #Model is generated from onnx, no src directory
+            self.dest_model_fname = str(name_path) + "_model.onnx"
+            self.name = name_path.stem
 
         # Deadline related configuration
         self.deadline = cfg.get("deadline", inf)

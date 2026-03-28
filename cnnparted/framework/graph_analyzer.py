@@ -28,12 +28,12 @@ class GraphAnalyzer:
         self.torchmodels  = {}
         for network, workload_info in self.workloads.items():
             logger.debug(f"Parsing Model for network {network}")
-            onnx_parser = OnnxParser(self.run_name, network)
+            onnx_parser = OnnxParser(self.run_name, network, workload_info.onnx_filepath)
             onnx_model = onnx_parser.parse_graph()
             onnx_model.set_runtime_constraints(workload_info)
 
             self.models[network]  = onnx_model
-            self.torchmodels[network] = onnx_parser.get_torch_model() 
+            #self.torchmodels[network] = onnx_parser.get_torch_model() #TODO
             nx.nx_pydot.write_dot(onnx_model, os.path.join(self.graph_dot_dir, f"{network}.dot") )
         
         # Perform layer tiling and store results as a DOT file for debugging/visualization

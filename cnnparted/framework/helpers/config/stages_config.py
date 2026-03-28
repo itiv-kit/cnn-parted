@@ -27,13 +27,14 @@ class SimulatedAnnealingConfig:
 @dataclass
 class OptunaConfig:
     n_trials: int
-    sampler: Literal["random", "grid", "tpe", "cmaes", "nsga2", "qmc", "gp"]
+    sampler: Literal["random", "grid", "tpe", "cmaes", "nsga2", "nsga3", "qmc", "gp"]
 
     def __init__(self, cfg: dict):
         self.n_trials = int(cfg["n_trials"])
+        self.n_trials_prostproc = int(cfg.get("n_trials_postproc", 0))
         self.sampler = cfg["sampler"]
-        self.population_size = cfg.get("population_size", 50)
-        self.mutation_prob = cfg.get("mutation_prob", None)
+        self.population_size = cfg.get("population_size", 150)
+        self.mutation_prob = cfg.get("mutation_prob", 0.001)
         self.crossover_prob = cfg.get("crossover_prob", 0.9)
 
 @dataclass

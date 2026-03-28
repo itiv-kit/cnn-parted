@@ -3,6 +3,7 @@ from functools import reduce
 import json
 from dataclasses import dataclass
 from collections import defaultdict
+import statistics
 
 from framework.helpers.dtypes import ComputeTask
 from framework.node.node_evaluator import SystemResult
@@ -66,8 +67,14 @@ class MultitenancySolution:
         min_latency_sol_idx = total_latencies.index(min(total_latencies))
         min_energy_sol = self.res[min_energy_sol_idx]
         min_latency_sol = self.res[min_latency_sol_idx]
+        edp_values = [res.total_edp for res in self.res]
 
         result_json = {
+            "other_stats":{
+                "median_latency": statistics.median(total_latencies),
+                "median_energy": statistics.median(total_energies),
+                "median_edp": statistics.median(edp_values),
+            },
             "min_energy": {
                 "index": min_energy_sol_idx,
                 "total_energy": min_energy_sol.total_energy,

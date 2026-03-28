@@ -105,6 +105,7 @@ class WorkloadInfo:
     deadline_mul: float
     frames: int | None
     onnx_filepath: str
+    identifier: str
 
     def __init__(self, accuracy_function: Callable, spec: WorkloadSpec, onnx_filepath: str):
         self.accuracy_function = accuracy_function

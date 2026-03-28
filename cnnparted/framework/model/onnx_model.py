@@ -200,9 +200,9 @@ class OnnxParser:
         "Resize": ResizeParser,
     }
 
-    def __init__(self, run_name: str, network_name: str):
+    def __init__(self, run_name: str, network_name: str, model_fname: str):
         self.network_name = network_name
-        _model_path = os.path.join(MODEL_PATH, run_name, network_name + "_model.onnx")
+        _model_path = os.path.join(MODEL_PATH, run_name, model_fname)
         self.onnx_model: ModelProto = onnx.load(_model_path)
         onnx.checker.check_model(self.onnx_model)
         self.onnx_model: ModelProto = shape_inference.infer_shapes(self.onnx_model)

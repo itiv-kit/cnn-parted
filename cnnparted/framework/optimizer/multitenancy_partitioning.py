@@ -18,6 +18,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 import optuna
+from optuna.samplers.nsgaii import BLXAlphaCrossover, UniformCrossover
 import tqdm
 
 from framework.model.layer_tracker import LayerBindings
@@ -257,7 +258,12 @@ class MultiTenancyProblem():
             case "cmaes":
                 sampler = optuna.samplers.CmaEsSampler()
             case "nsga2":
-                sampler = optuna.samplers.NSGAIISampler(seed=42, population_size=optuna_cfg.population_size, 
+                sampler = optuna.samplers.NSGAIISampler(population_size=optuna_cfg.population_size, 
+                                                        crossover=UniformCrossover(swapping_prob=0.5),
+                                                        mutation_prob=optuna_cfg.mutation_prob, crossover_prob=optuna_cfg.crossover_prob)
+            case "nsga3":
+                sampler = optuna.samplers.NSGAIIISampler(population_size=optuna_cfg.population_size, 
+                                                        crossover=UniformCrossover(swapping_prob=0.5),
                                                         mutation_prob=optuna_cfg.mutation_prob, crossover_prob=optuna_cfg.crossover_prob)
             case "random":
                 sampler = optuna.samplers.RandomSampler()
@@ -278,7 +284,6 @@ class MultiTenancyProblem():
 
         def objective(trial: optuna.trial.Trial):
             bindings: list[int] = []
-
             match binding_granularity:
                 case "tile":
                     for i, (nw, layer, current_binding) in enumerate(work_layer_tracker):
@@ -321,23 +326,35 @@ class MultiTenancyProblem():
                         )
 
         # Start the optimization, setup everything for Optuna run
+        # First phase: Performs a global exploration to find suitable points
+        # Second phase: Perform fine-tuning of the results
         os.makedirs(self.optuna_out_dir, exist_ok=True)
         storage_db = f"sqlite:///{self.optuna_out_dir}/optuna_allocation_opt.db"
         study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize"] + self.fairness_direction, 
                                     study_name="optuna_allocation_opt",) # storage=storage_db
-        
-        start_time_optuna = time.perf_counter()
         study.optimize(objective, n_trials=num_trials, n_jobs=1, show_progress_bar=True)
-        end_time_optuna = time.perf_counter()
-        logger.info(f"Runtime of task binding: {end_time_optuna - start_time_optuna}")
-        
+
+
+        if self.conf.mt.optimizer.n_trials_prostproc > 0:
+            # Second phase: refinement of the found Pareto points
+            # Do a study with more aggressive optimization to perform local search
+            refinement_sampler = optuna.samplers.NSGAIIISampler(
+                population_size=200, # large popuplatio to fill grid faster
+                crossover=UniformCrossover(swapping_prob=0.1), 
+                crossover_prob=0.5,
+                mutation_prob=0.0005,
+                dividing_parameter=10,
+            )
+            study.sampler = refinement_sampler
+            study.optimize(objective, n_trials=self.conf.mt.optimizer.n_trials_prostproc, n_jobs=1, show_progress_bar=True)
+
         # Plotting to make sense of the results
-        #fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["Energy", "Latency"], 
-        #                                                        targets=lambda t: (t.values[0], t.values[1]),
-        #                                                        include_dominated_trials=False)
-        #file_name = "pareto_points_optuna"
-        #fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
-        #fig.write_image(os.path.join(self.plot_dir, file_name+".png"))
+        fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["Energy", "Latency"], 
+                                                                targets=lambda t: (t.values[0], t.values[1]),
+                                                                include_dominated_trials=False)
+        file_name = "pareto_points_optuna"
+        fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
+        fig.write_image(os.path.join(self.plot_dir, file_name+".png"))
 
         for idx, target in [(0, "Energy"), (1, "Latency"), ]:
             fig: go.Figure = optuna.visualization.plot_optimization_history(study, target_name=target, target=lambda t: t.values[idx])
@@ -363,7 +380,6 @@ class MultiTenancyProblem():
         #        results.append( (sched_res.tracker, sched_res.schedule) )
         #    else:
         #        invalid_results.append( (sched_res.tracker, sched_res.schedule) )
-        #breakpoint()
         
         # #########################################################
         # ------------------ WIP Ray integration ------------------
@@ -587,7 +603,7 @@ class MultiTenancyProblem():
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
-            latencies[binding] += layer_data.latency * self.models[nw].frames
+            latencies[binding] += layer_data.latency #* self.models[nw].frames
         lats = list(latencies.values())
         
         x = sum(lats)**2
@@ -600,7 +616,7 @@ class MultiTenancyProblem():
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
-            latencies[binding] += layer_data.latency * self.models[nw].frames
+            latencies[binding] += layer_data.latency #* self.models[nw].frames
         lats = list(latencies.values())
         mean = (1/len(lats)) * sum(lats)
         var = (1/len(lats)) * sum( (lat - mean)**2 for lat in latencies) 
@@ -611,7 +627,7 @@ class MultiTenancyProblem():
         latencies  = {id: 0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
-            latencies[binding] += layer_data.latency * self.models[nw].frames
+            latencies[binding] += layer_data.latency #* self.models[nw].frames
         lats = list(latencies.values())
 
         mean = (1/len(lats)) * sum(lats)
@@ -625,7 +641,7 @@ class MultiTenancyProblem():
         latencies  = {id: 0.0 for id in self.conf.system.platform_ids}
         for nw, layer, binding in tracker:
             layer_data = self.node_stats[binding].designs[0].networks[nw].layers[layer]
-            latencies[binding] += layer_data.latency * self.models[nw].frames
+            latencies[binding] += layer_data.latency #* self.models[nw].frames
         lats = list(latencies.values())
 
         return max(lats) - min(lats)

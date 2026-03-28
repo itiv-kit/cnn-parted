@@ -12,7 +12,6 @@ from framework.helpers.config_helper import ConfigHelper
 class LayerTiling:
     def __init__(self, config: ConfigHelper):
         # Tiling will insert new compute nodes into the graph and remove old ones with smaller size
-        # Or maybe it should just update the layer information? And make a note about tiling?
 
         # Map network to num of tiles, these are "outer" tiles
         self.tiling = {wl.name: wl.tiling for wl in config.workload.workload_spec}
@@ -47,6 +46,10 @@ class LayerTiling:
             layers_to_remove = []
             layers_to_add: list[tuple[ComputationLayer, list[ComputationLayer], list[ComputationLayer]]] = []
             logger.debug(f"Begin tiling for network {network}")
+
+            # map original layer to all generated tiles, needed to correctly map
+            # data dependencies after tiling has been performed
+            generated_tiles_of_layer: dict[ComputationLayer, list[ComputationLayer]] = {}
 
             for layer in model.nodes:
                 if not isinstance(layer, ComputationLayer):
@@ -95,6 +98,7 @@ class LayerTiling:
                 # If tiling was performed for the current layer we have to remove it from
                 # the graph and add the newly generated tiles to it
                 if layer_was_tiled:
+                    generated_tiles_of_layer[layer] = final_generated_tiles
                     layers_to_remove.append(layer)
 
                     # Add all new tiles to the graph
@@ -108,12 +112,27 @@ class LayerTiling:
                         layers_to_add.append((tile, preds, succs))            
             
             # Add new layer to the graph and connect it
+            # We do this in two passes to correctly connect generated tiles
             for new_layer, preds, succs in layers_to_add:
                 model.add_layer(new_layer)
+
+            for new_layer, preds, succs in layers_to_add:
                 for pred in preds:
-                    model.add_edge(pred, new_layer)
+                    if pred in generated_tiles_of_layer:
+                        # The predecessor has been tiled and will be removed from the network.
+                        # Instead of connecting the predecessor, connect with all generated tiles
+                        for tiled_pred in generated_tiles_of_layer[pred]:
+                            model.add_edge(tiled_pred, new_layer)
+                    else:
+                        model.add_edge(pred, new_layer)
                 for succ in succs:
-                    model.add_edge(new_layer, succ)
+                    if succ in generated_tiles_of_layer:
+                        # The successor has been tiled and will be removed from the network
+                        # Instead of connecting the successor, connect with all generated tiles
+                        for tiled_succ in generated_tiles_of_layer[succ]:
+                            model.add_edge(new_layer, tiled_succ)
+                    else:
+                        model.add_edge(new_layer, succ)
 
             # The newly generated tiles have been inserted into the graph, now we delete
             # the untiled version of the layer
