@@ -16,6 +16,7 @@ class ExportMultiTenancyResults(Stage):
     def _take_artifacts(self, artifacts: Artifacts):
         self.node_results = artifacts.get_oneof_stage_result((NodeEvaluation, DesignPartitioningOptimization), "node_stats")
         self.mt_solutions = artifacts.multitenancy_optimization.solutions
+        self.mt_solutions_invalid = artifacts.multitenancy_optimization.invalid_solutions
         self.config = artifacts.config
         self.run_name = artifacts.config.args.run_name
     
@@ -27,6 +28,12 @@ class ExportMultiTenancyResults(Stage):
         # Store results as json file
         out_dir = os.path.join(self.config.general.work_dir, self.run_name + "_" + "multitenancy_solution.json")
         mt_sol.to_json(out_path=out_dir)
+
+        if artifacts.config.mt.store_invalid_solutions and len(self.mt_solutions_invalid) > 0:
+            # Also store invalid schedules
+            mt_sol_invalid = MultitenancySolution(node_stats=self.node_results, mt_solutions=self.mt_solutions_invalid, config=self.config)
+            out_dir_invalid = os.path.join(self.config.general.work_dir, self.run_name + "_" + "multitenancy_solution_invalid.json")
+            mt_sol_invalid.to_json(out_path=out_dir_invalid)
 
     
     def _update_artifacts(self, artifacts):

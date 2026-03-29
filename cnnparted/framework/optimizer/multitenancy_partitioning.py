@@ -46,8 +46,8 @@ class MultiTenancyPartitioning(Optimizer):
 
     def optimize(self):
         algorithm = MultiTenancyProblem(self.work_dir, self.system_result, self.ga, self.conf, self.noc)
-        solutions = algorithm.minimize()
-        return solutions
+        solutions, invalid_solutions = algorithm.minimize()
+        return solutions, invalid_solutions
 
 
 @dataclass
@@ -68,7 +68,7 @@ def _scheduling_wrapper(trial: optuna.Trial, models: dict[str, OnnxModel], sched
     are_constraints_fulfilled = validate_schedule(system_schedule, tracker, models)
     return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
 
-@ray.remote
+@ray.remote(max_calls=20)
 def scheduling_worker(trial, models_id, node_stats_id, noc_id, priority_id, scheduling_algorithm):
     """
     Worker function: Executes the scheduling and validation for one trial.
@@ -110,21 +110,31 @@ class MultiTenancyProblem():
                 self.scheduling_algorithm = list_scheduling
             case "multi_queue":
                 self.scheduling_algorithm = multi_queue_scheduling
+        
+        # Helper to plot allocation results
+        self.cost_terms = ["Energy", "Latency"]
+
+        if self.conf.mt.enable_scheduling_proxy:
+            self.cost_terms.append("Scheduling")
             
         # Determine which scoring metric is used to measure fairness of latency allocation
         match self.conf.mt.fairness_score:
             case "gini":
                 self.score_latency_fairness = self._score_latency_fairness_gini
                 self.fairness_direction = ["minimize"]
+                self.cost_terms.append("Gini")
             case "jain":
                 self.score_latency_fairness = self._score_latency_fairness_jain
                 self.fairness_direction = ["maximize"]
+                self.cost_terms.append("Jain")
             case "max_min_space":
                 self.score_latency_fairness = self._score_latency_fairness_max_min_space
                 self.fairness_direction = ["minimize"]
+                self.cost_terms.append("MaxMin")
             case "std_dev":
                 self.score_latency_fairness = self._score_latency_fairness_std_dev
                 self.fairness_direction = ["minimize"]
+                self.cost_terms.append("StdDev")
             case "no":
                 self.score_latency_fairness = None
                 self.fairness_direction = []
@@ -243,7 +253,7 @@ class MultiTenancyProblem():
         return [result]
 
     
-    def _optuna_optimizer(self) -> list[tuple[LayerBindings, SystemSchedule]]:
+    def _optuna_optimizer(self) -> tuple[list[tuple[LayerBindings, SystemSchedule]], list[tuple[LayerBindings, SystemSchedule]]]:
         """Optimize the assigment of layers to platforms a specified Optuna sampler.
         This aims to optize energy and latency as a multi-objective optimization.
         """
@@ -313,27 +323,36 @@ class MultiTenancyProblem():
             # Add information to be later retrieved
             trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
 
+            # Score this allocation
+            cost_term = [
+                self._score_binding_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker),
+                self._score_binding_latency(work_layer_tracker),
+            ]
+
+            if self.conf.mt.enable_scheduling_proxy:
+                cost_term.append(self._score_scheduling_proxy(work_layer_tracker, self.models))
+
             if self.score_latency_fairness is not None:
-                return (
-                        self._score_binding_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker),
-                        self._score_binding_latency(work_layer_tracker),
-                        self.score_latency_fairness(work_layer_tracker),
-                        )
-            else:
-                return (
-                        self._score_binding_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker),
-                        self._score_binding_latency(work_layer_tracker),
-                        )
+                cost_term.append(self.score_latency_fairness(work_layer_tracker))
+
+            return cost_term
 
         # Start the optimization, setup everything for Optuna run
         # First phase: Performs a global exploration to find suitable points
         # Second phase: Perform fine-tuning of the results
         os.makedirs(self.optuna_out_dir, exist_ok=True)
         storage_db = f"sqlite:///{self.optuna_out_dir}/optuna_allocation_opt.db"
-        study = optuna.create_study(sampler=sampler, directions=["minimize", "minimize"] + self.fairness_direction, 
+
+        # Setup cost optimization directions based on the provided config
+        opt_direction = ["minimize", "minimize"] #energy, latency always exist
+        if self.conf.mt.enable_scheduling_proxy:
+            opt_direction = opt_direction + ["minimize"]
+        if self.score_latency_fairness is not None:
+            opt_direction = opt_direction + self.fairness_direction
+
+        study = optuna.create_study(sampler=sampler, directions=opt_direction, 
                                     study_name="optuna_allocation_opt",) # storage=storage_db
         study.optimize(objective, n_trials=num_trials, n_jobs=1, show_progress_bar=True)
-
 
         if self.conf.mt.optimizer.n_trials_prostproc > 0:
             # Second phase: refinement of the found Pareto points
@@ -356,7 +375,7 @@ class MultiTenancyProblem():
         fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
         fig.write_image(os.path.join(self.plot_dir, file_name+".png"))
 
-        for idx, target in [(0, "Energy"), (1, "Latency"), ]:
+        for idx, target in enumerate(self.cost_terms):
             fig: go.Figure = optuna.visualization.plot_optimization_history(study, target_name=target, target=lambda t: t.values[idx])
             file_name = f"history_{target.lower()}_optuna"
             fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
@@ -484,7 +503,7 @@ class MultiTenancyProblem():
             if self.models[nw].has_constraints:
                 logger.info(f"End-frame success for {nw} in {stats.end_success}/{num_sched} cases ({stats.end_success/(num_sched)*100:.2f}%)")
 
-        return results
+        return results, invalid_results
     
     def minimize(self):
         # Distribute workload between platforms
@@ -492,29 +511,32 @@ class MultiTenancyProblem():
 
         match self.conf.mt.algorithm:
             case "optuna":
-                solutions = self._optuna_optimizer()
+                solutions, invalid_solutions = self._optuna_optimizer()
             case "sa":
                 solutions =  self._simulated_annealing()
             case "herald":
                 solutions = self._herald_like()
 
-        # Log some statistics
-        system_runtimes: list[float] = []
-        system_energy: list[float] = []
-        for bindings, schedule in solutions:
-            system_runtimes.append( max([sched.cur_time for sched in schedule.node_schedules.values()]) )
-            system_energy.append(schedule.get_system_energy(self.node_stats))
-        
-        min_runtime_idx = system_runtimes.index(min(system_runtimes))
-        min_runtime_latency = system_runtimes[min_runtime_idx]
-        min_runtime_energy = system_energy[min_runtime_idx]
-        min_energy_idx = system_energy.index(min(system_energy))
-        min_energy_latency = system_runtimes[min_energy_idx]
-        min_energy_energy = system_energy[min_energy_idx]
-        logger.info(f"Configuration with minimum system runtime (ID: {min_runtime_idx}):\n\tRuntime: {min_runtime_latency}\n\tEnergy: {min_runtime_energy}")
-        logger.info(f"Configuration with minimum system energy (ID: {min_energy_idx}):\n\tRuntime: {min_energy_latency}\n\tEnergy: {min_energy_energy}")
+        if len(solutions) > 0:
+            # Log some statistics
+            system_runtimes: list[float] = []
+            system_energy: list[float] = []
+            for bindings, schedule in solutions:
+                system_runtimes.append( max([sched.cur_time for sched in schedule.node_schedules.values()]) )
+                system_energy.append(schedule.get_system_energy(self.node_stats))
+            
+            min_runtime_idx = system_runtimes.index(min(system_runtimes))
+            min_runtime_latency = system_runtimes[min_runtime_idx]
+            min_runtime_energy = system_energy[min_runtime_idx]
+            min_energy_idx = system_energy.index(min(system_energy))
+            min_energy_latency = system_runtimes[min_energy_idx]
+            min_energy_energy = system_energy[min_energy_idx]
+            logger.info(f"Configuration with minimum system runtime (ID: {min_runtime_idx}):\n\tRuntime: {min_runtime_latency}\n\tEnergy: {min_runtime_energy}")
+            logger.info(f"Configuration with minimum system energy (ID: {min_energy_idx}):\n\tRuntime: {min_energy_latency}\n\tEnergy: {min_energy_energy}")
+        else:
+            logger.warning("No valid solutions for multi-tenancy scheduling were found")
 
-        return solutions
+        return solutions, invalid_solutions
 
     def _score_edp(self, tracker: LayerBindings) -> float:
         # For each layer we want to find the most efficient platform
@@ -645,6 +667,51 @@ class MultiTenancyProblem():
         lats = list(latencies.values())
 
         return max(lats) - min(lats)
+    
+    def _score_scheduling_proxy(self, tracker: LayerBindings, models: dict[str, OnnxModel]):
+        # Determine when the last accelerator finishes
+        latest_platform_finish_time = self._score_static_max_latency(tracker)
+
+        # Determine when the last network finishes
+        network_finish_time: dict[str, float] = {}
+        for network, model in models.items():
+            layer_finish_time: dict[str, float] = {layer.layer_name: 0 for layer in model.nodes}
+            for layer in model.nodes:
+
+                # Set the base value for the layer finish time: the time to process it
+                if isinstance(layer, ComputationLayer):
+                    # assumption that only computation layers have an execution time
+                    layer_binding = tracker.get_binding(network, layer.layer_name)
+                    layer_finish_time[layer.layer_name] = self.node_stats[layer_binding].design.networks[network].layers[layer.layer_name].latency
+                else:
+                    layer_finish_time[layer.layer_name] = 0
+
+                pred_latencies = []
+                for pred in model.predecessors(layer):
+                    pred_latencies.append(layer_finish_time[pred.layer_name])
+
+                if len(pred_latencies) > 0:
+                    layer_finish_time[layer.layer_name] += max(pred_latencies)
+
+            network_finish_time[network] = max(layer_finish_time.values())
+        
+        # The network that takes longest to execute
+        latest_network_finish_time = max(network_finish_time.values())
+
+        return max(latest_platform_finish_time, latest_network_finish_time)
+
+    def _score_task_clumping(self, tracker: LayerBindings):
+        task_counts = {}
+        for nw, layer, binding in tracker:
+            if binding not in task_counts:
+                task_counts[binding] = 0
+            task_counts[binding] += 1
+        
+        square_counts = [task_count**2 for task_count in task_counts.values()]
+        task_density_cost = sum(square_counts)
+        return task_density_cost
+
+
 
     def _calc_cost(self, tracker: LayerBindings, schedules: SystemSchedule) -> float:
         edp_cost = self._score_edp(tracker)

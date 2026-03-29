@@ -22,9 +22,9 @@ class MultiTenancyOptimization(Stage):
         self._take_artifacts(artifacts)
 
         mt_optimizer = MultiTenancyPartitioning(self.work_dir, self.node_results, self.ga, self.config, self.noc)
-        solutions = mt_optimizer.optimize()
+        solutions, invalid_solutions = mt_optimizer.optimize()
 
-        self._update_artifacts(artifacts, solutions)
+        self._update_artifacts(artifacts, solutions, invalid_solutions)
     
     def _take_artifacts(self, artifacts: Artifacts):
         self.ga = artifacts.graph_analysis.ga
@@ -33,10 +33,12 @@ class MultiTenancyOptimization(Stage):
         self.config = artifacts.config
         self.noc = artifacts.system_parser.noc
     
-    def _update_artifacts(self, artifacts: Artifacts, solutions):
+    def _update_artifacts(self, artifacts: Artifacts, solutions, invalid_solutions):
         artifacts.multitenancy_optimization.solutions = solutions
+        artifacts.multitenancy_optimization.invalid_solutions = invalid_solutions
 
 
 @dataclass
 class MultiTenancyOptimizationArtifacts():
     solutions: list[tuple[LayerBindings, SystemSchedule]] = None
+    invalid_solutions: list[tuple[LayerBindings, SystemSchedule]] = None

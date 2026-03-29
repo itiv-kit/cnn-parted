@@ -97,8 +97,10 @@ class MultiTenancyStageConfig:
     scheduling: Literal["list", "multi_queue"]
     scheduling_priority: SchedulingPriority
     binding_granularity: Literal["tile", "layer", "network"]
-    schedule_all_bindings: bool
+    enable_scheduling_proxy: bool
     num_jobs: int
+    schedule_all_bindings: bool
+    store_invalid_solutions: bool
 
     def __init__(self, cfg: dict):
         self.algorithm = cfg["algorithm"]
@@ -106,8 +108,10 @@ class MultiTenancyStageConfig:
         self.scheduling_priority = SchedulingPriority[cfg["scheduling_priority"].upper()]
         self.binding_granularity = cfg["binding_granularity"]
         self.fairness_score = cfg["fairness_score"]
+        self.enable_scheduling_proxy = cfg.get("enable_scheduling_proxy", True)
         self.num_jobs = cfg["num_jobs"]
         self.schedule_all_bindings = cfg.get("schedule_all_bindings", False)
+        self.store_invalid_solutions = cfg.get("store_invalid_solutions", False)
 
         match self.algorithm:
             case "sa":
