@@ -23,11 +23,11 @@ class ExportMultiTenancyResults(Stage):
     def run(self, artifacts: Artifacts):
         logger.info("Exporting multi-tenancy results")
         self._take_artifacts(artifacts)
-        mt_sol = MultitenancySolution(node_stats=self.node_results, mt_solutions=self.mt_solutions, config=self.config)
-        
-        # Store results as json file
-        out_dir = os.path.join(self.config.general.work_dir, self.run_name + "_" + "multitenancy_solution.json")
-        mt_sol.to_json(out_path=out_dir)
+
+        if len(self.mt_solutions) > 0:
+            mt_sol = MultitenancySolution(node_stats=self.node_results, mt_solutions=self.mt_solutions, config=self.config)
+            out_dir = os.path.join(self.config.general.work_dir, self.run_name + "_" + "multitenancy_solution.json")
+            mt_sol.to_json(out_path=out_dir)
 
         if artifacts.config.mt.store_invalid_solutions and len(self.mt_solutions_invalid) > 0:
             # Also store invalid schedules

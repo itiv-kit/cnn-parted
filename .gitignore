@@ -230,4 +230,7 @@ cython_debug/
 *.png
 *.jpg
 
+# Custom
+eval_scripts*
+
 
