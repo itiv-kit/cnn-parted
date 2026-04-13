@@ -19,7 +19,8 @@ from framework.model.model import ConvParameters, GemmParameters
 from framework.model.onnx_model import OnnxModel
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
-from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
+#from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
+from .helpers import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
 from framework.helpers.visualizer import plotMetricPerConfigPerLayer
@@ -32,7 +33,8 @@ yaml = YAML(typ="rt")
 class Timeloop(NodeEvaluator):
     # Output file names.
     out_prefix = "timeloop-mapper."
-    exec_path = os.path.join(ROOT_DIR, 'cnnparted', 'tools', 'timeloop', 'build', 'timeloop-mapper')
+    #exec_path = os.path.join(ROOT_DIR, 'cnnparted', 'tools', 'timeloop', 'build', 'timeloop-mapper')
+    exec_path = os.path.join(ROOT_DIR, 'cnnparted', 'tools', 'accelergy-timeloop-infrastructure', 'src', 'timeloop', 'build', 'timeloop-mapper')
     configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
     fname_result = "tl_layers"
 

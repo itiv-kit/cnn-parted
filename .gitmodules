@@ -1,27 +1,3 @@
-[submodule "tools/timeloop"]
-	path = cnnparted/tools/timeloop
-	url = https://github.com/NVlabs/timeloop.git
-    ignore = dirty
-[submodule "tools/accelergy"]
-	path = cnnparted/tools/accelergy
-	url = https://github.com/Accelergy-Project/accelergy.git
-    ignore = dirty
-[submodule "tools/accelergy-aladdin-plug-in"]
-	path = cnnparted/tools/accelergy-aladdin-plug-in
-	url = https://github.com/Accelergy-Project/accelergy-aladdin-plug-in.git
-	ignore = dirty
-[submodule "tools/accelergy-cacti-plug-in"]
-	path = cnnparted/tools/accelergy-cacti-plug-in
-	url = https://github.com/Accelergy-Project/accelergy-cacti-plug-in.git
-	ignore = dirty
-[submodule "tools/accelergy-table-based-plug-ins"]
-	path = cnnparted/tools/accelergy-table-based-plug-ins
-	url = https://github.com/Accelergy-Project/accelergy-table-based-plug-ins.git
-	ignore = dirty
-[submodule "tools/cacti"]
-	path = cnnparted/tools/cacti
-	url = https://github.com/HewlettPackard/cacti.git
-	ignore = dirty
 [submodule "tools/dnn-model-exploration"]
 	path = cnnparted/tools/dnn-model-exploration
 	url = https://github.com/itiv-kit/dnn-model-exploration.git
@@ -41,3 +17,6 @@
 [submodule "tools/zigzag"]
 	path = cnnparted/tools/zigzag
 	url = https://github.com/KULeuven-MICAS/zigzag.git
+[submodule "cnnparted/tools/accelergy-timeloop-infrastructure"]
+	path = cnnparted/tools/accelergy-timeloop-infrastructure
+	url = https://github.com/Accelergy-Project/accelergy-timeloop-infrastructure.git

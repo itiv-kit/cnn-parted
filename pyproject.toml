@@ -1,9 +1,20 @@
 [project]
 name = "cnn-parted"
 version = "0.1.0"
-description = "Add your description here"
+description = "CNN inference hardware accelerator"
 readme = "README.md"
 requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "Fabian Kreß", email = "fabian.kress@kit.edu" }
+]
+keywords = ["cnn", "inference", "hardware", "accelerator"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    'License :: OSI Approved :: MIT License',
+]
+
 dependencies = [
     "absl-py>=2.3.0",
     "cerberus>=1.3.8",
@@ -25,6 +36,7 @@ dependencies = [
     "prettytable>=3.16.0",
     "pydot>=4.0.1",
     "pymoo>=0.6.1.5",
+    "pytorch-quantization==2.1.3",
     "pyyaml>=6.0.2",
     "ray>=2.54.0",
     "ruamel-yaml>=0.18.14",
@@ -41,3 +53,22 @@ dependencies = [
     "webdataset>=1.0.2",
     "wheel>=0.45.1",
 ]
+
+[tool.setuptools]
+include-package-data = true
+packages = ["cnnparted"]
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com"
+explicit = true
+
+[tool.uv.sources]
+pytorch-quantization = { index = "nvidia" }
+
+#[tool.uv]
+##no-build-isolation = true
+
+[tool.uv.extra-build-dependencies]
+multiprocessing-on-dill = ["setuptools"]
+visdom = ["pkg_resources", "setuptools"]

@@ -3,7 +3,7 @@ compound_components:
   classes:
   - name: smartbuffer_SRAM
     attributes:
-      technology: 45nm
+      technology: "45nm"
       memory_depth: 12
       memory_width: 16
       n_rdwr_ports: 2
@@ -22,7 +22,7 @@ compound_components:
         class: intadder
         attributes:
           technology: technology
-          width: log(memory_depth)
+          width: ceil(log2(memory_depth))
     actions:
       - name: write
         arguments:
@@ -35,12 +35,17 @@ compound_components:
                 arguments:
                   data_delta: data_delta
                   address_delta: address_delta
+                  action_latency_cycles: 1
           - name: address_generators[0]
             actions:
               - name: count
+                arguments:
+                  action_latency_cycles: 1
           - name: address_generators[1]
             actions:
               - name: idle
+                arguments:
+                  action_latency_cycles: 1
       - name: read
         arguments:
           data_delta: 0..1
@@ -52,23 +57,32 @@ compound_components:
                 arguments:
                   data_delta: data_delta
                   address_delta: address_delta
+                  action_latency_cycles: 1
           - name: address_generators[1]
             actions:
               - name: add
+                arguments:
+                  action_latency_cycles: 1
           - name: address_generators[0]
             actions:
               - name: idle
+                arguments:
+                  action_latency_cycles: 1
       - name: idle
         subcomponents:
           - name: storage
             actions:
               - name: idle
+                arguments:
+                  action_latency_cycles: 1
           - name: address_generators[0..1]
             actions:
               - name: idle
+                arguments:
+                  action_latency_cycles: 1
   - name: smartbuffer_RF
     attributes:
-      technology: 45nm
+      technology: "45nm"
       memory_depth: 12
       memory_width: 16
       n_rdwr_ports: 2
@@ -87,7 +101,7 @@ compound_components:
         class: intadder
         attributes:
           technology: technology
-          width: log(memory_depth)
+          width: ceil(log2(memory_depth))
     actions:
       - name: write
         arguments:
@@ -100,12 +114,17 @@ compound_components:
                 arguments:
                   data_delta: data_delta
                   address_delta: address_delta
+                  action_latency_cycles: 1
           - name: address_generators[0]
             actions:
               - name: add
+                arguments:
+                  action_latency_cycles: 1
           - name: address_generators[1]
             actions:
               - name: idle
+                arguments:
+                  action_latency_cycles: 1
       - name: read
         arguments:
           data_delta: 0..1
@@ -117,20 +136,119 @@ compound_components:
                 arguments:
                   data_delta: data_delta
                   address_delta: address_delta
+                  action_latency_cycles: 1
           - name: address_generators[1]
             actions:
               - name: add
+                arguments:
+                  action_latency_cycles: 1
           - name: address_generators[0]
             actions:
               - name: idle
+                arguments:
+                  action_latency_cycles: 1
       - name: idle
         subcomponents:
           - name: storage
             actions:
               - name: idle
+                arguments:
+                  action_latency_cycles: 1
           - name: address_generators[0..1]
             actions:
               - name: idle
+                arguments:
+                  action_latency_cycles: 1
+  - name: lmac
+    attributes:
+      technology: "45nm"
+      width: 8
+    subcomponents:
+      - name: cunit
+        class: intmac 
+        attributes:
+          technology: technology
+          width: width
+    actions:
+      - name: idle
+        subcomponents:
+          - name: cunit
+            actions:
+              - name: leak
+                arguments:
+                  action_latency_cycles: 1
+      - name: compute
+        subcomponents:
+          - name: cunit
+            actions:
+              - name: access
+                arguments:
+                  action_latency_cycles: 1
+  - name: DRAM_wrapper
+    attributes:
+      type: "LPDDR4"
+      width: 16
+      block-size: 8
+      word-bits: 8
+    subcomponents:
+      - name: dram
+        class: DRAM 
+        attributes:
+          type: type
+          width: width
+    actions:
+      - name: read
+        subcomponents:
+          - name: dram
+            actions:
+              - name: read
+      - name: write
+        subcomponents:
+          - name: dram 
+            actions:
+              - name: write
+      - name: idle
+        subcomponents:
+          - name: dram
+            actions:
+              - name: idle
+  - name: regfile_storage
+    attributes:
+      technology: 45nm
+      latency: 1ns
+      width: 16
+      depth: 1
+    subcomponents:
+      - name: storage
+        class: reg
+        attributes:
+          technology: technology
+          latency: latency
+          width : width
+          depth: depth
+    actions:
+      - name: write
+        subcomponents:
+          - name: storage
+            actions:
+              - name: access
+                arguments:
+                  action_latency_cycles: 1
+      - name: read
+        subcomponents:
+          - name: storage
+            actions:
+              - name: access
+                arguments:
+                  action_latency_cycles: 1
+      - name: access
+        subcomponents:
+          - name: storage
+            actions:
+              - name: access
+                arguments:
+                  action_latency_cycles: 1
+
 architecture:
   # ============================================================
   # Architecture Description
@@ -140,16 +258,16 @@ architecture:
     - name: system
       local:
         - name: DRAM
-          class: DRAM
+          class: DRAM_wrapper
           attributes:
-            type: LPDDR4
+            type: "LPDDR4"
             width: 64
             block-size: 4
             word-bits: 16
       subtree:
         - name: eyeriss
           attributes:
-            technology: 45nm
+            technology: "45nm"
           local:
             - name: shared_glb
               class: smartbuffer_SRAM
@@ -162,7 +280,7 @@ architecture:
                 read_bandwidth: 16
                 write_bandwidth: 16
             - name: DummyBuffer[0..13] # for better mapping
-              class: regfile
+              class: regfile_storage
               attributes:
                 depth: 16
                 width: 16
@@ -204,7 +322,7 @@ architecture:
                   read_bandwidth: 2
                   write_bandwidth: 2
               - name: mac
-                class: intmac
+                class: lmac 
                 attributes:
-                  datawidth: 16
+                  width: 16
                   meshX : 14
