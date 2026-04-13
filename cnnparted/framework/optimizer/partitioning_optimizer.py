@@ -12,6 +12,7 @@ from pymoo.termination import get_termination
 
 from joblib import Parallel, delayed
 
+from framework.model.layers.rename_layer import OutputLayer
 from framework.optimizer.optimizer import Optimizer
 from framework.optimizer.partitioning_problem import PartitioningProblem
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
@@ -38,9 +39,10 @@ class PartitioningOptimizer(Optimizer):
         self.layer_dict = {}
         for layer in self.schedules[0]:
             self.layer_dict[layer] = {}
+            model_layer = ga.models[network].node_by_layer_name(str(layer))
             self.layer_dict[layer]["predecessors"] = [layer.layer_name for layer in ga.models[network].predecessors_by_layer_name(layer)]
             self.layer_dict[layer]["successors"] = [layer.layer_name for layer in ga.models[network].successors_by_layer_name(layer)]
-            if layer != "output":   
+            if not isinstance(model_layer, OutputLayer):
                 self.layer_dict[layer]["output_size"] = [ga.models[network].node_by_layer_name(layer).output.shape]
             else:
                 self.layer_dict[layer]["output_size"] = [ga.models[network].node_by_layer_name(layer).inputs[0].shape]

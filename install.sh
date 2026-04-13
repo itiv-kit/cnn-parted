@@ -1,18 +1,49 @@
+export UV_EXTRA_INDEX_URL="https://pypi.nvidia.com"
+
+export ROOT_DIR=$(pwd)
+export TIMELOOP_INCLUDE_PATH=$ROOT_DIR/cnnparted/tools/accelergy-timeloop-infrastructure/src/timeloop/include
+export TIMELOOP_LIB_PATH=$ROOT_DIR/cnnparted/tools/accelergy-timeloop-infrastructure/src/timeloop/lib
+
+# Install Python dependencies with uv and from submodules
+echo "--- Starting UV Sync ---"
+uv sync --verbose
+uv run plotly_get_chrome -y
+echo "--- UV Sync Complete ---"
+source env/setupEnv.sh 
+
+echo "Syncing git submodules"
 git config --global url."https://github.com/".insteadOf "git@github.com:"
 git submodule sync --recursive
 git submodule update --init --recursive
 
-# Install Python dependencies with uv and from submodules
-uv sync
-source env/setupEnv.sh 
-uv pip install --no-cache-dir --index-url https://pypi.nvidia.com pytorch-quantization
-git -C cnnparted/tools/accelergy-table-based-plug-ins/ apply  ../accelergy_table_plugins.patch
-git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then uv pip install .; elif [ -f setup.py ]; then uv pip install -e .; fi'
-git submodule foreach --recursive 'if [ -f requirements.txt ]; then uv pip install -r requirements.txt; fi'
+echo "Installing Timeloop and Accelergy"
+## Patch Timeloop sconscript
+TIMELOOP_SCONSTRUCT="cnnparted/tools/accelergy-timeloop-infrastructure/src/timeloop/SConstruct"
+# Inject the flag to ignore the ISL header warnings
+# We use 'a' (append) to add the line after the Environment initialization
+sed -i "/env = Environment(ENV = os.environ)/a \env.Append(CXXFLAGS=['-Wno-missing-field-initializers'])" "$TIMELOOP_SCONSTRUCT"
 
-
-# Apply patches to MNSIM, install Cacti and Timeloop
 source cnnparted/tools/install_tools.sh
-#sudo ln -s /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so #This step might be needed for Timeloop installation
-source cnnparted/tools/setupTimeloop.sh
+make -C cnnparted/tools local_install_accelergy
+make -C cnnparted/tools local_install_timeloop
+
+echo "Running installation of submodules"
+
+# Install from setup.py file,
+git submodule foreach --recursive '
+    if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then 
+        uv pip install --no-build-isolation .; 
+    elif [ -f setup.py ]; then 
+        uv pip install --no-build-isolation -e .; 
+    fi
+'
+make -C cnnparted/tools local_install_timeloop_python
+
+# Install from requirements.txt
+git submodule foreach --recursive '
+    if [ -f requirements.txt ]; then 
+        uv pip install --no-build-isolation -r requirements.txt
+    fi
+'
+
 uv pip install -e .

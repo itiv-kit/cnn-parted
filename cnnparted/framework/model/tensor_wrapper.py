@@ -13,7 +13,6 @@ class OperandKind(Enum):
 
 class TensorWrapper(TensorLike):
     def __init__(self, onnx_tensor: OnnxTensor, loop_dims: list[ConcreteLoopIterator], operand: OperandKind, sub_id: int = 0):
-        #super().__init__(name=onnx_tensor.name, elem_type_map=onnx_tensor.elem_type_map, kind=onnx_tensor.kind, shape=onnx_tensor.shape)
         super().__init__(name=onnx_tensor.name, kind=onnx_tensor.kind, _shape = onnx_tensor.shape)
         self._onnx_tensor = onnx_tensor
         self.loop_dims: list[ConcreteLoopIterator] = loop_dims

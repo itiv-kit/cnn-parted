@@ -1,6 +1,24 @@
 compound_components:
   version: 0.3
   classes:
+    - name: lmac
+      attributes:
+        technology: 32nm
+        datawidth: 16
+      subcomponents:
+        - name: intmac
+          class: intmac
+          attributes:
+            technology: technology
+            width: datawidth
+      actions:
+        - name: compute
+          subcomponents:
+            - name: intmac
+              actions:
+                - name: mac_random
+                  arguments:
+                    action_latency_cycles: 1
     - name: reg_storage
       attributes:
         technology: 45nm
@@ -13,13 +31,15 @@ compound_components:
           attributes:
             technology: technology
             latency: latency
-            datawidth : width
+            width : width
       actions:
         - name: access
           subcomponents:
             - name: storage
               actions:
                 - name: access
+                  arguments:
+                    action_latency_cycles: 1
     - name: smartbuffer_RF
       attributes:
         technology: 45nm
@@ -41,7 +61,7 @@ compound_components:
           class: intadder
           attributes:
             technology: technology
-            width: log(memory_depth)
+            width: ceil(log2(memory_depth))
       actions:
         - name: write
           arguments:
@@ -54,12 +74,17 @@ compound_components:
                   arguments:
                     data_delta: data_delta
                     address_delta: address_delta
+                    action_latency_cycles: 1
             - name: address_generators[0]
               actions:
                 - name: add
+                  arguments:
+                    action_latency_cycles: 1
             - name: address_generators[1]
               actions:
                 - name: idle
+                  arguments:
+                    action_latency_cycles: 1
         - name: read
           arguments:
             data_delta: 0..1
@@ -71,21 +96,29 @@ compound_components:
                   arguments:
                     data_delta: data_delta
                     address_delta: address_delta
+                    action_latency_cycles: 1
             - name: address_generators[1]
               actions:
                 - name: add
+                  arguments:
+                    action_latency_cycles: 1
             - name: address_generators[0]
               actions:
                 - name: idle
+                  arguments:
+                    action_latency_cycles: 1
         - name: idle
           subcomponents:
             - name: storage
               actions:
                 - name: idle
+                  arguments:
+                    action_latency_cycles: 1
             - name: address_generators[0..1]
               actions:
                 - name: idle
-
+                  arguments:
+                    action_latency_cycles: 1
     - name: smartbuffer_SRAM
       attributes:
         technology: 45nm
@@ -107,7 +140,7 @@ compound_components:
           class: intadder
           attributes:
             technology: technology
-            width: log(memory_depth)
+            width: ceil(log2(memory_depth))
       actions:
         - name: write
           arguments:
@@ -120,12 +153,17 @@ compound_components:
                   arguments:
                     data_delta: data_delta
                     address_delta: address_delta
+                    action_latency_cycles: 1
             - name: address_generators[0]
               actions:
                 - name: count
+                  arguments:
+                    action_latency_cycles: 1
             - name: address_generators[1]
               actions:
                 - name: idle
+                  arguments:
+                    action_latency_cycles: 1
         - name: read
           arguments:
             data_delta: 0..1
@@ -137,18 +175,55 @@ compound_components:
                   arguments:
                     data_delta: data_delta
                     address_delta: address_delta
+                    action_latency_cycles: 1
             - name: address_generators[1]
               actions:
                 - name: add
+                  arguments:
+                    action_latency_cycles: 1
             - name: address_generators[0]
               actions:
                 - name: idle
+                  arguments:
+                    action_latency_cycles: 1
         - name: idle
           subcomponents:
             - name: storage
               actions:
                 - name: idle
+                  arguments:
+                    action_latency_cycles: 1
             - name: address_generators[0..1]
+              actions:
+                - name: idle
+                  arguments:
+                    action_latency_cycles: 1
+    - name: DRAM_wrapper
+      attributes:
+        type: "LPDDR4"
+        width: 16
+        block-size: 8
+        word-bits: 8
+      subcomponents:
+        - name: dram
+          class: DRAM 
+          attributes:
+            type: type
+            width: width
+      actions:
+        - name: read
+          subcomponents:
+            - name: dram
+              actions:
+                - name: read
+        - name: write
+          subcomponents:
+            - name: dram 
+              actions:
+                - name: write
+        - name: idle
+          subcomponents:
+            - name: dram
               actions:
                 - name: idle
 
@@ -161,7 +236,7 @@ architecture:
     - name: system
       local:
         - name: DRAM
-          class: DRAM
+          class: DRAM_wrapper
           attributes:
             type: LPDDR4
             width: 64
@@ -194,9 +269,11 @@ architecture:
                   word-bits: 16
                   meshX: 16
               - name: mac
-                class: intmac
+                class: lmac
                 attributes:
                   datawidth: 16
+                  multiplier_width: 16
+                  adder_width: 32
                   meshX : 16
               # input and output registers for the mac unit
               - name: weight_reg

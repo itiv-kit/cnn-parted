@@ -1,6 +1,5 @@
 from setuptools import setup
 from setuptools.command.install import install
-import os
 
 class ToolsInstall(install):
     def run(self):
@@ -30,17 +29,17 @@ class ToolsInstall(install):
 
 setup(
     name='CNNParted',
-      version='1.0',
-      description='CNN Inference Partitioning Framework',
-      url='https://github.com/itiv-kit/cnn-parted',
-      classifiers=[
-        'Development Status :: 4 - Beta',
-        'Programming Language :: Python :: 3'
-      ],
-      keywords='cnn inference hardware accelerator',
-      author='Fabian Kreß',
-      author_email='fabian.kress@kit.edu',
-      license='MIT',
+      #version='1.0',
+      #description='CNN Inference Partitioning Framework',
+      #url='https://github.com/itiv-kit/cnn-parted',
+      #classifiers=[
+      #  'Development Status :: 4 - Beta',
+      #  'Programming Language :: Python :: 3'
+      #],
+      #keywords='cnn inference hardware accelerator',
+      #author='Fabian Kreß',
+      #author_email='fabian.kress@kit.edu',
+      #license='MIT',
       packages=['cnnparted'],
       install_requires = [
             'dataclasses',
@@ -73,8 +72,8 @@ setup(
             'ruamel.yaml',
             "plotly",
             ],
-      python_requires = '>=3.11',
-      include_package_data = True,
-      scripts=['cnnparted/tools/setupTimeloop.sh'],
+      #python_requires = '>=3.11',
+      #include_package_data = True,
+      scripts=[],
       cmdclass={'install': ToolsInstall}
     )

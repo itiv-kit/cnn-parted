@@ -74,8 +74,8 @@ class LayerTiling:
                         current_tile = tiles_to_process.pop(0)
                         
                         # Hack to get FCNResNet working with Simba
-                        if network == "fcnresnet50" and current_tile.has_loop_dim(dim) and current_tile.get_loop_iterator(dim).extent == 21:
-                            num_tiles_cfg = 8
+                        #if network == "fcnresnet50" and current_tile.has_loop_dim(dim) and current_tile.get_loop_iterator(dim).extent == 21:
+                        #    num_tiles_cfg = 8
                         
                         num_tiles = self._determine_num_tiles(current_tile, dim, num_tiles_cfg)
                         

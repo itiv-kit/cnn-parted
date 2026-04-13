@@ -232,5 +232,6 @@ cython_debug/
 
 # Custom
 eval_scripts*
+.external_libs
 
 
