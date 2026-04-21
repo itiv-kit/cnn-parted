@@ -58,6 +58,7 @@ multi-tenancy:
   scheduling_priority: earliest_finish
   binding_granularity: layer
   num_jobs: 8
+  cost_terms: ["energy", "latency"]
   optimizer:
     n_trials: 5000
     sampler: nsga2
