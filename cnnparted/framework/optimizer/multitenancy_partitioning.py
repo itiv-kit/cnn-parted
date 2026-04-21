@@ -111,33 +111,6 @@ class MultiTenancyProblem():
             case "multi_queue":
                 self.scheduling_algorithm = multi_queue_scheduling
         
-        # Helper to plot allocation results
-        self.cost_terms = ["Energy", "Latency"]
-
-        if self.conf.mt.enable_scheduling_proxy:
-            self.cost_terms.append("Scheduling")
-            
-        # Determine which scoring metric is used to measure fairness of latency allocation
-        match self.conf.mt.fairness_score:
-            case "gini":
-                self.score_latency_fairness = self._score_latency_fairness_gini
-                self.fairness_direction = ["minimize"]
-                self.cost_terms.append("Gini")
-            case "jain":
-                self.score_latency_fairness = self._score_latency_fairness_jain
-                self.fairness_direction = ["maximize"]
-                self.cost_terms.append("Jain")
-            case "max_min_space":
-                self.score_latency_fairness = self._score_latency_fairness_max_min_space
-                self.fairness_direction = ["minimize"]
-                self.cost_terms.append("MaxMin")
-            case "std_dev":
-                self.score_latency_fairness = self._score_latency_fairness_std_dev
-                self.fairness_direction = ["minimize"]
-                self.cost_terms.append("StdDev")
-            case "no":
-                self.score_latency_fairness = None
-                self.fairness_direction = []
         
         # Parse execution graphs into LayerBindings and generate random initial binding
         network_info = defaultdict(lambda: defaultdict(int))
@@ -284,6 +257,26 @@ class MultiTenancyProblem():
             case _:
                 raise RuntimeError(f"Unknow selection for Optuna sampler, found: {self.conf.mt.optimizer.sampler}")
         
+        cost_term_mapping = {
+            "energy":           ("minimize", self._score_binding_energy, "Energy"),
+            "latency":          ("minimize", self._score_binding_latency, "Latency"),
+            "gini":             ("minimize", self._score_latency_fairness_gini, "Gini"),
+            "jain":             ("maximize", self._score_latency_fairness_jain, "Jain"),
+            "max_min_space":    ("minimize", self._score_latency_fairness_max_min_space, "Max-Min Space"),
+            "std_dev":          ("minimize", self._score_latency_fairness_std_dev, "Std. dev"),
+            "crit_path":        ("minimize", self._score_scheduling_proxy, "Critical Path"),
+        }
+
+        cost_terms = []
+        cost_fns = []
+        opt_direction = []
+        for cost_term in self.conf.mt.cost_terms:
+            opt_dir, fn, name = cost_term_mapping[cost_term]
+            cost_terms.append(name)
+            cost_fns.append(fn)
+            opt_direction.append(opt_dir)
+
+            
         # Setup information for optuna. For every layer, sample from available 
         # platform ids to determine on which platform it should be executed
         platform_ids = self.conf.system.platform_ids
@@ -323,32 +316,21 @@ class MultiTenancyProblem():
             # Add information to be later retrieved
             trial.set_user_attr("bindings", copy.deepcopy(work_layer_tracker))
 
-            # Score this allocation
-            cost_term = [
-                self._score_binding_energy(work_layer_tracker) + self._score_tensor_transfer_energy(work_layer_tracker),
-                self._score_binding_latency(work_layer_tracker),
-            ]
+            cost_values = []
+            for cost_fn in cost_fns:
+                try:
+                    cost = cost_fn(work_layer_tracker)
+                except TypeError:
+                    cost = cost_fn(work_layer_tracker, self.models)
+                cost_values.append(cost)
 
-            if self.conf.mt.enable_scheduling_proxy:
-                cost_term.append(self._score_scheduling_proxy(work_layer_tracker, self.models))
-
-            if self.score_latency_fairness is not None:
-                cost_term.append(self.score_latency_fairness(work_layer_tracker))
-
-            return cost_term
+            return cost_values
 
         # Start the optimization, setup everything for Optuna run
         # First phase: Performs a global exploration to find suitable points
         # Second phase: Perform fine-tuning of the results
         os.makedirs(self.optuna_out_dir, exist_ok=True)
         storage_db = f"sqlite:///{self.optuna_out_dir}/optuna_allocation_opt.db"
-
-        # Setup cost optimization directions based on the provided config
-        opt_direction = ["minimize", "minimize"] #energy, latency always exist
-        if self.conf.mt.enable_scheduling_proxy:
-            opt_direction = opt_direction + ["minimize"]
-        if self.score_latency_fairness is not None:
-            opt_direction = opt_direction + self.fairness_direction
 
         study = optuna.create_study(sampler=sampler, directions=opt_direction, 
                                     study_name="optuna_allocation_opt",) # storage=storage_db
@@ -375,7 +357,7 @@ class MultiTenancyProblem():
         fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
         fig.write_image(os.path.join(self.plot_dir, file_name+".png"))
 
-        for idx, target in enumerate(self.cost_terms):
+        for idx, target in enumerate(cost_terms):
             fig: go.Figure = optuna.visualization.plot_optimization_history(study, target_name=target, target=lambda t: t.values[idx])
             file_name = f"history_{target.lower()}_optuna"
             fig.write_html(os.path.join(self.plot_dir, file_name+".html"))
@@ -582,6 +564,9 @@ class MultiTenancyProblem():
             tensor_transfer_energy = [energy * num_hops for (latency, energy, slice_size) in tensor_transfer_eval]
             total_energy += sum(tensor_transfer_energy)
         return total_energy
+
+    def _score_total_binding_energy(self, tracker: LayerBindings) -> float:
+        return self._score_binding_energy(tracker) + self._score_tensor_transfer_energy(tracker)
     
     def _score_cuts(self, tracker: LayerBindings) -> int:
         cut_cost = 0

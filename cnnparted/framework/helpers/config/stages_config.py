@@ -93,25 +93,26 @@ class SchedulingPriority(Enum):
 class MultiTenancyStageConfig:
     optimizer: GeneticAlgConfig | SimulatedAnnealingConfig | OptunaConfig | HeraldConfig
     algorithm: Literal["sa", "genetic", "optuna", "herald"]
-    fairness_score: Literal["gini", "jain", "max_min_space", "std_dev", "no"]
     scheduling: Literal["list", "multi_queue"]
     scheduling_priority: SchedulingPriority
     binding_granularity: Literal["tile", "layer", "network"]
-    enable_scheduling_proxy: bool
     num_jobs: int
     schedule_all_bindings: bool
     store_invalid_solutions: bool
+    cost_terms: list[str]
 
     def __init__(self, cfg: dict):
         self.algorithm = cfg["algorithm"]
         self.scheduling = cfg["scheduling"]
         self.scheduling_priority = SchedulingPriority[cfg["scheduling_priority"].upper()]
         self.binding_granularity = cfg["binding_granularity"]
-        self.fairness_score = cfg["fairness_score"]
-        self.enable_scheduling_proxy = cfg.get("enable_scheduling_proxy", True)
         self.num_jobs = cfg["num_jobs"]
         self.schedule_all_bindings = cfg.get("schedule_all_bindings", False)
         self.store_invalid_solutions = cfg.get("store_invalid_solutions", False)
+        self.cost_terms = cfg["cost_terms"]
+
+        valid_cost_terms = ["energy", "latency", "gini", "jain", "max_min_space", "std_dev", "crit_path"]
+        assert all([cost_term in valid_cost_terms for cost_term in self.cost_terms]), f"Invalid configuration of cost terms. Valid are: {valid_cost_terms}"
 
         match self.algorithm:
             case "sa":
