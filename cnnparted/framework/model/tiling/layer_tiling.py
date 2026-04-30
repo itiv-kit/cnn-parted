@@ -1,5 +1,8 @@
 import copy
 import numpy as np
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from typing import Dict, Optional
 from loguru import logger
 
 from framework.model.layer_parameters import ConvParameters, GemmParameters
@@ -9,12 +12,266 @@ from framework.model.onnx_model import OnnxModel
 from framework.model.tiling.iterators import LoopDim
 from framework.helpers.config_helper import ConfigHelper
 
+
+@dataclass
+class TilingContext:
+    """Context for a single tensor tiling operation"""
+    dim: LoopDim
+    n_outer_tiles: int
+    dim_value: int
+    params: GemmParameters | ConvParameters
+
+
+@dataclass
+class ConvolutionTilingContext(TilingContext):
+    """Extended context for convolution tiling with receptive field information"""
+    kernel_size: int = 0      # Kernel size for the tiled dimension (R or S)
+    stride: int = 1           # Stride for the tiled dimension
+    padding: int = 0          # Padding for the tiled dimension
+    
+    def compute_input_extent_from_output(self, output_extent: int, tile_idx: int) -> tuple[int, int]:
+        """
+        Compute input spatial extent needed to produce a tiled output.
+        Returns (input_start, input_size) accounting for receptive field and overlaps.
+        
+        For output tile covering [out_start, out_end), input covers:
+            in_start = out_start * stride - padding
+            in_size = (out_end - out_start) * stride + kernel_size - stride
+        """
+        out_start = tile_idx * output_extent
+        out_end = (tile_idx + 1) * output_extent
+        
+        # Receptive field start
+        in_start = out_start * self.stride - self.padding
+        # Receptive field size (accounts for overlap with next tile)
+        in_size = (out_end - out_start) * self.stride + (self.kernel_size - self.stride)
+        
+        return in_start, in_size
+    
+    def compute_output_extent_from_input(self, input_extent: int) -> int:
+        """Inverse: compute output extent that can be produced from input extent"""
+        # out = (in + 2*padding - kernel) / stride + 1
+        # For tiling, simplified: out = (in - kernel) / stride + 1 for each tile
+        return max(1, (input_extent - self.kernel_size) // self.stride + 1)
+
+
+class TensorTilingStrategy(ABC):
+    """Base class for tensor-specific tiling strategies"""
+    
+    @abstractmethod
+    def can_tile(self, tensor: TensorWrapper, dim: LoopDim) -> bool:
+        """Check if this strategy can tile the given tensor for this dimension"""
+        pass
+    
+    @abstractmethod
+    def compute_tiled_extent(self, tensor: TensorWrapper, context: TilingContext) -> int:
+        """Compute the extent after tiling, accounting for any operation-specific adjustments"""
+        pass
+
+
+class ConvInputTilingStrategy(TensorTilingStrategy):
+    """Strategy for tiling INPUT tensors in convolution operations
+    
+    Accounts for receptive field requirements when tiling spatial dimensions.
+    """
+    
+    def can_tile(self, tensor: TensorWrapper, dim: LoopDim) -> bool:
+        return dim in [LoopDim.N, LoopDim.M, LoopDim.P, LoopDim.Q]
+    
+    def compute_tiled_extent(self, tensor: TensorWrapper, context: TilingContext) -> int:
+        iterator = tensor.get_loop_dim(context.dim)
+        base_extent = iterator.extent // context.n_outer_tiles
+        
+        # Apply stride adjustments for spatial dimensions
+        if context.dim == LoopDim.P:
+            return base_extent * context.params.wstride
+        elif context.dim == LoopDim.Q:
+            return base_extent * context.params.hstride
+        else:
+            return base_extent
+    
+    def compute_tiled_extent_with_padding(self, tensor: TensorWrapper, context: "ConvolutionTilingContext") -> int:
+        """
+        Compute input extent accounting for kernel receptive field.
+        This is called when tiling spatial dimensions (P or Q).
+        """
+        if not isinstance(context, ConvolutionTilingContext):
+            # Fallback to simple tiling if no conv context provided
+            return self.compute_tiled_extent(tensor, context)
+        
+        # For spatial dims, account for receptive field overlap
+        if context.dim in [LoopDim.P, LoopDim.Q]:
+            iterator = tensor.get_loop_dim(context.dim)
+            
+            # Compute required input size for the tiled output
+            out_extent = iterator.extent // context.n_outer_tiles
+            in_start, in_size = context.compute_input_extent_from_output(out_extent, context.dim_value)
+            
+            # Clamp to tensor bounds
+            in_size = min(in_size, iterator.extent - max(0, in_start))
+            
+            # Apply stride correction if needed
+            if context.dim == LoopDim.P:
+                return in_size * context.params.wstride
+            else:
+                return in_size * context.params.hstride
+        
+        # For non-spatial dims, use default tiling
+        return self.compute_tiled_extent(tensor, context)
+
+
+class ConvWeightTilingStrategy(TensorTilingStrategy):
+    """Strategy for tiling WEIGHT tensors in convolution operations"""
+    
+    def can_tile(self, tensor: TensorWrapper, dim: LoopDim) -> bool:
+        return dim == LoopDim.M
+    
+    def compute_tiled_extent(self, tensor: TensorWrapper, context: TilingContext) -> int:
+        iterator = tensor.get_loop_dim(context.dim)
+        return iterator.extent // context.n_outer_tiles
+
+
+class ConvOutputTilingStrategy(TensorTilingStrategy):
+    """Strategy for tiling OUTPUT tensors in convolution operations"""
+    
+    def can_tile(self, tensor: TensorWrapper, dim: LoopDim) -> bool:
+        return True  # Can tile any dimension
+    
+    def compute_tiled_extent(self, tensor: TensorWrapper, context: TilingContext) -> int:
+        iterator = tensor.get_loop_dim(context.dim)
+        return iterator.extent // context.n_outer_tiles
+
+
+class ConvBiasTilingStrategy(TensorTilingStrategy):
+    """Strategy for tiling BIAS tensors in convolution operations (no-op)"""
+    
+    def can_tile(self, tensor: TensorWrapper, dim: LoopDim) -> bool:
+        return False  # Bias is not tiled
+    
+    def compute_tiled_extent(self, tensor: TensorWrapper, context: TilingContext) -> int:
+        # This should never be called since can_tile() returns False
+        raise NotImplementedError("BIAS tensors cannot be tiled")
+
+
+class GemmTilingStrategy(TensorTilingStrategy):
+    """Unified strategy for all GEMM operands (uniform tiling)"""
+    
+    def can_tile(self, tensor: TensorWrapper, dim: LoopDim) -> bool:
+        return True
+    
+    def compute_tiled_extent(self, tensor: TensorWrapper, context: TilingContext) -> int:
+        iterator = tensor.get_loop_dim(context.dim)
+        return iterator.extent // context.n_outer_tiles
+
+
+class TensorTiler:
+    """Handles tensor tiling with pluggable strategies"""
+    
+    def __init__(self):
+        # Map (operation_type, operand_kind) -> strategy
+        self.conv_strategies: Dict[OperandKind, TensorTilingStrategy] = {
+            OperandKind.INPUT: ConvInputTilingStrategy(),
+            OperandKind.WEIGHT: ConvWeightTilingStrategy(),
+            OperandKind.OUTPUT: ConvOutputTilingStrategy(),
+            OperandKind.BIAS: ConvBiasTilingStrategy(),
+        }
+        self.gemm_strategy = GemmTilingStrategy()
+    
+    def _get_strategy(self, tensor: TensorWrapper, params: GemmParameters | ConvParameters) -> Optional[TensorTilingStrategy]:
+        """Select the appropriate tiling strategy based on operation and operand type"""
+        if isinstance(params, ConvParameters):
+            return self.conv_strategies.get(tensor.operand)
+        elif isinstance(params, GemmParameters):
+            return self.gemm_strategy
+        return None
+    
+    def _create_conv_tiling_context(self, base_context: TilingContext, conv_params: ConvParameters, 
+                                     tensor: TensorWrapper) -> ConvolutionTilingContext:
+        """Create a ConvolutionTilingContext with kernel/stride/padding info for spatial dimensions"""
+        kernel_size = 0
+        stride = 1
+        padding = 0
+        
+        # Extract kernel and stride for the tiling dimension
+        if base_context.dim == LoopDim.P:
+            kernel_size = conv_params.kernel_w
+            stride = conv_params.wstride
+            padding = conv_params.wpadding if hasattr(conv_params, 'wpadding') else 0
+        elif base_context.dim == LoopDim.Q:
+            kernel_size = conv_params.kernel_h
+            stride = conv_params.hstride
+            padding = conv_params.hpadding if hasattr(conv_params, 'hpadding') else 0
+        
+        return ConvolutionTilingContext(
+            dim=base_context.dim,
+            n_outer_tiles=base_context.n_outer_tiles,
+            dim_value=base_context.dim_value,
+            params=base_context.params,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding
+        )
+    
+    def tile_tensor(self, tensor: TensorWrapper, context: TilingContext) -> bool:
+        """
+        Tile a single tensor according to the context.
+        Returns True if tiling was applied, False otherwise.
+        """
+        # Skip if dimension not present in tensor
+        if context.dim not in tensor:
+            return False
+        
+        # Get the appropriate strategy
+        strategy = self._get_strategy(tensor, context.params)
+        if strategy is None:
+            raise RuntimeError(f"No tiling strategy for {type(context.params)}")
+        
+        # Check if this strategy can tile this tensor
+        if not strategy.can_tile(tensor, context.dim):
+            return False
+        
+        # Get loop dimension and verify divisibility
+        iterator = tensor.get_loop_dim(context.dim)
+        assert (iterator.extent % context.n_outer_tiles) == 0, \
+            f"Extent {iterator.extent} not divisible by n_outer_tiles {context.n_outer_tiles}"
+        
+        # Compute and apply tiling
+        # For conv input on spatial dims, use receptive-field aware tiling
+        if (isinstance(context.params, ConvParameters) and 
+            tensor.operand == OperandKind.INPUT and 
+            context.dim in [LoopDim.P, LoopDim.Q] and
+            isinstance(strategy, ConvInputTilingStrategy)):
+            
+            conv_context = self._create_conv_tiling_context(context, context.params, tensor)
+            tiled_extent = strategy.compute_tiled_extent_with_padding(tensor, conv_context)
+        else:
+            tiled_extent = strategy.compute_tiled_extent(tensor, context)
+        
+        iterator.lower_bound = tiled_extent * context.dim_value
+        iterator.upper_bound = (tiled_extent * (context.dim_value + 1)) - 1
+        iterator.extent = tiled_extent
+        
+        return True
+    
+    def tile_tensors(self, tensors: list[TensorWrapper], dim: LoopDim, n_outer_tiles: int,
+                     dim_value: int, params: GemmParameters | ConvParameters) -> list[TensorWrapper]:
+        """Tile multiple tensors with the same context"""
+        context = TilingContext(dim, n_outer_tiles, dim_value, params)
+        
+        for tensor in tensors:
+            self.tile_tensor(tensor, context)
+        
+        return tensors
+
+
 class LayerTiling:
     def __init__(self, config: ConfigHelper):
         # Tiling will insert new compute nodes into the graph and remove old ones with smaller size
 
         # Map network to num of tiles, these are "outer" tiles
         self.tiling = {wl.name: wl.tiling for wl in config.workload.workload_spec}
+        self.tensor_tiler = TensorTiler()
+        
         for name, tiling in self.tiling.items():
             logger.debug(f"Initialize layer tiling for network {name} with tiling={tiling}")
 
@@ -152,6 +409,37 @@ class LayerTiling:
             tiled_inp = copy.deepcopy(inp)
             new_inputs.append(tiled_inp)
         return new_inputs
+    
+    def _adjust_padding_for_tile(self, params: ConvParameters, dim: LoopDim, tile_idx: int, 
+                                  n_outer_tiles: int) -> ConvParameters:
+        """
+        Adjust padding parameters for tiled convolution layers.
+        
+        When tiling spatial dimensions, only edge tiles need padding:
+        - First tile (idx=0): Keep left-side padding
+        - Middle tiles: No padding (fully contained within receptive field)
+        - Last tile (idx=n_outer_tiles-1): Keep right-side padding
+        """
+        if dim == LoopDim.P:
+            padding_attr = 'wpad'
+        elif dim == LoopDim.Q:
+            padding_attr = 'hpad'
+        else:
+            return params
+        
+        original_padding = getattr(params, padding_attr, 0)
+        
+        # Middle tiles don't need padding (receptive field is fully covered by input overlap)
+        if tile_idx > 0 and tile_idx < n_outer_tiles - 1:
+            setattr(params, padding_attr, 0)
+        # First tile keeps original padding on left side
+        elif tile_idx == 0:
+            setattr(params, padding_attr, original_padding)
+        # Last tile might need right-side padding (keep original for conservative approach)
+        else:
+            setattr(params, padding_attr, original_padding)
+        
+        return params
 
     
     def generate_tiles(self, layer: ComputationLayer, dim: LoopDim, n_outer_tiles: int) -> list[ComputationLayer]:
@@ -170,6 +458,10 @@ class LayerTiling:
             param_to_tile = param_to_tile // n_outer_tiles
             assert hasattr(new_params, loop_var), f"Did not find {loop_var} as a parameter of {type(new_params)}"
             setattr(new_params, loop_var, param_to_tile)
+            
+            # Adjust padding for tiled spatial dimensions in convolution layers
+            if isinstance(new_params, ConvParameters) and dim in [LoopDim.P, LoopDim.Q]:
+                new_params = self._adjust_padding_for_tile(new_params, dim, num, n_outer_tiles)
 
             # Apply tiling information to the loop dimension
             tiled_loop_dims = copy.deepcopy(layer.loop_dims)
@@ -198,65 +490,7 @@ class LayerTiling:
         
         return generated_tiles
     
-    def tile_tensors(self, tensors: list[TensorWrapper], dim: LoopDim, n_outer_tiles: int, 
-                     dim_value: int, params: GemmParameters | ConvParameters
-                      ) -> list[TensorWrapper]:
-        for tensor in tensors:
-            if dim not in tensor:
-                continue
-            loop_dim = tensor.get_loop_dim(dim)
-            assert (loop_dim.extent % n_outer_tiles) == 0
-
-            match params:
-                case GemmParameters():
-                    self._tile_tensor_gemm(tensor, dim, n_outer_tiles, dim_value, params)
-                case ConvParameters():
-                    self._tile_tensor_conv(tensor, dim, n_outer_tiles, dim_value, params)
-                case _:
-                    raise RuntimeError("Unexpected tensor tiling on operation that is not conv or gemm")
-
-        return tensors
-    
-    def _tile_tensor_conv(self, tensor: TensorWrapper, dim: LoopDim, n_outer_tiles: int, dim_value: int, param: ConvParameters):
-        iterator = tensor.get_loop_dim(dim)
-
-        match tensor.operand:
-            case OperandKind.INPUT:
-                match dim:
-                    case LoopDim.N | LoopDim.M:
-                        tiled_extent = iterator.extent // n_outer_tiles
-                    case LoopDim.P:
-                        tiled_extent = (iterator.extent // n_outer_tiles) * param.wstride
-                    case LoopDim.Q:
-                        tiled_extent = (iterator.extent // n_outer_tiles) * param.hstride
-                    case _:
-                        raise RuntimeError("Unexpected tiling dimension for conv2d INPUT operand")
-                iterator.lower_bound = tiled_extent * dim_value
-                iterator.upper_bound = (tiled_extent * (dim_value+1)) -1
-                iterator.extent = tiled_extent
-
-            case OperandKind.WEIGHT:
-                match dim:
-                    case LoopDim.M:
-                        tiled_extent = iterator.extent // n_outer_tiles
-                        iterator.lower_bound = tiled_extent * dim_value
-                        iterator.upper_bound = (tiled_extent * (dim_value+1)) -1
-                        iterator.extent = tiled_extent
-                    case _:
-                        raise RuntimeError("Unexpected tiling dimension for conv2d WEIGHT operand")
-
-            case OperandKind.OUTPUT:
-                tiled_extent = (iterator.extent // n_outer_tiles)
-                iterator.lower_bound = tiled_extent * dim_value
-                iterator.upper_bound = (tiled_extent * (dim_value+1)) -1
-                iterator.extent = tiled_extent
-            case OperandKind.BIAS:
-                # no tiling along C dimension is performed
-                ...
-
-    def _tile_tensor_gemm(self, tensor: TensorWrapper, dim: LoopDim, n_outer_tiles: int, dim_value: int, param: GemmParameters):
-        iterator = tensor.get_loop_dim(dim)
-        tiled_extent = iterator.extent // n_outer_tiles
-        iterator.lower_bound = tiled_extent * dim_value
-        iterator.upper_bound = (tiled_extent * (dim_value+1)) - 1
-        iterator.extent = tiled_extent
+    def tile_tensors(self, tensors: list[TensorWrapper], dim: LoopDim, n_outer_tiles: int,
+                     dim_value: int, params: GemmParameters | ConvParameters) -> list[TensorWrapper]:
+        """Tile multiple tensors using the unified TensorTiler strategy"""
+        return self.tensor_tiler.tile_tensors(tensors, dim, n_outer_tiles, dim_value, params)
