@@ -107,11 +107,11 @@ class MultiTenancyStageConfig:
         self.scheduling_priority = SchedulingPriority[cfg["scheduling_priority"].upper()]
         self.binding_granularity = cfg["binding_granularity"]
         self.num_jobs = cfg["num_jobs"]
-        self.schedule_all_bindings = cfg.get("schedule_all_bindings", False)
+        self.schedule_all_bindings = "scheduling" in cfg["cost_terms"] or cfg.get("schedule_all_bindings", False)
         self.store_invalid_solutions = cfg.get("store_invalid_solutions", False)
         self.cost_terms = cfg["cost_terms"]
 
-        valid_cost_terms = ["energy", "latency", "gini", "jain", "max_min_space", "std_dev", "crit_path"]
+        valid_cost_terms = ["energy", "latency", "gini", "jain", "max_min_space", "std_dev", "crit_path", "scheduling"]
         assert all([cost_term in valid_cost_terms for cost_term in self.cost_terms]), f"Invalid configuration of cost terms. Valid are: {valid_cost_terms}"
 
         match self.algorithm:
