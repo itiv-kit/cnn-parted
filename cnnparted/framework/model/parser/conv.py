@@ -41,7 +41,8 @@ class ConvParser(OnnxLayerParser):
             'ofms':ofms,
             'weights':weights,
             'groups': groups,
-            'dilations': dilations
+            'wdilation': dilations[0],
+            'hdilation': dilations[1],
         }
         params = ConvParameters(cfg)
         loop_dims = [

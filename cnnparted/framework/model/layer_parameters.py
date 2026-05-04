@@ -25,6 +25,8 @@ class ConvParameters(ParametersBase):
     ofms: int
     weights: int
     groups: int
+    wdilation: int
+    hdilation: int
     depthwise: bool
 
     def __init__(self, cfg: dict):
@@ -45,7 +47,9 @@ class ConvParameters(ParametersBase):
         self.ofms = cfg["ofms"]
         self.weights = cfg["weights"]
         self.groups = cfg["groups"]
-        self.depthwise = False #TODO Figure this out
+        self.wdilation = cfg["wdilation"]
+        self.hdilation = cfg["hdilation"]
+        self.depthwise = (self.groups == self.c) and (self.m % self.c == 0)
 
 
 @dataclass
