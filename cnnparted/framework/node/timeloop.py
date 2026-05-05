@@ -19,6 +19,7 @@ from framework.model.model import ConvParameters, GemmParameters
 from framework.model.onnx_model import OnnxModel
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
 from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
+from framework.node.evaluation_lut import EvaluationLut
 #from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
 from .helpers import parse_timeloop_stats
 
@@ -78,6 +79,8 @@ class Timeloop(NodeEvaluator):
         self.type_cfg = '.yaml'
         self.config = tl_config
         self.stats = {}
+
+        self.eval_lut = EvaluationLut()
 
         self.adaptor: TimeloopAdaptor = None
         self.dse_mode = "off"
@@ -152,20 +155,12 @@ class Timeloop(NodeEvaluator):
             for layer in tqdm.tqdm(model.nodes, self.accname, disable=(not progress)):
                 if not isinstance(layer, ComputationLayer):
                     continue
-                layer_name = layer.layer_name
-                output, valid = self._run_layer(self.runroot, layer, tl_files_path=None)
+                layer_result, valid = self._run_layer(self.runroot, layer, tl_files_path=None)
 
                 if not valid:
-                    logger.debug(f"Timeloop: running layer {layer_name} was invalid")
+                    logger.debug(f"Timeloop: running layer {layer.layer_name} was invalid")
                     self.stats = {}
                     return
-
-                layer_result = LayerResult()
-                layer_result.name = layer_name
-                layer_result.latency = output["latency_ms"]
-                layer_result.energy = output["energy_mJ"]
-                layer_result.area = output["area_mm2"]
-                logger.debug(f"Timeloop: running layer {layer_name} yielded result: {layer_result}")
 
                 design_result.add_layer_to_network(layer_result, network)
 
@@ -198,19 +193,11 @@ class Timeloop(NodeEvaluator):
             if not isinstance(layer, ComputationLayer):
                 continue
 
-            layer_name = layer.layer_name
-            output, valid = self._run_layer(design_runroot, layer, tl_files_path=tl_design_dir)
+            layer_result, valid = self._run_layer(design_runroot, layer, tl_files_path=tl_design_dir)
 
             if not valid:
-                logger.debug(f"Timeloop: running layer {layer_name} was invalid")
+                logger.debug(f"Timeloop: running layer {layer.layer_name} was invalid")
                 return
-
-            layer_result = LayerResult()
-            layer_result.name = layer_name
-            layer_result.latency = output["latency_ms"]
-            layer_result.energy = output["energy_mJ"]
-            layer_result.area = output["area_mm2"]
-            logger.debug(f"Timeloop: running layer {layer_name} yielded result: {layer_result}")
 
             design_result.add_layer_to_network(layer_result, network)
         
@@ -221,9 +208,17 @@ class Timeloop(NodeEvaluator):
             layer : ComputationLayer,
             logfile : str = 'timeloop.log',
             tl_files_path: str = None
-        ) -> dict:
+        ) -> tuple[LayerResult, bool]:
+
         if os.path.isfile(os.path.join(self.configs_dir, 'archs', (self.accname + '.cfg'))):
             self.type_cfg = '.cfg'
+
+        lut_entry = self.eval_lut.try_find_entry(layer.layer_params, self.accname)
+        if lut_entry is not None:
+            # LUT hits are always valid
+            lut_entry.name = layer.layer_name
+            logger.debug(f"Timeloop: cache hit {layer.layer_name} with {layer.layer_params} yielded result: {lut_entry}")
+            return lut_entry, True
 
         runname = layer.layer_name[1:]
         dirname = os.path.join(ROOT_DIR, runroot, runname)
@@ -273,7 +268,19 @@ class Timeloop(NodeEvaluator):
             if (groups := layer.layer_params.groups) and groups > 1: 
                 timeloop_stats["energy_mJ"] = timeloop_stats["energy_mJ"] * groups
                 timeloop_stats["latency_ms"] = timeloop_stats["latency_ms"] * groups
-        return timeloop_stats, valid
+
+        layer_result = LayerResult()
+        layer_result.name = layer.layer_name
+        layer_result.latency = timeloop_stats["latency_ms"]
+        layer_result.energy = timeloop_stats["energy_mJ"]
+        layer_result.area = timeloop_stats["area_mm2"]
+
+        logger.debug(f"Timeloop: running layer {layer.layer_name} with {layer.layer_params} yielded result: {layer_result}")
+
+        # Update the LUT for future lookups
+        self.eval_lut.add_entry(layer.layer_params, self.accname, layer_result)
+
+        return layer_result, valid
 
 
     def _plot_all_of_metric(self, stats, metric: str):
