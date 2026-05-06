@@ -1,3 +1,4 @@
+import copy
 
 from framework.node.node_evaluator import LayerResult
 from framework.model.layer_parameters import ComputeParameters
@@ -23,5 +24,6 @@ class EvaluationLut:
         if layer_params not in self._seen_params[acc_name]:
             return None
 
+        # Return deepcoy to enable changing of layer name
         entry = self.lut[acc_name].get(layer_params, None)
-        return entry
+        return copy.deepcopy(entry)

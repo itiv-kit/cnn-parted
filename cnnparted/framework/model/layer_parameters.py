@@ -6,7 +6,7 @@ import numpy as np
 class ParametersBase(ABC):
     ...
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class ConvParameters(ParametersBase):
     h: int
     w: int
@@ -52,7 +52,7 @@ class ConvParameters(ParametersBase):
         self.depthwise = (self.groups == self.c) and (self.m % self.c == 0)
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class GemmParameters(ParametersBase):
     b: int | None
     n: int
