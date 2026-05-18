@@ -28,31 +28,47 @@ class ConvolutionTilingContext(TilingContext):
     kernel_size: int = 0      # Kernel size for the tiled dimension (R or S)
     stride: int = 1           # Stride for the tiled dimension
     padding: int = 0          # Padding for the tiled dimension
+    dilation: int = 1         # Dilation for the tiled dimension
+    
+    @property
+    def effective_kernel_size(self) -> int:
+        """Compute effective kernel size accounting for dilation"""
+        return self.kernel_size + (self.kernel_size - 1) * (self.dilation - 1)
     
     def compute_input_extent_from_output(self, output_extent: int, tile_idx: int) -> tuple[int, int]:
         """
         Compute input spatial extent needed to produce a tiled output.
-        Returns (input_start, input_size) accounting for receptive field and overlaps.
+        Returns (input_start, input_size) accounting for receptive field, dilation, and overlaps.
         
         For output tile covering [out_start, out_end), input covers:
             in_start = out_start * stride - padding
-            in_size = (out_end - out_start) * stride + kernel_size - stride
+            in_size = (out_end - out_start) * stride + effective_kernel - stride
         """
         out_start = tile_idx * output_extent
         out_end = (tile_idx + 1) * output_extent
         
         # Receptive field start
         in_start = out_start * self.stride - self.padding
-        # Receptive field size (accounts for overlap with next tile)
-        in_size = (out_end - out_start) * self.stride + (self.kernel_size - self.stride)
+        # Receptive field size (accounts for overlap with next tile and dilation)
+        eff_k = self.effective_kernel_size
+        in_size = (out_end - out_start) * self.stride + (eff_k - self.stride)
         
         return in_start, in_size
     
     def compute_output_extent_from_input(self, input_extent: int) -> int:
-        """Inverse: compute output extent that can be produced from input extent"""
-        # out = (in + 2*padding - kernel) / stride + 1
-        # For tiling, simplified: out = (in - kernel) / stride + 1 for each tile
-        return max(1, (input_extent - self.kernel_size) // self.stride + 1)
+        """Inverse: compute output extent that can be produced from input extent accounting for dilation"""
+        # out = (in + 2*padding - effective_kernel) / stride + 1
+        eff_k = self.effective_kernel_size
+        return max(1, (input_extent - eff_k) // self.stride + 1)
+    
+    def compute_overlap_with_next_tile(self) -> int:
+        """
+        Compute how much input data overlaps between consecutive output tiles.
+        This informs data reuse and cache efficiency.
+        """
+        eff_k = self.effective_kernel_size
+        overlap = eff_k - self.stride
+        return overlap
 
 
 class TensorTilingStrategy(ABC):
@@ -92,18 +108,18 @@ class ConvInputTilingStrategy(TensorTilingStrategy):
     
     def compute_tiled_extent_with_padding(self, tensor: TensorWrapper, context: "ConvolutionTilingContext") -> int:
         """
-        Compute input extent accounting for kernel receptive field.
+        Compute input extent accounting for kernel receptive field and dilation.
         This is called when tiling spatial dimensions (P or Q).
         """
         if not isinstance(context, ConvolutionTilingContext):
             # Fallback to simple tiling if no conv context provided
             return self.compute_tiled_extent(tensor, context)
         
-        # For spatial dims, account for receptive field overlap
+        # For spatial dims, account for receptive field overlap and dilation
         if context.dim in [LoopDim.P, LoopDim.Q]:
             iterator = tensor.get_loop_dim(context.dim)
             
-            # Compute required input size for the tiled output
+            # Compute required input size for the tiled output (accounts for dilation)
             out_extent = iterator.extent // context.n_outer_tiles
             in_start, in_size = context.compute_input_extent_from_output(out_extent, context.dim_value)
             
@@ -187,20 +203,24 @@ class TensorTiler:
     
     def _create_conv_tiling_context(self, base_context: TilingContext, conv_params: ConvParameters, 
                                      tensor: TensorWrapper) -> ConvolutionTilingContext:
-        """Create a ConvolutionTilingContext with kernel/stride/padding info for spatial dimensions"""
+        """Create a ConvolutionTilingContext with kernel/stride/padding/dilation info for spatial dimensions"""
         kernel_size = 0
         stride = 1
         padding = 0
+        dilation = 1
         
-        # Extract kernel and stride for the tiling dimension
+        # Extract kernel (r/s), stride, padding (wpad/hpad), and dilation for the tiling dimension
+        # Note: ConvParameters uses r=kernel_h, s=kernel_w
         if base_context.dim == LoopDim.P:
-            kernel_size = conv_params.kernel_w
+            kernel_size = conv_params.s  # s = kernel_w
             stride = conv_params.wstride
-            padding = conv_params.wpadding if hasattr(conv_params, 'wpadding') else 0
+            padding = conv_params.wpad
+            dilation = conv_params.wdilation
         elif base_context.dim == LoopDim.Q:
-            kernel_size = conv_params.kernel_h
+            kernel_size = conv_params.r  # r = kernel_h
             stride = conv_params.hstride
-            padding = conv_params.hpadding if hasattr(conv_params, 'hpadding') else 0
+            padding = conv_params.hpad
+            dilation = conv_params.hdilation
         
         return ConvolutionTilingContext(
             dim=base_context.dim,
@@ -209,7 +229,8 @@ class TensorTiler:
             params=base_context.params,
             kernel_size=kernel_size,
             stride=stride,
-            padding=padding
+            padding=padding,
+            dilation=dilation
         )
     
     def tile_tensor(self, tensor: TensorWrapper, context: TilingContext) -> bool:
@@ -286,15 +307,19 @@ class LayerTiling:
         return False
     
     def _determine_num_tiles(self, layer: ComputationLayer, dim: LoopDim, num_tiles: int):
-        # Try to create a smaller number of tiles, if the dimension is not perfectly
+        # Try to create a smaller number of tiles, if the dimension is not evenly
         # tilable by the given factor
         if num_tiles is None:
             return num_tiles
         while num_tiles >= 1:
-            if layer.get_loop_iterator(dim).extent % num_tiles == 0:
+            ldim_extent = layer.get_loop_iterator(dim).extent
+
+            if ldim_extent % num_tiles == 0 :
+                # valid tiling: extent evenly divisible by num_tiles
                 return num_tiles
             else:
                 num_tiles -= 1
+
         return num_tiles
     
     def tile_layers_inplace(self, models: dict[str, OnnxModel]):
