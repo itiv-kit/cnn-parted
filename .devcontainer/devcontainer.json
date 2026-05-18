@@ -2,7 +2,7 @@
   "image": "gitlab.itiv.kit.edu:1443/itiv/docker/rocky9-timeloop:latest",
   "runArgs": [
       "--userns=",
-      "--shm-size=10.24gb"],
+      "--shm-size=64gb"],
   "remoteUser": "root",
   "securityOpt": [ "seccomp=unconfined" ],
   "postCreateCommand": "echo \"source /usr/share/bash-completion/completions/git\" >> ~/.bashrc",
