@@ -22,13 +22,13 @@ class MultiTenancySolutionElem:
 
 
 class MultitenancySolution:
-    def __init__(self, node_stats: SystemResult, mt_solutions:list[tuple[LayerBindings, SystemSchedule]],  config: ConfigHelper):
+    def __init__(self, node_stats: SystemResult, mt_solutions:list[SystemSchedule],  config: ConfigHelper):
         self.nw_names = [wl.name for wl in config.workload.workload_spec]
 
         self.res: list[MultiTenancySolutionElem] = []
         self.res_summary: list[tuple[float, float]] = [] #Energy, Latency
 
-        for _, schedule in mt_solutions:
+        for schedule in mt_solutions:
             nw_results: dict[str, list[ComputeTask]] = {nw_name: [] for nw_name in self.nw_names}
 
             schedule_edp = 0.0

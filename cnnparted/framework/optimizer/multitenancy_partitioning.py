@@ -23,6 +23,11 @@ import optuna
 from optuna.samplers.nsgaii import BLXAlphaCrossover, UniformCrossover
 import tqdm
 
+from framework.optimizer.strategies.multi_tenancy import (MultiTenancyContext,
+                                                          HeraldMultiTenancy, 
+                                                          SaMultiTenancy, 
+                                                          OptunaMultiTenancy,)
+
 from framework.model.layer_tracker import LayerBindings
 from framework.noc.noc import NocTopology
 from framework.model.onnx_model import OnnxModel
@@ -162,7 +167,7 @@ class MultiTenancyProblem():
         self.convergence_counter = 0
         self.cost_history = []
     
-    def _herald_like(self) -> list[tuple[LayerBindings, SystemSchedule]]:
+    def _herald_like(self) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
         system_schedule = herald_like(self.models, self.node_stats, self.noc, self.conf.mt.optimizer.lbf)
 
         # Herald combines binding and scheduling, read out values from the schedule
@@ -173,10 +178,10 @@ class MultiTenancyProblem():
         bindings = LayerBindings(network_info)
 
         # Herald only finds one solution
-        return [(bindings, system_schedule)]
+        return [system_schedule], []
                 
     
-    def _simulated_annealing(self) -> list[tuple[LayerBindings, SystemSchedule]]:
+    def _simulated_annealing(self) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
         """Optimize the assigment of layers to platforms using simulated annealing.
         This optimizer only supports single-objective optimization."""
 
@@ -253,11 +258,10 @@ class MultiTenancyProblem():
         fig.write_html(os.path.join(self.plot_dir, "edp_history_sa.html"))
 
         # Result is a list for compatibility with Multi-Objective Opt
-        result = (best_state, best_schedule)
-        return [result]
+        return [best_schedule], [] #TODO
 
     
-    def _optuna_optimizer(self) -> tuple[list[tuple[LayerBindings, SystemSchedule]], list[tuple[LayerBindings, SystemSchedule]]]:
+    def _optuna_optimizer(self) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
         """Optimize the assigment of layers to platforms a specified Optuna sampler.
         This aims to optize energy and latency as a multi-objective optimization.
         """
@@ -369,8 +373,8 @@ class MultiTenancyProblem():
         #   2) Perform scheduling only for pareto optimal task allocations
         os.makedirs(self.optuna_out_dir, exist_ok=True)
 
-        results: list[tuple[LayerBindings, SystemSchedule]] = []
-        invalid_results: list[tuple[LayerBindings, SystemSchedule]] = []
+        results: list[SystemSchedule] = []
+        invalid_results: list[SystemSchedule] = []
 
         study = optuna.create_study(sampler=sampler, directions=opt_direction, 
                                     study_name="optuna_allocation_opt",) # storage=storage_db
@@ -487,9 +491,9 @@ class MultiTenancyProblem():
                 with open(schedule_file, "rb") as f:
                    res: ScheduleResult = cloudpickle.load(f)
                 if res and res.is_valid:
-                    results.append((res.tracker, res.schedule))
+                    results.append(res.schedule)
                 elif res:
-                    invalid_results.append((res.tracker, res.schedule))
+                    invalid_results.append(res.schedule)
 
 
 
@@ -529,9 +533,9 @@ class MultiTenancyProblem():
             
             for res in final_results:
                 if res.is_valid:
-                    results.append( (res.tracker, res.schedule) )
+                    results.append(res.schedule)
                 else:
-                    invalid_results.append( (res.tracker, res.schedule) )
+                    invalid_results.append(res.schedule)
             # #########################################################
             # ------------------ END Ray integration ------------------
             # #########################################################
@@ -593,7 +597,7 @@ class MultiTenancyProblem():
         deadline_stats = {network: DeadlineStats() for network in self.models.keys()}
         all_partial_succeeded = []
         all_fully_succeeded = []
-        for _, schedule in results + invalid_results:
+        for schedule in results + invalid_results:
             network_frame_endtimes = schedule.network_finish_times
             partial_succ = True
             fully_succ = True
@@ -629,23 +633,41 @@ class MultiTenancyProblem():
 
         return results, invalid_results
     
-    def minimize(self):
+    def minimize(self) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
         # Distribute workload between platforms
         logger.debug(f"Optimizing multitenancy problem with {self.conf.mt.algorithm}")
+        
 
         match self.conf.mt.algorithm:
             case "optuna":
-                solutions, invalid_solutions = self._optuna_optimizer()
+                strategy = OptunaMultiTenancy()
+                #solutions, invalid_solutions = self._optuna_optimizer()
             case "sa":
-                solutions =  self._simulated_annealing()
+                strategy = SaMultiTenancy()
+                #solutions, invalid_solutions =  self._simulated_annealing()
             case "herald":
-                solutions = self._herald_like()
+                strategy = HeraldMultiTenancy()
+                #solutions, invalid_solutions = self._herald_like()
+            case _:
+                raise RuntimeError(f"Unknown algorith: {self.conf.mt.algorithm}")
+
+        # Perform the optimization based on the specified strategy
+        ctx = MultiTenancyContext(
+            strategy=strategy,
+            node_stats=self.node_stats,
+            models=self.models,
+            noc=self.noc,
+            initial_tracker=self.layer_tracker,
+            conf=self.conf,
+            scheduling_algorithm=self.scheduling_algorithm,
+        )
+        solutions, invalid_solutions = ctx.run()
 
         if len(solutions) > 0:
             # Log some statistics
             system_runtimes: list[float] = []
             system_energy: list[float] = []
-            for bindings, schedule in solutions:
+            for schedule in solutions:
                 system_runtimes.append( max([sched.cur_time for sched in schedule.node_schedules.values()]) )
                 system_energy.append(schedule.get_system_energy(self.node_stats))
             

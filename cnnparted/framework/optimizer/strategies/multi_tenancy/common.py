@@ -157,8 +157,8 @@ def _score_tensor_transfer_energy(tracker: LayerBindings, models: dict[str, Onnx
         total_energy += sum(tensor_transfer_energy)
     return total_energy
 
-def _score_total_binding_energy(tracker: LayerBindings, models: dict[str, OnnxModel], noc: NocTopology,) -> float:
-    return _score_binding_energy(tracker) + _score_tensor_transfer_energy(noc, models, tracker)
+def _score_total_binding_energy(node_stats: SystemResult, tracker: LayerBindings, models: dict[str, OnnxModel], noc: NocTopology,) -> float:
+    return _score_binding_energy(node_stats, tracker) + _score_tensor_transfer_energy(tracker, models, noc)
 
 _SCORING_REGISTRY = {
     "schedule_even_finish": _score_even_finish,
@@ -166,7 +166,8 @@ _SCORING_REGISTRY = {
     "schedule_max_latency": _score_max_latency,
     
     "edp": _score_edp,
-    "binding_energy": _score_binding_energy,
+    #"binding_energy": _score_binding_energy,
+    "energy": _score_binding_energy,
     "binding_latency": _score_binding_latency,
     "latency": _score_binding_latency, #alias for now
     "static_max_latency": _score_static_max_latency,
@@ -177,12 +178,12 @@ _SCORING_REGISTRY = {
 
     "crit_path": _score_scheduling_proxy,
 
+    #"energy": _score_total_binding_energy,
     "tensor_energy": _score_tensor_transfer_energy,
-    "energy": _score_total_binding_energy,
 }
 
 def scoring_dispatch(score_fn: str, node_stats: SystemResult, tracker: LayerBindings,
-                     models: dict[str, OnnxModel], noc: NocTopology, schedules: SystemSchedule = None):
+                     models: dict[str, OnnxModel], noc: NocTopology, schedules: SystemSchedule = None) -> float:
     assert score_fn in _SCORING_REGISTRY, f"Unknown scoring function {score_fn}, supported are: {_SCORING_REGISTRY.keys()}"
 
     # To resolve the different function signatures, dispatch is performed through this match statement
@@ -196,5 +197,8 @@ def scoring_dispatch(score_fn: str, node_stats: SystemResult, tracker: LayerBind
         case "crit_path":
             return _SCORING_REGISTRY[score_fn](node_stats, tracker, models)
         
-        case "tensor_energy" | "energy":
+        case "energy":
+            return _SCORING_REGISTRY[score_fn](node_stats, tracker)
+        #    return _SCORING_REGISTRY[score_fn](node_stats, tracker, models, noc)
+        case "tensor_energy":
             return _SCORING_REGISTRY[score_fn](tracker, models, noc)

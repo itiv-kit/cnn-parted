@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from collections.abc import Callable
+from functools import partial
 import copy
 import os
 import time
@@ -12,22 +13,24 @@ import cloudpickle
 from loguru import logger
 import plotly.graph_objects as go
 
-from framework.optimizer.strategies.multi_tenancy.context import MultiTenancyContext
 
-from ._strategy import MultiTenancyStrategy
 from framework.model.layer_tracker import LayerBindings
 from framework.noc.noc import NocTopology
 from framework.model.onnx_model import OnnxModel
 from framework.node.node_evaluator import SystemResult
 from framework.scheduling import (validate_schedule, SystemSchedule)
-                        
 
-from common import (_score_binding_energy, _score_binding_latency, 
+from framework.helpers.config_helper import ConfigHelper
+
+
+from .common import (_score_binding_energy, 
+                     _score_binding_latency, 
                     _score_latency_fairness_gini,
                     _score_latency_fairness_jain,
                     _score_latency_fairness_max_min_space,
                     _score_latency_fairness_std_dev,
                     _score_scheduling_proxy,)
+from .common import scoring_dispatch
 
 @dataclass
 class ScheduleResult:
@@ -90,28 +93,32 @@ def scoring_worker(trial: optuna.Trial, models_id, node_stats_id, noc_id, priori
             sched: ScheduleResult = cost_fn(trial, base_models, scheduling_algorithm, node_stats, noc, scheduling_priority, tracker)
             cost = sched.schedule.system_latency
         else:
-            try:
-                cost = cost_fn(tracker)
-            except TypeError:
-                cost = cost_fn(tracker, base_models)
+            cost = cost_fn(node_stats, tracker, base_models, noc)
         cost_terms.append(cost) 
     return cost_terms, sched
 
 
 
 
-class OptunaMultiTenancy(MultiTenancyStrategy):
-    def run(self, ctx: MultiTenancyContext):
+class OptunaMultiTenancy:
+
+    def multi_tenancy_opt(self,
+                            node_stats: SystemResult,
+                            models: dict[str, OnnxModel],
+                            noc: NocTopology,
+                            conf: ConfigHelper,
+                            initial_tracker: LayerBindings,
+                            scheduling_algorithm: Callable[..., SystemSchedule],
+                          ) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
         """Optimize the assigment of layers to platforms a specified Optuna sampler.
         This aims to optize energy and latency as a multi-objective optimization.
         """
-        optuna_out_dir = os.path.join(ctx.conf.general.work_dir, "optuna")
-        plot_dir = os.path.join(ctx.conf.general.work_dir, "figures")
+        optuna_out_dir = os.path.join(conf.general.work_dir, "optuna")
+        plot_dir = os.path.join(conf.general.work_dir, "figures")
 
+        optuna_cfg = conf.mt.optimizer
 
-        optuna_cfg = ctx.conf.mt.optimizer
-
-        match ctx.conf.mt.optimizer.sampler:
+        match conf.mt.optimizer.sampler:
             case "grid":
                 sampler = optuna.samplers.GridSampler()
             case "tpe":
@@ -133,7 +140,7 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
             case "gp":
                 sampler = optuna.samplers.GPSampler()
             case _:
-                raise RuntimeError(f"Unknow selection for Optuna sampler, found: {ctx.conf.mt.optimizer.sampler}")
+                raise RuntimeError(f"Unknow selection for Optuna sampler, found: {conf.mt.optimizer.sampler}")
         
         # Configuration of cost terms to be calculated
         # Includes optimization direction, function to be called and pretty-print name
@@ -151,8 +158,10 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
         cost_terms = []
         cost_fns = []
         opt_direction = []
-        for cost_term in ctx.conf.mt.cost_terms:
-            opt_dir, fn, name = cost_term_mapping[cost_term]
+        for cost_term in conf.mt.cost_terms:
+            opt_dir, _, name = cost_term_mapping[cost_term]
+
+            fn = partial(scoring_dispatch, score_fn=cost_term)
             cost_terms.append(name)
             cost_fns.append(fn)
             opt_direction.append(opt_dir)
@@ -160,10 +169,10 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
             
         # Setup information for optuna. For every layer, sample from available 
         # platform ids to determine on which platform it should be executed
-        platform_ids = ctx.conf.system.platform_ids
-        work_layer_tracker = copy.deepcopy(ctx.initial_tracker)
-        num_trials = ctx.conf.mt.optimizer.n_trials
-        binding_granularity = ctx.conf.mt.binding_granularity
+        platform_ids = conf.system.platform_ids
+        work_layer_tracker = copy.deepcopy(initial_tracker)
+        num_trials = conf.mt.optimizer.n_trials
+        binding_granularity = conf.mt.binding_granularity
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
         def _suggest_task_bindings(trial: optuna.trial.Trial) -> list[int]:
@@ -177,7 +186,7 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
                 case "layer":
                     layer_id_binding: dict[int, int] = {}
                     for i, (nw, layer, current_binding) in enumerate(work_layer_tracker):
-                        layer_id = ctx.models[nw].node_by_layer_name(layer).id
+                        layer_id = models[nw].node_by_layer_name(layer).id
                         if layer_id not in layer_id_binding:
                             layer_bind = trial.suggest_categorical(f"layer_binding_{i}",
                                                                    choices=platform_ids)
@@ -186,7 +195,7 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
                         bindings.append(layer_bind)
                 case "network":
                     network_bind = {}
-                    for i, nw in enumerate(ctx.models.keys()):
+                    for i, nw in enumerate(models.keys()):
                         network_bind[nw] = trial.suggest_categorical(f"network_binding_{i}",
                                                                 choices=platform_ids)
                     for (nw, layer, current_binding) in work_layer_tracker:
@@ -202,10 +211,7 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
 
             cost_values = []
             for cost_fn in cost_fns:
-                try:
-                    cost = cost_fn(work_layer_tracker)
-                except TypeError:
-                    cost = cost_fn(work_layer_tracker, ctx.models)
+                cost = cost_fn(node_stats=node_stats, tracker=work_layer_tracker, models=models, noc=noc)
                 cost_values.append(cost)
 
             return cost_values
@@ -216,8 +222,8 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
         #   2) Perform scheduling only for pareto optimal task allocations
         os.makedirs(optuna_out_dir, exist_ok=True)
 
-        results: list[tuple[LayerBindings, SystemSchedule]] = []
-        invalid_results: list[tuple[LayerBindings, SystemSchedule]] = []
+        results: list[SystemSchedule] = []
+        invalid_results: list[SystemSchedule] = []
 
         study = optuna.create_study(sampler=sampler, directions=opt_direction, 
                                     study_name="optuna_allocation_opt",) # storage=storage_db
@@ -229,18 +235,18 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
 
         # 1. Initialize Ray
         scheduling_start_time = time.perf_counter()
-        ray.init(num_cpus=max(ctx.conf.mt.num_jobs, 1), ignore_reinit_error=True)
+        ray.init(num_cpus=max(conf.mt.num_jobs, 1), ignore_reinit_error=True)
         
         # 2. Put static objects in the Shared Memory Object Store
-        models_ref = ray.put(ctx.models)
-        node_stats_ref = ray.put(ctx.node_stats)
-        noc_ref = ray.put(ctx.noc)
-        priority_ref = ray.put(ctx.conf.mt.scheduling_priority)
+        models_ref = ray.put(models)
+        node_stats_ref = ray.put(node_stats)
+        noc_ref = ray.put(noc)
+        priority_ref = ray.put(conf.mt.scheduling_priority)
         cost_fns_ref = ray.put(cost_fns)
 
 
 
-        if "scheduling" in ctx.conf.mt.cost_terms:
+        if "scheduling" in conf.mt.cost_terms:
             # Scheduling must be evaluated for every Optuna trial
             # Pipelined implementation for ray: whenever a task finishes we immediately add a new one
             # Scheduling is very compute intesive, so we try to minimize runtime by doing so.
@@ -250,7 +256,7 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
             pbar = tqdm.tqdm(total=num_trials, desc="Pipelined Optimization")
 
             # A. Prime the pipeline: Fill all CPU cores with initial tasks
-            for _ in range(ctx.conf.mt.num_jobs):
+            for _ in range(conf.mt.num_jobs):
                 if finished_count + len(task_mapping) < num_trials:
                     trial = study.ask()
                     bindings = _suggest_task_bindings(trial)
@@ -265,7 +271,7 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
                         noc_ref, 
                         priority_ref, 
                         cost_fns_ref,
-                        ctx.scheduling_algorithm,
+                        scheduling_algorithm,
                         bindings_ref
                     )
                     task_mapping[t_id] = trial
@@ -317,7 +323,7 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
                             noc_ref, 
                             priority_ref, 
                             cost_fns_ref,
-                            ctx.scheduling_algorithm,
+                            scheduling_algorithm,
                             bindings_ref
                         )
                         
@@ -334,9 +340,9 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
                 with open(schedule_file, "rb") as f:
                    res: ScheduleResult = cloudpickle.load(f)
                 if res and res.is_valid:
-                    results.append((res.tracker, res.schedule))
+                    results.append(res.schedule)
                 elif res:
-                    invalid_results.append((res.tracker, res.schedule))
+                    invalid_results.append(res.schedule)
 
 
 
@@ -347,7 +353,7 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
             
             task_ids = [
                 scheduling_worker.remote(
-                    trial, models_ref, node_stats_ref, noc_ref, priority_ref, ctx.scheduling_algorithm
+                    trial, models_ref, node_stats_ref, noc_ref, priority_ref, scheduling_algorithm
                 )
                 for trial in bindings_to_schedule
             ]
@@ -376,9 +382,9 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
             
             for res in final_results:
                 if res.is_valid:
-                    results.append( (res.tracker, res.schedule) )
+                    results.append(res.schedule)
                 else:
-                    invalid_results.append( (res.tracker, res.schedule) )
+                    invalid_results.append(res.schedule)
             # #########################################################
             # ------------------ END Ray integration ------------------
             # #########################################################
@@ -437,23 +443,23 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
             end_violation: int = 0
             end_success: int = 0
 
-        deadline_stats = {network: DeadlineStats() for network in ctx.models.keys()}
+        deadline_stats = {network: DeadlineStats() for network in models.keys()}
         all_partial_succeeded = []
         all_fully_succeeded = []
-        for _, schedule in results + invalid_results:
+        for schedule in results + invalid_results:
             network_frame_endtimes = schedule.network_finish_times
             partial_succ = True
             fully_succ = True
             for nw, frame_endtimes in network_frame_endtimes.items():
                 
                 # Check if every single frame finishes with the deadline
-                for frame_endtime, deadline in zip(frame_endtimes, ctx.models[nw].deadlines, strict=True):
+                for frame_endtime, deadline in zip(frame_endtimes, models[nw].deadlines, strict=True):
                     if frame_endtime > deadline:
                         deadline_stats[nw].partial_violation += 1
                         fully_succ = False
                         break
                 
-                if frame_endtimes[-1] > 1000 and ctx.models[nw].has_frame_constraint:
+                if frame_endtimes[-1] > 1000 and models[nw].has_frame_constraint:
                     # Check if the last frame is finished before 1s elapsed
                     partial_succ = False
                     fully_succ = False
@@ -471,7 +477,7 @@ class OptunaMultiTenancy(MultiTenancyStrategy):
         num_sched = len(all_partial_succeeded)
         logger.info(f"All deadlines were wet in {num_all_succ}/{num_sched} cases ({num_all_succ/num_sched*100:.2f}%)")
         for nw, stats in deadline_stats.items():
-            if ctx.models[nw].has_constraints:
+            if models[nw].has_constraints:
                 logger.info(f"End-frame success for {nw} in {stats.end_success}/{num_sched} cases ({stats.end_success/(num_sched)*100:.2f}%)")
 
         return results, invalid_results

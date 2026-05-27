@@ -127,7 +127,7 @@ class VisualizeSchedule(Stage):
         nw_color_palette = self.color_schemes[self.num_networks]
         nw_color_lut = {workload_spec.name: nw_color for workload_spec, nw_color in zip(self.config.workload.workload_spec, nw_color_palette)}
 
-        for i, (tracker, schedule) in enumerate(self.mt_solutions):
+        for i, schedule in enumerate(self.mt_solutions):
             fig = go.Figure()
             nw_legend_lut = {workload_spec.name: False for workload_spec in self.config.workload.workload_spec}
             for platform, node_schedule in schedule.node_schedules.items():

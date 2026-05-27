@@ -40,5 +40,5 @@ class MultiTenancyOptimization(Stage):
 
 @dataclass
 class MultiTenancyOptimizationArtifacts():
-    solutions: list[tuple[LayerBindings, SystemSchedule]] = None
-    invalid_solutions: list[tuple[LayerBindings, SystemSchedule]] = None
+    solutions: list[SystemSchedule] = None
+    invalid_solutions: list[SystemSchedule] = None

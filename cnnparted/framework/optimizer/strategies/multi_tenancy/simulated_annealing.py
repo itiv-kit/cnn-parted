@@ -1,33 +1,44 @@
-import numpy as np
+from typing import Callable
 import copy
 import os
+
+import numpy as np
 import plotly.express as px
 
-from ._strategy import MultiTenancyStrategy
-from .context import MultiTenancyContext
 from .common import _score_edp, _score_idle_times, _score_max_latency
 
 from framework.model.layer_tracker import LayerBindings
 from framework.scheduling import SystemSchedule
+from framework.helpers.config_helper import ConfigHelper
+from framework.model.onnx_model import OnnxModel
+from framework.noc.noc import NocTopology
+from framework.node.node_evaluator import SystemResult
 
-class SaMultiTenancy(MultiTenancyStrategy):
-    def run(self, ctx: MultiTenancyContext):
+class SaMultiTenancy:
+    def multi_tenancy_opt(self,
+                            node_stats: SystemResult,
+                            models: dict[str, OnnxModel],
+                            noc: NocTopology,
+                            conf: ConfigHelper,
+                            initial_tracker: LayerBindings,
+                            scheduling_algorithm: Callable[..., SystemSchedule],
+                          ) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
         """Optimize the assigment of layers to platforms using simulated annealing.
         This optimizer only supports single-objective optimization."""
 
         
-        initial_schedule = ctx.scheduling_algorithm(ctx.models, ctx.node_stats, priority=ctx.conf.mt.scheduling_priority)
-        num_nodes = ctx.initial_tracker.get_num_layers()
-        initial_cost = self._calc_cost(ctx.initial_tracker, initial_schedule)
+        initial_schedule = scheduling_algorithm(models, node_stats, priority=conf.mt.scheduling_priority)
+        num_nodes = initial_tracker.get_num_layers()
+        initial_cost = self._calc_cost(initial_tracker, initial_schedule)
         num_iter = num_nodes * 100
         t_start = initial_cost*8
         convergence_counter = 0
         cost_history = []
 
-        node_ids = ctx.node_stats.get_platform_ids()
+        node_ids = node_stats.get_platform_ids()
         old_cost = initial_cost
         best_cost = np.inf
-        current_state = copy.deepcopy(ctx.initial_tracker)
+        current_state = copy.deepcopy(initial_tracker)
         improvement_counter = convergence_counter
         convergence = False
         rng = np.random.default_rng()
@@ -70,7 +81,7 @@ class SaMultiTenancy(MultiTenancyStrategy):
                 
                 # Modify the binding and score it
                 new_state = _random_modify(current_state)
-                node_schedules: SystemSchedule = ctx.scheduling_algorithm(ctx.models, new_state, ctx.node_stats, ctx.noc, priority=ctx.conf.mt.scheduling_priority)
+                node_schedules: SystemSchedule = scheduling_algorithm(models, new_state, node_stats, noc, priority=conf.mt.scheduling_priority)
                 new_cost = self._calc_cost(new_state, node_schedules)
                 
                 if rng.random() <= np.exp( -(new_cost - old_cost) / t ):
@@ -97,11 +108,10 @@ class SaMultiTenancy(MultiTenancyStrategy):
         fig = px.line(cost_history, title="EDP History for SA")
         fig.update_yaxes(title_text="EDP")
         fig.update_xaxes(title_text="Iteration")
-        fig.write_html(os.path.join(ctx.conf.general.work_dir, "edp_history_sa.html")) #TODO: Correct dir
+        fig.write_html(os.path.join(conf.general.work_dir, "edp_history_sa.html")) #TODO: Correct dir
 
         # Result is a list for compatibility with Multi-Objective Opt
-        result = (best_state, best_schedule)
-        return [result]
+        return [best_schedule], [] #TODO
 
     def _calc_cost(self, tracker: LayerBindings, schedules: SystemSchedule) -> float:
         edp_cost =  _score_edp(tracker)
