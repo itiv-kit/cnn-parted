@@ -72,7 +72,7 @@ class PydeapMultiTenancy:
 
         num_attrs = len(initial_tracker)
         num_indiv = conf.mt.optimizer.population_size
-        num_generations = conf.mt.optimizer.n_trials
+        num_generations = conf.mt.optimizer.num_gen
         prob_crossover = conf.mt.optimizer.crossover_prob
         prob_mut = conf.mt.optimizer.mutation_prob
 
@@ -111,8 +111,6 @@ class PydeapMultiTenancy:
             fn = partial(scoring_dispatch, cost_term)
             cost_fns.append(fn)
 
-            #stats.register(f"min_{cost_term}", np.min)
-            #stats.register(f"med_{cost_term}", np.median)
             stats.register(f"min_{cost_term}", lambda values, i=idx: np.min([v[i] for v in values]))
             stats.register(f"med_{cost_term}", lambda values, i=idx: np.median([v[i] for v in values]))
 

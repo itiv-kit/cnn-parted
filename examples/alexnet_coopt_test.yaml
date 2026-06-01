@@ -21,7 +21,7 @@ dse:
   optimizer:
     algorithm: nsga2
     num_gen: 2
-    pop_size: 4
+    population_size: 4
   problem: DesignProblem
 
 partitioning:

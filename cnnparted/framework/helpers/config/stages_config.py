@@ -6,12 +6,12 @@ from enum import Enum, auto
 class GeneticAlgConfig:
     algorithm: str
     num_gen: int
-    pop_size: int
+    population_size: int
 
     def __init__(self, cfg):
         self.algorithm = cfg["algorithm"]
         self.num_gen = cfg["num_gen"]
-        self.pop_size = cfg["pop_size"]
+        self.population_size = cfg["population_size"]
 
 @dataclass
 class SimulatedAnnealingConfig:
@@ -27,6 +27,9 @@ class SimulatedAnnealingConfig:
 @dataclass
 class OptunaConfig:
     n_trials: int
+    population_size: int
+    mutation_prob: float
+    crossover_prob: float
     sampler: Literal["random", "grid", "tpe", "cmaes", "nsga2", "nsga3", "qmc", "gp"]
 
     def __init__(self, cfg: dict):
@@ -35,6 +38,21 @@ class OptunaConfig:
         self.population_size = cfg.get("population_size", 150)
         self.mutation_prob = cfg.get("mutation_prob", 0.001)
         self.crossover_prob = cfg.get("crossover_prob", 0.9)
+
+@dataclass
+class DeapConfig:
+    num_gen: int
+    population_size: int
+    mutation_prob: float
+    crossover_prob: float
+    sampler: Literal["ga", "gp"]
+
+    def __init__(self, cfg: dict):
+        self.num_gen = int(cfg["num_gen"])
+        self.sampler = cfg["sampler"]
+        self.population_size = cfg.get("population_size", 150)
+        self.mutation_prob = cfg.get("mutation_prob", 0.3)
+        self.crossover_prob = cfg.get("crossover_prob", 0.6)
 
 @dataclass
 class HeraldConfig:
@@ -90,8 +108,8 @@ class SchedulingPriority(Enum):
 
 @dataclass
 class MultiTenancyStageConfig:
-    optimizer: GeneticAlgConfig | SimulatedAnnealingConfig | OptunaConfig | HeraldConfig
-    algorithm: Literal["sa", "genetic", "optuna", "herald"]
+    optimizer: SimulatedAnnealingConfig | OptunaConfig | HeraldConfig | DeapConfig
+    strategy: Literal["sa", "optuna", "herald", "deap"]
     scheduling: Literal["list", "multi_queue"]
     scheduling_priority: SchedulingPriority
     binding_granularity: Literal["tile", "layer", "network"]
@@ -101,7 +119,7 @@ class MultiTenancyStageConfig:
     cost_terms: list[str]
 
     def __init__(self, cfg: dict):
-        self.algorithm = cfg["algorithm"]
+        self.strategy = cfg["strategy"]
         self.scheduling = cfg["scheduling"]
         self.scheduling_priority = SchedulingPriority[cfg["scheduling_priority"].upper()]
         self.binding_granularity = cfg["binding_granularity"]
@@ -113,14 +131,12 @@ class MultiTenancyStageConfig:
         valid_cost_terms = ["energy", "latency", "gini", "jain", "max_min_space", "std_dev", "crit_path", "scheduling"]
         assert all([cost_term in valid_cost_terms for cost_term in self.cost_terms]), f"Invalid configuration of cost terms. Valid are: {valid_cost_terms}"
 
-        match self.algorithm:
+        match self.strategy:
             case "sa":
                 self.optimizer = SimulatedAnnealingConfig(cfg["optimizer"])
-            case "genetic":
-                self.optimizer = GeneticAlgConfig(cfg["optimizer"])
             case "optuna":
                 self.optimizer = OptunaConfig(cfg["optimizer"])
             case "deap":
-                self.optimizer = OptunaConfig(cfg["optimizer"])
+                self.optimizer = DeapConfig(cfg["optimizer"])
             case "herald":
                 self.optimizer = HeraldConfig(cfg["optimizer"])

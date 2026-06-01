@@ -5,8 +5,6 @@ from collections import defaultdict
 from dataclasses import dataclass
 import itertools as it
 import time
-import sys
-import pdb
 from collections.abc import Callable
 import statistics
 import cloudpickle
@@ -20,7 +18,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 import optuna
-from optuna.samplers.nsgaii import BLXAlphaCrossover, UniformCrossover
+from optuna.samplers.nsgaii import UniformCrossover
 import tqdm
 
 from framework.optimizer.strategies.multi_tenancy import (MultiTenancyContext,
@@ -636,10 +634,10 @@ class MultiTenancyProblem():
     
     def minimize(self) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
         # Distribute workload between platforms
-        logger.debug(f"Optimizing multitenancy problem with {self.conf.mt.algorithm}")
+        logger.debug(f"Optimizing multitenancy problem with {self.conf.mt.strategy}")
         
 
-        match self.conf.mt.algorithm:
+        match self.conf.mt.strategy:
             case "optuna":
                 strategy = OptunaMultiTenancy()
                 #solutions, invalid_solutions = self._optuna_optimizer()
@@ -652,7 +650,7 @@ class MultiTenancyProblem():
             case "deap":
                 strategy = PydeapMultiTenancy()
             case _:
-                raise RuntimeError(f"Unknown algorith: {self.conf.mt.algorithm}")
+                raise RuntimeError(f"Unknown algorith: {self.conf.mt.strategy}")
 
         # Perform the optimization based on the specified strategy
         ctx = MultiTenancyContext(

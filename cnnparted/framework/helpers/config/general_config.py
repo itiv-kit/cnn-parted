@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from math import inf
 from pathlib import Path
@@ -17,7 +18,8 @@ class GeneralConfig:
         self.num_topos = general_cfg.get("num_topos", 1)
         self.num_jobs = general_cfg.get("num_jobs", 1)
         self.optimization = general_cfg.get("optimization", "all")
-        self.work_dir = general_cfg.get("work_dir", None)
+        self.work_dir = general_cfg["work_dir"] #general_cfg.get("work_dir", None)
+        self.plot_dir = os.path.join(self.work_dir, "figures")
         self.keep_dir = general_cfg.get("keep_dir", True)
 
 @dataclass

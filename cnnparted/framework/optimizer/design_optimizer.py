@@ -34,8 +34,8 @@ class DesignOptimizer(Optimizer):
                  problem, dse_system_config: DseStageConfig, 
                  work_dir: str, ga: GraphAnalyzer, run_name: str, show_progress: bool):
         self.dse_system_config = dse_system_config
-        self.num_gen =  dse_system_config.optimizer.num_gen #["optimizer"].get("num_gen")
-        self.pop_size = dse_system_config.optimizer.pop_size #["optimizer"].get("pop_size")
+        self.num_gen =  dse_system_config.optimizer.num_gen
+        self.pop_size = dse_system_config.optimizer.population_size
 
         self.node_components = node_components
         self.node_ids = [node.id for node in self.node_components]

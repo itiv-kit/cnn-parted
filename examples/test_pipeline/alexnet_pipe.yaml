@@ -12,7 +12,7 @@ dse:
   optimizer:
     algorithm: exhaustive
     num_gen: 4
-    pop_size: 25
+    population_size: 25
   optimization: edap
 
 pipeline:

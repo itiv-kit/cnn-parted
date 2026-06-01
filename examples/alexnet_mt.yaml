@@ -53,15 +53,17 @@ pipeline:
   - VisualizeSchedule
 
 multi-tenancy:
-  algorithm: optuna
-  scheduling: multi_queue
-  scheduling_priority: earliest_finish
-  binding_granularity: layer
-  num_jobs: 8
+  strategy: deap
+  scheduling: list
+  scheduling_priority: earliest_start
+  binding_granularity: tile
+  num_jobs: 1
   cost_terms: ["energy", "latency"]
   optimizer:
-    n_trials: 5000
+    n_trials: 300
     sampler: nsga2
+    mutation_prob: 0.6
+    crossover_prob: 0.3
 
 system:
   compute:
