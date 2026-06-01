@@ -31,7 +31,11 @@ class LayerBindings:
     def get_num_layers(self) -> int:
         layer_ctr = [ len(layers) for layers in self.network_info.values() ]
         return sum(layer_ctr)
-
+    
+    def __len__(self):
+        layer_ctr = [ len(layers) for layers in self.network_info.values() ]
+        return sum(layer_ctr)
+        
     def set_all_bindings(self, new_bindings: list[int]):
         """Takes a list[int] where each entry denotes the platform on which a layer should be executed"""
         idx = 0
@@ -39,6 +43,7 @@ class LayerBindings:
             for layer in layers:
                 self.network_info[nw][layer] = new_bindings[idx]
                 idx += 1
+        return self
 
     def swap_layers(self, nws_layers: list[tuple[str,str]]):
         """Swap the binding of two layers that are on different platforms"""

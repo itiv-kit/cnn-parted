@@ -38,12 +38,12 @@ class ScheduleResult:
     tracker: LayerBindings
     is_valid: bool
 
-def scheduling_wrapper(trial: optuna.Trial, models: dict[str, OnnxModel], scheduling_algorithm,
+def scheduling_wrapper(models: dict[str, OnnxModel], scheduling_algorithm,
                         node_stats: SystemResult, noc: NocTopology, scheduling_priority, bindings: list[int]) -> ScheduleResult:
     """Wrapper to simplify parallelizing scheduling"""
 
     # --- SCHEDULING ---
-    tracker: LayerBindings = bindings #trial.user_attrs["bindings"]
+    tracker: LayerBindings = bindings
     system_schedule: SystemSchedule = scheduling_algorithm(models, tracker, node_stats, noc, priority=scheduling_priority)
 
     # --- VALIDATION ---
@@ -74,7 +74,7 @@ def scheduling_worker(trial, models_id, node_stats_id, noc_id, priority_id, sche
     return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
 
 @ray.remote
-def scoring_worker(trial: optuna.Trial, models_id, node_stats_id, noc_id, priority_id, cost_fns_id, scheduling_algorithm, bindings_id):
+def scoring_worker(models_id, node_stats_id, noc_id, priority_id, cost_fns_id, scheduling_algorithm, bindings_id):
     """
     Worker function: Given a trial, perform all cost evaluations
     """
@@ -90,7 +90,7 @@ def scoring_worker(trial: optuna.Trial, models_id, node_stats_id, noc_id, priori
     sched = None
     for cost_fn in cost_fns:
         if cost_fn.__name__ == "scheduling_wrapper":
-            sched: ScheduleResult = cost_fn(trial, base_models, scheduling_algorithm, node_stats, noc, scheduling_priority, tracker)
+            sched: ScheduleResult = cost_fn(base_models, scheduling_algorithm, node_stats, noc, scheduling_priority, tracker)
             cost = sched.schedule.system_latency
         else:
             cost = cost_fn(node_stats, tracker, base_models, noc)
@@ -148,7 +148,7 @@ class OptunaMultiTenancy:
             "energy":           ("minimize", _score_binding_energy, "Cum. Energy"),
             "latency":          ("minimize", _score_binding_latency, "Cum. Latency"),
             "gini":             ("minimize", _score_latency_fairness_gini, "Gini"),
-            "jain":             ("maximize", _score_latency_fairness_jain, "Jain"),
+            "jain":             ("minimize", _score_latency_fairness_jain, "Jain"),
             "max_min_space":    ("minimize", _score_latency_fairness_max_min_space, "Max-Min Space"),
             "std_dev":          ("minimize", _score_latency_fairness_std_dev, "Std. dev"),
             "crit_path":        ("minimize", _score_scheduling_proxy, "Critical Path"),
@@ -265,7 +265,6 @@ class OptunaMultiTenancy:
                     
                     # Dispatch to Ray immediately
                     t_id = scoring_worker.remote(
-                        trial,
                         models_ref, 
                         node_stats_ref, 
                         noc_ref, 

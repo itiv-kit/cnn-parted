@@ -31,7 +31,6 @@ class OptunaConfig:
 
     def __init__(self, cfg: dict):
         self.n_trials = int(cfg["n_trials"])
-        self.n_trials_prostproc = int(cfg.get("n_trials_postproc", 0))
         self.sampler = cfg["sampler"]
         self.population_size = cfg.get("population_size", 150)
         self.mutation_prob = cfg.get("mutation_prob", 0.001)
@@ -120,6 +119,8 @@ class MultiTenancyStageConfig:
             case "genetic":
                 self.optimizer = GeneticAlgConfig(cfg["optimizer"])
             case "optuna":
+                self.optimizer = OptunaConfig(cfg["optimizer"])
+            case "deap":
                 self.optimizer = OptunaConfig(cfg["optimizer"])
             case "herald":
                 self.optimizer = HeraldConfig(cfg["optimizer"])

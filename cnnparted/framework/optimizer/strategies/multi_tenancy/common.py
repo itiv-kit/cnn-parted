@@ -62,7 +62,7 @@ def _score_static_max_latency(node_stats: SystemResult, tracker:LayerBindings) -
     return max(latencies.values())
 
 def _score_latency_fairness_jain(node_stats: SystemResult, tracker: LayerBindings) -> float:
-    """Calculate jains fairness index -> to be maximized"""
+    """Calculate 1 - jains fairness index  to create a minimization goal"""
     latencies  = {id: 0 for id in node_stats.get_platform_ids()}
     for nw, layer, binding in tracker:
         layer_data = node_stats[binding].designs[0].networks[nw].layers[layer]
@@ -72,7 +72,7 @@ def _score_latency_fairness_jain(node_stats: SystemResult, tracker: LayerBinding
     x = sum(lats)**2
     y = node_stats.get_num_platforms() * (sum([lat**2 for lat in lats])) 
     J = x / y
-    return J
+    return 1 - J
 
 def _score_latency_fairness_std_dev(node_stats: SystemResult, tracker: LayerBindings) -> float:
     """Calculate std deviation of latency on different platforms"""
