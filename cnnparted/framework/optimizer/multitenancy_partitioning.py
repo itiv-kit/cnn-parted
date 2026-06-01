@@ -26,7 +26,8 @@ import tqdm
 from framework.optimizer.strategies.multi_tenancy import (MultiTenancyContext,
                                                           HeraldMultiTenancy, 
                                                           SaMultiTenancy, 
-                                                          OptunaMultiTenancy,)
+                                                          OptunaMultiTenancy,
+                                                          PydeapMultiTenancy)
 
 from framework.model.layer_tracker import LayerBindings
 from framework.noc.noc import NocTopology
@@ -648,6 +649,8 @@ class MultiTenancyProblem():
             case "herald":
                 strategy = HeraldMultiTenancy()
                 #solutions, invalid_solutions = self._herald_like()
+            case "deap":
+                strategy = PydeapMultiTenancy()
             case _:
                 raise RuntimeError(f"Unknown algorith: {self.conf.mt.algorithm}")
 

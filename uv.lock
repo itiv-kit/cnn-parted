@@ -243,6 +243,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "absl-py" },
     { name = "cerberus" },
+    { name = "deap" },
     { name = "debugpy" },
     { name = "joblib" },
     { name = "kaleido" },
@@ -283,6 +284,7 @@ dependencies = [
 requires-dist = [
     { name = "absl-py", specifier = ">=2.3.0" },
     { name = "cerberus", specifier = ">=1.3.8" },
+    { name = "deap", specifier = ">=1.4.4" },
     { name = "debugpy", specifier = ">=1.8.20" },
     { name = "joblib", specifier = ">=1.5.1" },
     { name = "kaleido", specifier = ">=1.0.0" },
@@ -423,6 +425,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a9/95/a3dbbb5028f35eafb79008e7522a75244477d2838f38cbb722248dabc2a8/cycler-0.12.1.tar.gz", hash = "sha256:88bb128f02ba341da8ef447245a9e138fae777f6a23943da4540077d3601eb1c", size = 7615, upload-time = "2023-10-07T05:32:18.335Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl", hash = "sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30", size = 8321, upload-time = "2023-10-07T05:32:16.783Z" },
+]
+
+[[package]]
+name = "deap"
+version = "1.4.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "moocore" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0c/74/31d2dc3bfcf36257ef4ef2d00a9451696d43d10284bf1495340b2e62aecc/deap-1.4.4.tar.gz", hash = "sha256:50d4bd924fca5a16a3dba8bfdb1140a55e9c24ce50816ab4f5683d2f31c2d734", size = 1053722, upload-time = "2026-04-17T21:03:12.548Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7d/6e/4ba2e2e45fde8483b67e7bee7401a7f132e02c4058d31b6db301f546089a/deap-1.4.4-py3-none-any.whl", hash = "sha256:06c2fcf2e9f870da035c1372c9156ee817c2c31659ee70aae2dcc0849d2c8c49", size = 93078, upload-time = "2026-04-17T21:03:10.952Z" },
 ]
 
 [[package]]
@@ -894,6 +909,26 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "moocore"
+version = "0.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+    { name = "numpy" },
+    { name = "platformdirs" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9c/95/0e36dbb8f44690a3540ca3c8c08f9000799d95a5eeec2a49abc7c76a8a0f/moocore-0.3.1.tar.gz", hash = "sha256:a8f83cfbc0aa81c1c9dd33e473adbc9b638dc3b1a6943753f8146770bb76bae4", size = 424672, upload-time = "2026-05-04T21:39:12.77Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/76/fd/da7e96fca6a05f5a80b682aa75f301e2ce870836fc444973a2c717beb945/moocore-0.3.1-cp310-abi3-macosx_10_9_universal2.whl", hash = "sha256:cf22852e951e66cb1145858ff1e4fabcb2810dfc2c19d8df99bdc1a52b28c591", size = 631735, upload-time = "2026-05-04T21:39:01.39Z" },
+    { url = "https://files.pythonhosted.org/packages/40/df/c4715242db5a0d0e17578c5e643334c17d7760cd9f66c17b76a3b8267fb5/moocore-0.3.1-cp310-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:14af334b83ddf6fbdec8e5ab6e3246e85ad6b34b0f1b2c44a52e3c5561ff5530", size = 882475, upload-time = "2026-05-04T21:39:03.675Z" },
+    { url = "https://files.pythonhosted.org/packages/34/74/6230c8c2865586ce4c4b0eea994bccadd9e3e28f6acd9cade123ba8516fa/moocore-0.3.1-cp310-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:bd0a65e501e704e5270d564c3b32438ddac34d22d3c5c54b01b8c897f4d949aa", size = 866948, upload-time = "2026-05-04T21:39:05.2Z" },
+    { url = "https://files.pythonhosted.org/packages/23/10/6cbbc1039ce33a862d6fa7e24d381635ffd183a3e5a2036bad8477cb9c62/moocore-0.3.1-cp310-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:3fd980c39e8ad4ba12147ac01f700ec402fb25d452beeccc1a7dc2e0b61e95ca", size = 875147, upload-time = "2026-05-04T21:39:06.846Z" },
+    { url = "https://files.pythonhosted.org/packages/14/17/0ead0e1ea08fdc9a980c2525c61e034d5161675cbb320eae61028e93868d/moocore-0.3.1-cp310-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:7b9ddc86e6949d5b5466e805d474b5ae2dbb866ae218dfe7b53cee9eed0151ff", size = 862014, upload-time = "2026-05-04T21:39:08.232Z" },
+    { url = "https://files.pythonhosted.org/packages/09/93/a21b67ddaddb89843869b78e7691d20eab5c5b869a2908cda86fd0d8f663/moocore-0.3.1-cp310-abi3-win_amd64.whl", hash = "sha256:0d5b666bf80bc972816ba8586de77ac6eeaf2b55ab493310487c14e90d491650", size = 517463, upload-time = "2026-05-04T21:39:09.574Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/dc/cd6f4a8977011db9a62c7981462e1820593ee44720a1f3c9a7abe8a94421/moocore-0.3.1-cp310-abi3-win_arm64.whl", hash = "sha256:52178eaaa12babe9532c5494d619cb44c791660adc7ae70dbd2daccf37b7990f", size = 505777, upload-time = "2026-05-04T21:39:11.206Z" },
 ]
 
 [[package]]
@@ -1411,6 +1446,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f0/77/bc6f92a3e8e6e46c0ca78abfffec0037845800ea38c73483760362804c41/pillow-11.3.0-cp314-cp314t-win32.whl", hash = "sha256:118ca10c0d60b06d006be10a501fd6bbdfef559251ed31b794668ed569c87e12", size = 6377370, upload-time = "2025-07-01T09:15:46.673Z" },
     { url = "https://files.pythonhosted.org/packages/4a/82/3a721f7d69dca802befb8af08b7c79ebcab461007ce1c18bd91a5d5896f9/pillow-11.3.0-cp314-cp314t-win_amd64.whl", hash = "sha256:8924748b688aa210d79883357d102cd64690e56b923a186f35a82cbc10f997db", size = 7121500, upload-time = "2025-07-01T09:15:48.512Z" },
     { url = "https://files.pythonhosted.org/packages/89/c7/5572fa4a3f45740eaab6ae86fcdf7195b55beac1371ac8c619d880cfe948/pillow-11.3.0-cp314-cp314t-win_arm64.whl", hash = "sha256:79ea0d14d3ebad43ec77ad5272e6ff9bba5b679ef73375ea760261207fa8e0aa", size = 2512835, upload-time = "2025-07-01T09:15:50.399Z" },
+]
+
+[[package]]
+name = "platformdirs"
+version = "4.9.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/4a/0883b8e3802965322523f0b200ecf33d31f10991d0401162f4b23c698b42/platformdirs-4.9.6.tar.gz", hash = "sha256:3bfa75b0ad0db84096ae777218481852c0ebc6c727b3168c1b9e0118e458cf0a", size = 29400, upload-time = "2026-04-09T00:04:10.812Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/75/a6/a0a304dc33b49145b21f4808d763822111e67d1c3a32b524a1baf947b6e1/platformdirs-4.9.6-py3-none-any.whl", hash = "sha256:e61adb1d5e5cb3441b4b7710bea7e4c12250ca49439228cc1021c00dcfac0917", size = 21348, upload-time = "2026-04-09T00:04:09.463Z" },
 ]
 
 [[package]]
