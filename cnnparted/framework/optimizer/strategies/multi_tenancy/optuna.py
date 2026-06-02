@@ -18,7 +18,8 @@ from framework.model.layer_tracker import LayerBindings
 from framework.noc.noc import NocTopology
 from framework.model.onnx_model import OnnxModel
 from framework.node.node_evaluator import SystemResult
-from framework.scheduling import (validate_schedule, SystemSchedule)
+from framework.scheduling import validate_schedule, SystemSchedule
+from framework.scheduling.deadline_eval import deadline_evaluation
 
 from framework.helpers.config_helper import ConfigHelper
 
@@ -39,7 +40,8 @@ class ScheduleResult:
     is_valid: bool
 
 def scheduling_wrapper(models: dict[str, OnnxModel], scheduling_algorithm,
-                        node_stats: SystemResult, noc: NocTopology, scheduling_priority, bindings: list[int]) -> ScheduleResult:
+                        node_stats: SystemResult, noc: NocTopology, scheduling_priority, 
+                        bindings: LayerBindings) -> ScheduleResult:
     """Wrapper to simplify parallelizing scheduling"""
 
     # --- SCHEDULING ---
@@ -114,7 +116,6 @@ class OptunaMultiTenancy:
         This aims to optize energy and latency as a multi-objective optimization.
         """
         optuna_out_dir = os.path.join(conf.general.work_dir, "optuna")
-        plot_dir = os.path.join(conf.general.work_dir, "figures")
 
         optuna_cfg = conf.mt.optimizer
 
@@ -145,24 +146,24 @@ class OptunaMultiTenancy:
         # Configuration of cost terms to be calculated
         # Includes optimization direction, function to be called and pretty-print name
         cost_term_mapping = {
-            "energy":           ("minimize", _score_binding_energy, "Cum. Energy"),
-            "latency":          ("minimize", _score_binding_latency, "Cum. Latency"),
-            "gini":             ("minimize", _score_latency_fairness_gini, "Gini"),
-            "jain":             ("minimize", _score_latency_fairness_jain, "Jain"),
+            "energy":           ("minimize", _score_binding_energy,                 "Cum. Energy"),
+            "latency":          ("minimize", _score_binding_latency,                "Cum. Latency"),
+            "gini":             ("minimize", _score_latency_fairness_gini,          "Gini"),
+            "jain":             ("minimize", _score_latency_fairness_jain,          "Jain"),
             "max_min_space":    ("minimize", _score_latency_fairness_max_min_space, "Max-Min Space"),
-            "std_dev":          ("minimize", _score_latency_fairness_std_dev, "Std. dev"),
-            "crit_path":        ("minimize", _score_scheduling_proxy, "Critical Path"),
-            "scheduling":       ("minimize",  scheduling_wrapper, "Makespan")
+            "std_dev":          ("minimize", _score_latency_fairness_std_dev,       "Std. dev"),
+            "crit_path":        ("minimize", _score_scheduling_proxy,               "Critical Path"),
+            "scheduling":       ("minimize",  scheduling_wrapper,                   "Makespan")
         }
 
-        cost_terms = []
+        cost_names = []
         cost_fns = []
         opt_direction = []
         for cost_term in conf.mt.cost_terms:
             opt_dir, _, name = cost_term_mapping[cost_term]
 
             fn = partial(scoring_dispatch, score_fn=cost_term)
-            cost_terms.append(name)
+            cost_names.append(name)
             cost_fns.append(fn)
             opt_direction.append(opt_dir)
 
@@ -233,7 +234,6 @@ class OptunaMultiTenancy:
         noc_ref = ray.put(noc)
         priority_ref = ray.put(conf.mt.scheduling_priority)
         cost_fns_ref = ray.put(cost_fns)
-
 
 
         if "scheduling" in conf.mt.cost_terms:
@@ -379,7 +379,18 @@ class OptunaMultiTenancy:
             # #########################################################
 
 
+
+        logger.debug(f"Multi-Tenancy optimization complete, found {len(study.best_trials)} Parto-optimal solutions")
+        
+        self.plot_results(conf, study, cost_names)
+        deadline_evaluation(models, results, invalid_results)
+
+        return results, invalid_results
+
+    def plot_results(self, conf: ConfigHelper, study: optuna.Study, cost_names: list[str]):
         # Plotting to make sense of the results
+        plot_dir = os.path.join(conf.general.work_dir, "figures")
+
         fig: go.Figure = optuna.visualization.plot_pareto_front(study, target_names=["Energy", "Latency"], 
                                                                 targets=lambda t: (t.values[0], t.values[1]),
                                                                 include_dominated_trials=False)
@@ -402,7 +413,7 @@ class OptunaMultiTenancy:
         fig.write_html(os.path.join(plot_dir, file_name+".html"))
         fig.write_image(os.path.join(plot_dir, file_name+".png"))
 
-        for idx, target in enumerate(cost_terms):
+        for idx, target in enumerate(cost_names):
             fig: go.Figure = optuna.visualization.plot_optimization_history(study, target_name=target, target=lambda t: t.values[idx])
             fig.update_layout(
                 title_text="",
@@ -420,55 +431,4 @@ class OptunaMultiTenancy:
             file_name = f"history_{target.lower()}_optuna"
             fig.write_html(os.path.join(plot_dir, file_name+".html"))
             fig.write_image(os.path.join(plot_dir, file_name+".png"))
-
-        logger.debug(f"Multi-Tenancy optimization complete, found {len(study.best_trials)} Parto-optimal solutions")
-        logger.info("Performing scheduling of pareto-optimal bindings")
-        
-        # Log some statistics about deadline success rates
-        @dataclass
-        class DeadlineStats:
-            success: int = 0
-            partial_violation: int = 0
-            end_violation: int = 0
-            end_success: int = 0
-
-        deadline_stats = {network: DeadlineStats() for network in models.keys()}
-        all_partial_succeeded = []
-        all_fully_succeeded = []
-        for schedule in results + invalid_results:
-            network_frame_endtimes = schedule.network_finish_times
-            partial_succ = True
-            fully_succ = True
-            for nw, frame_endtimes in network_frame_endtimes.items():
-                
-                # Check if every single frame finishes with the deadline
-                for frame_endtime, deadline in zip(frame_endtimes, models[nw].deadlines, strict=True):
-                    if frame_endtime > deadline:
-                        deadline_stats[nw].partial_violation += 1
-                        fully_succ = False
-                        break
-                
-                if frame_endtimes[-1] > 1000 and models[nw].has_frame_constraint:
-                    # Check if the last frame is finished before 1s elapsed
-                    partial_succ = False
-                    fully_succ = False
-                    deadline_stats[nw].end_violation += 1
-                else:
-                    # If the last frame is successful, we count it as a success
-                    # This is a relaxed definition
-                    partial_succ = True
-                    deadline_stats[nw].end_success += 1
-
-            all_fully_succeeded.append(fully_succ)
-            all_partial_succeeded.append(partial_succ)
-                
-        num_all_succ = all_partial_succeeded.count(True)
-        num_sched = len(all_partial_succeeded)
-        logger.info(f"All deadlines were wet in {num_all_succ}/{num_sched} cases ({num_all_succ/num_sched*100:.2f}%)")
-        for nw, stats in deadline_stats.items():
-            if models[nw].has_constraints:
-                logger.info(f"End-frame success for {nw} in {stats.end_success}/{num_sched} cases ({stats.end_success/(num_sched)*100:.2f}%)")
-
-        return results, invalid_results
-
         

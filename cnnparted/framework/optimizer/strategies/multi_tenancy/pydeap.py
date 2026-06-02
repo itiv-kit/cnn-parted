@@ -2,22 +2,20 @@ from dataclasses import dataclass
 from collections.abc import Callable
 from functools import partial
 import array
-import statistics
 import itertools as it
 import copy
 import os
-import cProfile
 
 import numpy as np
 import tqdm
 import ray
-import cloudpickle
 from loguru import logger
 import plotly.graph_objects as go
 import random
 
 from deap import base, creator, tools, algorithms
 
+from framework.scheduling.deadline_eval import deadline_evaluation
 from framework.model.layer_tracker import LayerBindings
 from framework.noc.noc import NocTopology
 from framework.model.onnx_model import OnnxModel
@@ -147,6 +145,9 @@ class PydeapMultiTenancy:
         self.plot_statistics(conf, log)
         self.plot_pareto_front(conf, pareto)
 
+        logger.info(f"Found {len(pareto)} Pareto-optimal solutions")
+        logger.info("Performing scheduling of pareto-optimal bindings")
+
         # Perform scheduling for pareto optimal solutions
         ray.init(num_cpus=max(conf.mt.num_jobs, 1), ignore_reinit_error=True)
         results: list[SystemSchedule] = []
@@ -194,6 +195,9 @@ class PydeapMultiTenancy:
                 results.append(res.schedule)
             else:
                 invalid_results.append(res.schedule)
+        
+        deadline_evaluation(models, results, invalid_results)
+
         return results, invalid_results
         
 
@@ -280,3 +284,13 @@ class PydeapMultiTenancy:
             )
         
         fig.write_image(os.path.join(conf.general.work_dir, "figures", "pareto_front.pdf"))
+
+    def multi_tenancy_opt_gp(self,
+                            node_stats: SystemResult,
+                            models: dict[str, OnnxModel],
+                            noc: NocTopology,
+                            conf: ConfigHelper,
+                            initial_tracker: LayerBindings,
+                            scheduling_algorithm: Callable[..., SystemSchedule],
+                          ) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
+                          ...
