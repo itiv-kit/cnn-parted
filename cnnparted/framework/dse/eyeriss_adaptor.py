@@ -40,20 +40,20 @@ class EyerissConfig(ArchitectureConfig, Genome):
 
     @classmethod
     def from_yaml(cls, yaml_config: dict):
-        def get_idx(cfg: list[dict], name: str):
-            for idx, field in enumerate(cfg):
+        def get_field(cfg: list[dict], name: str) -> dict:
+            for field in cfg:
                 if field["name"] == name:
-                    return idx
+                    return field
             raise RuntimeError(f"Did not find key {name}")
 
         eyeriss = yaml_config["architecture"]["subtree"][0]["subtree"][0]
         pe_array = eyeriss["subtree"][0]["local"]
 
-        shared_glb = eyeriss["local"][get_idx("shared_glb")]
-        ifmap = pe_array[get_idx("ifmap_spad")]
-        weights = pe_array[get_idx("weights_spad")]
-        psum = pe_array[get_idx("psum_spad")]
-        macs = pe_array[get_idx("mac")]
+        shared_glb = get_field(eyeriss["local"], "shared_glb")
+        ifmap = get_field(pe_array, "ifmap_spad")
+        weights = get_field(pe_array, "weights_spad")
+        psum = get_field(pe_array, "psum_spad")
+        macs = get_field(pe_array, "mac")
 
         glb_depth = int(shared_glb["attributes"]["memory_depth"])
         pe_array_mem_depths = [int(ifmap["attributes"]["memory_depth"]),

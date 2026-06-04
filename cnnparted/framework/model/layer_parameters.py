@@ -162,59 +162,59 @@ class ConstantOperationParameters:
         self.kind = MiscOperationsKind.Constant
 
 
-@dataclass
-class TensorParameters:
-    name: str
-    shape: list[int]
-    #elem_type: np.integer | np.floating
-    definition: str = None
-    used_by: list[str] = field(default_factory=list)
-    dimensions: list[str] = None
-
-    @property
-    def num_elems(self):
-        return np.prod(self.shape)
+#@dataclass
+#class TensorParameters:
+#    name: str
+#    shape: list[int]
+#    #elem_type: np.integer | np.floating
+#    definition: str = None
+#    used_by: list[str] = field(default_factory=list)
+#    dimensions: list[str] = None
+#
+#    @property
+#    def num_elems(self):
+#        return np.prod(self.shape)
 
 type ComputeParameters = ConvParameters | GemmParameters
 type AnyLayerParameters = ComputeParameters | PoolingParameters | ActivationParameters | ElementwiseParameters | BinaryMiscOperationParameters | UnaryMiscOperationParameters
 
-@dataclass
-class LayerParameters:
-    # A layer consists of the computational parameters and the input and output tensors
-    name: str
-    inputs: list[str]
-    op_type: str
-    outputs: list[str]
-    output_size: np.ndarray
-    params: AnyLayerParameters | None
-    dimensions: list[str]
-    children: list[str]
-
-    def __init__(self, cfg: dict, params: ComputeParameters | None):
-        self.name = cfg["name"]
-        self.op_type = cfg["op_type"]
-
-        if isinstance(cfg["input"], list):
-            self.inputs = cfg["input"]
-        else:
-            self.inputs = [cfg["input"]]
-
-        if isinstance(cfg["output"], list):
-            self.outputs = cfg["output"]
-        else:
-            self.outputs = [cfg["output"]]
-
-        if len(cfg["output_size"]) == 0 and cfg["op_type"] == "Constant":
-            self.output_size = [[]]
-        elif isinstance(cfg["output_size"][0], list):
-            self.output_size = cfg["output_size"]
-        else:
-            self.output_size = [cfg["output_size"]]
-
-        self.params = params
-        if params is not None:
-            self.dimensions = params.dimensions
-        else:
-            self.dimensions = None
-        
-        self.children = None
+#@dataclass
+#class LayerParameters:
+#    # A layer consists of the computational parameters and the input and output tensors
+#    name: str
+#    inputs: list[str]
+#    op_type: str
+#    outputs: list[str]
+#    output_size: np.ndarray
+#    params: AnyLayerParameters | None
+#    dimensions: list[str]
+#    children: list[str]
+#
+#    def __init__(self, cfg: dict, params: ComputeParameters | None):
+#        self.name = cfg["name"]
+#        self.op_type = cfg["op_type"]
+#
+#        if isinstance(cfg["input"], list):
+#            self.inputs = cfg["input"]
+#        else:
+#            self.inputs = [cfg["input"]]
+#
+#        if isinstance(cfg["output"], list):
+#            self.outputs = cfg["output"]
+#        else:
+#            self.outputs = [cfg["output"]]
+#
+#        if len(cfg["output_size"]) == 0 and cfg["op_type"] == "Constant":
+#            self.output_size = [[]]
+#        elif isinstance(cfg["output_size"][0], list):
+#            self.output_size = cfg["output_size"]
+#        else:
+#            self.output_size = [cfg["output_size"]]
+#
+#        self.params = params
+#        if params is not None:
+#            self.dimensions = params.dimensions
+#        else:
+#            self.dimensions = None
+#        
+#        self.children = None

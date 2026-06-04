@@ -101,8 +101,6 @@ class WorkloadInfo:
     accuracy_function: Callable
     input_shape: list[int]
     deadline: int
-    deadline_div: float
-    deadline_mul: float
     frames: int | None
     onnx_filepath: str
     identifier: str
@@ -112,6 +110,4 @@ class WorkloadInfo:
         self.input_shape = spec.input_size
         self.onnx_filepath = onnx_filepath
         self.deadline = spec.deadline
-        self.deadline_div = spec.deadline_div
-        self.deadline_mul = spec.deadline_mul
         self.frames = spec.frames

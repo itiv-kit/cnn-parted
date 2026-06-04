@@ -11,11 +11,11 @@ from framework.model.tensor_wrapper import TensorWrapper, OperandKind
 class ConvParser(OnnxLayerParser):
     def parse(self, inputs: list[OnnxTensor], output: OnnxTensor) -> ComputationLayer:
         attrs = self.node.attribute
-        kernel_shape = self.get_int_attr_by_name("kernel_shape", attrs, default=None) #(kh, kw)
-        strides = self.get_int_attr_by_name("strides", attrs, default=[1,1])
-        dilations = self.get_int_attr_by_name("dilations", attrs, default=[1,1])
-        groups = self.get_int_attr_by_name("groups", attrs, 1)
-        pads = self.get_int_attr_by_name("pads", attrs, default=[0,0,0,0])
+        kernel_shape: list[int] = self.get_int_attr_by_name("kernel_shape", attrs, default=None) #(kh, kw)
+        strides: list[int] = self.get_int_attr_by_name("strides", attrs, default=[1,1])
+        dilations: list[int] = self.get_int_attr_by_name("dilations", attrs, default=[1,1])
+        groups: int = self.get_int_attr_by_name("groups", attrs, 1)
+        pads: list[int] = self.get_int_attr_by_name("pads", attrs, default=[0,0,0,0])
 
         ifms = np.prod(self.in_shape)
         ofms = np.prod(self.out_shape)

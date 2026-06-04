@@ -6,7 +6,7 @@ class MemoryNodeThread(ModuleThreadInterface):
 
     def _get_slice_size(self, size : int, word_bytes : int) -> int:
         slice_size = word_bytes
-        for i in size:
+        for i in range(1, size+1): #TODO
             slice_size *= i
         return slice_size
 

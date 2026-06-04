@@ -13,7 +13,7 @@ from loguru import logger
 import plotly.graph_objects as go
 import random
 
-from deap import base, creator, tools, algorithms
+from deap import base, creator, tools, algorithms, gp
 
 from framework.scheduling.deadline_eval import deadline_evaluation
 from framework.model.layer_tracker import LayerBindings

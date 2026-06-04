@@ -8,7 +8,8 @@ class DDR3Node(MemoryModelInterface):
         self.ramulator= Ramulator()
         self.vampire = Vampire()
 
-    def get_latency_ms_and_energy_mW(self, slice_size: int) -> float:
+    def get_latency_ms_and_energy_mW(self, slice_size: int
+                                     ) -> tuple[float, int, float, int]:
         # Function to handle read operation
         def read_thread():
             nonlocal r_trace, r_stats_file_path

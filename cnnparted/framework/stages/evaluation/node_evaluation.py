@@ -45,16 +45,6 @@ class NodeEvaluation(Stage):
                 for v_id_int in node_thread.config.virtual_ids.values():
                     node_eval_stats.add_platform(v_id_int, copy.deepcopy(stats))
         
-        # For all models that have been evaluated: check if the deadline should be automatically set
-        # based on the estimated computation times on the different platforms
-        for name, model in self.ga.models.items():
-            if model.has_auto_deadline:
-                model_latencies = []
-                for id in node_eval_stats.get_unique_platforms():
-                    network_on_id_latency = sum([lyr.latency for lyr in node_eval_stats.platforms[id].designs[0].networks[name].layers.values()])
-                    model_latencies.append(network_on_id_latency)
-                model.deadlines = [( max(model_latencies) * model.deadline_mul ) / model.deadline_div]
-        
         self._update_artifacts(artifacts, node_eval_stats)
     
     def _take_artifacts(self, artifacts: Artifacts):

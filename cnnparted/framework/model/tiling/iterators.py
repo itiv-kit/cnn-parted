@@ -13,7 +13,7 @@ class LoopIterator:
         self.kind = kind
         self.aliases = aliases
     
-    def __eq__(self, value: "LoopIterator"):
+    def __eq__(self, value):
         if not isinstance(value, LoopIterator):
             return False
         return self.kind == value.kind and \

@@ -12,7 +12,7 @@ class RobustnessConfig:
 
 @dataclass
 class RetrainingConfig:
-    epochs: int
+    epochs: int | None
 
     def __init__(self, cfg: dict):
         self.epochs = cfg.get("epochs", None)

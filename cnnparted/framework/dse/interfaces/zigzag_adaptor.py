@@ -36,7 +36,7 @@ class ZigzagAdaptor(ABC):
     @abstractmethod
     def run_zigzag_from_config(self, config, outdir=None):
         if outdir is None:
-            outdir = self.tl_out_configs_dir
+            outdir = self.zigzag_out_configs_dir
 
         self.write_zigzag_arch(config=config, outdir=outdir)
         self.write_zigzag_mapping(config=config, outdir=outdir)

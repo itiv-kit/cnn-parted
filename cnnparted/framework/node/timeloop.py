@@ -207,7 +207,7 @@ class Timeloop(NodeEvaluator):
             runroot: str,
             layer : ComputationLayer,
             logfile : str = 'timeloop.log',
-            tl_files_path: str = None
+            tl_files_path: str | None = None
         ) -> tuple[LayerResult, bool]:
 
         if os.path.isfile(os.path.join(self.configs_dir, 'archs', (self.accname + '.cfg'))):
@@ -308,7 +308,7 @@ class Timeloop(NodeEvaluator):
                 yaml.dump(config, f)
                 #f.write(yaml.dump(config))
 
-    def _get_timeloop_params(self, config: dict, layer: ComputationLayer) -> list:
+    def _get_timeloop_params(self, config: dict, layer: ComputationLayer) -> None:
         if isinstance(layer.layer_params, ConvParameters):
             conv_params = layer.layer_params
             q = conv_params.q
@@ -413,7 +413,7 @@ class Timeloop(NodeEvaluator):
 
         return area
 
-    def _parse_stats(self, dirname : str) -> dict:
+    def _parse_stats(self, dirname : str) -> tuple[dict, bool]:
         # First check if the Timeloop run found any mappings and emitted the required file
         valid = True
         mapping_file = glob.glob( os.path.join(dirname, "*.map+stats.xml") )

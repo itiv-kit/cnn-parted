@@ -49,7 +49,7 @@ class DeapConfig:
 
     def __init__(self, cfg: dict):
         self.num_gen = int(cfg["num_gen"])
-        self.sampler = cfg["sampler"]
+        self.sampler = cfg.get("sampler", "ga")
         self.population_size = cfg.get("population_size", 150)
         self.mutation_prob = cfg.get("mutation_prob", 0.3)
         self.crossover_prob = cfg.get("crossover_prob", 0.6)

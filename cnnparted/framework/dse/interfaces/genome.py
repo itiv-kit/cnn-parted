@@ -9,8 +9,8 @@ class Genome(ABC):
 
     def __init__(self):
         super().__init__()
-        self.crossover: Crossover = None
-        self.mutation: Mutation = None
+        #self.crossover: Crossover = None
+        #self.mutation: Mutation = None
 
     @classmethod
     def n_var_opt(cls) -> int:

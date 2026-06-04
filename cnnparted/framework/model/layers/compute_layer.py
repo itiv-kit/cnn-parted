@@ -39,7 +39,7 @@ class ComputationLayer(LayerBase):
         for ldim in self.loop_dims:
             if ldim.iterator == dim:
                 return ldim
-        raise RuntimeError("Could not find the desired loop dimension")
+        raise RuntimeError(f"Could not find the desired loop dimension {ldim}")
     
     def get_dependent_tensors(self, dim: LoopDim) -> tuple[list[TensorWrapper], TensorWrapper]:
         """Find all input and output tensors that have dim as an axis"""

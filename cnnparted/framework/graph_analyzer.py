@@ -42,10 +42,10 @@ class GraphAnalyzer:
         for network, model in self.models.items():
             nx.nx_pydot.write_dot(model, os.path.join(self.graph_dot_dir, f"{network}_tiled.dot") )
 
-        self.schedules: dict[str, list] = {}
+        self.schedules: dict[str, list[str]] = {}
 
 
-    def find_schedules(self, num_topos : int) -> list:
+    def find_schedules(self, num_topos : int) -> dict[str, list[str]]:
         #fname_csv = os.path.join(self.work_dir, self.run_name + "_" + "schedules.csv")
         for network in self.networks:
             fname_csv = os.path.join(self.work_dir, network + "_schedules.csv")
@@ -64,7 +64,7 @@ class GraphAnalyzer:
                 topo_sort_graph = [layer.layer_name for layer in nx.topological_sort(self.models[network])]
                 self.schedules[network].append(topo_sort_graph)
 
-                self.schedules[network] = np.unique(self.schedules[network], axis=0)
+                self.schedules[network] = np.unique(self.schedules[network], axis=0).tolist()
                 df = pd.DataFrame(self.schedules[network])
                 df.to_csv(fname_csv, header=False)
         return self.schedules
@@ -85,13 +85,6 @@ class GraphAnalyzer:
         if len(results) < samplesize:
             raise ValueError("Sample larger than population.")
         return results
-
-    def get_timeloop_layers(self, network: str):
-        output = [layer for layer in self.models[network].nodes if layer.op_type == "Gemm" or layer.op_type == "MatMul" or layer.op_type == "Conv"]
-        return output
-
-    def get_mnsim_layers(self, network: str):
-        return self.models[network], self._trees[network]
 
     def get_conv2d_layers(self, network: str):
         output = [layer for layer in self.models[network].nodes if layer.op_type == "Conv"]

@@ -66,19 +66,19 @@ class SimbaConfig(ArchitectureConfig, Genome):
     
     @classmethod
     def from_yaml(cls, yaml_config: dict):
-        def get_idx(cfg: list[dict], name: str):
-            for idx, field in enumerate(cfg):
-                if field["name"] == name or name in field["name"]:
-                    return idx
+        def get_field(cfg: list[dict], name: str):
+            for field in cfg:
+                if field["name"] == name:
+                    return field
             raise RuntimeError(f"Did not find key {name}")
 
         simba = yaml_config["architecture"]["subtree"][0]["subtree"][0]
         gbuf = simba["local"][0]
         pe_array = simba["subtree"][0]
-        input_buffer = pe_array["local"][get_idx("PEInputBuffer")]
-        weight_buffer= pe_array["local"][get_idx("PEWeightBuffer")]
-        accu_buffer = pe_array["local"][get_idx("PEAccuBuffer")]
-        lmacs = pe_array["local"][get_idx("LMAC")]
+        input_buffer = get_field(pe_array["local"], "PEInputBuffer")
+        weight_buffer= get_field(pe_array["local"], "PEWeightBuffer")
+        accu_buffer = get_field(pe_array["local"], "PEAccuBuffer")
+        lmacs = get_field(pe_array["local"], "LMAC")
 
         # First we get the PE array dimension
         p = re.compile(r"\d..\d+")

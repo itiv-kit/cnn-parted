@@ -309,7 +309,7 @@ class LayerTiling:
     def _determine_num_tiles(self, layer: ComputationLayer, dim: LoopDim, num_tiles: int):
         # Try to create a smaller number of tiles, if the dimension is not evenly
         # tilable by the given factor
-        if num_tiles is None:
+        if num_tiles == 1 or num_tiles is None:
             return num_tiles
         while num_tiles >= 1:
             ldim_extent = layer.get_loop_iterator(dim).extent

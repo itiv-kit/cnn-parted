@@ -58,10 +58,10 @@ class TilingConfig:
 
     def __init__(self, cfg: dict):
         self.tiling: dict[LoopDim, int] = {
-            LoopDim.N: cfg.get("N"),
-            LoopDim.M: cfg.get("M"),
-            LoopDim.P: cfg.get("P"),
-            LoopDim.Q: cfg.get("Q"),
+            LoopDim.N: cfg.get("N", 1),
+            LoopDim.M: cfg.get("M", 1),
+            LoopDim.P: cfg.get("P", 1),
+            LoopDim.Q: cfg.get("Q", 1),
         }
 
     @property
@@ -78,8 +78,6 @@ class WorkloadSpec:
     tiling: dict[str, TilingConfig] #op_type -> config
     deadline: int
     frames: int
-    deadline_mul: float
-    deadline_div: float
 
     def __init__(self, cfg: dict):
         self.input_size = cfg["input-size"] 
@@ -98,14 +96,9 @@ class WorkloadSpec:
 
         # Deadline related configuration
         self.deadline = cfg.get("deadline", inf)
-        self.frames = cfg.get("frames", None)
-        self.deadline_mul = cfg.get("deadline_mul", None)
-        self.deadline_div = cfg.get("deadline_div", None)
+        self.frames = cfg.get("frames", -1)
         assert self.deadline >= 0, "Deadline must be non-negative"
-        assert not (self.frames is not None and self.deadline != inf), "Cannot set a deadline for a workload with multiple frames"
-        use_auto_deadline = self.deadline != inf and (self.deadline_div is not None and self.deadline_mul is not None)
-        assert not (use_auto_deadline and (self.deadline_div is None or self.deadline_mul is None)), "Auto-deadline requires specifying dealine_mul AND deadline_div"
-        assert not (use_auto_deadline and (self.deadline_div > 0.0 and self.deadline_mul > 0.0)), "Deadline scaling cannot be negative"
+        assert not (self.frames != -1 and self.deadline != inf), "Cannot set a deadline for a workload with multiple frames"
 
         tiling_cfg = cfg.get("tiling", {})
         self.tiling = {}

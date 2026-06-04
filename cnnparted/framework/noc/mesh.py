@@ -1,7 +1,7 @@
 import networkx as nx
 import numpy as np
 import math
-import matplotlib as plt
+import matplotlib.pyplot as plt
 from pathlib import Path
 
 from framework.link.link import Link
@@ -67,7 +67,7 @@ class MeshNoc(NocTopology):
             self.dram_neighbors = [tuple(nghbr) for nghbr in noc_cfg.dram.neighbors]
         
         if len(noc_shape) == 2:
-            fig = plt.pyplot.figure()
+            fig = plt.figure()
             pos = {node:node.coord for node in self.nodes}
             nx.draw(self, 
                     pos=pos, 

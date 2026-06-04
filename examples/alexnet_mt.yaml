@@ -57,11 +57,11 @@ multi-tenancy:
   scheduling: list
   scheduling_priority: earliest_start
   binding_granularity: tile
-  num_jobs: 1
+  num_jobs: 16
   cost_terms: ["energy", "latency"]
   optimizer:
-    n_trials: 300
-    sampler: nsga2
+    num_gen: 200
+    #sampler: nsga2
     mutation_prob: 0.6
     crossover_prob: 0.3
 

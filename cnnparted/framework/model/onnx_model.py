@@ -1,6 +1,7 @@
 import math
 import os
 from typing import Any, TYPE_CHECKING
+from collections.abc import Sequence
 
 import onnx
 from onnx import shape_inference, ModelProto, NodeProto, TypeProto, TensorProto  # noqa: F401
@@ -41,21 +42,17 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         self._current_id = 0
         self.onnx_in_model = onnx_in_model
         self.name_to_node_mapping: dict[str, LayerBase] = {}
-        self.deadline_mul: float = None
-        self.deadline_div: float = None
-        self.frames: int = None
-        self.deadlines: list[float] = None
+        self.frames: int = -1
+        self.deadlines: list[float] = []
         self.has_frame_constraint = False
 
     def set_runtime_constraints(self, wl_info: WorkloadInfo):
-        self.deadline_mul = wl_info.deadline_mul
-        self.deadline_div = wl_info.deadline_div
 
         if wl_info.deadline != math.inf:
             self.has_frame_constraint = False
             self.deadlines = [wl_info.deadline]
             self.frames = 1
-        elif wl_info.frames is not None:
+        elif wl_info.frames != -1:
             self.has_frame_constraint = True
             self.frames = wl_info.frames
             time_per_frame = 1000 / wl_info.frames
@@ -65,10 +62,6 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
             self.frames = 1
             self.deadlines = [math.inf]
     
-    @property
-    def has_auto_deadline(self) -> bool:
-        return self.deadlines[0] == math.inf and len(self.deadlines) == 1 and  \
-                (self.deadline_div is not None and self.deadline_mul is not None)
     
     @property
     def has_constraints(self) -> bool:
@@ -238,7 +231,7 @@ class OnnxParser:
         out_shape = self._get_tensor_info(out_name).shape
         return in_shape, out_shape
     
-    def _get_tensors(self, names: list[str]):
+    def _get_tensors(self, names: Sequence[str]):
         tensors: list[OnnxTensor] = []
         for name in names:
             tensors.append(self._get_tensor_info(name))

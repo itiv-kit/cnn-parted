@@ -73,3 +73,14 @@ pytorch-quantization = { index = "nvidia" }
 [tool.uv.extra-build-dependencies]
 multiprocessing-on-dill = ["setuptools"]
 visdom = ["pkg_resources", "setuptools"]
+
+[dependency-groups]
+dev = [
+    "ty>=0.0.43",
+]
+
+[tool.ty.src]
+exclude = ["cnnparted/tools", "cnnparted/framework/node/helpers.py"]
+
+[tool.ty.analysis]
+allowed-unresolved-imports = ["framework.**"]

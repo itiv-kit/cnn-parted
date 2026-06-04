@@ -2,7 +2,8 @@ import numpy as np
 
 SUPPORTED_METRICS = ["edp", "eap", "adp", "edap", "eda2p", "latency", "energy", "area"]
 
-def calc_metric(energy_per_design: np.array, latency_per_design: np.array, area_per_design: np.array, metric: str, reduction = True) -> np.array:
+def calc_metric(energy_per_design: np.ndarray, latency_per_design: np.ndarray, 
+                area_per_design: np.ndarray, metric: str, reduction = True) -> np.ndarray:
     # function assumes that x_per_design arrays have this layout:
     #  x | l0 | l1 | l2 | l3 |
     # ------------------------

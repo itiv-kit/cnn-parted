@@ -23,7 +23,7 @@ class LayerResult:
     area: float  #must be in mm2
     latency: float #must be in ms
     energy: float #must be in mJ
-    cycles: int 
+    cycles: int | None
 
     def __init__(self):
         self.name: str = ""
@@ -156,7 +156,8 @@ class DesignResult:
     @property
     def area(self):
         nw = self.get_networks()[0]
-        return self.networks[nw][0].area
+        first_layer = list(self.networks[nw].layers.keys())[0]
+        return self.networks[nw].layers[first_layer]
     
     def total_latency(self, network: str):
         return self.networks[network].total_latency
