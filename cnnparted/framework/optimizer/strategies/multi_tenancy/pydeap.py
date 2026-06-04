@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from collections.abc import Callable
 from functools import partial
 import array

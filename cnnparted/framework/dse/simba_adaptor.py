@@ -82,8 +82,12 @@ class SimbaConfig(ArchitectureConfig, Genome):
 
         # First we get the PE array dimension
         p = re.compile(r"\d..\d+")
-        num_pe = [int(num) for num in p.search(pe_array["name"]).group(0)][1] + 1
-        num_lmac = [int(num) for num in p.search(lmacs["name"]).group(0)][1] + 1
+        match_pe = p.search(pe_array["name"])
+        assert match_pe is not None
+        num_pe = [int(num) for num in match_pe.group(0)][1] + 1
+        match_lmac = p.search(lmacs["name"])
+        assert match_lmac is not None
+        num_lmac = [int(num) for num in match_lmac.group(0)][1] + 1
 
         gbuf_depth = gbuf["attributes"]["memory_depth"]
         inbuf_depth = input_buffer["attributes"]["memory_depth"]

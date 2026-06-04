@@ -86,8 +86,12 @@ class GemminiConfig(ArchitectureConfig, Genome):
         
         # First we get the PE array dimension
         p = re.compile(r"\d..\d+")
-        pe_cols = [int(num) for num in p.search(pe_cols["name"]).group(0)][1] + 1
-        pe_rows = [int(num) for num in p.search(pe_rows["name"]).group(0)][1] + 1
+        match_cols = p.search(pe_cols["name"])
+        assert match_cols is not None
+        pe_cols = [int(num) for num in match_cols.group(0)][1] + 1
+        match_rows = p.search(pe_rows["name"])
+        assert match_rows is not None
+        pe_rows = [int(num) for num in match_rows.group(0)][1] + 1
 
         spad_depth = int(spad["attributes"]["depth"])
         acc_depth = acc["attributes"]["depth"] * pe_cols

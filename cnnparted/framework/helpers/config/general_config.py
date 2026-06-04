@@ -7,7 +7,7 @@ from framework.model.tiling.iterators import LoopDim
 
 @dataclass(init=False)
 class GeneralConfig:
-    work_dir: str | None
+    work_dir: str
     keep_dir: bool
 
     def __init__(self, general_cfg: dict):

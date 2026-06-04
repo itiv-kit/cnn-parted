@@ -88,7 +88,7 @@ class NodeConfig:
     noc_coords: list[tuple[int, ...]] | None | Literal["auto"]
     virtual_ids: dict[str, int] | None
     evaluation: EvaluationConfig
-    dse: DseNodeConfig
+    dse: DseNodeConfig | None
 
     def __init__(self, cfg: dict):
         self.id = NodeId(cfg["id"])
@@ -101,13 +101,15 @@ class NodeConfig:
         self.instances = cfg.get("instances", 1)
         self.noc_coords = cfg.get("noc_coords") if "noc_coords" in cfg else None
         self.dse = DseNodeConfig(cfg["dse"]) if "dse" in cfg else None
-        self.virtual_ids: dict[str, NodeId] | None = {} if self.instances > 1 else None
 
         # Check if we need to assign virtual IDs, assign them to None. System config assigns actual int ID
         if self.instances > 1:
+            self.virtual_ids = {}
             for i in range(1, self.instances):
                 v_id = "v" + str(i)
-                self.virtual_ids[v_id] = None
+                self.virtual_ids[v_id] = -1
+        else:
+            self.virtual_ids = None
 
 
 @dataclass

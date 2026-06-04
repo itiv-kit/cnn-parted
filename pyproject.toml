@@ -83,4 +83,4 @@ dev = [
 exclude = ["cnnparted/tools", "cnnparted/framework/node/helpers.py"]
 
 [tool.ty.analysis]
-allowed-unresolved-imports = ["framework.**"]
+allowed-unresolved-imports = ["framework.**", "model_explorer.**", "MNSIM.**"]

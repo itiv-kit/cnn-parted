@@ -241,7 +241,7 @@ class OptunaMultiTenancy:
             # Pipelined implementation for ray: whenever a task finishes we immediately add a new one
             # Scheduling is very compute intesive, so we try to minimize runtime by doing so.
             task_mapping: dict[ray.ObjectRef, optuna.Trial] = {} 
-            all_schedules: dict[int, ScheduleResult] = {}       # {trial_number: ScheduleResult}
+            all_schedules: dict[int, str] = {}
             finished_count = 0
             pbar = tqdm.tqdm(total=num_trials, desc="Pipelined Optimization")
 

@@ -60,7 +60,6 @@ class GraphAnalyzer:
                 #    self.schedules = self._iter_sample_fast(topo_sorts, num_topos)
 
                 self.schedules[network] = []
-                #self.schedules[network].append(list(nx.topological_sort(self.graphs[network].get_graph())))
                 topo_sort_graph = [layer.layer_name for layer in nx.topological_sort(self.models[network])]
                 self.schedules[network].append(topo_sort_graph)
 
