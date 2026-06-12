@@ -1,10 +1,13 @@
 {
   "image": "gitlab.itiv.kit.edu:1443/itiv/docker/rocky9-timeloop:latest",
   "runArgs": [
-      "--userns=",
-      "--shm-size=64gb"],
+      "--userns=host",
+      "--shm-size=64gb",
+      "--cap-add=ALL",
+      "--security-opt=apparmor=unconfined"],
   "remoteUser": "root",
   "securityOpt": [ "seccomp=unconfined" ],
+  "workspaceMount": "type=bind,source=${localWorkspaceFolder},target=/workspaces/cnn-parted,consistency=cached",
   "postCreateCommand": "echo \"source /usr/share/bash-completion/completions/git\" >> ~/.bashrc",
   "customizations": {
     "vscode": {
