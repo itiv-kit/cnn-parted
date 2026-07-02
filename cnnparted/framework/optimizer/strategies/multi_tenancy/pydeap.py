@@ -50,6 +50,29 @@ def scheduling_worker(binding, models_id, node_stats_id, noc_id, priority_id, sc
 
     return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
 
+@ray.remote
+def scoring_worker( node_stats_id, models_id, noc_id, priority_id, cost_fns_id, scheduling_algorithm, bindings_id):
+    """
+    Worker function: Given a trial, perform all cost evaluations
+    """
+    # Pull references from shared memory
+    base_models = models_id
+    node_stats = node_stats_id
+    noc = noc_id
+    scheduling_priority = priority_id
+    cost_fns: list[Callable[..., float]] = cost_fns_id
+    tracker: LayerBindings = bindings_id
+
+    cost_values = []
+    sched = None
+    for cost_fn in cost_fns:
+        if hasattr(cost_fn, "__name__") and cost_fn.__name__ == "scheduling_wrapper":
+            sched: ScheduleResult = cost_fn(base_models, scheduling_algorithm, node_stats, noc, scheduling_priority, tracker)
+            cost = sched.schedule.system_latency
+        else:
+            cost = cost_fn(node_stats, tracker, base_models, noc)
+        cost_values.append(cost) 
+    return cost_values, sched
 
 class PydeapMultiTenancy:
     def multi_tenancy_opt(self,
@@ -131,7 +154,59 @@ class PydeapMultiTenancy:
 
         pop = toolbox.population(n=num_indiv)
         pareto = tools.ParetoFront()
+        
+        # Initialize lists for scheduling results
+        results: list[SystemSchedule] = []
+        invalid_results: list[SystemSchedule] = []
 
+        all_schedules: list[ScheduleResult] = []
+
+        ray.init(num_cpus=max(conf.mt.num_jobs, 1), ignore_reinit_error=True)
+
+        # Put static objects in the Shared Memory Object Store
+        models_ref = ray.put(models)
+        node_stats_ref = ray.put(node_stats)
+        noc_ref = ray.put(noc)
+        priority_ref = ray.put(conf.mt.scheduling_priority)
+
+        if "scheduling" in conf.mt.cost_terms:
+            # Register functions to enable ray integration
+            def ray_map(func, iterable):
+                task_ids = [scoring_worker.remote(node_stats_ref,
+                                                  models_ref,
+                                                  noc_ref,
+                                                  priority_ref,
+                                                  cost_fns, #TODO
+                                                  scheduling_algorithm,
+                                                  copy.deepcopy(initial_tracker).set_all_bindings(ind.tolist()), 
+                                                ) for ind in iterable]
+
+                #task_id_results: list[tuple[float, ScheduleResult]] = ray.get(task_ids)
+                task_id_results: list[tuple[float, ScheduleResult]] = []
+
+                remaining = task_ids
+                while remaining:
+                    # Get the next finished task
+                    done, remaining = ray.wait(remaining, num_returns=1)
+                    obj_ref = done[0]
+                    try:
+                        result = ray.get(obj_ref)
+                        task_id_results.append(result)
+                    except Exception as e:
+                        print(f"WORKER ERROR: {e}")
+                    
+                for ind, task_id_result in zip(iterable, task_id_results):
+                    cost, sched = task_id_result
+                    if sched is not None:
+                        ind.schedule = sched
+                cost_values = [cost for cost,_ in task_id_results]
+                
+                return cost_values
+                    
+            toolbox.register("map", ray_map)
+            toolbox.register("clone", copy.deepcopy)
+
+        # Perform the optimization
         _, log = algorithms.eaMuPlusLambda(
             pop,
             toolbox,
@@ -144,56 +219,57 @@ class PydeapMultiTenancy:
             halloffame=pareto,
             verbose=False,
         )
+
+        if "scheduling" not in conf.mt.cost_terms:
+            # Perform scheduling for pareto optimal allocations
+            task_ids = [
+                scheduling_worker.remote(
+                    copy.deepcopy(initial_tracker).set_all_bindings(binding), 
+                    models_ref, 
+                    node_stats_ref, 
+                    noc_ref, 
+                    priority_ref, 
+                    scheduling_algorithm
+                )
+                for binding in pareto
+            ]
+
+            with tqdm.tqdm(total=len(task_ids), desc="Finalizing Schedules") as pbar:
+                remaining = task_ids
+                while remaining:
+                    # Get the next finished task
+                    done, remaining = ray.wait(remaining, num_returns=1)
+                    obj_ref = done[0]
+                    try:
+                        result = ray.get(obj_ref)
+                    except Exception as e:
+                        print(f"WORKER ERROR: {e}")
+                    
+                    all_schedules.append(result)
+                    
+                    pbar.update(1)
+        else:
+            for ind in pareto:
+                # Schedules are attached to individuals, we can just copy them here
+                all_schedules.append(ind.schedule)
         
+
+        # Shutdown Ray when done to free up shared memory
+        ray.shutdown()
+        os.environ.pop("PYTHONBREAKPOINT") #clear ray breakpoint
+
+        # Statistics logging
         self.plot_statistics(conf, log)
         self.plot_pareto_front(conf, pareto)
 
         logger.info(f"Found {len(pareto)} Pareto-optimal solutions")
-        logger.info("Performing scheduling of pareto-optimal bindings")
 
-        # Perform scheduling for pareto optimal solutions
-        ray.init(num_cpus=max(conf.mt.num_jobs, 1), ignore_reinit_error=True)
-        results: list[SystemSchedule] = []
-        invalid_results: list[SystemSchedule] = []
 
-        # Put static objects in the Shared Memory Object Store
-        models_ref = ray.put(models)
-        node_stats_ref = ray.put(node_stats)
-        noc_ref = ray.put(noc)
-        priority_ref = ray.put(conf.mt.scheduling_priority)
+        # Here we try to create a schedule cost proxy with GP
+        #all_bindings = [copy.deepcopy(initial_tracker).set_all_bindings(binding) for binding in pareto]
+        #self.gp_cost_proxy(models, node_stats, all_bindings, all_schedules)
 
-        task_ids = [
-            scheduling_worker.remote(
-                copy.deepcopy(initial_tracker).set_all_bindings(binding), 
-                models_ref, 
-                node_stats_ref, 
-                noc_ref, 
-                priority_ref, 
-                scheduling_algorithm
-            )
-            for binding in pareto
-        ]
-
-        final_results: list[ScheduleResult] = []
-        with tqdm.tqdm(total=len(task_ids), desc="Finalizing Schedules") as pbar:
-            remaining = task_ids
-            while remaining:
-                # Get the next finished task
-                done, remaining = ray.wait(remaining, num_returns=1)
-                obj_ref = done[0]
-                try:
-                    result = ray.get(obj_ref)
-                except Exception as e:
-                    print(f"WORKER ERROR: {e}")
-                
-                final_results.append(result)
-                
-                pbar.update(1)
-        
-        # Shutdown Ray when done to free up shared memory
-        ray.shutdown()
-
-        for res in final_results:
+        for res in all_schedules:
             if res.is_valid:
                 results.append(res.schedule)
             else:
