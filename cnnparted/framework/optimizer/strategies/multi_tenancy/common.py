@@ -1,5 +1,8 @@
 import math
 import itertools as it
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import Any, Callable
 
 from framework.model.onnx_model import OnnxModel
 from framework.noc.noc import NocTopology
@@ -7,6 +10,49 @@ from framework.model.layer_tracker import LayerBindings
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.scheduling import SystemSchedule
 from framework.node.node_evaluator import SystemResult
+
+
+@dataclass
+class ScoringContext:
+    node_stats: SystemResult
+    tracker: LayerBindings
+    models: dict[str, OnnxModel]
+    noc: NocTopology
+    schedules: SystemSchedule | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+
+class Scorer(ABC):
+    @abstractmethod
+    def score(self, context: ScoringContext) -> float:
+        raise NotImplementedError
+
+    def __call__(self,
+                 node_stats: SystemResult,
+                 tracker: LayerBindings,
+                 models: dict[str, OnnxModel],
+                 noc: NocTopology,
+                 schedules: SystemSchedule | None = None,
+                 **extra: Any) -> float:
+        context = ScoringContext(
+            node_stats=node_stats,
+            tracker=tracker,
+            models=models,
+            noc=noc,
+            schedules=schedules,
+            extra=extra,
+        )
+        return self.score(context)
+
+
+class FunctionScorer(Scorer):
+    def __init__(self, fn: Callable[..., float], arg_names: tuple[str, ...]):
+        self.fn = fn
+        self.arg_names = arg_names
+
+    def score(self, context: ScoringContext) -> float:
+        kwargs = {name: getattr(context, name) for name in self.arg_names}
+        return self.fn(**kwargs)
 
 
 def _score_even_finish(schedules: SystemSchedule) -> float:
@@ -113,7 +159,7 @@ def _score_latency_fairness_max_min_space(node_stats: SystemResult,  tracker: La
 def _score_scheduling_proxy(node_stats: SystemResult, tracker: LayerBindings, models: dict[str, OnnxModel]) -> float:
 
     # Determine when the last accelerator finishes
-    latest_platform_finish_time = _score_static_max_latency(tracker)
+    latest_platform_finish_time = _score_static_max_latency(node_stats, tracker)
 
     # Determine when the last network finishes
     network_finish_time: dict[str, float] = {}
@@ -157,48 +203,57 @@ def _score_tensor_transfer_energy(tracker: LayerBindings, models: dict[str, Onnx
         total_energy += sum(tensor_transfer_energy)
     return total_energy
 
+def _score_tensor_transfer_latency(tracker: LayerBindings, models: dict[str, OnnxModel], noc: NocTopology,  ) -> float:
+    total_latency = 0.0    
+    for nw, layer, bind in tracker:
+        # Besides executing the layer, consider the latency to transfer the input and output
+        # tensors between the platform and the DRAM
+        platform_coord = noc.id_to_node[bind].coord
+        num_hops = noc.get_min_hops_to_dram(platform_coord)
+        model_layer = models[nw].node_by_layer_name(layer)
+        tensor_num_elem = [math.prod(tensor.shape) for tensor in model_layer.inputs + [model_layer.output]]
+        tensor_transfer_eval = [noc.default_link.eval(num_elem) for num_elem in tensor_num_elem]
+        tensor_transfer_latency = [latency * num_hops for (latency, energy, slice_size) in tensor_transfer_eval]
+        total_latency += sum(tensor_transfer_latency)
+    return total_latency
+
 def _score_total_binding_energy(node_stats: SystemResult, tracker: LayerBindings, models: dict[str, OnnxModel], noc: NocTopology,) -> float:
     return _score_binding_energy(node_stats, tracker) + _score_tensor_transfer_energy(tracker, models, noc)
 
-_SCORING_REGISTRY = {
-    "schedule_even_finish": _score_even_finish,
-    "schedule_idle_times": _score_idle_times,
-    "schedule_max_latency": _score_max_latency,
-    
-    "edp": _score_edp,
-    #"binding_energy": _score_binding_energy,
-    "energy": _score_binding_energy,
-    "binding_latency": _score_binding_latency,
-    "latency": _score_binding_latency, #alias for now
-    "static_max_latency": _score_static_max_latency,
-    "jain": _score_latency_fairness_jain,
-    "std_dev": _score_latency_fairness_std_dev,
-    "gini": _score_latency_fairness_gini,
-    "max_min": _score_latency_fairness_max_min_space,
+def _score_total_binding_latency(node_stats: SystemResult, tracker: LayerBindings, models: dict[str, OnnxModel], noc: NocTopology,) -> float:
+    return _score_binding_latency(node_stats, tracker) + _score_tensor_transfer_latency(tracker, models, noc)
 
-    "crit_path": _score_scheduling_proxy,
+_SCORER_REGISTRY: dict[str, Scorer] = {
+    "schedule_even_finish": FunctionScorer(_score_even_finish, ("schedules",)),
+    "schedule_idle_times": FunctionScorer(_score_idle_times, ("schedules",)),
+    "schedule_max_latency": FunctionScorer(_score_max_latency, ("schedules",)),
 
-    #"energy": _score_total_binding_energy,
-    "tensor_energy": _score_tensor_transfer_energy,
+    "edp": FunctionScorer(_score_edp, ("node_stats", "tracker")),
+    "binding_energy": FunctionScorer(_score_binding_energy, ("node_stats", "tracker")),
+    "energy": FunctionScorer(_score_total_binding_energy, ("node_stats", "tracker", "models", "noc")),
+    "binding_latency": FunctionScorer(_score_binding_latency, ("node_stats", "tracker")),
+    "latency": FunctionScorer(_score_total_binding_latency, ("node_stats", "tracker", "models", "noc")),
+
+    "static_max_latency": FunctionScorer(_score_static_max_latency, ("node_stats", "tracker")),
+    "jain": FunctionScorer(_score_latency_fairness_jain, ("node_stats", "tracker")),
+    "std_dev": FunctionScorer(_score_latency_fairness_std_dev, ("node_stats", "tracker")),
+    "gini": FunctionScorer(_score_latency_fairness_gini, ("node_stats", "tracker")),
+    "max_min": FunctionScorer(_score_latency_fairness_max_min_space, ("node_stats", "tracker")),
+    "max_min_space": FunctionScorer(_score_latency_fairness_max_min_space, ("node_stats", "tracker")),
+
+    "crit_path": FunctionScorer(_score_scheduling_proxy, ("node_stats", "tracker", "models")),
+
+    "tensor_energy": FunctionScorer(_score_tensor_transfer_energy, ("tracker", "models", "noc")),
+    "tensor_latency": FunctionScorer(_score_tensor_transfer_latency, ("tracker", "models", "noc")),
 }
+
+
+def get_scorer(score_fn: str) -> Scorer:
+    assert score_fn in _SCORER_REGISTRY, f"Unknown scoring function {score_fn}, supported are: {_SCORER_REGISTRY.keys()}"
+    return _SCORER_REGISTRY[score_fn]
+
 
 def scoring_dispatch(score_fn: str, node_stats: SystemResult, tracker: LayerBindings,
                      models: dict[str, OnnxModel], noc: NocTopology, schedules: SystemSchedule = None) -> float:
-    assert score_fn in _SCORING_REGISTRY, f"Unknown scoring function {score_fn}, supported are: {_SCORING_REGISTRY.keys()}"
-
-    # To resolve the different function signatures, dispatch is performed through this match statement
-    match score_fn:
-        case "schedule_even_finish" | "schedule_idle_times" | "schedule_max_latency":
-            return _SCORING_REGISTRY[score_fn](schedules)
-
-        case "edp" | "binding_energy" | "latency" | "static_max_latency" | "jain" | "std_dev" | "gini" | "max_min":
-            return _SCORING_REGISTRY[score_fn](node_stats, tracker)
-
-        case "crit_path":
-            return _SCORING_REGISTRY[score_fn](node_stats, tracker, models)
-        
-        case "energy":
-            return _SCORING_REGISTRY[score_fn](node_stats, tracker)
-        #    return _SCORING_REGISTRY[score_fn](node_stats, tracker, models, noc)
-        case "tensor_energy":
-            return _SCORING_REGISTRY[score_fn](tracker, models, noc)
+    scorer = get_scorer(score_fn)
+    return scorer(node_stats, tracker, models, noc, schedules)

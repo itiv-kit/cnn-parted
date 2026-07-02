@@ -1,9 +1,10 @@
 from collections.abc import Callable
-from functools import partial
 import array
 import itertools as it
 import copy
 import os
+from typing import Sequence
+import operator
 
 import numpy as np
 import tqdm
@@ -22,8 +23,8 @@ from framework.node.node_evaluator import SystemResult
 from framework.scheduling import (validate_schedule, SystemSchedule)
 
 from framework.helpers.config_helper import ConfigHelper
-from .common import scoring_dispatch
-from .optuna import ScheduleResult
+from .common import get_scorer
+from .optuna import ScheduleResult, scheduling_wrapper
 
 
 @ray.remote
@@ -65,7 +66,7 @@ class PydeapMultiTenancy:
         # - Creates attributes for this class
         num_costs = len(conf.mt.cost_terms)
         creator.create("Fitness", base.Fitness, weights=list(it.repeat(-1.0, num_costs)))
-        creator.create("Individual", array.array, typecode="I", fitness=creator.Fitness)
+        creator.create("Individual", array.array, typecode="I", fitness=creator.Fitness, schedule=None)
 
         num_attrs = len(initial_tracker)
         num_indiv = conf.mt.optimizer.population_size
@@ -105,14 +106,17 @@ class PydeapMultiTenancy:
 
         cost_fns = []
         for idx, cost_term in enumerate(conf.mt.cost_terms):
-            fn = partial(scoring_dispatch, cost_term)
+            if cost_term == "scheduling":
+                fn = scheduling_wrapper
+            else:
+                fn = get_scorer(cost_term)
             cost_fns.append(fn)
 
             stats.register(f"min_{cost_term}", lambda values, i=idx: np.min([v[i] for v in values]))
             stats.register(f"med_{cost_term}", lambda values, i=idx: np.median([v[i] for v in values]))
 
 
-        def score_allocation(ind: list, cost_fns: list[Callable]):
+        def score_allocation(ind: Sequence, cost_fns: list[Callable]):
             cost_terms = []
             initial_tracker.set_all_bindings(ind),
             for cost_fn in cost_fns:

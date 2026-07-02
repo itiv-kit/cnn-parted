@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from collections.abc import Callable
-from functools import partial
 import copy
 import os
 import time
@@ -13,7 +12,6 @@ import cloudpickle
 from loguru import logger
 import plotly.graph_objects as go
 
-
 from framework.model.layer_tracker import LayerBindings
 from framework.noc.noc import NocTopology
 from framework.model.onnx_model import OnnxModel
@@ -23,15 +21,7 @@ from framework.scheduling.deadline_eval import deadline_evaluation
 
 from framework.helpers.config_helper import ConfigHelper
 
-
-from .common import (_score_binding_energy, 
-                     _score_binding_latency, 
-                    _score_latency_fairness_gini,
-                    _score_latency_fairness_jain,
-                    _score_latency_fairness_max_min_space,
-                    _score_latency_fairness_std_dev,
-                    _score_scheduling_proxy,)
-from .common import scoring_dispatch
+from .common import get_scorer
 
 @dataclass
 class ScheduleResult:
@@ -146,23 +136,23 @@ class OptunaMultiTenancy:
         # Configuration of cost terms to be calculated
         # Includes optimization direction, function to be called and pretty-print name
         cost_term_mapping = {
-            "energy":           ("minimize", _score_binding_energy,                 "Cum. Energy"),
-            "latency":          ("minimize", _score_binding_latency,                "Cum. Latency"),
-            "gini":             ("minimize", _score_latency_fairness_gini,          "Gini"),
-            "jain":             ("minimize", _score_latency_fairness_jain,          "Jain"),
-            "max_min_space":    ("minimize", _score_latency_fairness_max_min_space, "Max-Min Space"),
-            "std_dev":          ("minimize", _score_latency_fairness_std_dev,       "Std. dev"),
-            "crit_path":        ("minimize", _score_scheduling_proxy,               "Critical Path"),
-            "scheduling":       ("minimize",  scheduling_wrapper,                   "Makespan")
+            "energy":           ("minimize", "Cum. Energy"),
+            "latency":          ("minimize", "Cum. Latency"),
+            "gini":             ("minimize", "Gini"),
+            "jain":             ("minimize", "Jain"),
+            "max_min_space":    ("minimize", "Max-Min Space"),
+            "std_dev":          ("minimize", "Std. dev"),
+            "crit_path":        ("minimize", "Critical Path"),
+            "scheduling":       ("minimize", "Makespan")
         }
 
         cost_names = []
         cost_fns = []
         opt_direction = []
         for cost_term in conf.mt.cost_terms:
-            opt_dir, _, name = cost_term_mapping[cost_term]
+            opt_dir, name = cost_term_mapping[cost_term]
 
-            fn = partial(scoring_dispatch, score_fn=cost_term)
+            fn = scheduling_wrapper if cost_term == "scheduling" else get_scorer(cost_term)
             cost_names.append(name)
             cost_fns.append(fn)
             opt_direction.append(opt_dir)
