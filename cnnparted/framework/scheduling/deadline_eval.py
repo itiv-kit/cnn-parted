@@ -66,4 +66,4 @@ def deadline_evaluation(models: dict[str, OnnxModel],
         logger.info(f"All deadlines were wet in {num_all_succ}/{num_sched} cases ({num_all_succ/num_sched*100:.2f}%)")
         for nw, stats in deadline_stats.items():
             if models[nw].has_constraints:
-                logger.info(f"End-frame success for {nw} in {stats.epoch_success}/{num_sched} cases ({stats.end_success/(num_sched)*100:.2f}%)")
+                logger.info(f"End-frame success for {nw} in {stats.epoch_success}/{num_sched} cases ({stats.epoch_success/(num_sched)*100:.2f}%)")
