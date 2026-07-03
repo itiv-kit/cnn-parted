@@ -1,25 +1,11 @@
-import math
 import os
 import copy
 from collections import defaultdict
-from dataclasses import dataclass
-import itertools as it
-import time
-from collections.abc import Callable
 import statistics
-import cloudpickle
 
-import ray
 from loguru import logger
-
-
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
 
-import optuna
-from optuna.samplers.nsgaii import UniformCrossover
-import tqdm
 
 from framework.optimizer.strategies.multi_tenancy import (MultiTenancyContext,
                                                           HeraldMultiTenancy, 
@@ -56,76 +42,6 @@ class MultiTenancyPartitioning(Optimizer):
         return solutions, invalid_solutions
 
 
-@dataclass
-class ScheduleResult:
-    schedule: SystemSchedule
-    tracker: LayerBindings
-    is_valid: bool
-
-def scheduling_wrapper(trial: optuna.Trial, models: dict[str, OnnxModel], scheduling_algorithm,
-                        node_stats: SystemResult, noc: NocTopology, scheduling_priority, bindings: list[int]) -> ScheduleResult:
-    """Wrapper to simplify parallelizing scheduling"""
-
-    # --- SCHEDULING ---
-    tracker: LayerBindings = bindings #trial.user_attrs["bindings"]
-    system_schedule: SystemSchedule = scheduling_algorithm(models, tracker, node_stats, noc, priority=scheduling_priority)
-
-    # --- VALIDATION ---
-    are_constraints_fulfilled = validate_schedule(system_schedule, tracker, models)
-    return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
-
-@ray.remote
-def scheduling_worker(trial, models_id, node_stats_id, noc_id, priority_id, scheduling_algorithm):
-    """
-    Worker function: Executes the scheduling and validation for one trial.
-    """
-    # Pull references from shared memory (Zero-copy read)
-    base_models = models_id
-    node_stats = node_stats_id
-    noc = noc_id
-    scheduling_priority = priority_id
-
-    # --- SCHEDULING ---
-    tracker: LayerBindings = trial.user_attrs["bindings"]
-
-    system_schedule: SystemSchedule = scheduling_algorithm(
-        base_models, tracker, node_stats, noc, scheduling_priority
-    )
-
-    # --- VALIDATION ---
-    are_constraints_fulfilled = validate_schedule(system_schedule, tracker, base_models)
-
-    return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
-
-@ray.remote
-def scoring_worker(trial: optuna.Trial, models_id, node_stats_id, noc_id, priority_id, cost_fns_id, scheduling_algorithm, bindings_id):
-    """
-    Worker function: Given a trial, perform all cost evaluations
-    """
-    # Pull references from shared memory
-    base_models = models_id
-    node_stats = node_stats_id
-    noc = noc_id
-    scheduling_priority = priority_id
-    cost_fns: list[Callable[[], float]] = cost_fns_id
-    tracker: LayerBindings = bindings_id
-
-    cost_terms = []
-    sched = None
-    for cost_fn in cost_fns:
-        if cost_fn.__name__ == "scheduling_wrapper":
-            sched: ScheduleResult = cost_fn(trial, base_models, scheduling_algorithm, node_stats, noc, scheduling_priority, tracker)
-            cost = sched.schedule.system_latency
-        else:
-            try:
-                cost = cost_fn(tracker)
-            except TypeError:
-                cost = cost_fn(tracker, base_models)
-        cost_terms.append(cost) 
-    return cost_terms, sched
-
-
-    
 
 class MultiTenancyProblem():
     def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper, noc: NocTopology):
@@ -168,13 +84,10 @@ class MultiTenancyProblem():
         match self.conf.mt.strategy:
             case "optuna":
                 strategy = OptunaMultiTenancy()
-                #solutions, invalid_solutions = self._optuna_optimizer()
             case "sa":
                 strategy = SaMultiTenancy()
-                #solutions, invalid_solutions =  self._simulated_annealing()
             case "herald":
                 strategy = HeraldMultiTenancy()
-                #solutions, invalid_solutions = self._herald_like()
             case "deap":
                 strategy = PydeapMultiTenancy()
             case _:

@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
 
-from framework.model.onnx_model import OnnxModel
 
 @dataclass
 class LayerBindings:

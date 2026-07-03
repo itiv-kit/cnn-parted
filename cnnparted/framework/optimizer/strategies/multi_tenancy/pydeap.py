@@ -4,7 +4,6 @@ import itertools as it
 import copy
 import os
 from typing import Sequence
-import operator
 
 import numpy as np
 import tqdm
