@@ -34,10 +34,9 @@ from framework.model.parser.shape import ShapeParser
 from framework.model.parser.slice import SliceParser
 from framework.model.parser.resize import ResizeParser
 
-
 class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else nx.DiGraph):
     """Result after parsing the onnx model into an internal representation"""
-    def __init__(self, onnx_in_model: ModelProto, **attr: Any):
+    def __init__(self, onnx_in_model: ModelProto = None, **attr: Any):
         super().__init__(**attr)
         self._current_id = 0
         self.onnx_in_model = onnx_in_model
@@ -45,7 +44,7 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
         self.frames: int = -1
         self.deadlines: list[float] = []
         self.has_frame_constraint = False
-
+    
     def set_runtime_constraints(self, wl_info: WorkloadInfo):
 
         if wl_info.deadline != math.inf:
@@ -132,6 +131,10 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
                 input_layers.append(node)
         return input_layers
     
+    def get_output_layers(self) -> list[LayerBase]:
+        output_layers = [node for node in self.nodes if self.out_degree(node) == 0]
+        return output_layers
+    
     def get_compute_layers(self) -> list[ComputationLayer]:
         compute_layers = []
         for node in self.nodes:
@@ -160,6 +163,24 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
                 found_computation_succs = found_computation_succs + self.computation_successors(succ)
         return found_computation_succs
 
+    def get_computation_graph(self):
+        # Get a graph that only features the ComputationLayer nodes
+        compute_graph = self.copy()
+        misc_layers = [n for n in compute_graph.nodes if not isinstance(n, ComputationLayer)]
+
+        for layer in misc_layers:
+            preds = list(compute_graph.predecessors(layer))
+            succs = list(compute_graph.successors(layer))
+
+            # Connect every incoming edge to the successors
+            for pred in preds:
+                for succ in succs:
+                    if not compute_graph.has_edge(pred, succ):
+                        compute_graph.add_edge(pred, succ)
+            
+            compute_graph.remove_node(layer)
+    
+        return compute_graph
 
 class OnnxParser: 
     OP_PARSER: dict = {

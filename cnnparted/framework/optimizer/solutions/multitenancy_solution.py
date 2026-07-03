@@ -1,3 +1,4 @@
+import math
 import operator
 from functools import reduce
 import json
@@ -9,7 +10,6 @@ from framework.helpers.dtypes import ComputeTask
 from framework.node.node_evaluator import SystemResult
 from framework import ConfigHelper
 from framework.scheduling.schedules import SystemSchedule
-from framework.model.layer_tracker import LayerBindings
 
 @dataclass
 class MultiTenancySolutionElem:
@@ -29,24 +29,33 @@ class MultitenancySolution:
         self.res_summary: list[tuple[float, float]] = [] #Energy, Latency
 
         for schedule in mt_solutions:
-            nw_results: dict[str, list[ComputeTask]] = {nw_name: [] for nw_name in self.nw_names}
+            if schedule.is_feasible:
+                nw_results: dict[str, list[ComputeTask]] = {nw_name: [] for nw_name in self.nw_names}
 
-            schedule_edp = 0.0
-            for node_schedule in schedule.node_schedules.values():
-                for task in node_schedule.tasks:
-                    nw_results[task.network].append(task)
-                    schedule_edp += (task.computation_energy * task.computation_latency) + \
-                                        (task.communication_energy * task.communication_latency)
+                schedule_edp = 0.0
+                for node_schedule in schedule.node_schedules.values():
+                    for task in node_schedule.tasks:
+                        nw_results[task.network].append(task)
+                        schedule_edp += (task.computation_energy * task.computation_latency) + \
+                                            (task.communication_energy * task.communication_latency)
 
-            for nw_tasks in nw_results.values():
-                nw_tasks.sort(key=lambda task: task.start_time)
+                for nw_tasks in nw_results.values():
+                    nw_tasks.sort(key=lambda task: task.start_time)
 
-            elem = MultiTenancySolutionElem(network_res=nw_results, 
-                                            total_energy=schedule.get_system_energy(node_stats),
-                                            total_latency=schedule.system_latency,
-                                            network_end_times=schedule.network_finish_times,
-                                            total_edp = schedule_edp,
-                                            max_min_span=schedule.max_min_span)
+                elem = MultiTenancySolutionElem(network_res=nw_results, 
+                                                total_energy=schedule.get_system_energy(node_stats),
+                                                total_latency=schedule.system_latency,
+                                                network_end_times=schedule.network_finish_times,
+                                                total_edp = schedule_edp,
+                                                max_min_span=schedule.max_min_span)
+            else:
+                # infeasible schedule has no elements, therefore generate a dummy element
+                elem = MultiTenancySolutionElem([],
+                                                total_energy=math.inf,
+                                                total_latency=math.inf,
+                                                network_end_times={nw: [] for nw in self.nw_names},
+                                                total_edp=math.inf,
+                                                max_min_span=math.inf)
             self.res.append(elem)
 
         #From system_config: get hardware parameters of the resulting architecture

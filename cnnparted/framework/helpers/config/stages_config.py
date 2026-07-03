@@ -110,7 +110,7 @@ class SchedulingPriority(Enum):
 class MultiTenancyStageConfig:
     optimizer: SimulatedAnnealingConfig | OptunaConfig | HeraldConfig | DeapConfig
     strategy: Literal["sa", "optuna", "herald", "deap"]
-    scheduling: Literal["list", "multi_queue"]
+    scheduling: Literal["list", "multi_queue", "sat_solver"]
     scheduling_priority: SchedulingPriority
     binding_granularity: Literal["tile", "layer", "network"]
     num_jobs: int

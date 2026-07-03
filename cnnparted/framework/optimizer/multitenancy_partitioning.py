@@ -35,8 +35,8 @@ from framework.optimizer.optimizer import Optimizer
 from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
-from framework.scheduling import (list_scheduling, multi_queue_scheduling, 
-                                  herald_like, validate_schedule, SystemSchedule)
+from framework.scheduling import (list_scheduling, multi_queue_scheduling, sat_solver_scheduling,
+                                   SystemSchedule)
 
 
 class MultiTenancyPartitioning(Optimizer):
@@ -145,7 +145,8 @@ class MultiTenancyProblem():
                 self.scheduling_algorithm = list_scheduling
             case "multi_queue":
                 self.scheduling_algorithm = multi_queue_scheduling
-        
+            case "sat_solver":
+                self.scheduling_algorithm = sat_solver_scheduling
         
         # Parse execution graphs into LayerBindings and generate random initial binding
         network_info = defaultdict(lambda: defaultdict(int))

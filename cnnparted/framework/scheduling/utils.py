@@ -145,13 +145,17 @@ def handle_multiframe_logic(models: dict[str, OnnxModel], scheduling_constraints
                             scheduling_constraints[network][input_layer].earliest_start = model_endtimes[network]
 
 def validate_schedule(schedule: SystemSchedule, tracker: LayerBindings,  models: dict[str, OnnxModel]):
+    if not schedule.is_feasible:
+        return False
+
     network_end_times = schedule.network_finish_times
 
     # Check that all layers are of each network are scheduled #frames-times
-    scheduled_layers = {nw_name: [] for nw_name in models.keys()}
+    scheduled_layers = {network: [] for network in models.keys()}
     for platform_schedule in schedule.node_schedules.values():
         for task in platform_schedule.tasks:
             scheduled_layers[task.network].append(task.layer)
+    
     for network, model in models.items():
         for layer in model.nodes:
             if not isinstance(layer, ComputationLayer):

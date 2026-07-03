@@ -32,6 +32,7 @@ dependencies = [
     "onnx2torch>=1.5.15",
     "optuna>=4.7.0",
     "optunahub>=0.3.1",
+    "ortools>=9.15.6755",
     "pandas>=2.3.0",
     "plotly>=6.2.0",
     "prettytable>=3.16.0",

@@ -39,6 +39,8 @@ def deadline_evaluation(models: dict[str, OnnxModel],
             partial_succ = True
             fully_succ = True
             for nw, frame_endtimes in network_frame_endtimes.items():
+                if not models[nw].has_constraints:
+                    continue
                 
                 # Check if every single frame finishes with the deadline
                 for frame_endtime, deadline in zip(frame_endtimes, models[nw].deadlines, strict=True):

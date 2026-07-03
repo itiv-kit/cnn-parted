@@ -63,6 +63,26 @@ class PlatformSchedule:
         self.tasks.append(task)
         return task
 
+    def append_layer(self, network: str, current_frame: int, layer_name: str, 
+                     layer_result: LayerResult,  start_time: float, 
+                     end_time: float = None, latency: float = None):
+
+        if end_time is not None and latency is None:
+            latency = end_time - start_time
+        elif latency is not None and end_time is None:
+            end_time = start_time + latency
+        elif latency is not None and end_time is None:
+            assert start_time + latency == end_time, "Invalid spec"
+        else:
+            raise RuntimeError("Invalid usage of append layer: must specify either end_time or latency")
+
+        task = ComputeTask(network, current_frame, layer_name, 
+                           self.id, start_time, end_time, latency, 
+                           layer_result.energy)
+        self.cur_time = max(self.cur_time, end_time)
+        self.tasks.append(task)
+        return task
+
     def get_idle_time(self) -> float:
         idle_time = [(nxt.start_time-cur.end_time)  for cur, nxt in it.pairwise(self.tasks)]
         if self.tasks[0].start_time > 0:
@@ -116,6 +136,7 @@ class SystemSchedule:
         self.noc = noc
         self.networks = networks
         self.network_finish_times: dict[str, list[float]] = {nw: [] for nw in networks} #track when each frame of a network is completed
+        self.is_feasible = True # solution obtained from CP-SAT solver might not find a feasible schedule
 
         self.transfer_tasks: list[TransferTask] = []
 
@@ -244,6 +265,15 @@ class SystemSchedule:
         #compute_task.end_time = store_task.end_time
 
         # Keep a dict to make searching for a specifc layer easier
+        self.layers[platform_id][network][compute_task.layer] = compute_task
+        return compute_task
+    
+    def append_layer(self, platform_id: int, network: str, current_frame: int, layer_name: str, 
+                     layer_result: LayerResult,  start_time: float, 
+                     end_time: float = None, latency: float = None):
+
+        compute_task = self.node_schedules[platform_id].append_layer(network, current_frame, layer_name, 
+                                                      layer_result, start_time, end_time, latency)
         self.layers[platform_id][network][compute_task.layer] = compute_task
         return compute_task
 
