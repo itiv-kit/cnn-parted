@@ -162,16 +162,8 @@ class SystemSchedule:
         num_elems = sum([t.num_elems for t in compute_layer.inputs])
 
         # Determine which links will be traversed
-        dest_compute_node = self.noc.id_to_node[platform_id].coord
+        dest_compute_node = self.noc._resolve_node(platform_id)
         start_dram_node = self.noc.get_nearest_dram_node(dest_compute_node)
-        if dest_compute_node == start_dram_node:
-            task = TransferTask(network, "inputs",
-                                start_time=compute_task.start_time,
-                                end_time=compute_task.start_time,
-                                src_node=start_dram_node, dest_node=dest_compute_node,
-                                bandwidth=allocated_bw,
-                                events=[])
-            return task
 
         visited_nodes = self.noc.singlecast_routing(start_dram_node, dest_compute_node)
         traversed_link_ids = it.pairwise([node.id for node in visited_nodes])
@@ -207,16 +199,9 @@ class SystemSchedule:
         num_elems = compute_layer.output.num_elems
 
         # Determine which links will be traversed
-        start_compute_node = self.noc.id_to_node[platform_id].coord
+        start_compute_node = self.noc._resolve_node(platform_id)
         dest_dram_node = self.noc.get_nearest_dram_node(start_compute_node)
-        if start_compute_node == dest_dram_node:
-            task = TransferTask(network, "output",
-                                start_time=compute_task.end_time,
-                                end_time=compute_task.end_time,
-                                src_node=start_compute_node, dest_node=dest_dram_node,
-                                bandwidth=allocated_bw,
-                                events=[])
-            return task
+
         visited_nodes = self.noc.singlecast_routing(start_compute_node, dest_dram_node)
         traversed_link_ids = it.pairwise([node.id for node in visited_nodes])
         traversed_links = [self.links[link_ids] for link_ids in traversed_link_ids]

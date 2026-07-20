@@ -89,6 +89,10 @@ class ComputeTask:
     @property
     def total_energy(self):
         return self.computation_energy + self.communication_energy
+    
+    @property
+    def data_ready_time(self):
+        return self.end_time + [st.transfer_latency for st in self.stores]
 
 @dataclass
 class AllocatedTensor:

@@ -7,7 +7,8 @@ from pathlib import Path
 from framework.link.link import Link
 from framework.helpers.dtypes import NocCoordinate
 from framework.helpers.config_helper import ConfigHelper
-from .noc import NocLink, NocNode, NocTopology
+from .noc import NocLink, NocNode, NocTopology, NodeIdentifier
+
 
 class MeshNoc(NocTopology):
     """
@@ -32,6 +33,7 @@ class MeshNoc(NocTopology):
             noc_layout[info.noc_coord] = node
             self.noc_ids[info.noc_coord] = node_id
             self.id_to_node[node_id] = node
+            self.coord_to_id[info.noc_coord] = node_id
             self.add_node(node)
         
         node_neigbors = self._get_nd_neighbors()
@@ -47,7 +49,8 @@ class MeshNoc(NocTopology):
         
         # Add reverse edge to model bidirectional data transfer
         for u, v, k in self.edges:
-            self.add_edge(v, u)
+            self.add_edge(v, u) #TODO Why no id_to_link?
+
         
         # Configure DRAM neighbor nodes
         if noc_cfg.dram.location is not None:
@@ -66,6 +69,9 @@ class MeshNoc(NocTopology):
         else:
             self.dram_neighbors = [tuple(nghbr) for nghbr in noc_cfg.dram.neighbors]
         
+        # Setup the DRAM as its own node that is connected to all neighbors
+        self.setup_dram_nodes( (-1,)*len(noc_shape) ) #dummy coord
+        
         if len(noc_shape) == 2:
             fig = plt.figure()
             pos = {node:node.coord for node in self.nodes}
@@ -77,29 +83,32 @@ class MeshNoc(NocTopology):
             fig_dir = Path(cfg.general.work_dir) / "figures" / "mesh.png"
             fig.savefig(fig_dir)
     
-    def get_num_hops(self, start: NocCoordinate, end: NocCoordinate):
-        hops_by_dim = [abs(start_dim - end_dim ) for start_dim, end_dim in zip(start, end)]
-        return sum(hops_by_dim)
+    def get_num_hops(self, start: NodeIdentifier, end: NodeIdentifier):
+        start = self._resolve_node(start)
+        end = self._resolve_node(end)
+        visited_nodes = nx.shortest_path(self, start, end)
+        return len(visited_nodes) - 1
     
     def get_min_hops_to_dram(self, start) -> int:
-        hops_to_dram_neighbor = [self.get_num_hops(start, dram_neighbor) for dram_neighbor in self.dram_neighbors]
-        return min(hops_to_dram_neighbor)
+        start_node = self._resolve_node(start)
+        path_length = nx.shortest_path_length(self, start_node, self.dram_node)
+        return int(path_length)
     
     def get_nearest_dram_node(self, start) -> NocCoordinate:
-        hops_to_dram_neighbor = [self.get_num_hops(start, dram_neighbor) for dram_neighbor in self.dram_neighbors]
-        min_hops_idx = hops_to_dram_neighbor.index(min(hops_to_dram_neighbor))
-        return self.dram_neighbors[min_hops_idx]
+        #TODO Should return DRAM
+        start_node = self._resolve_node(start)
+        path = nx.shortest_path(self, start_node, self.dram_node)
+        return path[-1]
 
     def singlecast_routing(self, start, end) -> list[NocNode]:
-        start_node_id = self.noc_ids[start]
-        start_node  = self.id_to_node[start_node_id]
-        end_node_id = self.noc_ids[end]
-        end_node = self.id_to_node[end_node_id]
+        start_node = self._resolve_node(start)
+        end_node = self._resolve_node(end)
         nodes_on_path = nx.shortest_path(self, start_node, end_node)
         return nodes_on_path
     
     def multicast_routing(self, start, ends):
-        paths: dict[NocCoordinate, list[list[NocNode]]] = {}
+        ends = [self._resolve_node(end) for end in ends]
+        paths: dict[NocNode, list[list[NocNode]]] = {}
         for end in ends:
             paths[end] = self.singlecast_routing(start, end)
         return paths
