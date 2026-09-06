@@ -50,15 +50,15 @@ class ConfigHelper:
                 dse_cfg = node.dse
                 mem_steps = dse_cfg.step_mem_shared
 
-                xl += dse_cfg.min_pe #["min_pe"]
-                min_size_mem_shared = dse_cfg.min_size_mem_shared #["min_size_mem_shared"]
+                xl += dse_cfg.min_pe
+                min_size_mem_shared = dse_cfg.min_size_mem_shared
                 xl += [min_size // step for (min_size, step) in zip(min_size_mem_shared, mem_steps)]
-                xl += dse_cfg.min_size_mem_local #["min_size_mem_local"]
+                xl += dse_cfg.min_size_mem_local
 
-                xu += dse_cfg.max_pe #["max_pe"]
-                max_size_mem_shared = dse_cfg.max_size_mem_shared #["max_size_mem_shared"]
+                xu += dse_cfg.max_pe
+                max_size_mem_shared = dse_cfg.max_size_mem_shared
                 xu += [max_size // step for (max_size, step) in zip(max_size_mem_shared, mem_steps)]
-                xu += dse_cfg.max_size_mem_local #["max_size_mem_local"]
+                xu += dse_cfg.max_size_mem_local
 
                 constr_sys += [[xl, xu]]
 
@@ -96,27 +96,3 @@ class ConfigHelper:
             memories.append( node["max_memory_size"])
 
         return memories
-
-    def get_optimization_objectives(self, nodes, links):
-        try:
-            id = self.config['optimization-objectives']['device']
-        except KeyError:
-            id = '0'
-
-        try:
-            metric = self.config['optimization-objectives']['metric']
-        except KeyError:
-            metric = 'energy'
-
-        if any(str(node.get('id')) == id for node in nodes):
-            name = "Node-" + str(id)
-
-        elif any(str(link.get('id')) == id for link in links):
-            name = "Link-" + str(id)
-        else:
-            raise ValueError(f"ID {id} not found in nodes or links.")
-
-        key_name = f"{name}_{metric}"
-
-
-        return key_name

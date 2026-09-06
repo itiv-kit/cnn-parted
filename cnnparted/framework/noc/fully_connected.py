@@ -33,7 +33,6 @@ class FullyConnectedNoc(NocTopology):
         input_nodes = [node for node in self.id_to_node.values()]
         self.add_edges_from(it.permutations(input_nodes, 2))
     
-    # TODO Fix routing here
     def singlecast_routing(self, start: NodeIdentifier, end: NodeIdentifier):
         start = self._resolve_node(start)
         end = self._resolve_node(end)
