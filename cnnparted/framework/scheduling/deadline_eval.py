@@ -41,6 +41,12 @@ def deadline_evaluation(models: dict[str, OnnxModel],
             for nw, frame_endtimes in network_frame_endtimes.items():
                 if not models[nw].has_constraints:
                     continue
+
+                if not schedule.is_feasible:
+                    # For an infeasible schedule: assume all frames are violated
+                    deadline_stats[nw].partial_violation += len(models[nw].deadlines)
+                    deadline_stats[nw].end_violation += 1
+                    continue
                 
                 # Check if every single frame finishes with the deadline
                 for frame_endtime, deadline in zip(frame_endtimes, models[nw].deadlines, strict=True):

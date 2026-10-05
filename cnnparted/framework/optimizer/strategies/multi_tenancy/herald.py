@@ -1,5 +1,3 @@
-from typing import Callable
-
 from framework.model.layer_tracker import LayerBindings
 from framework.scheduling import herald_like
 from framework.helpers.config_helper import ConfigHelper
@@ -16,7 +14,6 @@ class HeraldMultiTenancy:
                             noc: NocTopology,
                             conf: ConfigHelper,
                             initial_tracker: LayerBindings,
-                            scheduling_algorithm: Callable[..., SystemSchedule],
                           ) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
 
         system_schedule = herald_like(models, node_stats, noc, conf.mt.optimizer.lbf)

@@ -1,4 +1,3 @@
-from typing import Callable
 import copy
 import os
 
@@ -9,6 +8,8 @@ from .common import _score_edp, _score_idle_times, _score_max_latency
 
 from framework.model.layer_tracker import LayerBindings
 from framework.scheduling import SystemSchedule
+from framework.scheduling.dispatch import run_scheduling
+from framework.scheduling.utils import SchedulingProblem
 from framework.helpers.config_helper import ConfigHelper
 from framework.model.onnx_model import OnnxModel
 from framework.noc.noc import NocTopology
@@ -21,13 +22,12 @@ class SaMultiTenancy:
                             noc: NocTopology,
                             conf: ConfigHelper,
                             initial_tracker: LayerBindings,
-                            scheduling_algorithm: Callable[..., SystemSchedule],
                           ) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
         """Optimize the assigment of layers to platforms using simulated annealing.
         This optimizer only supports single-objective optimization."""
 
-        
-        initial_schedule = scheduling_algorithm(models, node_stats, priority=conf.mt.scheduling_priority)
+        problem = SchedulingProblem(models, node_stats, noc)
+        initial_schedule = run_scheduling(problem, initial_tracker, conf.mt.scheduling)
         num_nodes = initial_tracker.get_num_layers()
         initial_cost = self._calc_cost(initial_tracker, initial_schedule)
         num_iter = num_nodes * 100
@@ -81,7 +81,7 @@ class SaMultiTenancy:
                 
                 # Modify the binding and score it
                 new_state = _random_modify(current_state)
-                node_schedules: SystemSchedule = scheduling_algorithm(models, new_state, node_stats, noc, priority=conf.mt.scheduling_priority)
+                node_schedules: SystemSchedule = run_scheduling(problem, new_state, conf.mt.scheduling)
                 new_cost = self._calc_cost(new_state, node_schedules)
                 
                 if rng.random() <= np.exp( -(new_cost - old_cost) / t ):

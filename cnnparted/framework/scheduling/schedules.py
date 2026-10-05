@@ -134,7 +134,7 @@ class SystemSchedule:
     """
     def __init__(self, platform_ids: list[int], networks: list[str], noc: NocTopology):
         self.noc = noc
-        self.networks = networks
+        self.networks = list(networks)
         self.network_finish_times: dict[str, list[float]] = {nw: [] for nw in networks} #track when each frame of a network is completed
         self.is_feasible = True # solution obtained from CP-SAT solver might not find a feasible schedule
 

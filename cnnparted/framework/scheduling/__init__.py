@@ -5,7 +5,8 @@ from .sat_solving import sat_solver_scheduling  # noqa: F401
 from .herald_like import herald_like  # noqa: F401
 
 from .schedules import SystemSchedule  # noqa: F401
-from .schedules import PlatformSchedule  # noqa: F401 
+from .schedules import PlatformSchedule  # noqa: F401
 from .utils import validate_schedule  # noqa: F401
+from .utils import SchedulingProblem  # noqa: F401
 
 __all__ = []

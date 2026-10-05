@@ -1,14 +1,27 @@
-import math
+import heapq
+import itertools
 from dataclasses import dataclass
+from typing import Callable
 
 from framework.model.layer_tracker import LayerBindings
 from framework.model.layers.abstract_layer import LayerBase
 from framework.model.layers.rename_layer import RenameLayer
+from framework.noc.noc import NocTopology
 from framework.scheduling.schedules import SystemSchedule
 from framework.helpers.config.stages_config import SchedulingPriority
 from framework.model.onnx_model import OnnxModel
 from framework.model.layers.compute_layer import ComputationLayer
 from framework.node.node_evaluator import LayerResult, SystemResult
+
+
+@dataclass
+class SchedulingProblem:
+    """Bundles the inputs every scheduling algorithm needs that stay fixed across an entire
+    optimization run (e.g. all trials of one Optuna/SA/GA search)
+    """
+    models: dict[str, OnnxModel]
+    node_stats: SystemResult
+    noc: NocTopology
 
 @dataclass
 class SchedulingInfo:
@@ -64,6 +77,88 @@ class SchedulingDeadlines:
     def mark_frame_complete(self):
         self._current_idx += 1
 
+class ReadyQueue:
+    """Holds layers that are ready to be scheduled and hands out the best one according to
+    `priority`. Keys are computed once, when a layer becomes ready, and pushed onto a heap.
+    Except for IDLE_TIME, whose key (earliest_start - platform.cur_time) changes for every
+    other ready layer bound to the same platform whenever anything is scheduled on it. For
+    that one, we instead keep one heap per platform: ordering by earliest_start within a
+    single platform's heap is equivalent to ordering by idle time, since every entry on that
+    heap shares the same cur_time term - so only the heap tops (recomputed with the platform's
+    live cur_time) need to be compared across platforms."""
+
+    def __init__(self, priority: SchedulingPriority, bindings: LayerBindings, schedule: SystemSchedule):
+        self._priority = priority
+        self._bindings = bindings
+        self._schedule = schedule
+        self._tie_break = itertools.count()
+        self._heap: list[tuple] = []
+        self._platform_heaps: dict[int, list[tuple]] = {}
+
+    def push(self, network: str, layer: ComputationLayer, eval_data: LayerResult,
+            sched_constr: SchedulingConstraints, sched_deadlines: dict[str, SchedulingDeadlines]):
+        entry = (next(self._tie_break), network, eval_data, layer)
+
+        if self._priority == SchedulingPriority.IDLE_TIME:
+            platform = self._bindings.get_binding(network, layer.layer_name)
+            earliest_start = sched_constr[layer].earliest_start
+            heapq.heappush(self._platform_heaps.setdefault(platform, []), (earliest_start, *entry))
+            return
+
+        match self._priority:
+            case SchedulingPriority.EARLIEST_START:
+                key = sched_constr[layer].earliest_start
+            case SchedulingPriority.SHORTEST_JOB:
+                key = eval_data.latency
+            case SchedulingPriority.EARLIEST_FINISH:
+                key = sched_constr[layer].earliest_start + eval_data.latency
+            case SchedulingPriority.LONGEST_JOB:
+                key = -eval_data.latency
+            case SchedulingPriority.EARLIEST_DEADLINE:
+                key = sched_deadlines[network].active_deadline
+            case _:
+                raise RuntimeError(f"Found an unknown priority {self._priority}")
+        heapq.heappush(self._heap, (key, *entry))
+
+    def pop(self) -> tuple[str, LayerResult, ComputationLayer] | None:
+        if self._priority == SchedulingPriority.IDLE_TIME:
+            return self._pop_idle_time()
+        if not self._heap:
+            return None
+        _, _, network, eval_data, layer = heapq.heappop(self._heap)
+        return network, eval_data, layer
+
+    def _pop_idle_time(self) -> tuple[str, LayerResult, ComputationLayer] | None:
+        best_platform = None
+        best_delay = None
+        for platform, heap in self._platform_heaps.items():
+            if not heap:
+                continue
+            earliest_start = heap[0][0]
+            delay = earliest_start - self._schedule.node_schedules[platform].cur_time
+            if best_delay is None or delay < best_delay:
+                best_delay, best_platform = delay, platform
+
+        if best_platform is None:
+            return None
+        _, _, network, eval_data, layer = heapq.heappop(self._platform_heaps[best_platform])
+        return network, eval_data, layer
+
+
+def release_misc_layer(models: dict[str, OnnxModel], scheduling_constraints: dict[str, SchedulingConstraints],
+                        network: str, layer: RenameLayer, on_ready: Callable[[str, LayerBase], None]):
+    """Misc layers take zero time to execute, so we can propagate their earliest_start
+    immediately instead of waiting for a future iteration to discover them: the final schedule
+    only depends on this happening before any successor is scheduled, not on when exactly it
+    happens. `on_ready` is called back for any successor whose in_degree reaches zero here."""
+    scheduling_constraints[network][layer].is_scheduled = True
+    for succ in models[network].successors(layer):
+        succ_constr = scheduling_constraints[network][succ]
+        succ_constr.earliest_start = max(succ_constr.earliest_start, scheduling_constraints[network][layer].earliest_start)
+        succ_constr.in_degree -= 1
+        if succ_constr.in_degree == 0:
+            on_ready(network, succ)
+
 
 def find_layer_info(id: int, nw_name: str, layer_name: str, node_stats: SystemResult):
     network = node_stats[id].designs[0].networks[nw_name]
@@ -112,9 +207,6 @@ def sort_ready_list(ready_list: list[tuple[str, LayerResult, ComputationLayer, f
             ready_list.sort(key=lambda data: -data[1].latency)
         case SchedulingPriority.IDLE_TIME:
             ready_list.sort(key=lambda data: data[3])
-        case SchedulingPriority.DYNAMIC_DEADLINE:
-            ready_list.sort(key=lambda data:
-                            sched_deadlines[data[0]].active_deadline - schedule.node_schedules[bindings.get_binding(data[0], data[2].layer_name)].cur_time )
         case SchedulingPriority.EARLIEST_DEADLINE:
             ready_list.sort(key=lambda data:
                             sched_deadlines[data[0]].active_deadline)

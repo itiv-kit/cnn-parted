@@ -166,6 +166,11 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
     def get_computation_graph(self):
         # Get a graph that only features the ComputationLayer nodes
         compute_graph = self.copy()
+        # nx.DiGraph.copy() only preserves the graph/node/edge data
+        compute_graph.frames = self.frames
+        compute_graph.has_frame_constraint = self.has_frame_constraint
+        compute_graph.deadlines = self.deadlines
+
         misc_layers = [n for n in compute_graph.nodes if not isinstance(n, ComputationLayer)]
 
         for layer in misc_layers:
@@ -179,7 +184,9 @@ class OnnxModel(nx.DiGraph[ComputationLayer | RenameLayer] if TYPE_CHECKING else
                         compute_graph.add_edge(pred, succ)
             
             compute_graph.remove_node(layer)
-    
+
+        compute_graph.name_to_node_mapping = {n.layer_name: n for n in compute_graph.nodes}
+
         return compute_graph
 
 class OnnxParser: 

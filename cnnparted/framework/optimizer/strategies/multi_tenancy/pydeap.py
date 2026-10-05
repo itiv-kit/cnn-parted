@@ -3,7 +3,7 @@ import array
 import itertools as it
 import copy
 import os
-from typing import Sequence
+from collections.abc import Sequence
 
 import numpy as np
 import tqdm
@@ -20,57 +20,58 @@ from framework.noc.noc import NocTopology
 from framework.model.onnx_model import OnnxModel
 from framework.node.node_evaluator import SystemResult
 from framework.scheduling import (validate_schedule, SystemSchedule)
+from framework.scheduling.dispatch import run_scheduling, SchedulingConfig
+from framework.scheduling.utils import SchedulingProblem
 
 from framework.helpers.config_helper import ConfigHelper
 from .common import get_scorer
 from .optuna import ScheduleResult, scheduling_wrapper
 
+# Pydeap has no rng of its own, it uses Pythons modules for this.
+# Constant is forwarded to random.seed
+# TODO: Turn this into a configuration parameter
+SEED = 42
+
 
 @ray.remote
-def scheduling_worker(binding, models_id, node_stats_id, noc_id, priority_id, scheduling_algorithm):
+def scheduling_worker(binding, problem_id, config_id):
     """
     Worker function: Executes the scheduling and validation for one trial.
     """
     # Pull references from shared memory (Zero-copy read)
-    base_models = models_id
-    node_stats = node_stats_id
-    noc = noc_id
-    scheduling_priority = priority_id
+    problem: SchedulingProblem = problem_id
+    config: SchedulingConfig = config_id
 
     # --- SCHEDULING ---
     tracker: LayerBindings = binding
 
-    system_schedule: SystemSchedule = scheduling_algorithm(
-        base_models, tracker, node_stats, noc, scheduling_priority
-    )
+    system_schedule: SystemSchedule = run_scheduling(problem, tracker, config)
 
     # --- VALIDATION ---
-    are_constraints_fulfilled = validate_schedule(system_schedule, tracker, base_models)
+    are_constraints_fulfilled = validate_schedule(system_schedule, tracker, problem.models)
 
     return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
 
 @ray.remote
-def scoring_worker( node_stats_id, models_id, noc_id, priority_id, cost_fns_id, scheduling_algorithm, bindings_id):
+def scoring_worker(problem_id, cost_fns_id, config_id, bindings_id):
     """
     Worker function: Given a trial, perform all cost evaluations
     """
     # Pull references from shared memory
-    base_models = models_id
-    node_stats = node_stats_id
-    noc = noc_id
-    scheduling_priority = priority_id
+    problem: SchedulingProblem = problem_id
     cost_fns: list[Callable[..., float]] = cost_fns_id
+    config: SchedulingConfig = config_id
     tracker: LayerBindings = bindings_id
 
     cost_values = []
     sched = None
     for cost_fn in cost_fns:
         if hasattr(cost_fn, "__name__") and cost_fn.__name__ == "scheduling_wrapper":
-            sched: ScheduleResult = cost_fn(base_models, scheduling_algorithm, node_stats, noc, scheduling_priority, tracker)
+            sched: ScheduleResult = cost_fn(problem.models, problem.node_stats, problem.noc, config, tracker)
             cost = sched.schedule.system_latency
         else:
-            cost = cost_fn(node_stats, tracker, base_models, noc)
-        cost_values.append(cost) 
+            cost = cost_fn(problem.node_stats, tracker, problem.models, problem.noc)
+        cost_values.append(cost)
     return cost_values, sched
 
 class PydeapMultiTenancy:
@@ -80,8 +81,9 @@ class PydeapMultiTenancy:
                             noc: NocTopology,
                             conf: ConfigHelper,
                             initial_tracker: LayerBindings,
-                            scheduling_algorithm: Callable[..., SystemSchedule],
                           ) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
+
+        random.seed(SEED)
 
         # Notes:
         # - create a class of "name", inheriting for <base>
@@ -161,23 +163,18 @@ class PydeapMultiTenancy:
         all_schedules: list[ScheduleResult] = []
 
         ray.init(num_cpus=max(conf.mt.num_jobs, 1), ignore_reinit_error=True)
-
+        
         # Put static objects in the Shared Memory Object Store
-        models_ref = ray.put(models)
-        node_stats_ref = ray.put(node_stats)
-        noc_ref = ray.put(noc)
-        priority_ref = ray.put(conf.mt.scheduling_priority)
+        problem_ref = ray.put(SchedulingProblem(models, node_stats, noc))
+        config_ref = ray.put(conf.mt.scheduling)
 
         if "scheduling" in conf.mt.cost_terms:
             # Register functions to enable ray integration
             def ray_map(func, iterable):
-                task_ids = [scoring_worker.remote(node_stats_ref,
-                                                  models_ref,
-                                                  noc_ref,
-                                                  priority_ref,
+                task_ids = [scoring_worker.remote(problem_ref,
                                                   cost_fns, #TODO
-                                                  scheduling_algorithm,
-                                                  copy.deepcopy(initial_tracker).set_all_bindings(ind.tolist()), 
+                                                  config_ref,
+                                                  copy.deepcopy(initial_tracker).set_all_bindings(ind.tolist()),
                                                 ) for ind in iterable]
 
                 #task_id_results: list[tuple[float, ScheduleResult]] = ray.get(task_ids)
@@ -223,12 +220,9 @@ class PydeapMultiTenancy:
             # Perform scheduling for pareto optimal allocations
             task_ids = [
                 scheduling_worker.remote(
-                    copy.deepcopy(initial_tracker).set_all_bindings(binding), 
-                    models_ref, 
-                    node_stats_ref, 
-                    noc_ref, 
-                    priority_ref, 
-                    scheduling_algorithm
+                    copy.deepcopy(initial_tracker).set_all_bindings(binding),
+                    problem_ref,
+                    config_ref,
                 )
                 for binding in pareto
             ]
@@ -262,11 +256,6 @@ class PydeapMultiTenancy:
         self.plot_pareto_front(conf, pareto)
 
         logger.info(f"Found {len(pareto)} Pareto-optimal solutions")
-
-
-        # Here we try to create a schedule cost proxy with GP
-        #all_bindings = [copy.deepcopy(initial_tracker).set_all_bindings(binding) for binding in pareto]
-        #self.gp_cost_proxy(models, node_stats, all_bindings, all_schedules)
 
         for res in all_schedules:
             if res.is_valid:
@@ -362,13 +351,3 @@ class PydeapMultiTenancy:
             )
         
         fig.write_image(os.path.join(conf.general.work_dir, "figures", "pareto_front.pdf"))
-
-    def multi_tenancy_opt_gp(self,
-                            node_stats: SystemResult,
-                            models: dict[str, OnnxModel],
-                            noc: NocTopology,
-                            conf: ConfigHelper,
-                            initial_tracker: LayerBindings,
-                            scheduling_algorithm: Callable[..., SystemSchedule],
-                          ) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
-                          ...

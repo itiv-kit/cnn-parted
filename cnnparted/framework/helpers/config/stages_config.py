@@ -103,15 +103,87 @@ class SchedulingPriority(Enum):
     IDLE_TIME = auto()
     LONGEST_JOB = auto()
     SHORTEST_JOB = auto()
-    DYNAMIC_DEADLINE = auto()
     EARLIEST_DEADLINE = auto()
+
+@dataclass
+class ListSchedulingConfig:
+    priority: SchedulingPriority
+
+    def __init__(self, cfg: dict):
+        self.priority = SchedulingPriority[cfg["priority"].upper()]
+
+@dataclass
+class MultiQueueSchedulingConfig:
+    priority: SchedulingPriority
+
+    def __init__(self, cfg: dict):
+        self.priority = SchedulingPriority[cfg["priority"].upper()]
+
+@dataclass
+class SatSolverSchedulingConfig:
+    num_search_workers: int
+    max_time_in_seconds: float
+
+    def __init__(self, cfg: dict):
+        self.num_search_workers = cfg.get("num_search_workers", 8)
+        self.max_time_in_seconds = cfg.get("max_time_in_seconds", 30.0)
+
+@dataclass
+class IlpSchedulingConfig:
+    objective: Literal["sum_finish", "makespan", "soft_rt", "deadline_misses"]
+    hard_rt: bool
+    solver: str
+    max_time_in_seconds: float
+
+    def __init__(self, cfg: dict):
+        self.objective = cfg.get("objective", "makespan")
+        self.hard_rt = cfg.get("hard_rt", False)
+        self.solver = cfg.get("solver", "CBC")
+        self.max_time_in_seconds = cfg.get("max_time_in_seconds", 30.0)
+
+@dataclass
+class RlSchedulingConfig:
+    total_timesteps: int
+    ready_window: int
+    seed: int | None
+    save_path: str | None
+    load_path: str | None
+
+    def __init__(self, cfg: dict):
+        self.total_timesteps = cfg.get("total_timesteps", 200_000)
+        self.ready_window = cfg.get("ready_window", 8)
+        self.seed = cfg.get("seed", None)
+        self.save_path = cfg.get("save_path", None)
+        self.load_path = cfg.get("load_path", None)
+
+@dataclass
+class GpSchedulingConfig:
+    population_size: int
+    generations: int
+    max_tree_depth: int
+    cxpb: float
+    mutpb: float
+    seed: int | None
+    verbose: bool
+    save_path: str | None
+    load_path: str | None
+
+    def __init__(self, cfg: dict):
+        self.population_size = cfg.get("population_size", 30)
+        self.generations = cfg.get("generations", 20)
+        self.max_tree_depth = cfg.get("max_tree_depth", 5)
+        self.cxpb = cfg.get("cxpb", 0.7)
+        self.mutpb = cfg.get("mutpb", 0.2)
+        self.seed = cfg.get("seed", None)
+        self.verbose = cfg.get("verbose", False)
+        self.save_path = cfg.get("save_path", None)
+        self.load_path = cfg.get("load_path", None)
 
 @dataclass
 class MultiTenancyStageConfig:
     optimizer: SimulatedAnnealingConfig | OptunaConfig | HeraldConfig | DeapConfig
     strategy: Literal["sa", "optuna", "herald", "deap"]
-    scheduling: Literal["list", "multi_queue", "sat_solver"]
-    scheduling_priority: SchedulingPriority
+    scheduling: ListSchedulingConfig | MultiQueueSchedulingConfig | SatSolverSchedulingConfig | IlpSchedulingConfig | RlSchedulingConfig | GpSchedulingConfig
     binding_granularity: Literal["tile", "layer", "network"]
     num_jobs: int
     schedule_all_bindings: bool
@@ -120,8 +192,6 @@ class MultiTenancyStageConfig:
 
     def __init__(self, cfg: dict):
         self.strategy = cfg["strategy"]
-        self.scheduling = cfg["scheduling"]
-        self.scheduling_priority = SchedulingPriority[cfg["scheduling_priority"].upper()]
         self.binding_granularity = cfg["binding_granularity"]
         self.num_jobs = cfg["num_jobs"]
         self.schedule_all_bindings = "scheduling" in cfg["cost_terms"] or cfg.get("schedule_all_bindings", False)
@@ -130,6 +200,23 @@ class MultiTenancyStageConfig:
 
         valid_cost_terms = ["energy", "latency", "gini", "jain", "max_min_space", "std_dev", "crit_path", "scheduling"]
         assert all([cost_term in valid_cost_terms for cost_term in self.cost_terms]), f"Invalid configuration of cost terms. Valid are: {valid_cost_terms}"
+
+        scheduling_cfg = cfg.get("scheduling_config", {})
+        match cfg["scheduling"]:
+            case "list":
+                self.scheduling = ListSchedulingConfig(scheduling_cfg)
+            case "multi_queue":
+                self.scheduling = MultiQueueSchedulingConfig(scheduling_cfg)
+            case "sat_solver":
+                self.scheduling = SatSolverSchedulingConfig(scheduling_cfg)
+            case "ilp":
+                self.scheduling = IlpSchedulingConfig(scheduling_cfg)
+            case "rl":
+                self.scheduling = RlSchedulingConfig(scheduling_cfg)
+            case "gp":
+                self.scheduling = GpSchedulingConfig(scheduling_cfg)
+            case _:
+                raise RuntimeError(f"Unknown scheduling algorithm: {cfg['scheduling']}")
 
         match self.strategy:
             case "sa":

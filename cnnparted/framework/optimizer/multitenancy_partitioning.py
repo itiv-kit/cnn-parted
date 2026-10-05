@@ -21,8 +21,7 @@ from framework.optimizer.optimizer import Optimizer
 from framework.graph_analyzer import GraphAnalyzer
 from framework.helpers.config_helper import ConfigHelper
 from framework.node.node_evaluator import SystemResult
-from framework.scheduling import (list_scheduling, multi_queue_scheduling, sat_solver_scheduling,
-                                   SystemSchedule)
+from framework.scheduling import SystemSchedule
 
 
 class MultiTenancyPartitioning(Optimizer):
@@ -42,6 +41,8 @@ class MultiTenancyPartitioning(Optimizer):
         return solutions, invalid_solutions
 
 
+def _int_defaultdict():
+    return defaultdict(int)
 
 class MultiTenancyProblem():
     def __init__(self, work_dir: str, node_stats: SystemResult, ga: GraphAnalyzer, global_conf: ConfigHelper, noc: NocTopology):
@@ -55,17 +56,8 @@ class MultiTenancyProblem():
         self.models = copy.deepcopy(ga.models)
         self.conf = global_conf
 
-        # Determine scheduling algorithms
-        match self.conf.mt.scheduling:
-            case "list":
-                self.scheduling_algorithm = list_scheduling
-            case "multi_queue":
-                self.scheduling_algorithm = multi_queue_scheduling
-            case "sat_solver":
-                self.scheduling_algorithm = sat_solver_scheduling
-        
         # Parse execution graphs into LayerBindings and generate random initial binding
-        network_info = defaultdict(lambda: defaultdict(int))
+        network_info = defaultdict(_int_defaultdict)
         node_ids = self.node_stats.get_platform_ids()
         for network, model in ga.models.items():
             for layer in model.nodes:
@@ -101,7 +93,6 @@ class MultiTenancyProblem():
             noc=self.noc,
             initial_tracker=self.layer_tracker,
             conf=self.conf,
-            scheduling_algorithm=self.scheduling_algorithm,
         )
         solutions, invalid_solutions = ctx.run()
 

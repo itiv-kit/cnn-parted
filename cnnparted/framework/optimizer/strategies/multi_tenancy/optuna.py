@@ -3,6 +3,9 @@ from collections.abc import Callable
 import copy
 import os
 import time
+import itertools
+from pathlib import Path
+import pickle
 
 import tqdm
 import ray
@@ -18,6 +21,8 @@ from framework.model.onnx_model import OnnxModel
 from framework.node.node_evaluator import SystemResult
 from framework.scheduling import validate_schedule, SystemSchedule
 from framework.scheduling.deadline_eval import deadline_evaluation
+from framework.scheduling.dispatch import run_scheduling, SchedulingConfig
+from framework.scheduling.utils import SchedulingProblem
 
 from framework.helpers.config_helper import ConfigHelper
 
@@ -29,64 +34,58 @@ class ScheduleResult:
     tracker: LayerBindings
     is_valid: bool
 
-def scheduling_wrapper(models: dict[str, OnnxModel], scheduling_algorithm,
-                        node_stats: SystemResult, noc: NocTopology, scheduling_priority, 
-                        bindings: LayerBindings) -> ScheduleResult:
+def scheduling_wrapper(models: dict[str, OnnxModel], node_stats: SystemResult, noc: NocTopology,
+                        config: SchedulingConfig, bindings: LayerBindings) -> ScheduleResult:
     """Wrapper to simplify parallelizing scheduling"""
 
     # --- SCHEDULING ---
     tracker: LayerBindings = bindings
-    system_schedule: SystemSchedule = scheduling_algorithm(models, tracker, node_stats, noc, priority=scheduling_priority)
+    problem = SchedulingProblem(models, node_stats, noc)
+    system_schedule: SystemSchedule = run_scheduling(problem, tracker, config)
 
     # --- VALIDATION ---
     are_constraints_fulfilled = validate_schedule(system_schedule, tracker, models)
     return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
 
 @ray.remote
-def scheduling_worker(trial, models_id, node_stats_id, noc_id, priority_id, scheduling_algorithm):
+def scheduling_worker(trial, problem_id, config_id):
     """
     Worker function: Executes the scheduling and validation for one trial.
     """
     # Pull references from shared memory (Zero-copy read)
-    base_models = models_id
-    node_stats = node_stats_id
-    noc = noc_id
-    scheduling_priority = priority_id
+    problem: SchedulingProblem = problem_id
+    config: SchedulingConfig = config_id
 
     # --- SCHEDULING ---
     tracker: LayerBindings = trial.user_attrs["bindings"]
 
-    system_schedule: SystemSchedule = scheduling_algorithm(
-        base_models, tracker, node_stats, noc, scheduling_priority
-    )
+    system_schedule: SystemSchedule = run_scheduling(problem, tracker, config)
 
     # --- VALIDATION ---
-    are_constraints_fulfilled = validate_schedule(system_schedule, tracker, base_models)
+    are_constraints_fulfilled = validate_schedule(system_schedule, tracker, problem.models)
 
     return ScheduleResult(system_schedule, tracker, are_constraints_fulfilled)
 
 @ray.remote
-def scoring_worker(models_id, node_stats_id, noc_id, priority_id, cost_fns_id, scheduling_algorithm, bindings_id):
+def scoring_worker(problem_id, cost_fns_id, config_id, bindings_id):
     """
     Worker function: Given a trial, perform all cost evaluations
     """
     # Pull references from shared memory
-    base_models = models_id
-    node_stats = node_stats_id
-    noc = noc_id
-    scheduling_priority = priority_id
+    problem: SchedulingProblem = problem_id
     cost_fns: list[Callable[[], float]] = cost_fns_id
+    config: SchedulingConfig = config_id
     tracker: LayerBindings = bindings_id
 
     cost_terms = []
     sched = None
     for cost_fn in cost_fns:
         if cost_fn.__name__ == "scheduling_wrapper":
-            sched: ScheduleResult = cost_fn(base_models, scheduling_algorithm, node_stats, noc, scheduling_priority, tracker)
+            sched: ScheduleResult = cost_fn(problem.models, problem.node_stats, problem.noc, config, tracker)
             cost = sched.schedule.system_latency
         else:
-            cost = cost_fn(node_stats, tracker, base_models, noc)
-        cost_terms.append(cost) 
+            cost = cost_fn(problem.node_stats, tracker, problem.models, problem.noc)
+        cost_terms.append(cost)
     return cost_terms, sched
 
 
@@ -100,7 +99,6 @@ class OptunaMultiTenancy:
                             noc: NocTopology,
                             conf: ConfigHelper,
                             initial_tracker: LayerBindings,
-                            scheduling_algorithm: Callable[..., SystemSchedule],
                           ) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
         """Optimize the assigment of layers to platforms a specified Optuna sampler.
         This aims to optize energy and latency as a multi-objective optimization.
@@ -216,13 +214,13 @@ class OptunaMultiTenancy:
 
         # 1. Initialize Ray
         scheduling_start_time = time.perf_counter()
-        ray.init(num_cpus=max(conf.mt.num_jobs, 1), ignore_reinit_error=True)
+        num_cpus = max(conf.mt.num_jobs, 1)
+        max_in_flight = 2 * num_cpus
+        ray.init(num_cpus=num_cpus, ignore_reinit_error=True)
         
         # 2. Put static objects in the Shared Memory Object Store
-        models_ref = ray.put(models)
-        node_stats_ref = ray.put(node_stats)
-        noc_ref = ray.put(noc)
-        priority_ref = ray.put(conf.mt.scheduling_priority)
+        problem_ref = ray.put(SchedulingProblem(models, node_stats, noc))
+        config_ref = ray.put(conf.mt.scheduling)
         cost_fns_ref = ray.put(cost_fns)
 
 
@@ -245,12 +243,9 @@ class OptunaMultiTenancy:
                     
                     # Dispatch to Ray immediately
                     t_id = scoring_worker.remote(
-                        models_ref, 
-                        node_stats_ref, 
-                        noc_ref, 
-                        priority_ref, 
+                        problem_ref,
                         cost_fns_ref,
-                        scheduling_algorithm,
+                        config_ref,
                         bindings_ref
                     )
                     task_mapping[t_id] = trial
@@ -296,13 +291,9 @@ class OptunaMultiTenancy:
                         work_layer_tracker.set_all_bindings(bindings)
                         bindings_ref = ray.put(copy.deepcopy(work_layer_tracker))
                         new_t_id = scoring_worker.remote(
-                            new_trial,
-                            models_ref, 
-                            node_stats_ref, 
-                            noc_ref, 
-                            priority_ref, 
+                            problem_ref,
                             cost_fns_ref,
-                            scheduling_algorithm,
+                            config_ref,
                             bindings_ref
                         )
                         
@@ -329,41 +320,63 @@ class OptunaMultiTenancy:
             # Scheduling is only performed for Pareto-optimal task allocations
             study.optimize(objective, n_trials=num_trials, n_jobs=1, show_progress_bar=True)
             bindings_to_schedule = study.best_trials
-            
-            task_ids = [
-                scheduling_worker.remote(
-                    trial, models_ref, node_stats_ref, noc_ref, priority_ref, scheduling_algorithm
-                )
-                for trial in bindings_to_schedule
-            ]
-            
+            results_dir = Path(optuna_out_dir)
             final_results: list[ScheduleResult] = []
-            with tqdm.tqdm(total=len(task_ids), desc="Finalizing Schedules") as pbar:
-                remaining = task_ids
-                while remaining:
-                    # Get the next finished task
-                    done, remaining = ray.wait(remaining, num_returns=1)
+
+            trial_iter = enumerate(bindings_to_schedule)
+            in_flight: dict = {}   # ObjectRef -> trial index
+
+            # prime the pipeline
+            for idx, trial in itertools.islice(trial_iter, max_in_flight):
+                ref = scheduling_worker.remote(trial, problem_ref, config_ref)
+                in_flight[ref] = idx
+
+            result_paths: dict[int, Path] = {}
+
+            with tqdm.tqdm(total=len(bindings_to_schedule), desc="Finalizing Schedules") as pbar:
+                while in_flight:
+                    done, _ = ray.wait(list(in_flight.keys()), num_returns=1)
                     obj_ref = done[0]
+                    idx = in_flight.pop(obj_ref)   # remove and recover the correct index
+
                     try:
                         result = ray.get(obj_ref)
+                        path = results_dir / f"result_{idx:04d}.pkl"
+                        with open(path, "wb") as f:
+                            pickle.dump(result, f)
+                        result_paths[idx] = path
                     except Exception as e:
                         print(f"WORKER ERROR: {e}")
-                    
-                    final_results.append(result)
-                    
-                    pbar.update(1)
+                    finally:
+                        del obj_ref
+                        pbar.update(1)
+
+                    next_item = next(trial_iter, None)
+                    if next_item is not None:
+                        next_idx, next_trial = next_item
+                        ref = scheduling_worker.remote(next_trial, problem_ref, config_ref)
+                        in_flight[ref] = next_idx
             
             # Shutdown Ray when done to free up shared memory
             ray.shutdown()
 
-            scheduling_end_time = time.perf_counter()
-            logger.info(f"Scheduling runtime: {scheduling_end_time-scheduling_start_time}")
-            
-            for res in final_results:
+            for idx in sorted(result_paths.keys()):
+                with open(result_paths[idx], "rb") as f:
+                    res = pickle.load(f)
                 if res.is_valid:
                     results.append(res.schedule)
                 else:
                     invalid_results.append(res.schedule)
+                result_paths[idx].unlink(missing_ok=True)
+
+            scheduling_end_time = time.perf_counter()
+            logger.info(f"Scheduling runtime: {scheduling_end_time-scheduling_start_time}")
+            
+            #for res in final_results:
+            #    if res.is_valid:
+            #        results.append(res.schedule)
+            #    else:
+            #        invalid_results.append(res.schedule)
             # #########################################################
             # ------------------ END Ray integration ------------------
             # #########################################################
