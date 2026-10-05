@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 from framework.model.onnx_model import OnnxModel
 from framework.scheduling import SystemSchedule
-
 from loguru import logger
+
 
 @dataclass
 class DeadlineStats:

@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from scipy.optimize import dual_annealing
-from typing import Callable
+from collections.abc import Callable
 from copy import deepcopy
 
 

@@ -1,7 +1,7 @@
-import os
 import inspect
-
+import os
 from pathlib import Path
+
 import torchvision.models as tvmodels
 import torchvision.models.segmentation as segmodels
 

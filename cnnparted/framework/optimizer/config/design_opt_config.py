@@ -1,8 +1,9 @@
 import itertools
-import numpy as np
 
+import numpy as np
 from framework.optimizer.config.optimizer_config import OptimizerConfig
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
+
 
 class DesignOptConfig(OptimizerConfig):
     def __init__(self, 

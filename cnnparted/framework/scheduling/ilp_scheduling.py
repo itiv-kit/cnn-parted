@@ -1,15 +1,15 @@
 import heapq
 import itertools as it
 
+from framework.helpers.config.stages_config import SchedulingPriority
+from framework.model.layer_tracker import LayerBindings
+from framework.model.onnx_model import OnnxModel
+from framework.noc.noc import NocTopology
+from framework.node.node_evaluator import SystemResult
+from framework.scheduling.utils import find_layer_info
 from ortools.linear_solver import pywraplp
 
-from framework.noc.noc import NocTopology
-from framework.model.layer_tracker import LayerBindings
-from framework.helpers.config.stages_config import SchedulingPriority
-from framework.model.onnx_model import OnnxModel
-from framework.node.node_evaluator import SystemResult
 from .schedules import SystemSchedule
-from framework.scheduling.utils import find_layer_info
 
 
 def ilp_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_stats: SystemResult,

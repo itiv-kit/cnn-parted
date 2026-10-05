@@ -1,13 +1,15 @@
 import heapq
 import random
 
-from framework.noc.noc import NocTopology
-from framework.model.layers.rename_layer import RenameLayer
 from framework.model.layers.compute_layer import ComputationLayer
+from framework.model.layers.rename_layer import RenameLayer
 from framework.model.onnx_model import OnnxModel
+from framework.noc.noc import NocTopology
 from framework.node.node_evaluator import SystemResult
-from .schedules import SystemSchedule
 from framework.scheduling.utils import SchedulingConstraints, release_misc_layer
+
+from .schedules import SystemSchedule
+
 
 def herald_like(models: dict[str, OnnxModel], node_stats: SystemResult,
                     noc: NocTopology, lbf: float) -> SystemSchedule:

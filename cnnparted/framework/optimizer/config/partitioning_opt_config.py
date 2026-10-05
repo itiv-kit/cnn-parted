@@ -1,6 +1,6 @@
 import numpy as np
+from framework.optimizer.config.optimizer_config import OptimizerConfig
 
-from  framework.optimizer.config.optimizer_config import OptimizerConfig
 
 class PartitioningOptConfig(OptimizerConfig):
     def __init__(self, num_platforms: int, num_pp: int, num_layers: int):

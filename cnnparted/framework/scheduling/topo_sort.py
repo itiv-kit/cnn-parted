@@ -1,10 +1,11 @@
 import random
-from joblib import Parallel, delayed
-import tqdm
+from copy import deepcopy
+
 import networkx as nx
 import numpy as np
+import tqdm
+from joblib import Parallel, delayed
 
-from copy import deepcopy
 
 def topo_sort_starting_node(
     G: nx.DiGraph, strating_node: int, seed: int | None = None, as_ndarray: bool = False

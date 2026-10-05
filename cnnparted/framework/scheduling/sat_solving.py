@@ -1,16 +1,16 @@
-import math
 import itertools as it
+import math
 
-from ortools.sat.python import cp_model
-
-from framework.noc.noc import NocTopology
+from framework.helpers.config.stages_config import SchedulingPriority
 from framework.helpers.dtypes import NocCoordinate
 from framework.model.layer_tracker import LayerBindings
-from framework.helpers.config.stages_config import SchedulingPriority
 from framework.model.onnx_model import OnnxModel
+from framework.noc.noc import NocTopology
 from framework.node.node_evaluator import SystemResult
-from .schedules import SystemSchedule
 from framework.scheduling.utils import find_layer_info
+from ortools.sat.python import cp_model
+
+from .schedules import SystemSchedule
 
 SCALE = 1000 # Scale time to turn float values into int without too much loss of precision
 

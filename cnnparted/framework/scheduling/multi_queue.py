@@ -1,12 +1,20 @@
-from framework.noc.noc import NocTopology
-from framework.model.layer_tracker import LayerBindings
 from framework.helpers.config.stages_config import SchedulingPriority
-from framework.model.layers.rename_layer import RenameLayer
+from framework.model.layer_tracker import LayerBindings
 from framework.model.layers.compute_layer import ComputationLayer
+from framework.model.layers.rename_layer import RenameLayer
 from framework.model.onnx_model import OnnxModel
+from framework.noc.noc import NocTopology
 from framework.node.node_evaluator import SystemResult
+from framework.scheduling.utils import (
+    ReadyQueue,
+    SchedulingConstraints,
+    SchedulingDeadlines,
+    find_layer_info,
+    release_misc_layer,
+)
+
 from .schedules import SystemSchedule
-from .utils import find_layer_info, SchedulingConstraints, SchedulingDeadlines, ReadyQueue, release_misc_layer
+
 
 def multi_queue_scheduling(models: dict[str, OnnxModel], bindings: LayerBindings, node_stats: SystemResult,
                            noc: NocTopology, priority: SchedulingPriority) -> SystemSchedule:

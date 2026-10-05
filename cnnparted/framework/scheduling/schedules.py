@@ -1,10 +1,10 @@
 import itertools as it
-from sortedcontainers import SortedDict
 
-from framework.helpers.dtypes import ComputeTask, NocCoordinate, TransferTask, LinkEvent
-from framework.noc.noc import NocTopology, NocLink, NocNode
+from framework.helpers.dtypes import ComputeTask, LinkEvent, NocCoordinate, TransferTask
 from framework.model.layers.compute_layer import ComputationLayer
-from framework.node.node_evaluator import SystemResult, LayerResult
+from framework.noc.noc import NocLink, NocNode, NocTopology
+from framework.node.node_evaluator import LayerResult, SystemResult
+from sortedcontainers import SortedDict
 
 
 class PlatformSchedule:

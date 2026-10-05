@@ -4,17 +4,22 @@ import random
 from functools import partial
 
 import networkx as nx
-from deap import base, creator, tools, gp, algorithms
-
-from framework.noc.noc import NocTopology
-from framework.model.layer_tracker import LayerBindings
+from deap import algorithms, base, creator, gp, tools
 from framework.helpers.config.stages_config import SchedulingPriority
-from framework.model.layers.rename_layer import RenameLayer
+from framework.model.layer_tracker import LayerBindings
 from framework.model.layers.compute_layer import ComputationLayer
+from framework.model.layers.rename_layer import RenameLayer
 from framework.model.onnx_model import OnnxModel
+from framework.noc.noc import NocTopology
 from framework.node.node_evaluator import SystemResult
+
 from .schedules import SystemSchedule
-from .utils import SchedulingConstraints, SchedulingDeadlines, find_layer_info, release_misc_layer
+from .utils import (
+    SchedulingConstraints,
+    SchedulingDeadlines,
+    find_layer_info,
+    release_misc_layer,
+)
 
 EPS = 1e-6
 

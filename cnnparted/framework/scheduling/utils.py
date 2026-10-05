@@ -1,17 +1,17 @@
 import heapq
 import itertools
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
+from framework.helpers.config.stages_config import SchedulingPriority
 from framework.model.layer_tracker import LayerBindings
 from framework.model.layers.abstract_layer import LayerBase
-from framework.model.layers.rename_layer import RenameLayer
-from framework.noc.noc import NocTopology
-from framework.scheduling.schedules import SystemSchedule
-from framework.helpers.config.stages_config import SchedulingPriority
-from framework.model.onnx_model import OnnxModel
 from framework.model.layers.compute_layer import ComputationLayer
+from framework.model.layers.rename_layer import RenameLayer
+from framework.model.onnx_model import OnnxModel
+from framework.noc.noc import NocTopology
 from framework.node.node_evaluator import LayerResult, SystemResult
+from framework.scheduling.schedules import SystemSchedule
 
 
 @dataclass
