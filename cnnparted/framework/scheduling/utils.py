@@ -271,7 +271,7 @@ def validate_schedule(schedule: SystemSchedule, tracker: LayerBindings,  models:
                     # Check that all successors only start after the predecessor is finished
                     succ_task_binding = tracker.get_binding(network, succ.layer_name)
                     succ_task = schedule.find_task(succ_task_binding, network, frame, succ.layer_name)
-                    assert succ_task.start_time >= current_task.end_time, f"Layer {succ.layer_name} of {network} is not scheduled after predecessor {layer.layer_name}"
+                    assert succ_task.start_time >= current_task.end_time, f"Layer {succ.layer_name} of {network} is not scheduled after predecessor {layer.layer_name} (succ end: {succ_task.end_time}, current start: {current_task.start_time})"
         
         # Check if this schedule fulfills the constraints
         if model.has_constraints and not model.has_frame_constraint: 

@@ -44,7 +44,7 @@ class NocNode:
 
 class DramNode(NocNode):
     def __init__(self, coord: NocCoordinate):
-        super().__init__(id, coord, "DRAM")
+        super().__init__(-1, coord, "DRAM")
 
 
 class NocTopology(nx.MultiDiGraph[NocNode] if TYPE_CHECKING else nx.MultiDiGraph):

@@ -67,8 +67,8 @@ class MultiTenancyProblem():
         self.layer_tracker = LayerBindings(network_info)
         self.num_nodes = self.layer_tracker.get_num_layers()
 
-    
-    
+
+
     def minimize(self) -> tuple[list[SystemSchedule], list[SystemSchedule]]:
         # Distribute workload between platforms
         logger.debug(f"Optimizing multitenancy problem with {self.conf.mt.strategy}")

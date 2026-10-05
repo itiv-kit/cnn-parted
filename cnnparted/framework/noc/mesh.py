@@ -95,7 +95,6 @@ class MeshNoc(NocTopology):
         return int(path_length)
     
     def get_nearest_dram_node(self, start) -> NocCoordinate:
-        #TODO Should return DRAM
         start_node = self._resolve_node(start)
         path = nx.shortest_path(self, start_node, self.dram_node)
         return path[-1]
