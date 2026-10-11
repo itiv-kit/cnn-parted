@@ -15,6 +15,7 @@ default:
       - .venv/
       - .cache/uv
       - .external_libs/
+      - .chrome/
 
 setup-env:
   stage: build
@@ -42,6 +43,7 @@ run-test:
     <<: *global_cache
     policy: pull
   before_script:
+    - export BROWSER_PATH="$CI_PROJECT_DIR/.chrome/chrome-linux64/chrome"
     - source env/setupEnv.sh
     - export PATH="$CI_PROJECT_DIR/.venv/bin:$PATH"
     - sudo ln -s /usr/lib/libstdc++.so.6 /usr/lib/libstdc++.so
