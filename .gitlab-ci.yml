@@ -31,6 +31,7 @@ setup-env:
     #- git submodule sync --recursive
     - git submodule foreach --recursive git reset --hard
     - export BROWSER_PATH="$CI_PROJECT_DIR/.chrome/chrome-linux64/chrome"
+    - mkdir .cache/
     #- git submodule update --init --recursive
   script:
     - curl -LsSf https://astral.sh/uv/install.sh | sudo  env UV_INSTALL_DIR="/usr/local/bin" sh
