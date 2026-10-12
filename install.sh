@@ -7,7 +7,8 @@ export TIMELOOP_LIB_PATH=$ROOT_DIR/cnnparted/tools/accelergy-timeloop-infrastruc
 # Install Python dependencies with uv and from submodules
 echo "--- Starting UV Sync ---"
 uv sync --verbose
-uv run plotly_get_chrome -y
+mkdir .chrome/
+uv run plotly_get_chrome -y --path "$ROOT_DIR/.chrome"
 echo "--- UV Sync Complete ---"
 source env/setupEnv.sh 
 

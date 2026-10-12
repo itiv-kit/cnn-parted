@@ -31,7 +31,6 @@ setup-env:
     #- git submodule sync --recursive
     - git submodule foreach --recursive git reset --hard
     - export BROWSER_PATH="$CI_PROJECT_DIR/.chrome/chrome-linux64/chrome"
-    - mkdir .chrome/
   script:
     - curl -LsSf https://astral.sh/uv/install.sh | sudo  env UV_INSTALL_DIR="/usr/local/bin" sh
     - git config --global --add safe.directory /builds/ai-hardware-accelerators/cnn-parted
