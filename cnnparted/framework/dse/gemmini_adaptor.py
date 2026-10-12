@@ -1,19 +1,20 @@
-import copy
 from math import log2
 import pathlib
 from ruamel.yaml import YAML
-yaml = YAML(typ="rt")
-import numpy as np
+import re
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
-from framework.dse.interfaces.genome_interface import GenomeInterface
-from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.genome import Genome
+from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
+from framework.helpers.config import DseNodeConfig
+from framework.node.evaluation_registry import AcceleratorRegistry
 
-class GemminiConfig(ArchitectureConfig, GenomeInterface):
-    def _is_pow_2(self, n):
-        return (n & (n-1) == 0) and n != 0
+yaml = YAML(typ="rt")
 
+@AcceleratorRegistry.register_architecture("gemmini_like")
+class GemminiConfig(ArchitectureConfig, Genome):
+    N_VAR_OPT = 6
 
     def __init__(self, mesh_dim, spad_size, acc_size, enable_checks=False):
         super().__init__()
@@ -49,6 +50,9 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
             assert self.acc_bank_rows % (self.dim) == 0, "the number of rows in an accumulator bank must be a multiple of the dimensions of the systolic array"
             assert ((self.spad_rows/self.dim) - 2) >= (self.acc_rows/self.dim), "the number os usable scratchpad tiles must be greater than or equal the number of total accumulator tiles"
 
+    def _is_pow_2(self, n):
+        return (n & (n-1) == 0) and n != 0
+
     def __str__(self):
         return f"GemminiConfig(dim={self.dim}, spad={self.spad_size}kB, acc={self.acc_size}kB)"
 
@@ -70,6 +74,31 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
         gemmini = cls(1, 1, 1, enable_checks=False) 
         gemmini.pe_array_dim = pe_dims
         gemmini.local_mems = [spad_depth*mem_step[0], acc_depth*mem_step[1]]
+        return gemmini
+    
+    @classmethod
+    def from_yaml(cls, yaml_config: dict):
+        chip = yaml_config["architecture"]["subtree"][0]["subtree"][0]
+        spad = chip["local"][0]
+        pe_cols = chip["subtree"][0]
+        acc = pe_cols["local"][0]
+        pe_rows = pe_cols["subtree"][0]
+        
+        # First we get the PE array dimension
+        p = re.compile(r"\d..\d+")
+        match_cols = p.search(pe_cols["name"])
+        assert match_cols is not None
+        pe_cols = [int(num) for num in match_cols.group(0)][1] + 1
+        match_rows = p.search(pe_rows["name"])
+        assert match_rows is not None
+        pe_rows = [int(num) for num in match_rows.group(0)][1] + 1
+
+        spad_depth = int(spad["attributes"]["depth"])
+        acc_depth = acc["attributes"]["depth"] * pe_cols
+
+        gemmini = cls(1, 1, 1, enable_checks=False) 
+        gemmini.pe_array_dim = [pe_cols, pe_rows]
+        gemmini.local_mems = [spad_depth, acc_depth]
         return gemmini
 
     def to_genome(self) -> list:
@@ -117,45 +146,42 @@ class GemminiConfig(ArchitectureConfig, GenomeInterface):
         #self.acc_size = int(self.acc_rows * self.acc_w * self.mesh_dim_x // (8*1024))
     
 
-
-class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch):
+@AcceleratorRegistry.register_adaptor("gemmini_like")
+class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, ExhaustiveSearch):
 
     def __init__(self):
         super().__init__()
         self.config: GemminiConfig = None
         self._design_space = []
 
-    def read_space_cfg(self, cfg):
+    def read_space_cfg(self, cfg: DseNodeConfig):
         self.spad_banks = 4
         self.acc_banks = 2
         self.spad_data_width = 8
         self.acc_data_width = 32
 
-        search_space_constraints = cfg.get("constraints", {})
+        search_space = cfg
 
         #Boundaries of scratchpad sizes
-        self.min_spad_size = search_space_constraints.get("min_spad_size", 256)
-        self.max_spad_size = search_space_constraints.get("max_spad_size", 256)
+        self.min_spad_size = search_space.min_size_mem_shared[0]
+        self.max_spad_size = search_space.max_size_mem_shared[0]
 
         #Boundaries of accumulator sizes 
-        self.min_acc_size = search_space_constraints.get("min_acc_size", 64)
-        self.max_acc_size = search_space_constraints.get("max_acc_size", 64)
+        self.min_acc_size = search_space.min_size_mem_shared[1]
+        self.max_acc_size = search_space.max_size_mem_shared[1]
 
         self.spad_sizes = []
         self.acc_sizes = []
     
         # Mesh dim parameters
-        self.mesh_dim_min = search_space_constraints.get("mesh_dim_min", 16)
-        self.mesh_dim_max = search_space_constraints.get("mesh_dim_max", 16)
+        self.mesh_dim_min = search_space.min_pe[0]
+        self.mesh_dim_max = search_space.max_pe[0]
         _min = int(log2(self.mesh_dim_min))
         _max = int(log2(self.mesh_dim_max))
         self.mesh_dims = [2**x for x in range(_min, _max+1) ]
 
-        if mesh_dim_fix := search_space_constraints.get("mesh_dims_fix"):
-            self.mesh_dims = mesh_dim_fix
-
         # Tile dim parameters
-        self.tile_dims = [1] #search_space_constraints.get("tile_dim", [1])
+        self.tile_dims = [1]
 
         # Generate valid configuration
         self.generate_design_space() 
@@ -210,13 +236,13 @@ class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
                     acc_bank_rows_max = int(((spad_size*1024*8)//(spad_width) - 2*dim) / self.acc_banks)
                     acc_sizes = self._calc_valid_mem_sizes(dim, self.acc_banks, acc_width, self.min_acc_size, self.max_acc_size, rows_max=acc_bank_rows_max)
                     for acc_size in acc_sizes:
-                        self.design_space.append(copy.copy(GemminiConfig(mesh_dim, spad_size, acc_size) )) 
+                        self.design_space.append(GemminiConfig(mesh_dim, spad_size, acc_size) )
 
     def write_tl_arch_constraints(self, config=None, outdir=None):
         # no arch constraints for Gemmini-like config
         pass
     
-    def write_tl_map_constraints(self, config=None, outdir=None):
+    def write_tl_map_constraints(self, config: GemminiConfig=None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -233,10 +259,10 @@ class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         scratchpad["factors"] = f"R=1 S=1 P=1 Q=1 N=1 C=1 M<={config.dim}"
 
         with open(constraints_out, "w") as f:
-            y = yaml.dump(constraints, f)
+            _ = yaml.dump(constraints, f)
 
 
-    def write_tl_arch(self, config=None, outdir=None):
+    def write_tl_arch(self, config: GemminiConfig=None, outdir=None):
         if config is None:
             config = self.config
         if outdir is None:
@@ -252,7 +278,7 @@ class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         accumulator = pe_cols["local"][0]
         pe_rows = pe_cols["subtree"][0]
         registers = pe_rows["local"][0]
-        macc = pe_rows["local"][1]
+        macc = pe_rows["local"][1]  # noqa: F841
 
         scratchpad["attributes"]["depth"] = int(config.spad_rows)
         scratchpad["attributes"]["width"] = config.dim * config.data_w
@@ -277,8 +303,7 @@ class GemminiArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         #macc["attributes"]["word-bits"] = config.data_w
 
         with open(arch_out, "w") as f:
-            y = yaml.dump(arch, f)
-            #f.write(y)
+            _ = yaml.dump(arch, f)
 
 
     def run_tl_from_config(self, config: GemminiConfig, outdir=None):

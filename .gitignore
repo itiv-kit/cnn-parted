@@ -14,6 +14,7 @@ timeloop-mapper.*
 calibrations*
 *.onnx
 *.pt
+*.dot
 
 #visualization outputs
 _visualizations/
@@ -228,5 +229,9 @@ cython_debug/
 # Images
 *.png
 *.jpg
+
+# Custom
+eval_scripts*
+.external_libs
 
 

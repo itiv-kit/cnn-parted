@@ -1,17 +1,19 @@
 import collections
 import configparser
 import math
-from platform import node
 import torch
 from tqdm import tqdm
+from loguru import logger
 
 import sys
 import os
+from framework.model.layers.abstract_layer import LayerBase
+from framework.model.onnx_model import OnnxModel
 from framework.constants import ROOT_DIR
-sys.path.append(os.path.join(ROOT_DIR, "tools", "MNSIM-2.0"))
-
 from framework.node.node_evaluator import  NodeResult, DesignResult, LayerResult, NodeEvaluator
+from framework.helpers.config import NodeConfig
 
+sys.path.append(os.path.join(ROOT_DIR, "cnnparted", "tools", "MNSIM-2.0"))
 from MNSIM.Interface.network import NetworkGraph
 from MNSIM.Interface.interface import TrainTestInterface
 from MNSIM.Latency_Model.Model_latency import Model_latency
@@ -23,12 +25,12 @@ from pytorch_quantization import tensor_quant
 class MNSIMInterface(TrainTestInterface, NodeEvaluator):
     fname_result = "mnsim_layers"
 
-    def __init__ (self, in_config : dict, input_size : list) -> None:
-        mnsim_config = in_config["evaluation"]
-        self.SimConfig = ROOT_DIR + mnsim_config.get('conf_path')
+    def __init__ (self, in_config : NodeConfig) -> None:
+        mnsim_config = in_config.evaluation
+        self.SimConfig = ROOT_DIR + mnsim_config.simulator_cfg.conf_path
         self.node_config = in_config
         self.config = mnsim_config
-        self.input_size = input_size
+        self.input_size = None
 
         # load simconfig
         ## xbar_size, input_bit, weight_bit, quantize_bit
@@ -94,20 +96,22 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
 
-    def _find_rel_layer_idx(self, layers : list, l_idx : int, name: str) -> int:
+    def _find_rel_layer_idx(self, layers : list[LayerBase], l_idx : int, name: str) -> int:
         for i in range(l_idx-1,0, -1):
-            if layers[i].get('output')[0] == name:
+            if layers[i].output is not None and layers[i].output.name == name:
                 return i - l_idx
 
-    def _get_net(self, layers : list, hardware_config : dict = None) -> NetworkGraph:
-        if hardware_config == None:
+    def _get_net(self, model: OnnxModel, hardware_config : dict = None) -> NetworkGraph:
+        if hardware_config is None:
             hardware_config = {'xbar_size': 512, 'input_bit': 2, 'weight_bit': 1, 'quantize_bit': 10}
         layer_config_list = []
         quantize_config_list = []
         input_index_list = []
 
+        layers: list[LayerBase] = [n for n in model.nodes]
+
         for l in layers:
-            op_type = l.get('op_type')
+            op_type = l.op_type
             lyr = None
             #linqiushi modified
             # if op_type == "Conv":
@@ -122,32 +126,32 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             # if depthwise==True we will add the depthwise-conv,
             # if depthwise==False we will add the normal conv
             if op_type =='Conv':
-                conv_params = l.get('conv_params')
-                ich = conv_params.get('c')
-                och = conv_params.get('m')
-                krl = conv_params.get('r')
-                pad = conv_params.get('wpad')
-                srd = conv_params.get('wstride')
-                depthwise=  conv_params.get('depthwise')
-                if depthwise==True:
+                conv_params = l.layer_params
+                ich = conv_params.c
+                och = conv_params.m
+                krl = conv_params.r
+                pad = conv_params.wpad
+                srd = conv_params.wstride
+                depthwise =  conv_params.depthwise
+                if depthwise:
                     lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd,'depthwise':'separable'}
                 else:
                     lyr = {'type': 'conv', 'in_channels': ich, 'out_channels': och, 'kernel_size': krl, 'padding': pad, 'stride': srd}
             #linqiushi above
 
             elif op_type == "MaxPool":
-                pool_params = l.get('pool_params')
-                krl = pool_params.get('kernel')[0]
-                pad = pool_params.get('padding')[0]
-                srd = pool_params.get('stride')[0]
+                pool_params = l.layer_params
+                krl = pool_params.kernel_shape[0]
+                pad = pool_params.padding[0]
+                srd = pool_params.stride[0]
                 lyr = {'type': 'pooling', 'mode': 'MAX', 'kernel_size': krl,  'padding': pad, 'stride': srd}
             elif op_type == "AveragePool":
-                pool_params = l.get('pool_params')
-                krl = pool_params.get('kernel')[0]
-                srd = pool_params.get('stride')[0]
+                pool_params = l.layer_params
+                krl = pool_params.kernel_shape[0]
+                srd = pool_params.stride[0]
                 lyr = {'type': 'pooling', 'mode': 'AVE', 'kernel_size': krl, 'stride': srd}
             elif op_type == "GlobalAveragePool":
-                input_size = layers[layers.index(l) - 1].get('output_size')
+                input_size = layers[layers.index(l) - 1].output.shape
                 lyr = {'type': 'pooling', 'mode': 'ADA', 'kernel_size': input_size[2], 'stride': 1}
             elif op_type == "Relu":
                 lyr = {'type': 'relu'}
@@ -156,8 +160,8 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             elif op_type == "Flatten":
                 lyr = {'type': 'view'}
             elif op_type == "Gemm":
-                input_size = layers[layers.index(l) - 1].get('output_size')
-                num_classes = l.get('output_size')[1]
+                input_size = layers[layers.index(l) - 1].output.shape
+                num_classes = l.output.shape[1]
                 lyr = {'type': 'fc', 'in_features': input_size[1], 'out_features': num_classes}
             elif op_type == "Concat":
                 lyr = {'type': 'concat'}
@@ -172,22 +176,46 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             elif op_type =='Swish':
                 lyr={'type':'Swish'}
             #linqiushi above
-            elif op_type == 1: # DNN input/output
+            elif op_type == "Erf":
+                lyr={'type': "Sigmoid"} #approximation
+            elif op_type == "MatMul":
+                input_size = layers[layers.index(l) - 1].output.shape
+                batch = input_size[1]
+                gemm_dims = input_size[2:]
+                in_features = input_size[-1]
+                num_classes = l.output.shape[3]
+                lyr = {'type': 'fc', 'in_features': in_features, 'out_features': num_classes, 'batch': batch}
+            #elif op_type == "LayerNormalization":
+            #    lyr = {'type': 'element_multiply'} #approximation
+            #    input_size = layers[layers.index(l) - 1].output.shape
+            #elif op_type == "Mul":
+            #    lyr = {'type': 'element_multiply'} #approximation
+            #elif op_type == "Div":
+            #    lyr = {'type': 'element_multiply'} #approximation
+            elif op_type in ["Mul", "Div", "LayerNormalization"]:
+                continue #mute
+            elif op_type == "Transpose":
+                lyr = {'type': 'view'}
+            elif op_type == "Input":
+                if self.input_size is None:
+                    self.input_size = l.output.shape
+                continue
+            elif op_type == "Output":
                 continue
             else:
                 print("[MNSIMInterface] Warning: unknown Op_type ", op_type)
                 continue
 
-            inputs = l.get('input')
+            inputs = l.inputs
             l_idx = layers.index(l)
             input_idx = []
             for i in inputs:
-                if i.endswith("output_0"):
-                    input_idx.append(self._find_rel_layer_idx(layers, l_idx, i))
+                if i.name.endswith("output_0") and "Constant" not in i.name:
+                    input_idx.append(self._find_rel_layer_idx(layers, l_idx, i.name))
             if len(input_idx) != 0:
                 lyr['input_index'] = sorted(input_idx, reverse=True)
 
-            lyr['name'] = l.get('name')
+            lyr['name'] = l.layer_name
 
             layer_config_list.append(lyr)
 
@@ -213,8 +241,8 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
         net = NetworkGraph(hardware_config, layer_config_list, quantize_config_list, input_index_list, input_params)
         return net
 
-    def run(self, network: str, layers: list, progress : bool = False):
-        self.net = self._get_net(layers, self.hardware_config)
+    def run(self, network: str, model: OnnxModel, progress : bool = False):
+        self.net = self._get_net(model, self.hardware_config)
 
         struct_file = self.get_structure()
         mod_l = Model_latency(struct_file, self.SimConfig)
@@ -222,7 +250,7 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
         mod_a = Model_area(struct_file,self.SimConfig)
         mod_l.calculate_model_latency()
         area_list=mod_a.area_output_CNNParted()
-        self.node_config["bits"] = self.ADC_quantize_bit #TODO Check if this is the correct bit width
+        self.node_config.bits = self.ADC_quantize_bit #TODO Check if this is the correct bit width
         design = DesignResult(self.hardware_config)
         node_res = NodeResult(self.node_config)
         for idx, layer in enumerate(struct_file):
@@ -232,13 +260,13 @@ class MNSIMInterface(TrainTestInterface, NodeEvaluator):
             energy = mod_e.arch_energy[idx]
             area=area_list[idx]
 
-            l = LayerResult()
-            l.name = layer[0][0].get('name')
-            l.latency = latency / 1e6 # ns -> ms
-            l.energy = energy / 1e6 # nJ -> mJ
-            l.area = area / 1e6 # um^2 -> mm^2
-            design.add_layer(l)
-            design.add_layer_to_network(l, network)
+            lyr_result = LayerResult()
+            lyr_result.name = layer[0][0].get('name')
+            lyr_result.latency = latency / 1e6 # ns -> ms
+            lyr_result.energy = energy / 1e6 # nJ -> mJ
+            lyr_result.area = area / 1e6 # um^2 -> mm^2
+            logger.debug(f"MNSIM: Finished running {lyr_result.name}, yielded result: {lyr_result}")
+            design.add_layer_to_network(lyr_result, network)
 
         # for compatibility reasons with DSE-Extension
         node_res.add_design(design)

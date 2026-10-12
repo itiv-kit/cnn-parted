@@ -3,41 +3,23 @@
 ## About
 CNNParted is a framework for hardware-aware design space exploration of CNN inference partitioning in embedded AI applications. Thereby, not only the hardware deployed in the nodes is considered but also the impact of the link on system energy consumption and inference latency.
 
-The framework currently includes a custom Ethernet model as well as hardware accelerators models taken from Timeloop example repository (Simba, Eyeriss and Simple OS Array).
+The framework currently includes a custom Ethernet and UCIe model, as well as hardware accelerators models taken from Timeloop example repository (Simba, Eyeriss and Gemmini).
+Additionally, we support evaluating accelerators with ZigZag.
 
-## Instructions
-0. First, create a virtual environment to install all the dependencies:
+## Installation Instructions
+We provide an installation script with all necessary steps. To simplify the installation of all dependencies, the usage of a Docker Container is highly recommended. A devcontainer file for use with VSCode is also provided. Otherwise, Timeloop dependencies might need to be manually installed.
+To manage the dependencies for the Python module, we use uv.
+For convenience, we provide an installation script to automatically perform all installation step. Note that this assumes usage of the provided Docker container.
     ```sh
-    python3.11 -m venv pythonEnv
-    source pythonEnv/bin/activate
-    pip install --upgrade pip
-    pip install wheel
-    pip install nvidia-pyindex 
-    pip install numpy absl-py scipy sphinx-glpi-theme prettytable pyyaml
-    pip install --no-cache-dir --index-url https://pypi.nvidia.com pytorch-quantization
+    ./install.sh
     ```
 
-1. Download submodules
-    ```sh
-    git submodule update --init --recursive
-    ```
 
-2. Run installation
+3. Run the given python script:
     ```sh
-    git submodule foreach --recursive 'if [ -f setup.py ] && [[ $name =~ "accelergy" ]]; then  pip install .; elif [ -f setup.py ]; then pip install -e .; fi'
-    git submodule foreach --recursive 'if [ -f requirements.txt ]; then pip install -r requirements.txt; fi'
-    pip install -e .
-    pip install -r requirements.txt
-    ```
-
-3. Setup the environment using the script provided in env:
-    ```sh
+    # If not already in virtual environment, activate it:
     source env/setupEnv.sh
-    ```
-
-4. Run the given python script:
-    ```sh
-    python3.11 cnnparted/cnnparted.py examples/squeezenet1_1.yaml RunName
+    python3 cnnparted/cnnparted.py examples/squeezenet1_1.yaml RunName
     ```
 
 ## Known issues

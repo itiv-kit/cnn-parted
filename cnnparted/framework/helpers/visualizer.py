@@ -1,6 +1,4 @@
 import os
-from matplotlib import legend
-from matplotlib.pylab import xlabel, ylabel, yscale
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -22,10 +20,10 @@ def plotMetricPerConfigPerLayer(stats: dict, dir: str, metric: str, type: str = 
     # ------------------------
     # d0 | ...| ...| ...| ...|
     # d1 | ...| ...| ...| ...|
-    energy_per_design = []
-    latency_per_design = []
-    area_per_design = []
-    labels = []
+    energy_per_design: list[float] = []
+    latency_per_design: list[float] = []
+    area_per_design: list[float] = []
+    labels: list[str] = []
 
     for tag, design in stats.items():
         assert len(design["networks"]) == 1
@@ -59,7 +57,7 @@ def plotMetricPerConfigPerLayer(stats: dict, dir: str, metric: str, type: str = 
             plt.plot(layer_idx, metric_per_design[i], label = labels[i], linestyle="dotted")
     elif type == "bar":
         data = np.array(metric_per_design).T
-        df = pd.DataFrame(data, columns=labels)
+        df = pd.DataFrame(data, columns=labels)  # type: ignore[arg-type]
         df.plot.bar(color=COLOR_SEQUENCE, 
                     title=f"{metric_str} for all Designs by layer", 
                     ylabel=f"{metric_str} [{metric_unit}]", 

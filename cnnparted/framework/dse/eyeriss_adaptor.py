@@ -1,19 +1,25 @@
 import copy
-from math import sqrt
 import pathlib
 from ruamel.yaml import YAML
-yaml = YAML(typ="rt")
 import shutil
-import numpy as np
+import re
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
-from framework.dse.interfaces.genome_interface import GenomeInterface
-from framework.dse.interfaces.timeloop_interface import TimeloopInterface
-from framework.dse.interfaces.zigzag_interface import ZigzagInterface
+from framework.dse.interfaces.genome import Genome
+from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
+from framework.dse.interfaces.zigzag_adaptor import ZigzagAdaptor
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
+from framework.helpers.config import DseNodeConfig
+from framework.node.evaluation_registry import AcceleratorRegistry
 
-class EyerissConfig(ArchitectureConfig, GenomeInterface):
+yaml = YAML(typ="rt")
+
+@AcceleratorRegistry.register_architecture("eyeriss_like")
+class EyerissConfig(ArchitectureConfig, Genome):
+    N_VAR_OPT = 6
+
     def __init__(self, pe_dim_y, pe_dim_x, glb_size, ifmap_spad_size, weight_spad_size, psum_spad_size):
+        super().__init__()
         self.word_bits = 16
         self.glb_block_size = 4
         self.spad_block_size = 1
@@ -31,6 +37,42 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
         self.pe_dim_y = pe_dim_y
         self.pe_dim_x = pe_dim_x
         self.num_pes = pe_dim_y * pe_dim_x
+
+    @classmethod
+    def from_yaml(cls, yaml_config: dict):
+        def get_field(cfg: list[dict], name: str) -> dict:
+            for field in cfg:
+                if field["name"] == name:
+                    return field
+            raise RuntimeError(f"Did not find key {name}")
+
+        eyeriss = yaml_config["architecture"]["subtree"][0]["subtree"][0]
+        pe_array = eyeriss["subtree"][0]["local"]
+
+        shared_glb = get_field(eyeriss["local"], "shared_glb")
+        ifmap = get_field(pe_array, "ifmap_spad")
+        weights = get_field(pe_array, "weights_spad")
+        psum = get_field(pe_array, "psum_spad")
+        macs = get_field(pe_array, "mac")
+
+        glb_depth = int(shared_glb["attributes"]["memory_depth"])
+        pe_array_mem_depths = [int(ifmap["attributes"]["memory_depth"]),
+                               int(weights["attributes"]["memory_depth"]),
+                               int(psum["attributes"]["memory_depth"])]
+
+        p = re.compile(r"\d..\d+")
+        pe_string: str = p.findall(eyeriss["subtree"]["name"])[0]
+        num_macs = [int(num) for num in pe_string.split("..")]
+        num_macs = num_macs[1] + 1
+
+        pe_x: int = macs["attributes"]["meshX"]
+        pe_y: int = num_macs // pe_x
+
+        eyeriss_config = cls(2, 2, 1024, 128, 128, 128) #init with dumm
+        eyeriss_config.pe_array_dim = [pe_y, pe_x]
+        eyeriss_config.pe_array_mem = pe_array_mem_depths
+        eyeriss_config.local_mems = [glb_depth]
+        return eyeriss_config
 
     def get_config(self) -> dict:
         cfg = {}
@@ -55,7 +97,7 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
 
     def to_genome(self) -> list:
         return self.pe_array_dim + self.pe_array_mem + self.local_mems
-
+    
     @property
     def pe_array_dim(self):
         return [self.pe_dim_y, self.pe_dim_x]
@@ -91,23 +133,24 @@ class EyerissConfig(ArchitectureConfig, GenomeInterface):
         #self.glb_size = int(glb_depth * self.word_bits * self.glb_block_size // (8*1024))
 
 
-class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch, ZigzagInterface):
+@AcceleratorRegistry.register_adaptor("eyeriss_like")
+class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, ExhaustiveSearch, ZigzagAdaptor):
     def __init__(self):
         super().__init__()
         self.config: EyerissConfig = None
         #self.design_space = []
 
-    def read_space_cfg(self, cfg):
-        search_space_constraints = cfg.get("constraints", {})
+    def read_space_cfg(self, cfg: DseNodeConfig):
+        search_space = cfg
 
-        self.pe_dims_y = search_space_constraints.get("pe_dims_y", [12])
-        self.pe_dims_x = search_space_constraints.get("pe_dims_x", [14])
+        self.pe_dims_y = [search_space.min_pe[0], search_space.max_pe[0]] #get("pe_dims_y", [12])
+        self.pe_dims_x = [search_space.max_pe[1], search_space.max_pe[1]] #get("pe_dims_x", [14])
 
-        self.ifmap_spad_sizes = search_space_constraints.get("ifmap_spad_sizes", [24]) #Byte
-        self.weight_spad_sizes = search_space_constraints.get("weight_spad_sizes", [384]) #Byte
-        self.psum_spad_sizes = search_space_constraints.get("psum_spad_sizes", [32]) #Byte
+        self.ifmap_spad_sizes = [search_space.min_size_mem_local[0], search_space.max_size_mem_local[0]]  #Byte
+        self.weight_spad_sizes =  [search_space.min_size_mem_local[1], search_space.max_size_mem_local[1]] #Byte
+        self.psum_spad_sizes = [search_space.min_size_mem_local[2], search_space.max_size_mem_local[2]] #Byte
 
-        self.glb_sizes = search_space_constraints.get("gbuf_sizes", [128]) #kB
+        self.glb_sizes = [search_space.min_size_mem_shared[0], search_space.max_size_mem_shared[0]]  #kB
 
         # Generate valid configuration
         self.generate_design_space() 
@@ -164,8 +207,7 @@ class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         mac["attributes"]["meshX"] = config.pe_dim_x
 
         with open(arch_out, "w") as f:
-            y = yaml.dump(arch, f)
-            #f.write(y)
+            _ = yaml.dump(arch, f)
     
     def write_tl_arch_constraints(self, config:EyerissConfig = None, outdir=None):
         if config is None:
@@ -201,7 +243,6 @@ class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
     def run_tl_from_config(self, config: EyerissConfig, outdir=None):
         return super().run_tl_from_config(config, outdir)
     
-    #TODO
     def write_zigzag_arch(self, config=None, outdir=None):
         if config is None:
             config = self.config
@@ -233,7 +274,7 @@ class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
         pe_array["sizes"] = config.pe_array_dim
 
         with open(arch_out, "w") as f:
-            y = yaml.dump(arch, f)
+            _ = yaml.dump(arch, f)
 
 
     def write_zigzag_mapping(self, config=None, outdir=None):
@@ -255,7 +296,7 @@ class EyerissArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaust
                                          "D2": [f"C, {config.pe_array_dim[1]}"]}
         
         with open(mapping_out, "w") as f:
-            y = yaml.dump(mapping, f)
+            _ = yaml.dump(mapping, f)
         
 
 

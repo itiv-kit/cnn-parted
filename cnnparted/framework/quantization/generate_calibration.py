@@ -1,8 +1,8 @@
 import torch.nn as nn
 import os
 
-from model_explorer.utils.setup import setup_torch_device
 from framework.quantization.faulty_quantized_model import FaultyQuantizedModel
+#from model_explorer.utils.setup import setup_torch_device
 from model_explorer.utils.data_loader_generator import DataLoaderGenerator
 
 from pytorch_quantization.tensor_quant import QuantDescriptor

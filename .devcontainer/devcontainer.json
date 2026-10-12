@@ -1,0 +1,26 @@
+{
+  "image": "gitlab.itiv.kit.edu:1443/itiv/docker/rocky9-timeloop:latest",
+  "runArgs": [
+      "--userns=host",
+      "--shm-size=64gb",
+      "--cap-add=ALL",
+      "--security-opt=apparmor=unconfined"],
+  "remoteUser": "root",
+  "securityOpt": [ "seccomp=unconfined" ],
+  "workspaceMount": "type=bind,source=${localWorkspaceFolder},target=/workspaces/cnn-parted,consistency=cached",
+  "postCreateCommand": "echo \"source /usr/share/bash-completion/completions/git\" >> ~/.bashrc",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.vscode-pylance",
+        "ms-python.python",
+        "ms-python.debugpy",
+        "mechatroner.rainbow-csv",
+        "ms-vscode.live-server",
+        "tintinweb.graphviz-interactive-preview",
+        "charliermarsh.ruff",
+        "gruntfuggly.todo-tree"
+      ]
+    }
+  }
+}

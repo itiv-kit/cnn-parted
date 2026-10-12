@@ -12,6 +12,7 @@ from pymoo.termination import get_termination
 
 from joblib import Parallel, delayed
 
+from framework.model.layers.rename_layer import OutputLayer
 from framework.optimizer.optimizer import Optimizer
 from framework.optimizer.partitioning_problem import PartitioningProblem
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
@@ -36,11 +37,15 @@ class PartitioningOptimizer(Optimizer):
         nodes = len(ga.schedules[network][0])
 
         self.layer_dict = {}
-        for l in self.schedules[0]:
-            self.layer_dict[l] = {}
-            self.layer_dict[l]["predecessors"] = list(ga.graphs[network].get_graph().predecessors(l))
-            self.layer_dict[l]["successors"] = [s for s in ga.graphs[network].get_successors(l)]
-            self.layer_dict[l]["output_size"] = ga.graphs[network].output_sizes[l]
+        for layer in self.schedules[0]:
+            self.layer_dict[layer] = {}
+            model_layer = ga.models[network].node_by_layer_name(str(layer))
+            self.layer_dict[layer]["predecessors"] = [layer.layer_name for layer in ga.models[network].predecessors_by_layer_name(layer)]
+            self.layer_dict[layer]["successors"] = [layer.layer_name for layer in ga.models[network].successors_by_layer_name(layer)]
+            if not isinstance(model_layer, OutputLayer):
+                self.layer_dict[layer]["output_size"] = [ga.models[network].node_by_layer_name(layer).output.shape]
+            else:
+                self.layer_dict[layer]["output_size"] = [ga.models[network].node_by_layer_name(layer).inputs[0].shape]
 
         self.layer_params = self._set_layer_params(ga)
 
@@ -56,19 +61,19 @@ class PartitioningOptimizer(Optimizer):
         params = {}
         network = ga.networks[0]
         for layer in ga.get_conv2d_layers(network):
-            params[layer['name']] = layer['conv_params']['weights']
+            params[layer.layer_name] = layer.layer_params.weights
         for layer in ga.get_gemm_layers(network):
-            params[layer['name']] = layer['gemm_params']['weights']
+            params[layer.layer_name] = layer.layer_params.weights
 
         return params
 
-    def optimize(self, q_constr : dict, conf : dict, store_results: bool = True) -> tuple[int, int, dict]:
-        fixed_sys = conf["general"].get('fixed_sys', False)
-        acc_once = conf["general"].get('acc_once', False)
-        opt = conf["general"].get('optimization')
-        num_jobs = conf["general"].get('num_jobs')
-        system_constraints = ConfigHelper.get_system_constraints(conf)
-        max_num_platforms = conf["general"].get("max_num_platforms", None)
+    def optimize(self, q_constr : dict, conf : ConfigHelper, store_results: bool = True) -> tuple[int, int, dict]:
+        fixed_sys = conf.partitioning.fixed_sys
+        acc_once = conf.partitioning.acc_once
+        opt = conf.partitioning.optimization
+        num_jobs = conf.partitioning.num_jobs
+        system_constraints = conf.get_system_constraints()
+        max_num_platforms = conf.partitioning.max_num_platforms
 
         all_paretos = []
         non_optimals = []
@@ -88,7 +93,7 @@ class PartitioningOptimizer(Optimizer):
 
             num_platforms = len(self.node_stats)
             num_layers = len(self.schedules[0])
-            nodeStatsIds = list(self.node_stats.keys())
+            #nodeStatsIds = list(self.node_stats.keys())
             for i, sort in enumerate(sorts):
                 if sort is not None:
                     for res in sort:

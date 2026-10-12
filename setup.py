@@ -1,45 +1,45 @@
 from setuptools import setup
 from setuptools.command.install import install
-import os
 
 class ToolsInstall(install):
     def run(self):
         install.run(self)
-        path = os.getcwd().replace(" ", "\ ").replace("(","\(").replace(")","\)") + "/tools/"
-        os.system("echo 'Setting up CNNParted Tools'")
 
-        # Install CACTI
-        os.system("make -C"+path+"cacti")
-        os.system("chmod -R 777 "+path+"cacti")
+        #path = os.getcwd().replace(" ", "\ ").replace("(","\(").replace(")","\)") + "/tools/"
+        #os.system("echo 'Setting up CNNParted Tools'")
 
-        # Install Ramulator and vampire
-        os.system("echo 'Setting up ramulator and vampire")
+        ## Install CACTI
+        #os.system("make -C"+path+"cacti")
+        #os.system("chmod -R 777 "+path+"cacti")
 
-        os.system("make -j -C"+path+"ramulator")
-        os.system("make -j -C"+path+"VAMPIRE")
+        ## Install Ramulator and vampire
+        #os.system("echo 'Setting up ramulator and vampire")
 
-        # Install Timeloop
-        os.system("chmod +x "+path+"setupTimeloop.sh")
-        os.system("sh "+path+"setupTimeloop.sh")
+        #os.system("make -j -C"+path+"ramulator")
+        #os.system("make -j -C"+path+"VAMPIRE")
 
-        # Update MNSIM
-        os.system("git -C "+path+"MNSIM-2.0 apply ../mnsim.patch")
+        ## Install Timeloop
+        #os.system("chmod +x "+path+"setupTimeloop.sh")
+        #os.system("sh "+path+"setupTimeloop.sh")
+
+        ## Update MNSIM
+        #os.system("git -C "+path+"MNSIM-2.0 apply ../mnsim.patch")
 
 
 
 setup(
     name='CNNParted',
-      version='1.0',
-      description='CNN Inference Partitioning Framework',
-      url='https://github.com/itiv-kit/cnn-parted',
-      classifiers=[
-        'Development Status :: 4 - Beta',
-        'Programming Language :: Python :: 3'
-      ],
-      keywords='cnn inference hardware accelerator',
-      author='Fabian Kreß',
-      author_email='fabian.kress@kit.edu',
-      license='MIT',
+      #version='1.0',
+      #description='CNN Inference Partitioning Framework',
+      #url='https://github.com/itiv-kit/cnn-parted',
+      #classifiers=[
+      #  'Development Status :: 4 - Beta',
+      #  'Programming Language :: Python :: 3'
+      #],
+      #keywords='cnn inference hardware accelerator',
+      #author='Fabian Kreß',
+      #author_email='fabian.kress@kit.edu',
+      #license='MIT',
       packages=['cnnparted'],
       install_requires = [
             'dataclasses',
@@ -72,8 +72,8 @@ setup(
             'ruamel.yaml',
             "plotly",
             ],
-      python_requires = '>=3.11',
-      include_package_data = True,
-      scripts=['tools/setupTimeloop.sh'],
+      #python_requires = '>=3.11',
+      #include_package_data = True,
+      scripts=[],
       cmdclass={'install': ToolsInstall}
     )

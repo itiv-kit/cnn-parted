@@ -5,7 +5,7 @@ import torch.nn as nn
 import numpy as np
 
 from copy import deepcopy
-from tqdm import tqdm
+#from tqdm import tqdm
 from typing import Callable, Tuple
 
 from model_explorer.utils.setup import build_dataloader_generators
@@ -13,12 +13,13 @@ from model_explorer.utils.setup import build_dataloader_generators
 from framework.quantization.faulty_quantized_model import FaultyQuantizedModel
 from framework.quantization.generate_calibration import generate_calibration
 from framework.node.node_evaluator import SystemResult
+from framework.helpers.config import AccuracyConfig
 
 
 class AccuracyEvaluator():
-    def __init__(self, models : dict[str, nn.Module], node_stats : SystemResult, config : dict, device : str, progress : bool) -> None:
+    def __init__(self, models : dict[str, nn.Module], node_stats : SystemResult, config : AccuracyConfig, device : str, progress : bool) -> None:
         node_stats = node_stats.to_dict()
-        self.bits = [node_stats[acc].get("bits") for acc in node_stats]
+        self.bits = [node_stats[acc].get("bits") for acc in node_stats] #TODO cfg
         self.fault_rates = [node_stats[acc].get("fault_rates") for acc in node_stats]
         self.faulty_bits = [node_stats[acc].get("faulty_bits") for acc in node_stats]
         self.gpu_device = torch.device(device)
@@ -30,16 +31,18 @@ class AccuracyEvaluator():
         m = deepcopy(model)
         self.qmodel = FaultyQuantizedModel(m, self.gpu_device)
 
-        dataloaders = build_dataloader_generators(config['datasets'])
+        dataloaders = build_dataloader_generators(config.get_datasets_dict())
         self.calib_dataloadergen = dataloaders['calibrate']
         self.train_dataloadergen = dataloaders['train']
         self.val_dataloadergen = dataloaders['validation']
 
-        self.param_path = config.get('datasets').get('calibrate').get('file')
+        #self.param_path = config.get('datasets').get('calibrate').get('file')
+        self.param_path = config.calibrate.file
         if not os.path.exists(self.param_path):
             generate_calibration(model, self.calib_dataloadergen, True, self.param_path)
 
-        self.train_epochs = config.get('retraining', {'epochs' : 0})['epochs']
+        #self.train_epochs = config.get('retraining', {'epochs' : 0})['epochs']
+        self.train_epochs = config.retraining.epochs
 
 
     def eval(self, sols : list, n_constr : int, n_var : int, schedules : dict[str, list], accuracy_function : Callable) -> list:
@@ -105,9 +108,9 @@ class AccuracyEvaluator():
                 if (idx_b, idx_f) in [*acc_lut]:
                     acc = acc_lut[(idx_b, idx_f)]
                     print("[AccuracyEvaluator] Skipping inference due to duplicate")
-            if acc == None:
+            if acc is None:
                 self.qmodel.base_model.eval()
-                acc = accuracy_function(self.qmodel.base_model, self.val_dataloadergen, progress=self.progress, title=f"Infere")
+                acc = accuracy_function(self.qmodel.base_model, self.val_dataloadergen, progress=self.progress, title="Infere")
                 acc = acc.cpu().detach().numpy()
 
                 # store to avoid duplicate evaluations
@@ -134,13 +137,13 @@ class AccuracyEvaluator():
         quant_list = []
         for base_layer in self.qmodel.explorable_module_names:
             quant_list.append(self.bits[0])
-            for i, l in enumerate(schedules[0]):
-                if l in base_layer and l != 'input' and l != 'output':
-                    if l in layer_dict and layer_dict[l] % 2:
+            for i, layer in enumerate(schedules[0]):
+                if layer in base_layer and layer != 'input' and layer != 'output':
+                    if layer in layer_dict and layer_dict[layer] % 2:
                         continue
-                    layer_dict[l] = len(quant_list) - 1
+                    layer_dict[layer] = len(quant_list) - 1
                     break
-                elif l == 'output': # FIXME? hotfix for last layer being renamed in ONNX file
+                elif layer == 'output': # FIXME? hotfix for last layer being renamed in ONNX file
                     layer_dict[schedules[0][i-1]] = len(quant_list) - 1
 
         quants = []
@@ -171,11 +174,11 @@ class AccuracyEvaluator():
         for base_layer in self.qmodel.faulty_module_names:
             fault_rate_list.append(self.fault_rates[0])
             faulty_bit_list.append(self.faulty_bits[0])
-            for l in schedules[0]:
-                if l in base_layer:
-                    if l in layer_dict:
+            for layer in schedules[0]:
+                if layer in base_layer:
+                    if layer in layer_dict:
                         continue
-                    layer_dict[l] = len(fault_rate_list) - 1
+                    layer_dict[layer] = len(fault_rate_list) - 1
                     break
 
         fault_rates = []

@@ -1,12 +1,12 @@
 from framework.link.memory_model_interface import MemoryModelInterface
-from framework.module_thread_interface import ModuleThreadInterface
+from framework.helpers.module_thread_interface import ModuleThreadInterface
 from framework.link.ddr3_memory_node import DDR3Node
 
 class MemoryNodeThread(ModuleThreadInterface):
 
     def _get_slice_size(self, size : int, word_bytes : int) -> int:
         slice_size = word_bytes
-        for i in size:
+        for i in range(1, size+1): #TODO
             slice_size *= i
         return slice_size
 

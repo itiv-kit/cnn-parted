@@ -1,13 +1,13 @@
 import os
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.stages.optimization.partitioning_optimization import PartitioningOptimization
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
 @register_required_stage(PartitioningOptimization, GraphAnalysis)
 class ExportPartitionResults(Stage):
@@ -15,6 +15,7 @@ class ExportPartitionResults(Stage):
         super().__init__()
 
     def run(self, artifacts: Artifacts):
+        logger.info("Exporting partitioning results")
         self._take_artifacts(artifacts)
         self._export_files()
         self._write_log_file()
@@ -22,16 +23,14 @@ class ExportPartitionResults(Stage):
 
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
-        self.work_dir = self.config["work_dir"]
-        self.run_name = artifacts.args["run_name"]
-        #self.n_constr = artifacts.get_stage_result(PartitioningOptimization, "n_constr")
-        #self.n_var = artifacts.get_stage_result(PartitioningOptimization, "n_var")
-        self.optimizer_cfg: PartitioningOptConfig = artifacts.get_stage_result(PartitioningOptimization, "optimizer_cfg")
+        self.work_dir = self.config.general.work_dir
+        self.run_name = artifacts.config.args.run_name
+        self.optimizer_cfg: PartitioningOptConfig = artifacts.partitioning_optimization.optimizer_cfg
         self.n_constr = self.optimizer_cfg.n_constr
         self.n_var = self.optimizer_cfg.n_var_part
 
-        sol = artifacts.get_stage_result(PartitioningOptimization, "sol")
-        if not "accuracy" in self.config:
+        sol = artifacts.partitioning_optimization.sol
+        if self.config.accuracy is not None:
             for i, p in enumerate(sol["nondom"]): # achieving aligned csv file
                 sol["nondom"][i] = np.append(p, float(0))
             for i, p in enumerate(sol["dom"]): # achieving aligned csv file
@@ -39,10 +38,10 @@ class ExportPartitionResults(Stage):
         self.sol = sol
 
         #TODO Multiple networks
-        ga = artifacts.get_stage_result(GraphAnalysis, "ga")
+        ga =  artifacts.graph_analysis.ga
         network = ga.networks[0]
         self.schedules = ga.schedules[network]
-        self.num_platforms = self.config["num_platforms"]
+        self.num_platforms = self.config.system.num_platforms
 
     def _update_artifacts(self, artifacts: Artifacts):
         ...

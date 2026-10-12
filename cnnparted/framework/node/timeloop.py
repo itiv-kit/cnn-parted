@@ -1,36 +1,45 @@
 import pickle
 import importlib
 import os
-import stat
 import sys
 import subprocess
 from typing import Optional
 import libconf
-import yaml
+from ruamel.yaml import YAML
+
 import glob
 import re
 import tqdm
 import shutil
+from loguru import logger
 
-from framework.dse.interfaces.genome_interface import GenomeInterface
+#from framework.node.evaluation_registry import AcceleratorRegistry
+from framework.model.layers.compute_layer import ComputationLayer
+from framework.model.layer_parameters import ConvParameters, GemmParameters
+from framework.model.onnx_model import OnnxModel
 from framework.dse.interfaces.architecture_config import ArchitectureConfig
-from framework.dse.interfaces.timeloop_interface import TimeloopInterface
-from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
-from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
+from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
+from framework.node.evaluation_lut import EvaluationLut
+#from tools.timeloop.scripts.parse_timeloop_output import parse_timeloop_stats
+from .helpers import parse_timeloop_stats
 
 from framework.constants import ROOT_DIR
 from framework.helpers.visualizer import plotMetricPerConfigPerLayer
-from framework.helpers.design_metrics import calc_metric, SUPPORTED_METRICS
+from framework.helpers.design_metrics import SUPPORTED_METRICS
 from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, NodeEvaluator
+from framework.helpers.config import NodeConfig, DseStageConfig
+
+yaml = YAML(typ="rt")
 
 class Timeloop(NodeEvaluator):
     # Output file names.
     out_prefix = "timeloop-mapper."
-    exec_path = os.path.join(ROOT_DIR, 'tools', 'timeloop', 'build', 'timeloop-mapper')
+    #exec_path = os.path.join(ROOT_DIR, 'cnnparted', 'tools', 'timeloop', 'build', 'timeloop-mapper')
+    exec_path = os.path.join(ROOT_DIR, 'cnnparted', 'tools', 'accelergy-timeloop-infrastructure', 'src', 'timeloop', 'build', 'timeloop-mapper')
     configs_dir = os.path.join(ROOT_DIR, 'configs', 'tl_configs')
     fname_result = "tl_layers"
 
-    def __init__ (self, in_config : dict, dse_system_config: dict = {}) -> None:
+    def __init__ (self, in_config : NodeConfig, dse_system_config: DseStageConfig = None) -> None:
         log_file_name = self.out_prefix + "log"
         stats_file_name = self.out_prefix + "stats.txt"
         xml_file_name = self.out_prefix + "map+stats.xml"
@@ -59,54 +68,56 @@ class Timeloop(NodeEvaluator):
 
         self.dse_system_config = dse_system_config
         self.node_config = in_config
-        tl_config = in_config["evaluation"]
-        self.dse_node_config = in_config.get("dse", None)
+        tl_config = in_config.evaluation
+        self.dse_node_config = in_config.dse
 
-        self.accname = tl_config['accelerator']
-        self.prob_name = tl_config['layer']
-        self.freq = tl_config['frequency']
-        self.mapper_cfg = {} if not tl_config.get('mapper') else tl_config['mapper']
+        self.accname = tl_config.accelerator
+        self.prob_name = tl_config.simulator_cfg.layer
+        self.freq = tl_config.frequency
+        #self.mapper_cfg = {} if not tl_config.get('mapper') else tl_config['mapper']
+        self.mapper_cfg =  tl_config.simulator_cfg.mapper
         self.type_cfg = '.yaml'
         self.config = tl_config
         self.stats = {}
 
-        self.adaptor: TimeloopInterface = None
-        self.dse_mode = "off"
-        if self.dse_node_config and "mutator" in self.dse_node_config:
-            adaptor_cfg = self.dse_node_config
-            adaptor_cfg["tl_in_configs_dir"] = self.configs_dir
+        self.eval_lut = EvaluationLut()
 
+        self.adaptor: TimeloopAdaptor = None
+        self.dse_mode = "off"
+        if self.dse_node_config and self.dse_node_config.mutator is not None:
             dse_package = importlib.import_module("framework.dse")
-            mutator_cls = getattr(dse_package, self.dse_node_config["mutator"])
+            mutator_cls = getattr(dse_package, self.dse_node_config.mutator) #["mutator"])
             self.adaptor = mutator_cls()
 
-            if self.dse_system_config["optimizer"]["algorithm"] == "exhaustive":
+            if self.dse_system_config.optimizer.algorithm == "exhaustive":
                 self.adaptor.read_space_cfg(self.dse_node_config)
                 self.dse_mode = "exhaustive"
-            elif self.dse_system_config["optimizer"]["algorithm"] == "nsga2":
+            elif self.dse_system_config.optimizer.algorithm == "nsga2":
                 self.dse_mode = "nsga2"
 
     def set_workdir(self, work_dir: str, runname: str, id: int):
         return super().set_workdir(work_dir, runname, id)
 
-    def run_from_adaptor(self, network: str, layers : dict, adaptor: TimeloopInterface, progress : bool = False) -> NodeResult:
+    def run_from_adaptor(self, network: str, model: OnnxModel, adaptor: TimeloopAdaptor, progress : bool = False) -> NodeResult:
         self.adaptor = adaptor
         node_result = NodeResult(self.node_config)
+        logger.debug("Running Timeloop from DSE adaptor...")
 
         if not self.adaptor.design_space:
-            self._run_design(network, layers, progress, node_result, adaptor.config)
+            self._run_design(network, model, progress, node_result, adaptor.config)
 
             self.stats = {tag: results for tag, results in node_result.to_dict().items()}
             self.adaptor = None
             return node_result
         
         else:
-            print(f"There are a total of {len(self.adaptor.design_space)} designs to be evaluated!")
+            logger.info(f"There are a total of {len(self.adaptor.design_space)} designs to be evaluated!")
             
             for i, design in enumerate(self.adaptor.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
                     shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
-                self._run_design(network, layers, progress, node_result, design, i)
+                logger.debug(f"Running design: {design}")
+                self._run_design(network, model, progress, node_result, design, i)
             
             # Plot all metrics in all combinations of line/bar, scale/log
             for m in SUPPORTED_METRICS:
@@ -119,9 +130,10 @@ class Timeloop(NodeEvaluator):
 
         return node_result
 
-    def run(self, network: str, layers : dict, progress : bool = False) -> NodeResult:
+    def run(self, network: str, model: OnnxModel, progress : bool = False) -> NodeResult:
         node_result = NodeResult(self.node_config)
         node_result.accelerator_name = self.accname
+        logger.debug("Running Timeloop...")
 
         # Here for compatibility with old definition
         if self.adaptor is not None:
@@ -130,7 +142,8 @@ class Timeloop(NodeEvaluator):
             for i, design in enumerate(self.adaptor.design_space):
                 if os.path.exists(os.path.join(self.runroot, "design"+str(i))):
                     shutil.rmtree(os.path.join(self.runroot, "design"+str(i)))
-                self._run_design(network, layers, progress, node_result, design, i)
+                logger.debug(f"Running design: {design}")
+                self._run_design(network, model, progress, node_result, design, i)
             
             # Plot all metrics in all combinations of line/bar, scale/log
             for m in SUPPORTED_METRICS:
@@ -139,21 +152,16 @@ class Timeloop(NodeEvaluator):
 
         else:
             design_result = DesignResult()
-            for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
-                layer_name = layer.get("name")
-                output, valid = self._run_layer(self.runroot, layer, tl_files_path=None)
+            for layer in tqdm.tqdm(model.nodes, self.accname, disable=(not progress)):
+                if not isinstance(layer, ComputationLayer):
+                    continue
+                layer_result, valid = self._run_layer(self.runroot, layer, tl_files_path=None)
 
                 if not valid:
+                    logger.debug(f"Timeloop: running layer {layer.layer_name} was invalid")
                     self.stats = {}
                     return
 
-                layer_result = LayerResult()
-                layer_result.name = layer_name
-                layer_result.latency = output["latency_ms"]
-                layer_result.energy = output["energy_mJ"]
-                layer_result.area = output["area_mm2"]
-
-                design_result.add_layer(layer_result)
                 design_result.add_layer_to_network(layer_result, network)
 
             node_result.add_design(design_result)
@@ -165,7 +173,7 @@ class Timeloop(NodeEvaluator):
 
         return node_result
 
-    def _run_design(self, network: str, layers: dict, progress: bool, stats: NodeResult,  design: ArchitectureConfig, design_id: Optional[int] = None,):
+    def _run_design(self, network: str, model: OnnxModel, progress: bool, stats: NodeResult,  design: ArchitectureConfig, design_id: Optional[int] = None,):
         if self.adaptor and self.adaptor.tl_out_design_name:
             design_runroot = os.path.join(self.runroot, self.adaptor.tl_out_design_name)
         else:
@@ -179,37 +187,40 @@ class Timeloop(NodeEvaluator):
         self.adaptor.run_tl_from_config(design, outdir=tl_design_dir)
         design_result = DesignResult(design.get_config())
         with open(os.path.join(design_runroot, "arch_config.yaml"), "w") as f:
-            y = yaml.safe_dump(design.get_config(), sort_keys=False)
-            f.write(y)
+            yaml.dump(design.get_config(), f)
 
-        for layer in tqdm.tqdm(layers, self.accname, disable=(not progress)):
-            layer_name = layer.get("name")
-            output, valid = self._run_layer(design_runroot, layer, tl_files_path=tl_design_dir)
+        for layer in tqdm.tqdm(model.nodes, self.accname, disable=(not progress)):
+            if not isinstance(layer, ComputationLayer):
+                continue
+
+            layer_result, valid = self._run_layer(design_runroot, layer, tl_files_path=tl_design_dir)
 
             if not valid:
+                logger.debug(f"Timeloop: running layer {layer.layer_name} was invalid")
                 return
 
-            layer_result = LayerResult()
-            layer_result.name = layer_name
-            layer_result.latency = output["latency_ms"]
-            layer_result.energy = output["energy_mJ"]
-            layer_result.area = output["area_mm2"]
-
-            design_result.add_layer(layer_result)
             design_result.add_layer_to_network(layer_result, network)
         
         stats.add_design(design_result)
 
     def _run_layer(self,
             runroot: str,
-            layer : dict,
+            layer : ComputationLayer,
             logfile : str = 'timeloop.log',
-            tl_files_path: str = None
-        ) -> dict:
+            tl_files_path: str | None = None
+        ) -> tuple[LayerResult, bool]:
+
         if os.path.isfile(os.path.join(self.configs_dir, 'archs', (self.accname + '.cfg'))):
             self.type_cfg = '.cfg'
 
-        runname = layer.get('name')[1:]
+        lut_entry = self.eval_lut.try_find_entry(layer.layer_params, self.accname)
+        if lut_entry is not None:
+            # LUT hits are always valid
+            lut_entry.name = layer.layer_name
+            logger.debug(f"Timeloop: cache hit {layer.layer_name} with {layer.layer_params} yielded result: {lut_entry}")
+            return lut_entry, True
+
+        runname = layer.layer_name[1:]
         dirname = os.path.join(ROOT_DIR, runroot, runname)
         subprocess.check_call(['mkdir', '-p', dirname])
 
@@ -249,15 +260,27 @@ class Timeloop(NodeEvaluator):
         # just perform each batch/group separately. Since they then all have the same
         # shape the mapping is also the same and we can just multiply the results of one batch.
         # For acclerators where this is not the case, a new mapping configuration must be designed
-        if gemm_params := layer.get('gemm_params'):
-            if batch_size := gemm_params.get('b'):
+        if isinstance(layer.layer_params, GemmParameters):
+            if (batch_size := layer.layer_params.b) is not None:
                 timeloop_stats["energy_mJ"] = timeloop_stats["energy_mJ"] * batch_size
                 timeloop_stats["latency_ms"] = timeloop_stats["latency_ms"] * batch_size
-        elif conv_params := layer.get('conv_params'):
-            if (groups := conv_params.get('groups')) and groups > 1: 
+        elif isinstance(layer.layer_params, ConvParameters):
+            if (groups := layer.layer_params.groups) and groups > 1: 
                 timeloop_stats["energy_mJ"] = timeloop_stats["energy_mJ"] * groups
                 timeloop_stats["latency_ms"] = timeloop_stats["latency_ms"] * groups
-        return timeloop_stats, valid
+
+        layer_result = LayerResult()
+        layer_result.name = layer.layer_name
+        layer_result.latency = timeloop_stats["latency_ms"]
+        layer_result.energy = timeloop_stats["energy_mJ"]
+        layer_result.area = timeloop_stats["area_mm2"]
+
+        logger.debug(f"Timeloop: running layer {layer.layer_name} with {layer.layer_params} yielded result: {layer_result}")
+
+        # Update the LUT for future lookups
+        self.eval_lut.add_entry(layer.layer_params, self.accname, layer_result)
+
+        return layer_result, valid
 
 
     def _plot_all_of_metric(self, stats, metric: str):
@@ -273,7 +296,7 @@ class Timeloop(NodeEvaluator):
             if "cfg" in src:
                 config = libconf.load(f)
             elif "yaml" in src:
-                config = yaml.load(f, Loader = yaml.SafeLoader)
+                config = yaml.load(f)
 
         for key in self.mapper_cfg.keys():
             config['mapper'][key] = self.mapper_cfg[key]
@@ -282,32 +305,34 @@ class Timeloop(NodeEvaluator):
             if "cfg" in src:
                 f.write(libconf.dumps(config))
             elif "yaml" in src:
-                f.write(yaml.dump(config))
+                yaml.dump(config, f)
+                #f.write(yaml.dump(config))
 
-    def _get_timeloop_params(self, config: dict, layer: dict) -> list:
-        if layer.get('conv_params'):
-            conv_params = layer.get('conv_params')
-            q = conv_params.get('q')
-            p = conv_params.get('p')
-            c = conv_params.get('c')  # input channels
-            n = conv_params.get('n')  # input batch_size
-            m = conv_params.get('m')
-            s = conv_params.get('s')
-            r = conv_params.get('r')
-            wstride = conv_params.get('wstride')
-            hstride = conv_params.get('hstride')
-        else:
-            gemm_params = layer.get('gemm_params')
-            c = gemm_params.get('c')
-            n = gemm_params.get('n')
-            m = gemm_params.get('m')
+    def _get_timeloop_params(self, config: dict, layer: ComputationLayer) -> None:
+        if isinstance(layer.layer_params, ConvParameters):
+            conv_params = layer.layer_params
+            q = conv_params.q
+            p = conv_params.p
+            c = conv_params.c  # input channels
+            n = conv_params.n  # input batch_size
+            m = conv_params.m
+            s = conv_params.s
+            r = conv_params.r
+            wstride = conv_params.wstride
+            hstride = conv_params.hstride
+        elif isinstance(layer.layer_params, GemmParameters):
+            gemm_params = layer.layer_params
+            c = gemm_params.c
+            n = gemm_params.n
+            m = gemm_params.m
             q = 1
             p = 1
             s = 1
             r = 1
             wstride = 1
             hstride = 1
-
+        else:
+            raise RuntimeError(f"Invalid layer type for Timeloopsimulation. Found layer with op_type={layer.op_type}")
 
         config['problem']['instance']['R'] = r
         config['problem']['instance']['S'] = s
@@ -324,12 +349,12 @@ class Timeloop(NodeEvaluator):
         config['problem']['instance']['Wdilation'] = 1
         config['problem']['instance']['Hdilation'] = 1
 
-    def _rewrite_workload_bounds(self, src : str, dst : str, layer : dict) -> None:
+    def _rewrite_workload_bounds(self, src : str, dst : str, layer : ComputationLayer) -> None:
         with open(src, "r") as f:
             if "cfg" in src:
                 config = libconf.load(f)
             elif "yaml" in src:
-                config = yaml.load(f, Loader = yaml.SafeLoader)
+                config = yaml.load(f)
 
         self._get_timeloop_params(config, layer)
 
@@ -337,7 +362,7 @@ class Timeloop(NodeEvaluator):
             if "cfg" in src:
                 f.write(libconf.dumps(config))
             elif "yaml" in src:
-                f.write(yaml.dump(config))
+                yaml.dump(config, f)
 
     def _load_accelerator_files(self, dir : str) -> list:
         arch_fnames = os.path.join(dir, 'archs', (self.accname + '.yaml'))
@@ -369,7 +394,7 @@ class Timeloop(NodeEvaluator):
     def _parse_area_stats(self, filename : str) -> float:
         area = 0.0
         with open(filename, "r") as f:
-            area_stats = yaml.load(f, Loader = yaml.SafeLoader)
+            area_stats = yaml.load(f)
             for comp in area_stats['ART']['tables']:
                 single_area = float(comp['area'])
 
@@ -388,7 +413,7 @@ class Timeloop(NodeEvaluator):
 
         return area
 
-    def _parse_stats(self, dirname : str) -> dict:
+    def _parse_stats(self, dirname : str) -> tuple[dict, bool]:
         # First check if the Timeloop run found any mappings and emitted the required file
         valid = True
         mapping_file = glob.glob( os.path.join(dirname, "*.map+stats.xml") )

@@ -1,8 +1,15 @@
-from ast import Lambda
-import yaml
+from ruamel.yaml import YAML
+from .config import (CnnpartedArguments, GeneralConfig, WorkloadConfig, 
+                     PipelineConfig, DseStageConfig, PartitioningStageConfig,
+                     MultiTenancyStageConfig, AccuracyConfig, SystemConfig,
+                     )
+
+yaml = YAML(typ="safe")
 
 class ConfigHelper:
-    def __init__(self, conf_in : str | dict):
+    def __init__(self, args: CnnpartedArguments):
+        self.args = args
+        conf_in = args.conf_file_path
         if isinstance(conf_in, str):
             self.fname = conf_in
             self.config = self.__load_config()
@@ -12,39 +19,26 @@ class ConfigHelper:
         else:
             raise RuntimeError(f"Invalid argument to ConfigHelper. Expected str or dict but received {type(conf_in)}")
         
+        # Parse the configuration
+        self.general = GeneralConfig(self.config["general"])
+        self.workload = WorkloadConfig(self.config["workload"])
+        self.pipeline = PipelineConfig(self.config["pipeline"])
+        self.dse = DseStageConfig(self.config["dse"]) if "dse" in self.config else None
+        #self.partitioning = PartitioningStageConfig(self.config["partitioning"]) if "partitioning" in self.config else None
+        self.partitioning = PartitioningStageConfig(self.config.get("partitioning", {})) #TODO Currently DSE relies on this existing
+        self.mt = MultiTenancyStageConfig(self.config["multi-tenancy"]) if "multi-tenancy" in self.config else None
+        self.accuracy = AccuracyConfig(self.config["accuracy"]) if "accuracy" in self.config else None
+        self.system = SystemConfig(self.config["system"])
 
     def __load_config(self) -> dict:
         with open(self.fname) as f:
-            return yaml.load(f, Loader = yaml.SafeLoader)
+            return yaml.load(f)
 
     def get_config(self) -> dict:
         return self.config
 
     def get_system_components(self):
-        if "components" in self.config.keys():
-            # Old config style: determine compute vs link by content of the entry
-            components = self.config.get('components', [])
-            sorted_components = sorted(components, key=lambda x: x.get('id', -1))
-
-            node_components = []
-            link_components = []
-            for component in sorted_components:
-                if "evaluation" in component:
-                    node_components.append(component)
-                else:
-                    link_components.append(component)
-        elif system := self.config.get("system"):
-            # New config style: dedicated fields for compute and link nodes
-            nodes = system.get("compute", [])
-            links = system.get("link", [])
-            node_components = sorted(nodes, key=lambda x: x.get("id", -1))
-            link_components = sorted(links, key=lambda x: x.get("id", -1))
-        else:
-            # No system config found
-            node_components = []
-            link_components = []
-
-        return node_components,link_components
+        return self.system.compute, self.system.link
 
     def get_node_constraints(self):
         node_components, _ = self.get_system_components()
@@ -52,19 +46,19 @@ class ConfigHelper:
         for node in node_components:
             xl = []
             xu = []
-            if "dse" in node:
-                dse_cfg = node["dse"]
-                mem_steps = dse_cfg["step_mem_shared"]
+            if node.dse is not None:
+                dse_cfg = node.dse
+                mem_steps = dse_cfg.step_mem_shared
 
-                xl += dse_cfg["min_pe"]
-                min_size_mem_shared = dse_cfg["min_size_mem_shared"]
+                xl += dse_cfg.min_pe
+                min_size_mem_shared = dse_cfg.min_size_mem_shared
                 xl += [min_size // step for (min_size, step) in zip(min_size_mem_shared, mem_steps)]
-                xl += dse_cfg["min_size_mem_local"]
+                xl += dse_cfg.min_size_mem_local
 
-                xu += dse_cfg["max_pe"]
-                max_size_mem_shared = dse_cfg["max_size_mem_shared"]
+                xu += dse_cfg.max_pe
+                max_size_mem_shared = dse_cfg.max_size_mem_shared
                 xu += [max_size // step for (max_size, step) in zip(max_size_mem_shared, mem_steps)]
-                xu += dse_cfg["max_size_mem_local"]
+                xu += dse_cfg.max_size_mem_local
 
                 constr_sys += [[xl, xu]]
 
@@ -86,16 +80,15 @@ class ConfigHelper:
             else:
                 print(f"{indent}{key}")
 
-    @staticmethod
-    def get_system_constraints(config):
+    def get_system_constraints(self):
         default_constraints = {
             "latency": None,
             "energy": None,
             "area": None,
             "throughput": None,
         }
-        constraints = config.get("system_constraints", default_constraints)
-        return constraints
+        #constraints = config.get("system_constraints", default_constraints)
+        return default_constraints #TODO Integrate these
 
     def get_node_memory_sizes(self, node_components ):
         memories=[]
@@ -103,27 +96,3 @@ class ConfigHelper:
             memories.append( node["max_memory_size"])
 
         return memories
-
-    def get_optimization_objectives(self, nodes, links):
-        try:
-            id = self.config['optimization-objectives']['device']
-        except KeyError:
-            id = '0'
-
-        try:
-            metric = self.config['optimization-objectives']['metric']
-        except KeyError:
-            metric = 'energy'
-
-        if any(str(node.get('id')) == id for node in nodes):
-            name = "Node-" + str(id)
-
-        elif any(str(link.get('id')) == id for link in links):
-            name = "Link-" + str(id)
-        else:
-            raise ValueError(f"ID {id} not found in nodes or links.")
-
-        key_name = f"{name}_{metric}"
-
-
-        return key_name

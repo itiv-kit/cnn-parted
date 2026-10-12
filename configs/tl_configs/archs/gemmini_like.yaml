@@ -1,26 +1,157 @@
+compound_components:
+  version: 0.3
+  classes:
+  - name: reg_storage
+    attributes:
+      technology: 45nm
+      latency: 1ns
+      width: 16
+      depth: 1
+    subcomponents:
+      - name: storage
+        class: reg
+        attributes:
+          technology: technology
+          latency: latency
+          width : width
+    actions:
+      - name: write
+        subcomponents:
+          - name: storage
+            actions:
+              - name: access
+                arguments:
+                  action_latency_cycles: 1
+      - name: read
+        subcomponents:
+          - name: storage
+            actions:
+              - name: access
+                arguments:
+                  action_latency_cycles: 1
+      - name: access
+        subcomponents:
+          - name: storage
+            actions:
+              - name: access
+                arguments:
+                  action_latency_cycles: 1
+  - name: lmac
+    attributes:
+      technology: "45nm"
+      width: 8
+    subcomponents:
+      - name: cunit
+        class: intmac 
+        attributes:
+          technology: technology
+          width: width
+    actions:
+      - name: idle
+        subcomponents:
+          - name: cunit
+            actions:
+              - name: leak
+                arguments:
+                  action_latency_cycles: 1
+      - name: compute
+        subcomponents:
+          - name: cunit
+            actions:
+              - name: access
+                arguments:
+                  action_latency_cycles: 1
+  - name: DRAM_wrapper
+    attributes:
+      type: "LPDDR4"
+      width: 16
+      block-size: 8
+      word-bits: 8
+    subcomponents:
+      - name: dram
+        class: DRAM 
+        attributes:
+          type: type
+          width: width
+    actions:
+      - name: read
+        subcomponents:
+          - name: dram
+            actions:
+              - name: read
+      - name: write
+        subcomponents:
+          - name: dram 
+            actions:
+              - name: write
+      - name: idle
+        subcomponents:
+          - name: dram
+            actions:
+              - name: idle
+  - name: SRAM_wrapper
+    attributes:
+      technology: "45m"
+      depth: 16384
+      width: 128
+      n_rdwr_ports: 2
+      n_banks: 1
+    subcomponents:
+      - name: sram
+        class: SRAM 
+        attributes:
+          technology: technology
+          width: width
+          depth: depth
+          n_rdwr_ports: n_rdwr_ports
+          n_banks: n_banks
+    actions:
+      - name: write
+        arguments:
+          data_delta: 0..1
+          address_delta: 0..n_banks
+        subcomponents:
+          - name: sram 
+            actions:
+              - name: write
+                arguments:
+                  data_delta: data_delta
+                  address_delta: address_delta
+                  action_latency_cycles: 1
+      - name: read
+        arguments:
+          data_delta: 0..1
+          address_delta: 0..n_banks
+        subcomponents:
+          - name: sram
+            actions:
+              - name: read
+                arguments:
+                  data_delta: data_delta
+                  address_delta: address_delta
+                  action_latency_cycles: 1
+
 # A Timeloop-compatible YAML definition of an architecture similar to Gemmini
 # WARNING: Not correlated with Gemmini RTL
 architecture:
   version: 0.3
-
   subtree:
   - name: System
     local:
     - name: DRAM
-      class: DRAM
+      class: DRAM_wrapper
       attributes:
         instances: 1
         word-bits: 8
         block_size: 64
         shared_bandwidth: 8
-
     subtree:
     - name: Chip
       attributes:
-        technology: 40nm
+        technology: 45nm
       local:
       - name: Scratchpad 
-        class: SRAM
+        class: SRAM_wrapper
         attributes:
           entries: 262144
           depth: 16384
@@ -35,7 +166,7 @@ architecture:
       - name: PECols[0..15] # only the K dim can be parallelized across Accumulator columns
         local:
         - name: Accumulator
-          class: SRAM
+          class: SRAM_wrapper
           attributes:
             entries: 1024 # acc size / pe_dim = 16384/16
             depth: 1024
@@ -50,18 +181,14 @@ architecture:
         - name: PERows[0..15]
           local:
           - name: Registers
-            class: SRAM
+            class: reg_storage
             attributes:
               depth: 1
               width: 8
-              entries: 1
               instances: 256
               word-bits: 8
               block_size: 1
-              n_rdwr_ports: 2
-              n_banks: 1
           - name: MACC
-            class: intmac
+            class: lmac
             attributes:
-              datawidth: 8
-              word-bits: 8
+              width: 8

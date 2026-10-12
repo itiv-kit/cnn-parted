@@ -1,10 +1,4 @@
 general:
-  fixed_sys: true
-  acc_once: true
-  num_pp: 1
-  num_topos: 1
-  num_jobs: 64
-  optimization: ppa
   work_dir: runs/resnext50_run
   keep_dir: false
 
@@ -23,49 +17,60 @@ pipeline:
   - AccuracyEvaluation
   - ExportPartitionResults
 
-components:
-- id: 0
-  bits: 8
-  fault_rates: [0, 0]   # input, weight
-  max_memory_size: 600000000
-  evaluation:
-    accelerator: eyeriss_like
-    frequency: 200000000
-    layer: conv2d
-    mapper:
-      algorithm: random-pruned
-      live-status: false
-      max-permutations-per-if-visit: 16
-      num-threads: 200
-      optimization-metrics:
-      - edp
-      timeout: 15000
-      victory-condition: 500
-    simulator: timeloop
-- id: 1
-  max_out_size: 150000000
-  data_bit_width: 16
-  ethernet:
-    cable_len_m: 5
-    eee_lmi_ratio: 0.1
-    eee_toff_ms: 0
-    enable_eee: false
-    eth_mode: BASE1000-T
-  fps: 25
-- id: 2
-  bits: 8
-  max_memory_size: 600000000
-  evaluation:
-    accelerator: simba_like
-    frequency: 200000000
-    layer: conv2d
-    mapper:
-      algorithm: random-pruned
-      live-status: false
-      max-permutations-per-if-visit: 16
-      num-threads: 200
-      optimization-metrics:
-      - edp
-      timeout: 15000
-      victory-condition: 500
-    simulator: timeloop
+partitioning:
+  fixed_sys: true
+  acc_once: true
+  max_num_platforms:
+  num_pp: 1
+  num_jobs: 64
+  num_topos: 1
+  optimization: ppa
+
+system:
+  compute:
+  - id: 0
+    bits: 8
+    fault_rates: [0, 0] # input, weight
+    max_memory_size: 600000000
+    evaluation:
+      accelerator: eyeriss_like
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 200
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+      simulator: timeloop
+  - id: 2
+    bits: 8
+    max_memory_size: 600000000
+    evaluation:
+      accelerator: simba_like
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 200
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+      simulator: timeloop
+  link:
+  - id: 1
+    max_out_size: 150000000
+    data_bit_width: 16
+    ethernet:
+      cable_len_m: 5
+      eee_lmi_ratio: 0.1
+      eee_toff_ms: 0
+      enable_eee: false
+      eth_mode: BASE1000-T
+    fps: 25

@@ -1,45 +1,24 @@
 import os
 import shutil
-import pickle
 from itertools import zip_longest
 
 import numpy as np
 from pymoo.core.problem import ElementwiseProblem
 
-from framework.optimizer.config import design_opt_config
+from framework.helpers.config import NodeConfig, LinkConfig, DseStageConfig
+
 from framework.optimizer.config.partitioning_opt_config import PartitioningOptConfig
 from framework.optimizer.config.design_opt_config import DesignOptConfig
-from framework.helpers.config_helper import ConfigHelper
+from framework.dse.interfaces import ArchitectureConfig, Genome
 from framework.stages.artifacts import Artifacts
-from framework.stages.evaluation.node_evaluation import NodeEvaluation
-from framework.stages.analysis.graph_analysis import GraphAnalysis
-from framework.stages.inputs.system_parser import SystemParser
 from framework.node.node_thread import NodeThread
-from framework.dse.simba_adaptor import SimbaConfig, SimbaArchitectureAdaptor
-from framework.dse.eyeriss_adaptor import EyerissConfig, EyerissArchitectureAdaptor
-from framework.dse.gemmini_adaptor import GemminiConfig, GemminiArchitectureAdaptor
+from framework.node.evaluation_registry import AcceleratorRegistry
 
 from framework.optimizer.partitioning_optimizer import PartitioningOptimizer
+from framework.node.node_evaluator import SystemResult
 
-from framework.node.node_evaluator import LayerResult, DesignResult, NodeResult, SystemResult
+type DseArchitecture = ArchitectureConfig | Genome
 
-N_VAR_ACC = {
-    "gemmini_like": 6,
-    "eyeriss_like": 6,
-    "simba_like": 6
-}
-
-ACCELERATOR_CONFIG_MAP = {
-    "gemmini_like": GemminiConfig,
-    "eyeriss_like": EyerissConfig,
-    "simba_like": SimbaConfig
-}
-
-ACCELERATOR_ADAPTOR_MAP = {
-    GemminiConfig: GemminiArchitectureAdaptor,
-    EyerissConfig: EyerissArchitectureAdaptor,
-    SimbaConfig: SimbaArchitectureAdaptor,
-}
 
 
 # This class does the following:
@@ -48,17 +27,17 @@ ACCELERATOR_ADAPTOR_MAP = {
 #   - Evaluate the system with the NodeEvaluator, unless the results are already present in a LUT
 class DesignProblem(ElementwiseProblem):
     def __init__(self, 
-                 node_components, link_components,
+                 node_components: list[NodeConfig], link_components: list[LinkConfig],
                  node_constraints, node_mem_steps,
                  q_constr: dict,
                  artifacts: Artifacts,
                  partitioning_optimizer_cls,
-                 system_dse_config):
-        self.work_dir = artifacts.config["general"]["work_dir"]
-        self.run_name = artifacts.args["run_name"]
-        self.ga = artifacts.get_stage_result(GraphAnalysis, "ga")
-        self.show_progress = artifacts.args["p"]
-        self.num_pp = artifacts.config["num_pp"]
+                 system_dse_config: DseStageConfig):
+        self.work_dir = artifacts.config.general.work_dir
+        self.run_name = artifacts.config.args.run_name
+        self.ga = artifacts.graph_analysis.ga 
+        self.show_progress = artifacts.config.args.show_progress
+        self.num_pp = artifacts.config.partitioning.num_pp
         self.config = artifacts.config
         self.q_constr = q_constr
         self.system_dse_config = system_dse_config
@@ -77,37 +56,39 @@ class DesignProblem(ElementwiseProblem):
         # Initialize variable to gather all results for later export
         self.system_results = SystemResult()
         for node in self.node_components:
-            self.system_results.register_platform(node["id"], node_config=node)
+            self.system_results.register_platform(node.id, node_config=node)
 
-        self.n_var_per_node = [N_VAR_ACC[node["evaluation"]["accelerator"]]  for node in node_components if "dse" in node]
+        self.accelerator_registry = AcceleratorRegistry()
 
         # We return all values of the partitioning algorithm as "constraint"
-        self.accelerator_configs = [ACCELERATOR_CONFIG_MAP[node["evaluation"]["accelerator"]] for node in node_components if "dse" in node]
-        self.accelerator_adaptors=[ACCELERATOR_ADAPTOR_MAP[cfg] for cfg in self.accelerator_configs]
+        self.accelerator_names: list[str] = [node.evaluation.accelerator for node in node_components if node.dse is not None] #TODO Why was the name a string of its own?
+        self.accelerator_config_types: list[Genome|ArchitectureConfig] = [self.accelerator_registry[name] for name in self.accelerator_names]
+        self.n_var_per_node: list[int] = [accelerator_config_t.n_var_opt for accelerator_config_t in self.accelerator_config_types]
+        #self.n_var_per_node : list[int] = [N_VAR_ACC[node.evaluation.accelerator]  for node in node_components if node.dse is not None]
+        self.accelerator_adaptors=[AcceleratorRegistry.get_adaptor(cfg) for cfg in self.accelerator_names]
 
         # LUT to prevent evaluating duplicates
         self.dse_node_lut = {}
         for node in node_components:
-            if "dse" in node:
-                self.dse_node_lut[node["id"]] = {}
+            if node.dse is not None:
+                self.dse_node_lut[node.id] = {}
 
         self.partitioning_optimizer_cls: type[PartitioningOptimizer] = partitioning_optimizer_cls
 
         # Perform the evaluation for all nodes that not suject to DSE
         # to prevent simulating them multiple times
-        fixed_nodes = [node for node in node_components if "dse" not in node]
+        fixed_nodes = [node for node in node_components if node.dse is not None]
         self.fixed_node_stats = self._eval_nodes(fixed_nodes)
         for ((id, node_stats), node_config)  in zip(self.fixed_node_stats.platforms.items(), fixed_nodes):
             self.system_results.add_platform(id, node_stats)
         print("Done evaluating fixed nodes!")
 
-        num_platforms = sum([node.get("instances", 1) for node in self.node_components])
+        num_platforms = sum([node.instances for node in self.node_components])
         part_opt_cfg = PartitioningOptConfig(num_platforms, self.num_pp, len(self.ga.schedules[self.ga.networks[0]]) ) #TODO Mulitple networks
 
         self.design_opt_config = DesignOptConfig(self.n_var_per_node,
                                                  node_constraints,
-                                                 part_opt_cfg,
-                                                 self.config["dse"])
+                                                 part_opt_cfg)
 
         n_var, n_obj, n_constr, xl, xu = self.design_opt_config.get()
         super().__init__(n_var=n_var, n_obj=n_obj, n_constr=n_constr, xl=xl, xu=xu)
@@ -132,11 +113,11 @@ class DesignProblem(ElementwiseProblem):
             ]
         # A thread is instantiated for every accelerator, but only started if it is not present in the LUT
         for (t, in_lut) in zip(node_threads, cfgs_already_in_lut):
-            if (not in_lut) and (t.config["evaluation"]["simulator"] not in ["timeloop", "zigzag"]):
+            if (not in_lut) and (t.config.evaluation.simulator not in ["timeloop", "zigzag"]):
                 t.start()
 
         for (t, in_lut) in zip(node_threads, cfgs_already_in_lut):
-            if (not in_lut) and (t.config["evaluation"]["simulator"] in ["timeloop", "zigzag"]): # run them simply on main thread
+            if (not in_lut) and (t.config.evaluation.simulator in ["timeloop", "zigzag"]): # run them simply on main thread
                 t.run()
             else:
                 t.join()
@@ -148,7 +129,7 @@ class DesignProblem(ElementwiseProblem):
             if in_lut:
                 stats = self.dse_node_lut[id][tuple(cfg)]
 
-            instances = node_thread.config.get("instances", 1)
+            instances = node_thread.config.instances
             if instances == 1:
                 node_eval_stats.add_platform(id, stats)
             else:
@@ -183,10 +164,10 @@ class DesignProblem(ElementwiseProblem):
         return False
 
     def _evaluate(self, x: np.ndarray, out: dict, *args, **kwargs):
-        valid = True
+        #valid = True
 
         xs = self._split_system_input(x)
-        acc_cfgs = [cfg.from_genome(param, mem_step) for (cfg, param, mem_step) in zip(self.accelerator_configs, xs, self.node_mem_steps, strict=True)]
+        acc_cfgs = [cfg.from_genome(param, mem_step) for (cfg, param, mem_step) in zip(self.accelerator_config_types, xs, self.node_mem_steps, strict=True)]
         acc_adaptors = [adaptor() for adaptor in self.accelerator_adaptors] 
 
         # Attach the config we want to run to the adaptor
@@ -196,7 +177,7 @@ class DesignProblem(ElementwiseProblem):
             adaptor.config = cfg
 
         # For every DSE enabled node we call a simulator for evaluation
-        dse_nodes = [node for node in self.node_components if "dse" in node]
+        dse_nodes = [node for node in self.node_components if node.dse is not None]
         dse_node_stats = self._eval_nodes(dse_nodes, acc_adaptors)
 
         # Prevent adding duplicates to the SystemResult, only unique designs should be found there
@@ -208,7 +189,7 @@ class DesignProblem(ElementwiseProblem):
         for (cfg, in_lut, (id, stats)) in zip(xs, cfgs_already_in_lut, dse_node_stats.platforms.items()):
             if not stats.to_dict()["eval"]:
                 #simulation failed
-                valid = False
+                #valid = False
                 cost.append(float(1000000000))
                 constraints.append([1,1,1])
             else:
@@ -218,9 +199,9 @@ class DesignProblem(ElementwiseProblem):
                 if not in_lut:
                     self.system_results[id].add_design(design_result)
 
-                layers_data = stats.designs[0].layers_dict
-                energy = [data.energy for (key, data) in layers_data.items()]
-                latency = [data.latency for (key, data) in layers_data.items()]
+                network_result = stats.designs[0].networks[self.ga.networks[0]] #TODO Multiple networks
+                energy = [data.energy for _, data in network_result]
+                latency = [data.latency for _, data in network_result]
                 area = stats.designs[0].area
                 energy_total = sum(energy)
                 latency_total = sum(latency)

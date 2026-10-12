@@ -1,4 +1,5 @@
-#from framework.stages import GraphAnalysis, NodeEvaluation, PartitioningOptimization, WorkloadParser
+import numpy as np
+from loguru import logger
 
 from framework.stages.analysis.graph_analysis import GraphAnalysis
 from framework.stages.evaluation.node_evaluation import NodeEvaluation
@@ -7,9 +8,7 @@ from framework.stages.inputs.workload_parser import WorkloadParser
 from framework.stages.stage_base import Stage, register_required_stage
 from framework.stages.artifacts import Artifacts
 from framework.quantization.accuracy_evaluator import AccuracyEvaluator
-from framework.constants import MODEL_PATH, ROOT_DIR, WORKLOAD_FOLDER
 
-import numpy as np
 
 @register_required_stage(GraphAnalysis, NodeEvaluation, PartitioningOptimization, WorkloadParser)
 class AccuracyEvaluation(Stage):
@@ -17,8 +16,10 @@ class AccuracyEvaluation(Stage):
         super().__init__()
 
     def run(self, artifacts: Artifacts):
+        logger.info("Running AccuracyEvaluation stage")
         self._take_artifacts(artifacts)
-        if accuracy_cfg := self.config["accuracy"]:
+        if self.config.accuracy is not None:
+            accuracy_cfg = self.config.accuracy
             print("Found: ")
             for pareto, sched in self.sol.items():
                 print(pareto, len(sched))
@@ -35,15 +36,18 @@ class AccuracyEvaluation(Stage):
 
     def _take_artifacts(self, artifacts: Artifacts):
         self.config = artifacts.config
-        self.torch_models = artifacts.get_stage_result(GraphAnalysis, "ga").torchmodels
-        self.node_stats = artifacts.get_stage_result(NodeEvaluation, "node_stats")
         self.device = artifacts.device
-        self.show_progress = artifacts.args["p"]
-        self.schedules = artifacts.get_stage_result(GraphAnalysis, "ga").schedules
-        self.sol = artifacts.get_stage_result(PartitioningOptimization, "sol")
-        self.n_constr = artifacts.get_stage_result(PartitioningOptimization, "n_constr")
-        self.n_var = artifacts.get_stage_result(PartitioningOptimization, "n_var")
-        self.accuracy_function = artifacts.get_stage_result(WorkloadParser, "accuracy_function")
+        self.show_progress = artifacts.config.args.show_progress
+
+        self.accuracy_function = artifacts.workload_parser.accuracy_function
+        self.torch_models = artifacts.graph_analysis.ga.torchmodels
+        self.schedules = artifacts.graph_analysis.ga.schedules
+        self.node_stats = artifacts.node_evaluation.node_stats
+        self.sol = artifacts.partitioning_optimization.sol
+        self.n_constr = artifacts.partitioning_optimization.n_constr
+        self.n_var = artifacts.partitioning_optimization.n_var
+
+
 
     def _update_artifacts(self, artifacts: Artifacts):
-        artifacts.set_stage_result(PartitioningOptimization, "sol", self.sol)
+        artifacts.partitioning_optimization.sol = self.sol

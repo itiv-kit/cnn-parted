@@ -1,18 +1,24 @@
 import copy
-from math import sqrt
 import pathlib
 from ruamel.yaml import YAML
-yaml = YAML(typ="rt")
 import shutil
-import numpy as np
+import re
 
 from framework.dse.interfaces.architecture_config import ArchitectureConfig, ArchitectureAdaptor
-from framework.dse.interfaces.genome_interface import GenomeInterface
-from framework.dse.interfaces.timeloop_interface import TimeloopInterface
+from framework.dse.interfaces.genome import Genome
+from framework.dse.interfaces.timeloop_adaptor import TimeloopAdaptor
 from framework.dse.interfaces.exhaustive_search import ExhaustiveSearch
+from framework.helpers.config import DseNodeConfig
+from framework.node.evaluation_registry import AcceleratorRegistry
 
-class SimbaConfig(ArchitectureConfig, GenomeInterface):
+yaml = YAML(typ="rt")
+
+@AcceleratorRegistry.register_architecture("simba_like")
+class SimbaConfig(ArchitectureConfig, Genome):
+    N_VAR_OPT = 6
+
     def __init__(self, num_pes, lmacs, wbuf_size, accbuf_size, globalbuf_size, inbuf_size):
+        super().__init__()
         #Constants
         self.word_bits = 8
         self.word_bits_acc = 24
@@ -57,6 +63,42 @@ class SimbaConfig(ArchitectureConfig, GenomeInterface):
         simba.pe_array_mem = pe_mems
         simba.local_mems = local_mems*mem_step[0]
         return simba
+    
+    @classmethod
+    def from_yaml(cls, yaml_config: dict):
+        def get_field(cfg: list[dict], name: str):
+            for field in cfg:
+                if field["name"] == name:
+                    return field
+            raise RuntimeError(f"Did not find key {name}")
+
+        simba = yaml_config["architecture"]["subtree"][0]["subtree"][0]
+        gbuf = simba["local"][0]
+        pe_array = simba["subtree"][0]
+        input_buffer = get_field(pe_array["local"], "PEInputBuffer")
+        weight_buffer= get_field(pe_array["local"], "PEWeightBuffer")
+        accu_buffer = get_field(pe_array["local"], "PEAccuBuffer")
+        lmacs = get_field(pe_array["local"], "LMAC")
+
+        # First we get the PE array dimension
+        p = re.compile(r"\d..\d+")
+        match_pe = p.search(pe_array["name"])
+        assert match_pe is not None
+        num_pe = [int(num) for num in match_pe.group(0)][1] + 1
+        match_lmac = p.search(lmacs["name"])
+        assert match_lmac is not None
+        num_lmac = [int(num) for num in match_lmac.group(0)][1] + 1
+
+        gbuf_depth = gbuf["attributes"]["memory_depth"]
+        inbuf_depth = input_buffer["attributes"]["memory_depth"]
+        wbuf_depth = weight_buffer["attributes"]["memory_depth"]
+        accu_depth = accu_buffer["attributes"]["memory_depth"]
+
+        simba_config = cls(1, 1, 1, 1, 1, 1)
+        simba_config.pe_array_dim = [num_pe, num_lmac]
+        simba_config.local_mems = [gbuf_depth]
+        simba_config.pe_array_mem = [inbuf_depth, wbuf_depth, accu_depth]
+        return simba_config
 
     def to_genome(self) -> list:
         return self.pe_array_dim + self.pe_array_mem + self.local_mems
@@ -95,7 +137,8 @@ class SimbaConfig(ArchitectureConfig, GenomeInterface):
         #self.globalbuf_size = int(self.globalbuf_depth * self.word_bits * self.block_size_global_buf // (8*1024))
 
 
-class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, ExhaustiveSearch):
+@AcceleratorRegistry.register_adaptor("simba_like")
+class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopAdaptor, ExhaustiveSearch):
     def __init__(self):
         super().__init__()
         self.config: SimbaConfig = None
@@ -112,12 +155,12 @@ class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaustiv
         self.acc_bufs = 4
 
 
-    def read_space_cfg(self, cfg):
-        search_space_constraints = cfg.get("constraints", {})
+    def read_space_cfg(self, cfg: DseNodeConfig):
+        search_space = cfg
 
         #Compute elements
-        self.pe_nums = search_space_constraints.get("num_pes", [16])
-        self.lmac_nums = search_space_constraints.get("num_lmacs", [16])
+        self.pe_nums =  list(range(search_space.min_pe[0], search_space.max_pe[0]))
+        self.lmac_nums = list(range(search_space.min_pe[0], search_space.max_pe[1]))
 
         #weight and accumulator buffers are in equal numbers
         self.num_bufs = 4
@@ -125,10 +168,11 @@ class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaustiv
         self.lmac_nums = list(filter(lambda x: x % self.num_bufs == 0, self.lmac_nums))
         assert self.lmac_nums, f"No valid number of LMAC specified, must be multiple of num_bufs={self.num_bufs}"
 
-        self.inbuf_sizes = search_space_constraints.get("inbuf_sizes", [64])
-        self.wbuf_sizes = search_space_constraints.get("wbuf_sizes", [32])
-        self.accbuf_sizes = search_space_constraints.get("accbuf_sizes", [0.375])
-        self.globalbuf_sizes = search_space_constraints.get("gbuf_sizes", [128])
+        self.inbuf_sizes = list(range(search_space.min_size_mem_local[0], search_space.max_size_mem_local[0], search_space.step_mem_local)) #search_space_constraints.get("inbuf_sizes", [64])
+        self.wbuf_sizes =  list(range(search_space.min_size_mem_local[1], search_space.max_size_mem_local[1], search_space.step_mem_local)) #search_space_constraints.get("wbuf_sizes", [32])
+        self.accbuf_sizes = list(range(search_space.min_size_mem_local[2], search_space.max_size_mem_local[2], search_space.step_mem_local))#search_space_constraints.get("accbuf_sizes", [0.375])
+
+        self.globalbuf_sizes = list(range(search_space.min_size_mem_shared[0], search_space.max_size_mem_shared[0], search_space.step_mem_shared[0])) #search_space_constraints.get("gbuf_sizes", [128])
 
         # Generate valid configuration
         self.generate_design_space() 
@@ -160,7 +204,7 @@ class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaustiv
 
     def write_tl_arch(self, config:SimbaConfig = None, outdir=None):
         if config is None:
-            config = self.config
+            config: SimbaConfig = self.config
         if outdir is None:
             outdir = self.tl_out_configs_dir
         base_arch = pathlib.Path(self.tl_in_configs_dir, "archs", "simba_like.yaml")
@@ -208,8 +252,7 @@ class SimbaArchitectureAdaptor(ArchitectureAdaptor, TimeloopInterface, Exhaustiv
         lmac["attributes"]["meshX"] = config.num_pes
 
         with open(arch_out, "w") as f:
-            y = yaml.dump(arch, f)
-            #f.write(y)
+            _ = yaml.dump(arch, f)
 
     def write_tl_arch_constraints(self, config:SimbaConfig = None, outdir=None):
         if config is None:

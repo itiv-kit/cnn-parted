@@ -1,0 +1,11 @@
+diff --git a/setup.py b/setup.py
+index 8bb806a..fb35510 100644
+--- a/setup.py
++++ b/setup.py
+@@ -1,5 +1,5 @@
+ from setuptools import setup
+-import os, yaml, sys
++import os, sys
+ 
+ def readme():
+       with open('README.md') as f:

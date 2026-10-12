@@ -1,10 +1,4 @@
 general:
-  fixed_sys: false
-  acc_once: false
-  num_pp: -1
-  num_topos: 1
-  num_jobs: 1
-  optimization: ppa
   work_dir: runs/resnet34_run
 
 workload:
@@ -52,70 +46,81 @@ accuracy:
       batch_size: 256
       sample_limit:
 
-components:
-- id: 0
-  bits: 16
-  fault_rates: [0, 0]   # input, weight
-  max_memory_size: 600000000
-  evaluation:
-    accelerator: eyeriss_like
-    frequency: 200000000
-    layer: conv2d
-    mapper:
-      algorithm: random-pruned
-      live-status: false
-      max-permutations-per-if-visit: 16
-      num-threads: 8
-      optimization-metrics:
-      - edp
-      timeout: 15000
-      victory-condition: 500
-    simulator: timeloop
-- id: 1
-  max_out_size: 20000000
-  data_bit_width: 8
-  noi:
-    noi_mode: UCIe
-    width: 16
-    data_rate_Gbps: 4
-    latency_ns: 2   # including D2D Adapter and PHY
-    power_bit_pj: 0.5
-  fps: 25
-- id: 2
-  bits: 8
-  max_memory_size: 600000000
-  evaluation:
-    accelerator: simba_like
-    frequency: 200000000
-    layer: conv2d
-    mapper:
-      algorithm: random-pruned
-      live-status: false
-      max-permutations-per-if-visit: 16
-      num-threads: 8
-      optimization-metrics:
-      - edp
-      timeout: 15000
-      victory-condition: 500
-    simulator: timeloop
-- id: 3
-  fault_rates: [0, 1e-4]   # input, weight
-  max_memory_size: 600000000
-  evaluation:
-    accelerator: MRAM_area   # accelerator name
-    conf_path: /configs/mnsim_configs/MRAM_area.ini
-    simulator: mnsim
-- id: 4
-  fault_rates: [0, 1e-4]   # input, weight
-  max_memory_size: 600000000
-  evaluation:
-    accelerator: MRAM_lat   # accelerator name
-    conf_path: /configs/mnsim_configs/MRAM_lat.ini
-    simulator: mnsim
-- id: 5
-  fault_rates: [0, 1e-4]   # input, weight
-  max_memory_size: 600000000
-  evaluation:
-    accelerator: RRAM_acc   # accelerator name
-    conf_path: /configs/mnsim_configs/RRAM_acc.ini
-    simulator: mnsim
+partitioning:
+  fixed_sys: false
+  acc_once: false
+  max_num_platforms:
+  num_pp: -1
+  num_jobs: 1
+  num_topos: 1
+  optimization: ppa
+
+system:
+  compute:
+  - id: 0
+    bits: 16
+    fault_rates: [0, 0] # input, weight
+    max_memory_size: 600000000
+    evaluation:
+      accelerator: eyeriss_like
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+      simulator: timeloop
+  - id: 2
+    bits: 8
+    max_memory_size: 600000000
+    evaluation:
+      accelerator: simba_like
+      frequency: 200000000
+      layer: conv2d
+      mapper:
+        algorithm: random-pruned
+        live-status: false
+        max-permutations-per-if-visit: 16
+        num-threads: 8
+        optimization-metrics:
+        - edp
+        timeout: 15000
+        victory-condition: 500
+      simulator: timeloop
+  - id: 3
+    fault_rates: [0, 1e-4] # input, weight
+    max_memory_size: 600000000
+    evaluation:
+      accelerator: MRAM_area # accelerator name
+      conf_path: /configs/mnsim_configs/MRAM_area.ini
+      simulator: mnsim
+  - id: 4
+    fault_rates: [0, 1e-4] # input, weight
+    max_memory_size: 600000000
+    evaluation:
+      accelerator: MRAM_lat # accelerator name
+      conf_path: /configs/mnsim_configs/MRAM_lat.ini
+      simulator: mnsim
+  - id: 5
+    fault_rates: [0, 1e-4] # input, weight
+    max_memory_size: 600000000
+    evaluation:
+      accelerator: RRAM_acc # accelerator name
+      conf_path: /configs/mnsim_configs/RRAM_acc.ini
+      simulator: mnsim
+  link:
+  - id: 1
+    max_out_size: 20000000
+    data_bit_width: 8
+    noi:
+      noi_mode: UCIe
+      width: 16
+      data_rate_Gbps: 4
+      latency_ns: 2 # including D2D Adapter and PHY
+      power_bit_pj: 0.5
+    fps: 25

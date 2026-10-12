@@ -1,9 +1,8 @@
 import os
-import csv
 import copy
-import numpy as np
+from loguru import logger
 
-from framework.module_thread_interface import ModuleThreadInterface
+from framework.helpers.module_thread_interface import ModuleThreadInterface
 from framework.node.timeloop import Timeloop
 from framework.node.mnsim_interface import MNSIMInterface
 from framework.node.generic_node import GenericNode
@@ -19,48 +18,43 @@ class NodeThread(ModuleThreadInterface):
         # Check if design is DSE enabled
         top_k = -1
         metric = "edp"
-        if "dse" in self.config:
+        if self.config.dse is not None:
             # Check if dse_system_config is empty. If it is, raise an error here
-            assert self.dse_system_config, "Cannot specify DSE for a node if it is not also configured on system level"
+            assert self.dse_system_config is not None, "Cannot specify DSE for a node if it is not also configured on system level"
         
-            metric = self.dse_system_config.get("optimization", "edp")
-            top_k = int(self.dse_system_config.get("top_k", -1))
+            metric = self.dse_system_config.optimization
+            top_k = int(self.dse_system_config.top_k)
 
         node_result_networks = []
+
+        # Select which simulator should be used
+        logger.debug(f"Running evaluation of {self.config.accelerator}_{self.config.id} with evaluator {self.config.evaluation.simulator}")
+        match self.config.evaluation.simulator:
+            case "timeloop":
+                simulator = Timeloop(self.config, self.dse_system_config)
+            case "mnsim":
+                simulator = MNSIMInterface(self.config)
+            case "zigzag":
+                simulator = Zigzag(self.config, self.runname)
+            case _:
+                simulator = GenericNode(self.config)
 
         # Evaluate all networks
         for network in self.ga.networks:
 
-            # Select which simulator should be used
-            match self.config["evaluation"]["simulator"]:
-                case "timeloop":
-                    layers = self.ga.get_timeloop_layers(network)
-                    simulator = Timeloop(self.config, self.dse_system_config)
-                case "mnsim":
-                    layers = self.ga.get_mnsim_layers(network)
-                    simulator = MNSIMInterface(self.config, self.ga.workloads[network].input_shape)
-                case "zigzag":
-                    layers = []
-                    simulator = Zigzag(self.config, self.runname)
-                case _:
-                    layers = []
-                    simulator = GenericNode(self.config)
-
-
             # Check if some previous results are available
             fname_base = simulator.set_workdir(self.work_dir, network, self.id)
-            if os.path.isfile(fname_base+".csv"):
-                #stats_j = NodeResult.from_json(fname_base, network, self.config)
-                stats = NodeResult.from_csv(fname_base, network, self.config)
+            if os.path.isfile(fname_base+".json"):
+                stats = NodeResult.from_json(fname_base, network, self.config)
             else:
                 # Perform the actual evaluation
                 if self.acc_adaptor is None:
-                    stats = simulator.run(network, layers)
+                    stats = simulator.run(network, self.ga.models[network], progress=True)
                 else:
-                    stats = simulator.run_from_adaptor(network, layers, self.acc_adaptor)
+                    stats = simulator.run_from_adaptor(network, self.ga.models[network], self.acc_adaptor)
 
                 if self.save_results:
-                    stats.to_csv(fname_base)
+                    #stats.to_csv(fname_base)
                     stats.to_json(fname_base)
 
             node_result_networks.append(stats)
